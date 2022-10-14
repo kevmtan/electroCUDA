@@ -1,10 +1,17 @@
 # electroCUDA
 
-Accelerated preprocessing & analysis routines for intracranial & scalp electrophysiology. Robust signal processing & statistics are used at each step from preprocessing to group-level analyses. Data are **never epoched** to support variable-length trials & minimize edge artifacts. 
+Hardware-accelerated preprocessing & analysis routines for intracranial & scalp electrophysiology. Robust signal processing & statistical techniques are used at each step from preprocessing to final analyses. Data are **never epoched** to support variable-length trials & minimize edge artifacts. 
 
-Unlike most toolboxes, electroCUDA is designed to maximize the utility of all available computing resources. Computationally-intensive techniques are used to improve signal processing, statistical inference & automation. Thus, electroCUDA runs best on workstations, servers & HPC clusters. 
+Unlike most toolboxes, electroCUDA is designed to maximize the utility of all available GPU/CPU resources. Computationally-intensive techniques are used to improve signal processing, statistical inference & automation. Thus, electroCUDA runs best on workstations, servers & HPC clusters.
 
-Codebase is written in MATLAB with calls to compiled CUDA binaries. Hardware acceleration is implemented with the following preference: 1) [CUDA compiler](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html), 2) [GPU vectorization](https://www.mathworks.com/help/parallel-computing/gpuarray.arrayfun.html), 3) [CPU vectorization](https://www.mathworks.com/help/matlab/matlab_prog/vectorization.html), 4) [threaded GPU parallelization](https://www.mathworks.com/help/parallel-computing/run-matlab-functions-on-a-gpu.html), 5) [threaded CPU parallelization](https://www.mathworks.com/help/parallel-computing/parallel.threadpool.html), and 6) [process-based CPU parallelization](https://www.mathworks.com/help/parallel-computing/choose-between-thread-based-and-process-based-environments.html). The first feasible implementation was chosen for a given routine/operation. 
+Code is MATLAB-based with calls to compiled CUDA binaries. Hardware acceleration is implemented with this preference: 1) [CUDA compiler](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html), 2) [GPU vectorization](https://www.mathworks.com/help/parallel-computing/gpuarray.arrayfun.html), 3) [CPU vectorization](https://www.mathworks.com/help/matlab/matlab_prog/vectorization.html), 4) [threaded GPU parallelization](https://www.mathworks.com/help/parallel-computing/run-matlab-functions-on-a-gpu.html), 5) [threaded CPU parallelization](https://www.mathworks.com/help/parallel-computing/parallel.threadpool.html), and 6) [process-based CPU parallelization](https://www.mathworks.com/help/parallel-computing/choose-between-thread-based-and-process-based-environments.html). The highest-ranking feasible implementation was chosen for a given operation.
+
+## Current release: pre-alpha (Oct 14, 2022)
+
+Hello world! This is the first commit: a glorified dump from my personal codebase. Development status is pre-alpha with no guarantees. Shorter function stacks should work, but high-level pipelines are not yet released due to patient-identifying function arguments. Eventually, there will be example pipelines that call all routines in the correct order with approprate arguments.
+
+Of note, **ec_cudaica** is a fully-operational wrapper that integrates compiled [CUDAICA](https://doi.org/10.1155/2012/206972) binaries in the Matlab environment. 
+
 
 ## Single-subject pipeline for intracranial EEG
 
@@ -44,10 +51,3 @@ Codebase is written in MATLAB with calls to compiled CUDA binaries. Hardware acc
 21. If interested in high-frequency bands (assuming [HFB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6632564/) but also applies to gamma), run ICA again on channel HFB timecourses (prior to subtracting non-neurogenic ICs). Use the original ICA weights as starting weights for high-freq ICA. This produces HFB-optimized ICs that remain analogous to original ICs. 
 
 Standard ICA (e.g. step 8) is [biased towards lower frequencies](https://sccn.ucsd.edu/mediawiki/images/0/09/IcaRejectionLabPresentation_updated.pdf) due to 1/f frequency decay. In other words, higher frequencies have less variance than lower frequencies, thus ICA focuses on lower-frequency activity. Running ICA again on HFB timecourses results in much better decomposition of HFB's neuronal sources.
-
-
-## Current release: pre-alpha (Oct 14, 2022)
-
-Hello world! This is the first commit: a glorified dump from my personal codebase. Development status is pre-alpha with no guarantees. Shorter function stacks should work, but high-level pipelines are not yet released due to patient-identifying function arguments. Eventually, there will be example pipelines that call all routines in the correct order with approprate arguments.
-
-Of note, **ec_cudaica** is a fully-operational wrapper that integrates compiled [CUDAICA](https://doi.org/10.1155/2012/206972) binaries in the Matlab environment. 
