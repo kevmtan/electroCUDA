@@ -1,0 +1,11 @@
+PRIVATE_FILES
+*.m~
+*.dat
+*.dat.*
+*.mgh
+.DS_Store
+BIDS_STUFF
+iELVis_MAIN/.DS_Store
+iELVis_MAIN/iELVis_MATLAB/.DS_Store
+diary
+*.asv

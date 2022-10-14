@@ -1,0 +1,3 @@
+%   NeuralAct_procedure.jpg     - The individual processing steps
+%   NeuralAct_AB.jpg            - Steps A and B of the procedure
+%   NeuralAct_examples.jpg      - Example figures produced using NeuralAct
