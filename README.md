@@ -1,8 +1,8 @@
 # electroCUDA
 
-Accelerated preprocessing & analysis routines for neural electrophysiology. Noise-resistant signal processing & statistical techniques are used at each step from preprocessing to final analyses. Data are **never epoched** to support variable-length trials & minimize edge artifacts. 
+Accelerated preprocessing & analysis routines for neural electrophysiology. Noise-resistant signal processing & statistics at each step from preprocessing to final analyses. Data are **never epoched** to support variable-length trials & to minimize artifacts. 
 
-Unlike most toolboxes, electroCUDA is designed to maximize the utility of all available GPU/CPU resources. Computationally-intensive techniques are used to improve signal processing, statistical inference & automation. Runs best on workstations, servers & HPC clusters.
+Unlike many toolboxes, electroCUDA is designed to efficiently leverage all available GPU/CPU resources. Computationally-intensive techniques are used to improve signal processing, statistical inference & automation. Works best on workstations, servers & HPC clusters.
 
 Code is written in Matlab with calls to compiled CUDA binaries. Hardware acceleration is implemented with this preference: 1) [CUDA compiler](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html), 2) [GPU vectorization](https://www.mathworks.com/help/parallel-computing/gpuarray.arrayfun.html), 3) [CPU vectorization](https://www.mathworks.com/help/matlab/matlab_prog/vectorization.html), 4) [threaded GPU parallelization](https://www.mathworks.com/help/parallel-computing/run-matlab-functions-on-a-gpu.html), 5) [threaded CPU parallelization](https://www.mathworks.com/help/parallel-computing/parallel.threadpool.html), and 6) [process-based CPU parallelization](https://www.mathworks.com/help/parallel-computing/choose-between-thread-based-and-process-based-environments.html). The highest-ranking feasible implementation was chosen for a given routine.
 
