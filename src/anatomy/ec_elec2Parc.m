@@ -43,6 +43,8 @@
 % -I should have a function called neat_labels.m that will format the DK
 % atlas names to be more kind to the eye. It might help to incoporate that.
 
+% MODIFIED: fix issues with sEEG, code optimizations for speed --Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
+
 
 function [elecParc,atlasNfo]=ec_elec2Parc(subj,atlas,out2text)
 

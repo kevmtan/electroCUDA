@@ -20,7 +20,7 @@ function [wts,sph,winv,cfg,icact] = ec_cudaica(x,wtsIn,o)
 %       then revert to rawer data for IC reconstruction (icact = wts*sph*data)
 %
 %
-%               Kevin Tan, 2022 (http://kevmtan.github.io)
+%               Kevin Tan, 2022 (http://github.com/kevmtan/electroCUDA)
 %
 %
 % ACKNOWLEDGEMENTS:

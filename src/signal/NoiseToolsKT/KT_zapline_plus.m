@@ -1,5 +1,5 @@
 % Author: Marius Klug, 2021
-% MODIFIED: Kevin Tan, 2022 (kevmtan.github.io)
+% MODIFIED: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 %   - Added CPU parallelization where possible & other optimizations
 %   - Diagnostic plots disabled for parallelization compatibility & overhead reduction
 

@@ -1,5 +1,5 @@
 function cort = readSurfTri(cort)
-% Kevin Tan, 2022 (kevmtan.github.io)
+% Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 % Reads freesurfer cortex & converts to triangulation object
 
 if ischar(cort) || isstring(cort)

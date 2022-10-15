@@ -79,6 +79,8 @@ function ec_dykstraElecPjct(sub,minimizeChange,bidsRootDir,sessionId,elecHem)
 % To Do
 % -Create text files of avg brain coordinates too?
 
+% Modified: fix filepath issues --Kevin Tan (github.com/kevmtan/electroCUDA) 
+
 if nargin<2
     minimizeChange=1;
 end

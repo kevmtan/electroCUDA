@@ -10,7 +10,7 @@ function [bad_epochs, bad_indices]=ec_hfoDetectIdx(pTS,pChan,chanNames,onsetTS,p
 %   "pChan".
 %   Written by Su Liu.
 %   suliu@stanford.edu
-%   MODIFIED: Kevin Tan, 2022 (kevmtan.github.io)
+%   MODIFIED: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 
 chan=cell(length(pChan),2);
 % for i = 1:length(pChan)

@@ -3,7 +3,7 @@ function h = ec_plotCortexChs(h,d,o,a)
 % This function is meant to be called with plotCortex
 % If not using plotCortex, you must call plotCortexSurf *before* this function
 %
-% AUTHOR: Kevin Tan, 2022 (kevmtan.github.io)
+% AUTHOR: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 % LICENSE: GNU GPL - use at your own risk!
 %
 % INPUTS:

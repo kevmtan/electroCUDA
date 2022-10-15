@@ -12,7 +12,7 @@ function hLight = locView(theta,phi,o,hAx)
 % of inputting cartesian, but that can be ambiguous, for example [0 0 1] has ambiguous orientation.
 %
 % Copyright (C) 2009 K.J. Miller, Dept of Neurology and Neurosurgery, University Medical Center Utrecht
-% Edited by Kevin Tan, 2022 (https://kevmtan.github.io)
+% Edited by Kevin Tan, 2022 (https://github.com/kevmtan/electroCUDA)
 
 % Check inputs
 if nargin<3 || ~isfield(o,'lightStyle')

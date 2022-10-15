@@ -35,6 +35,8 @@ function [vertices,label,colortable] = ec_readAnnotation(filename)
 % General inquiries: freesurfer@nmr.mgh.harvard.edu
 % Bug reports: analysis-bugs@nmr.mgh.harvard.edu
 %
+% MODIFIED: code optimizations for speed --Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
+
 
 fp = fopen(filename, 'r', 'b');
 

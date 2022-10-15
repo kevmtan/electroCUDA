@@ -68,9 +68,11 @@ function ptd = getPtdIndex_KT(fs_subj,offset)
 
 % Change Log:
 % 08-2017: a few other minor changes for iELVis by DG. In particular,
-% instead of using wmparc.mgz, we now use aparc+aseg.mgz.
+% 			instead of using wmparc.mgz, we now use aparc+aseg.mgz.
 % 08-2017: adapted for iElvis by MrM;
 % 02-2016: created by MrM;
+% 09-2022: adapted for electroCUDA, fix sEEG issues, code optimizations for speed
+%			--Kevin Tan
 
 arguments
     fs_subj {mustBeText}

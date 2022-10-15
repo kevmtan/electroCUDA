@@ -28,7 +28,7 @@ function [errors,n,x] = ec_preproc(sbj,proj,o,n,x,arg)
 % HARDWARE ACCELERATION: threaded CPU parallelization (see MATLAB ThreadPool)
 %
 %
-%               Kevin Tan, 2022 (http://kevmtan.github.io)
+%               Kevin Tan, 2022 (http://github.com/kevmtan/electroCUDA)
 %
 %
 % ACKNOWLEDGEMENTS:

@@ -1,5 +1,5 @@
 function [elecNames,hemisphere,isSubdural,avgCoord,subCoord,avgVids,subVids]=sub2AvgBrain_KT(subj,cfg)
-% Modified by Kevin Tan to get inflated coords (kevmtan.github.io)
+% Modified by Kevin Tan to get inflated coords (github.com/kevmtan/electroCUDA)
 %
 % This function maps electrodes from patient space to the FreeSurfer average
 % brain. For subdural electrodes, it takes RAS "pial" coordinates (snapped

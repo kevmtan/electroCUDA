@@ -2,7 +2,7 @@ function h = ec_plotCortex(hems,views,d,o,a)
 % Wrapper for ec_plotCortexSurf & ec_plotCortexChs (use this to call those functions)
 % Missing inputs are filled with default values
 %
-% AUTHOR: Kevin Tan, 2022 (kevmtan.github.io)
+% AUTHOR: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 % LICENSE: GNU GPL - use at your own risk!
 %
 % MAIN INPUTS:

@@ -15,7 +15,7 @@ function [chCov,outliers,chOrder,chCovNfo] = ec_cov(x,chBad,varargin)
 %		chOrder(channels,channels-1) = channel indices sorted by covariance with each channel {numeric matrix}
 %		chCovNfo = additional info about covariance estimate
 %
-%	Kevin Tan, 2022 (kevmtan.github.io)
+%	Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 
 % Input validation & prellocation
 if nargin<2; chBad=[]; elseif islogical(chBad); chBad=find(chBad); end

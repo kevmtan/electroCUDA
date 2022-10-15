@@ -14,7 +14,7 @@ function [pathological_chan_id,pathological_event]=ec_hfoDetect(eeg,chanNames,fs
 %   Su Liu
 %   suliu@standord.edu
 %
-% MODIFIED: Kevin Tan, 2022 (kevmtan.github.io)
+% MODIFIED: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 %    - Accelerated with parfor loops when possible (ideally ThreadPools) 
 %    - Preallocation & other speed optimizations
 fs = floor(fs);

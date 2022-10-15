@@ -13,7 +13,7 @@ function h = ec_plotCortexSurf(h,o,a)
 %
 % TO DO: gpuArray support?
 %
-% AUTHOR: Kevin Tan, 2022 (kevmtan.github.io)
+% AUTHOR: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 % LICENSE: GNU GPL - use at your own risk!
 
 %% Check inputs
