@@ -1,7 +1,7 @@
 # electroCUDA
-Accelerated preprocessing & analysis routines for neural electrophysiology. Noise-resistant signal processing & statistics at each step from preprocessing to final analyses. Data are **never epoched** to support variable-length trials & to minimize artifacts. 
+Accelerated preprocessing & analysis routines for intracranial & scalp electrophysiology. Noise-resistant signal processing & statistics at each step from preprocessing to final analyses. Data are **never epoched** to support variable-length trials & to minimize artifacts. 
 
-Unlike many toolboxes, electroCUDA is designed to leverage all available GPU/CPU resources efficiently. Computationally-intensive techniques are used to improve signal processing, statistical inference & automation. Works best on workstations, servers & HPC clusters.
+Unlike many toolboxes, electroCUDA doesn't shy away from using computationally-intensive techniques to improve signal processing, statistical inference & automation. Extensive code optimizations & hardware acceleration are used to maximize compute performance. NVIDIA GPU IS REQUIRED (sorry Mac users!). 
 
 Code is written in Matlab with calls to compiled CUDA binaries. Hardware acceleration is implemented in this preference: 1) [CUDA compiler](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html), 2) [GPU vectorization](https://www.mathworks.com/help/parallel-computing/gpuarray.arrayfun.html), 3) [CPU vectorization](https://www.mathworks.com/help/matlab/matlab_prog/vectorization.html), 4) [threaded GPU parallelization](https://www.mathworks.com/help/parallel-computing/run-matlab-functions-on-a-gpu.html), 5) [threaded CPU parallelization](https://www.mathworks.com/help/parallel-computing/parallel.threadpool.html), and 6) [process-based CPU parallelization](https://www.mathworks.com/help/parallel-computing/choose-between-thread-based-and-process-based-environments.html). The highest-ranking feasible implementation is used for a given routine. GPU functionality can be disabled in most functions.
 
@@ -51,5 +51,6 @@ Of note, *ec_cudaica* is a fully-operational wrapper that integrates compiled [C
 
 ### ICA on high-frequency timecourses
 25. Run ICA again if analyzing high-frequency bands like [HFB](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6632564/) or gamma. High-freq ICA should use channel HFB timecourses *prior* to subtraction of non-neurogenic ICs to avoid rank deficiency. Use the original ICA weights as starting weights for high-freq ICA. This produces HFB-optimized ICs that retain some correspondance to the original ICs.
-
 - Standard ICA (e.g. step 11) is [biased towards lower frequencies](https://sccn.ucsd.edu/mediawiki/images/0/09/IcaRejectionLabPresentation_updated.pdf) due to 1/f frequency decay. In other words, lower frequencies have more variance than higher frequencies, which biases ICA towards lower-frequency activity. Running ICA again on HFB timecourses removes low-frequency variance, resulting in much better decomposition of HFB's neural sources.
+26. Subtract non-neurogenic/pathological ICs from channel HFB timecourses (step 19 but applied to HFB data only)
+27. Identify remaining noisy timepoints within HFB per channel/IC (step 24 but applied to HFB data only)
