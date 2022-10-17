@@ -51,9 +51,9 @@ blocks = string(n.blocks);
 fsOg = floor(n.fs_orig);
 n.proj = proj;
 if ~arg.ica
-    nChs=n.xChs; sbjChs=chNfo.sbjCh;
+    sbjChs=chNfo.sbjCh;
 else
-    nChs=n.nICs; sbjChs=n.icNfo.sbjIC;
+    sbjChs=n.icNfo.sbjIC;
 end
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.data+"/robust/s"+sbjID+"/"+proj+"/"; end % Output directory
@@ -70,6 +70,7 @@ if isempty(x)
         if nnz(~cellfun(@isempty,errPreproc)); errors{end+1}=errPreproc; end 
     end
 end
+nChs = size(x,2);
 
 % Get downsampling factor & anti-aliasing filter
 if ~isempty(dsTarg)

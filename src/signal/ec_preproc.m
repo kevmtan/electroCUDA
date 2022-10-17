@@ -111,7 +111,7 @@ nChs = width(x);
 nFrames = height(x);
 
 %% Filter & detrend (within-run to avoid edge artifacts)
-x = robust_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,missing=o.missingInterp);
+x = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,missing=o.missingInterp);
 
 %% Classify bad EEG channels
 if o.doBadCh

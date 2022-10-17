@@ -2,7 +2,7 @@ function [x,n] = ec_hiPassDetrend(x,fHi,polyOrder,winLength,n,tt,arg)
 % Input validation
 arguments
     x {isfloat}
-    fHi {isnumeric,isobject} = 0.01
+    fHi {isnumeric,isobject} = 0
     polyOrder {isnumeric} = 10
     winLength {isnumeric} = []
     n struct = struct;
@@ -16,6 +16,7 @@ arguments
     arg.thr {isnumeric} = 3
     arg.sfx {isstring,ischar} = "";
 end
+if isempty(fHi); fHi=0; end
 if isempty(polyOrder); polyOrder=0; end
 if ~isempty(arg.fs); fs=arg.fs; else; fs=n.fs; end
 if ~isempty(arg.runIdx); runIdx=arg.runIdx; else; runIdx=n.runIdxOg(:,2); end

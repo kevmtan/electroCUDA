@@ -1,14 +1,12 @@
-function [wts,sph,winv,cfg,icact] = ec_cudaica(x,wtsIn,o)
+function [ica,x] = ec_cudaica(x,cudaica_bin,wtsIn,arg)
 %% cudaica_wrapper - use CUDAICA in Matlab
 %    Call a precompiled CUDAICA binary from the Matlab workspace
 %    CUDAICA is a GPU implementation of Infomax ICA (~25x speedup)
+%    PCA is done in-wrapper because it's broken on CUDAICA binary
 %
-% Inputs:
-%   x(chans,frames) = data to decompose
-%   wtsIn(comps,chans) = starting weights (e.g. from previous ICA decomposition)
-%   o.bin = full filepath of compiled CUDAICA binary
+% INPUTS: see 'Input validation' below
 %
-% Outputs:
+% OUTPUTS:
 %   wts(comps,chans) = Weight matrix
 %   sph(chans,comps) = Sphering matrix
 %   winv(chans,comps) = Mixing matrix (backprojection of ICs into channels)
@@ -16,7 +14,7 @@ function [wts,sph,winv,cfg,icact] = ec_cudaica(x,wtsIn,o)
 %   cfg = runtime configuration script & output log
 %   icact(comps,frames) = Reconstructed IC activity timecourses
 %        
-% NOTE: use agressively cleaned data for ICA decomposition (hipass & outlier rejection),
+% NOTE: use agressively cleaned data for ICA decomposition (detrend & outlier rejection),
 %       then revert to rawer data for IC reconstruction (icact = wts*sph*data)
 %
 %
@@ -32,88 +30,100 @@ function [wts,sph,winv,cfg,icact] = ec_cudaica(x,wtsIn,o)
 %    guarantees on the performance or accuracy of this code. This code is for
 %    research purposes only. NOT INTENDED FOR MEDICAL USE.
 
+%% Input validation
 arguments
-    x {mustBeFloat}
-    wtsIn {isfloat,isstring,ischar} = ''
-    o.sphering {mustBeMember(o.sphering,["on" "off"])} = "on"  % Sphering of data (on/off)   {default: on}
-    o.bias {mustBeMember(o.bias,["on" "off"])} = "on"          % Perform bias adjustment (on/off) {default: on}
-    o.extended {isnumeric} = 1                                 % Perform "extended-ICA" using tnah() with kurtosis estimation every N training blocks. If N < 0, fix number of sub-Gaussian components to -N 
-    o.pca {isnumeric} = 0  % DONT TURN ON                      % Decompose a principal component subspace of
-    o.lrate {isfloat} = 1e-4;                                  % Start learning rate (0<float<<1) {default: 1e-4}
-    o.blocksize {isinteger} = 0                                % int>=0        [0 default: heuristic, from data size]
-    o.stop {isfloat} = "" %1e-7                                % Stop learning rate {default: 1e-7, heuristic} 
-    o.maxsteps {isinteger} = 512                               % int>0         {default: 512}
-    o.posact {mustBeMember(o.posact,["on" "off"])} = "off"     % Make maximum value for each comp positive.
-    o.annealstep {isfloat} = 0.98
-    o.annealdeg {isnumeric} = 60
-    o.momentum {isnumeric} = 0
-    o.verbose {mustBeMember(o.verbose,["on" "off"])} = "off"   % Verbose terminal output
-    o.sfx {isstring,ischar} = ""                               % Suffix for filenames
-    o.dir {isstring,ischar} = pwd                              % Directory to save in
-    o.dry logical = false                                      % Dry run - preparation only
-    o.double logical = false % DONT TURN ON                    % Double precision all steps (float64) - CRITICAL but slower
-    o.bin {mustBeText} = "/home/kt/Documents/MATLAB/cudaica-master/cudaica" % Path to CUDAICA compiled binary
+    x {mustBeFloat}                      % x(frames,chans) = data to decompose
+    cudaica_bin {mustBeText}             % Path to CUDAICA compiled binary
+    wtsIn {isfloat,isstring,ischar} = '' % wtsIn(comps,chans) = starting weights (e.g. from previous ICA decomposition)
+    % Name-value arguments
+    arg.pca {isnumeric} = 0                % Number of PCA components to decompose {skip PCA=0}
+    arg.sfx string = ""                    % Suffix for filenames
+    arg.dir string = pwd                   % Directory to save in
+    arg.dry logical = false                % Dry run - don't call cudaica binary
+    % CUDAICA flags
+    arg.sphering {mustBeMember(arg.sphering,["on" "off"])} = "on" % Sphering of data (on/off)   {default: on}
+    arg.bias {mustBeMember(arg.bias,["on" "off"])} = "on"         % Perform bias adjustment (on/off) {default: on}
+    arg.extended {isnumeric} = 1                                  % Perform "extended-ICA" using tnah() with kurtosis estimation every N training blocks. If N < 0, fix number of sub-Gaussian components to -N 
+    arg.lrate {isfloat} = 1e-4                                    % Start learning rate (0<float<<1) {default: 1e-4}
+    arg.blocksize {isnumeric} = 0                                 % int>=0        [0 default: heuristic, from data size]
+    arg.stop {isfloat} = ""                                       % Stop learning rate {default: 1e-7, heuristic} 
+    arg.maxsteps {isnumeric} = 512                                % int>0         {default: 512}
+    arg.posact {mustBeMember(arg.posact,["on" "off"])} = "off"    % Make maximum value for each comp positive.
+    arg.annealstep {isfloat} = 0.98                               % (0<float<1)   {default: 0.98}
+    arg.annealdeg {isfloat} = 60                                  % (0<n<360)     {default: 60} 
+    arg.momentum {isfloat} = 0                                    % (0<float<1)   {default: 0 = off]
+    arg.verbose {mustBeMember(arg.verbose,["on" "off"])} = "off"  % Verbose terminal output
 end
-if ~isempty(o.sfx) && o.sfx~=""; sfx="_"+o.sfx; else; sfx=""; end
-wts=[]; sph=[];
+if isempty(arg.lrate); arg.lrate=1e-4; end
+if isempty(arg.stop); arg.stop=""; end
+if ~isempty(arg.sfx) && arg.sfx~=""; sfx="_"+arg.sfx; else; sfx=""; end
+doFlip=true;
+if size(x,2)>size(x,1); x=x'; doFlip=0; warning("data has more channels than frames, flipping..."); end
 
-%% Get arguments for script
-o.dir = string(o.dir);
-
-% Data matrix
-if size(x,1)>size(x,2); x=x'; end
-nChs = size(x,1);
-nFrames = size(x,2);
+%% Prep
+ica=struct; ica.wts=[]; ica.sph=[]; ica.w=[]; ica.winv=[]; ica.pca=[];
+nChs = size(x,2);
+nFrames = size(x,1);
 
 % Filenames
-fnSc = o.dir+"cudaica"+sfx+".sc";
-fnDat = o.dir+"cudaica"+sfx+".fdt";
-fnWts = o.dir+"cudaica"+sfx+".wts";
-fnSph = o.dir+"cudaica"+sfx+".sph";
+fnSc = arg.dir+"cudaica"+sfx+".sc";
+fnDat = arg.dir+"cudaica"+sfx+".fdt";
+fnWts = arg.dir+"cudaica"+sfx+".wts";
+fnSph = arg.dir+"cudaica"+sfx+".sph";
 fnWtsIn = "";
 if ~isempty(wtsIn)
     if isstring(wtsIn) || ischar(wtsIn)
         fnWtsIn = wtsIn;
     else
-        fnWtsIn = o.dir+"cudaica"+sfx+".wtsIn";
+        fnWtsIn = arg.dir+"cudaica"+sfx+".wtsIn";
     end
 end
+
+%% PCA for dimensionality reduction
+if arg.pca > 0
+    nComps = arg.pca;
+    [wtsPCA,x] = pca(x,NumComponents=nComps,Centered=false);
+    disp("ec_cudaica: running PCA & decomposing "+nComps+" components");
+else
+    nComps = nChs;
+end
+
 
 %% Make CUDAICA runtime config script
 sc = repmat("",27,2);
 
 % These arguments must be at *exactly* these line positions... yes annoying
 sc(1,1)="DataFile";           sc(1,2)=fnDat;
-sc(3,1)="chans";              sc(3,2)=nChs;
+sc(3,1)="chans";              sc(3,2)=nComps;
 sc(4,1)="frames";             sc(4,2)=nFrames;
 sc(5,1)="WeightsOutFile";     sc(5,2)=fnWts;
 sc(6,1)="SphereFile";         sc(6,2)=fnSph;
-sc(7,1)="sphering";           sc(7,2)=o.sphering;
-sc(8,1)="bias";               sc(8,2)=o.bias;
-sc(9,1)="extended";           sc(9,2)=o.extended;
-sc(13,1)="pca";               sc(13,2)=o.pca;
-sc(14,1)="lrate";             sc(14,2)=o.lrate;
-sc(16,1)="blocksize";         sc(16,2)=o.blocksize;
-sc(18,1)="stop";              sc(18,2)=o.stop;
-sc(20,1)="maxsteps";          sc(20,2)=o.maxsteps;
-sc(21,1)="posact";            sc(21,2)=o.posact;
-sc(23,1)="annealstep";        sc(23,2)=o.annealstep;
-sc(25,1)="annealdeg";         sc(25,2)=o.annealdeg;
-sc(26,1)="momentum";          sc(26,2)=o.momentum;
-sc(27,1)="verbose";           sc(27,2)=o.verbose;
+sc(7,1)="sphering";           sc(7,2)=arg.sphering;
+sc(8,1)="bias";               sc(8,2)=arg.bias;
+sc(9,1)="extended";           sc(9,2)=arg.extended;
+sc(14,1)="lrate";             sc(14,2)=arg.lrate;
+sc(16,1)="blocksize";         sc(16,2)=arg.blocksize;
+sc(18,1)="stop";              sc(18,2)=arg.stop;
+sc(20,1)="maxsteps";          sc(20,2)=arg.maxsteps;
+sc(21,1)="posact";            sc(21,2)=arg.posact;
+sc(23,1)="annealstep";        sc(23,2)=arg.annealstep;
+sc(25,1)="annealdeg";         sc(25,2)=arg.annealdeg;
+sc(26,1)="momentum";          sc(26,2)=arg.momentum;
+sc(27,1)="verbose";           sc(27,2)=arg.verbose;
+% sc(13,1)="pca";               sc(13,2)=o.pca; % BROKEN
 sc(isempty(sc(:,2))|sc(:,2)=="",1) = "";
 if fnWtsIn~=""
-    sc(28,1)="WeightsInFile";     sc(28,2)=fnWtsIn;
+    sc(28,1)="WeightsInFile"; sc(28,2)=fnWtsIn;
 end
 
 % Save as plain text script
 writematrix(sc,fnSc,'Delimiter',' ',"FileType","text");
 
-
 %% Write data
-if o.double; prec="float64"; else; prec="float"; end
+prec="float";
 
 % EEG data
+if doFlip; x = x'; end
 fID = fopen(fnDat,"w");
 fwrite(fID,x,prec);
 fclose(fID);
@@ -124,40 +134,49 @@ if ~isempty(wtsIn) && isnumeric(wtsIn)
     fwrite(fID,wtsIn,prec);
     fclose(fID);
 end
-if o.dry; return; end
+if arg.dry; return; end
 
 %% Run CUDAICA
-[status,cmdout] = system(o.bin+" -f "+fnSc,'-echo');
+[status,cmdout] = system(cudaica_bin+" -f "+fnSc,'-echo');
 system("rm "+fnDat);
 %if ~status; warning("CUDAICA FAILED"); return; end
 
 % Read weights
 fID = fopen(fnWts,"r");
-wts = fread(fID,[nChs nChs],prec);
+wts = fread(fID,[nComps nComps],prec);
 fclose(fID);
 
 % Read sphere
 fID = fopen(fnSph,"r");
-sph = fread(fID,[nChs nChs],prec);
+sph = fread(fID,[nComps nComps],prec);
 fclose(fID);
 
-% Calculate mixing matrix
-winv = pinv(wts * sph); 
-
-% Collate config script & terminal output
-if nargout>=4
-    cfg = struct;
-    cfg.status = status;
-    cfg.sc = sc;
-    cfg.log = cmdout;
+%% Prepare outputs
+ica.wts = wts;
+ica.sph = sph;
+ica.w_og = wts*sph;
+ica.winv_og = pinv(wts*sph); 
+if arg.pca > 0
+    ica.w = wts*sph*wtsPCA';
+    ica.pca = wtsPCA;
+else
+    ica.w = wts*sph;
 end
+ica.winv = pinv(ica.w);
+
+% Logs
+ica.status = status;
+ica.sc = sc;
+ica.log = cmdout;
 
 % Reconstruct IC activity
-if nargout>=5
-    icact = (n.icWeights * n.icSphere) * x;
+if nargout>=2
+    x = (wts * sph) * x;
+    if doFlip; x = x'; end
 end
 
-end
+
+
 % cudaica() - Run stand-alone binary version of runica() from the
 %            Matlab command line. Saves time and memory relative
 %            to runica().  If stored in a float file, data are not 
