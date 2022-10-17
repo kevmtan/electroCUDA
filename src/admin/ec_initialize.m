@@ -20,17 +20,17 @@ dirs=arg.dirs; blocks=arg.blocks; dsTarg=arg.dsTarg;
 if ~isstruct(dirs)||isempty(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
 if isempty(blocks); blocks = BlockBySubj(sbj,proj); end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.robustSbj; end % Output directory
-if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+proj+".mat"; end % Filename ending string
+if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+proj+".mat"; end % Filename ending string
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
 errors={};
 % arg.save=0; arg.redoCh=0; arg.redoTr=0; arg.redoPsy=1;
 
 %% Initialize info struct
-fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr;
+fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr+".mat";
 if ~arg.ica || o.suffix=="i"
-    fn_base = o.dirOut+"n_"+o.fnStr;
+    fn_base = o.dirOut+"n_"+o.fnStr+".mat";
 else
-    fn_base = o.dirOut+"ni_"+o.fnStr;
+    fn_base = o.dirOut+"ni_"+o.fnStr+".mat";
 end
 if isempty(n) || arg.redo || arg.redoN
     if isfile(fn) && ~arg.redo && ~arg.redoN
@@ -62,9 +62,10 @@ else; dsTarg=0; disp(sbj+": dsT <= 1, not downsampling..."); end
 if fs==n.fs_orig; fs_s=""; else; fs_s=num2str(fs); end
 
 %% chNfo
-fn = o.dirOut+"chNfo_"+o.fnStr;
+fn = o.dirOut+"chNfo_"+o.fnStr+".mat";
 if ~isfile(fn) || arg.redoCh
     load(dirs.origSbj+"chNfo_"+sbj+".mat","chNfo");
+    load(dirs.origSbj+"subjVar_"+sbj+".mat","subjVar");
     ch_bad = chNfo(:,1:2);
     ch_bad.bad(:) = false;
     ch_bad.gv(abs(subjVar.badChan)) = true;
@@ -80,7 +81,7 @@ elseif nargout > 3
 end
 
 %% Get task events
-fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr;
+fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr+".mat";
 if ~isfile(fn) || dsTarg>0 || arg.redoTr || arg.redoPsy
     [trialNfo,runIdx,runIdxOg,runTimes,runTimesOg,errorsEvent] =...
         ec_getEventIdx(sbj,proj,blocks,dirs,dsTarg=dsTarg);
@@ -101,7 +102,7 @@ elseif nargout > 4
 end
 
 %% Align task events & neural data
-fn = o.dirOut+"psy"+fs_s+"_"+ o.fnStr;
+fn = o.dirOut+"psy"+fs_s+"_"+ o.fnStr+".mat";
 if ~isfile(fn) || arg.redoPsy || arg.redoTr
     try
         [psy,trialNfo] = ec_alignNeuroBehav(trialNfo,sbj,n.runs,runIdx,times,fs,o);
@@ -120,22 +121,22 @@ n.errorPsy = errors;
 
 % Save to disk
 if arg.save
-    fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr;
+    fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr+".mat";
     if ~isfile(fn) || arg.redo
         save(fn,"n","-v7"); disp("SAVED: "+fn)
     end
 
-    fn = o.dirOut+"chNfo_"+o.fnStr;
+    fn = o.dirOut+"chNfo_"+o.fnStr+".mat";
     if ~isfile(fn) || arg.redoCh
         save(fn,"chNfo","-v7"); disp("SAVED: "+fn)
     end
 
-    fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr;
+    fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr+".mat";
     if ~isfile(fn) || arg.redoTr
         save(fn,"trialNfo","-v7"); disp("SAVED: "+fn)
     end
 
-    fn = o.dirOut+"psy"+fs_s+"_"+ o.fnStr;
+    fn = o.dirOut+"psy"+fs_s+"_"+ o.fnStr+".mat";
     if ~isfile(fn) || arg.redoPsy
         save(fn,"psy","-v7"); disp("SAVED: "+fn)
     end

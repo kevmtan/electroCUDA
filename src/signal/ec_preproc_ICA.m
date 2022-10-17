@@ -139,11 +139,11 @@ if o.doRereference
 end
 
 %% Prepare for ICA
-[ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,ch_bad,chNfo,sfx1,errors,tt);
+[o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,ch_bad,chNfo,sfx1,errors,tt);
 chNfo.bad = ch_bad;
 
 %% Run ICA decomposition on GPU
-[n,icNfo] = run_cudaica_lfn(x,n,o,chNfo,chICA,tt);
+[n,icNfo] = run_cudaica_lfn(x,n,o,dirs,chNfo,chICA,tt);
 
 % Initial save of 'n'
 if arg.save
@@ -173,7 +173,7 @@ if ~arg.test; clear xOg; end
 
 %% Identify bad frames per IC
 if o.doBadFrames
-    [ic_bad,x_bad] = findBadFrames(x,[],icNfo(:,["ic" "name"]),mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+    [ic_bad,x_bad] = ec_findBadFrames(x,[],icNfo(:,["ic" "name"]),mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     ic_bad.Properties.VariableNames = "bad_"+ic_bad.Properties.VariableNames;
     icNfo(:,ic_bad.Properties.VariableNames) = ic_bad;
     n.badFrames = x_bad;
@@ -236,9 +236,8 @@ end
 
 
 %% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,ch_bad,chNfo,sfx1,errors,tt)
+function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,ch_bad,chNfo,sfx1,errors,tt)
 if ~exist('tt','var'); tt = tic; end
-%sbj = chNfo.sbj(1);
 
 % Get Hurst exponent
 hurst = abs(ch_bad.hursP - 0.5); % 0.5 = brownian noise
@@ -263,27 +262,39 @@ ch_bad = movevars(ch_bad,["cov" "covP"],"After","nan");
 id = find(contains(ch_bad.Properties.VariableNames,"ai"),1,"last");
 chICA = find(~(ch_bad.empty|ch_bad.ref|ch_bad.nan|(chCovOL & ch_bad{:,id})|...
     ismember(chNfo.pialRAS(:,1),[0 nan])));
-chRank = getRank(x(:,chICA)); % Calculate rank
-chRankOg = chRank;
+chRank = ec_rank(x(:,chICA)); % Calculate rank
 disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
 
-% If rank-deficient, permute to find which chans to exclude
-while chRank<numel(chICA) && 0.9*chRankOg<=numel(chICA)
+% If rank-deficient by 1; permute to find which chans to exclude
+if chRank+1 == numel(chICA)
     chPerm = nan(numel(chICA),1);
     parfor v = 1:numel(chICA) % See which exclusions result in highest rank
         xCh = x;
         ch = chICA(v);
         id = chICA~=ch; %#ok<PFBNS> 
-        chPerm(v) = getRank(xCh(:,chICA(id)));
+        chPerm(v) = ec_rank(xCh(:,chICA(id)));
+    end   
+
+    % Remove chan only if it fixes rank-deficiency
+    if max(chPerm) >= numel(chICA)-1
+        chRank = max(chPerm);
+        chRm = chICA(chPerm==chRank);
+        if numel(chRm)>1
+            [~,id] = min(hurst(chRm));
+            chRm = chRm(id);
+        end
+        chICA(chICA==chRm) = [];
+        disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
     end
-    chRank = max(chPerm);
-    chRm = chICA(chPerm==chRank);
-    if numel(chRm)>1
-        [~,id] = min(hurst(chRm));
-        chRm = chRm(id);
-    end
-    chICA(chICA==chRm) = [];
-    disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
+end
+
+% If rank deficient by more than 1, do PCA
+if chRank < numel(chICA)
+    o.ica_pca = ec_rank(x(:,chICA));
+    warning("setting o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
+    errors{end+1,1} = lastwarn;
+else
+    o.ica_pca = 0;
 end
 
 % Copy to permanent tables
@@ -326,13 +337,13 @@ toc(tt);
 %     end
 %     chICA(chICA==chx(idx)) = [];
 %     chPct = numel(chICA)/chRankOg;
-%     chRank = getRank(x(:,chICA)); % Calculate rank
+%     chRank = ec_rank(x(:,chICA)); % Calculate rank
 %     disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | maxCorr="+maxCorr+" | chPct="+chPct);
 % end
 % % Do PCA if still rank-deficient
 % if chRank < numel(chICA)
 %     chICA = find(~(ch_bad.bad|ch_bad.nan|ismember(chNfo.pialRAS(:,1),[0 nan])));
-%     pcaArg = getRank(x(:,chICA));
+%     pcaArg = ec_rank(x(:,chICA));
 %     warning("setting pcaArg="+pcaArg+" for "+sbj);
 %     errors{end+1,1} = lastwarn;
 % else
@@ -344,27 +355,25 @@ end
 
 
 %% Run CUDAICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [n,icNfo] = run_cudaica_lfn(x,n,o,chNfo,chICA,tt)
+function [n,icNfo] = run_cudaica_lfn(x,n,o,dirs,chNfo,chICA,tt)
 sbj = n.sbj;
 sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
 cd(o.dirOut); system("rm cudaica_"+sfx+"*"); % Remove old cudaica files
 
 % Infomax ICA compiled in CUDA
-[wts,sph,winv,cfg] = cudaica_wrapper(x(:,chICA)',...
-    stop=1e-10, maxsteps=1024, dir=o.dirOut, sfx=sfx);
-winv = winv';
-nICs = height(wts);
+ica = ec_cudaica(x(:,chICA),dirs.cudaica,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
+    lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
+nICs = height(ica.wts);
 disp("Finished CUDAICA: "+sbj); toc(tt);
 %[ic_wts,ic_sph] = cudaica_KT(x(~chICA_badIdx,chICA)','extended',1);
 
 %% Estimate channel locations (TO DO: calculate cortex vertices)
-icWt = abs(winv);
+icWt = abs(ica.winv');
 icWt = normalize(icWt,2,'range');
 MNI = nan(nICs,3);
-for ic = 1:numel(chICA)
-    ch = chICA(ic);
-    MNIch = chNfo.MNI(ch,:).*icWt(ic,:)' / sum(icWt(ic,:),'omitnan');
+for ic = 1:nICs
+    MNIch = chNfo.MNI(chICA,:).*icWt(ic,:)' / sum(icWt(ic,:),'omitnan');
     MNI(ic,:) = sum(MNIch,1,'omitnan');
 end
 
@@ -376,15 +385,13 @@ icNfo.MNI = MNI;
 
 % Copy to 'n' struct
 n.ICA = true;
-n.ICA_cfg = cfg;
+n.ica = ica;
 n.chICA = chICA;
 %n.chICA_badFrames = sparse(chICA_badIdx);
 n.nICs = nICs;
 n.icNfo = icNfo;
-n.icWeights = wts;
-n.icSphere = sph;
-n.icWinv = winv;
-n.icWinvZ = zscore(winv,[],2);
+n.icW = ica.w;
+n.icWinvZ = normalize(ica.winv',2,'zscore');
 %n.icPCA = pcaArg;
 
 end
@@ -408,7 +415,7 @@ if o.doRereference
 end
 
 % Reconstruct IC timecourses
-x = ((n.icWeights*n.icSphere)*xOg(:,chICA)')';
+x = (n.icW * xOg(:,chICA)')';
 disp("Reconstructed IC timecourses: "+n.sbj); toc(tt);
 
 % Get IC covariance
@@ -420,19 +427,19 @@ end
 
 
 %% Classify bad ICs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function icNfo = classifyBadICs_lfn(xi,icNfo,n,o,tt)
-if isempty(xi)
-    xi = load_iEEG_LBCN(n.sbj,proj,blocks,dirs); 
+function icNfo = classifyBadICs_lfn(xa,icNfo,n,o,tt)
+if isempty(xa)
+    xa = load_iEEG_LBCN(n.sbj,proj,blocks,dirs); 
 end % Load raw EEG data (classifier doesn't work with robust referenced data)
 
 % Hi-pass
 %xi = ec_hiPassDetrend(xi,n.fs,o.hiPassICA,[],[],n.runIdx,n.blocks,tt);
 
 % Reconstruct IC timecourses
-xi = ((n.icWeights*n.icSphere)*xi(:,n.chICA)')';
+xa = (n.icW * xa(:,n.chICA)')';
 
 % Run classifier
-[chClass,icNfo.dist] = ec_classifyBadChs(xi,icNfo.MNI);
+[chClass,icNfo.dist] = ec_classifyBadChs(xa,icNfo.MNI);
 icNfo.bad_ai = chClass.bad;
 
 % Hurst exponent

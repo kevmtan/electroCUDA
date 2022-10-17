@@ -14,8 +14,7 @@ nn = min(arg.nn,nChs);
 pos(isnan(pos)) = 0;
 
 if isempty(mdl)
-    mdl = load('ImaGIN_trainedClassifier_KT.mat');
-    mdl = mdl.trainedClassifier;
+    load('ec_trainedClassifier_ImaGIN.mat','mdl');
 end
 try parpool('threads'); catch;end
 
@@ -80,7 +79,7 @@ parfor ch = 1:nChs
     m_var(ch) = median(ch_var(sortIdx(1:nn))); %#ok<PFBNS> 
 
     % Computer hurst exponent of time series
-    ch_hurs(ch) = genHurst(x(ch,:)); %hurst_lfn(x(ch,:)); %fastHurst(x(ch,:));
+    ch_hurs(ch) = ec_generalizedHurst(x(ch,:)); %hurst_lfn(x(ch,:)); %fastHurst(x(ch,:));
 
     % Copy
     chDist(ch).d=d'; chDist(ch).closest=sortIdx';

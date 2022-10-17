@@ -20,17 +20,18 @@ if isempty(sbjID) && ~isempty(sbj)
 end
 
 %% Initialize directories
-[dirServer,dirComp,dirCode,dirFS] = AddPaths(usrStr);
+[dirFreesufer,dirMain,dirCode,path_cudaica] = AddPaths(usrStr);
 
 dirs.code = string(dirCode);
-dirs.comp = string(dirComp); 
+dirs.comp = string(dirMain); 
 dirs.data = dirs.comp; 
 dirs.orig = dirs.data+"orig"+filesep;
 dirs.psych = dirs.orig;
 dirs.robust = dirs.data+"robust"+filesep;
-dirs.anal = dirComp+"anal"+filesep;
-dirs.freesurfer = string(dirServer);
-dirs.fsaverage = string(dirFS);
+dirs.anal = dirMain+"anal"+filesep;
+dirs.freesurfer = string(dirFreesufer);
+dirs.fsaverage = dirs.freesurfer+sbj+filesep+"fsaverage";
+dirs.cudaica = path_cudaica;
 if ~isempty(sbj)
     dirs.sbj = sbj;
     dirs.sbjID = sbjID;

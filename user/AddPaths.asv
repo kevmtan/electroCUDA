@@ -1,21 +1,23 @@
-function [dirFreesurfer,dirMain,dirCode,path_cudaica] = AddPaths(user)
+function [dirFreesurfer,dirMain,dirCode,fsAverage_local] = AddPaths(user)
 % Paths for electroCUDA directories (end all paths with filesep)
 
 if strcmp(user,'Kevin_DMN')
     dirMain = '/proj/lbcn/d/';
     dirCode = '/home/kevin/Gdrive/Git/electroCUDA/';
     dirFreesurfer = '/proj/lbcn/d/freesurfer/';
-    path_cudaica = '/home/kt/Documents/MATLAB/cudaica-master/cudaica';
+    path_cudaica = '/proj/lbcn/d/freesurfer/fsaverage';
+    %fsDir_local = '/usr/local/freesurfer/7.2.0/subjects/fsaverage';
 elseif strcmp(user,'Kevin_DMNpp')
-    dirMain = '/proj/lbcn/d/';
-    dirCode = '/home/kevin/Gdrive/Git/electroCUDA/';
+    dirMain = '/proj/lbcn/d';
+    dirCode = '/home/kevin/Gdrive/Git/lbcnKT';
     dirFreesurfer = '/mnt/KT_MMRraw/';
-    path_cudaica = '/home/kt/Documents/MATLAB/cudaica-master/cudaica';
+    %fsAverage_local = '/usr/local/freesurfer/7.2.0/subjects/fsaverage';
 elseif strcmp(user,'Kevin_UCLA')
     dirMain = '/data/MMR/d/';
     dirCode = '/home/kevin/Google Drive/Git/lbcnPP/';
     dirFreesurfer = '/media/kevin/KT_MMRraw/';
-    path_cudaica = '/home/kevin/Documents/MATLAB/cudaica-master/cudaica';
+    fsAverage_local = '/usr/local/freesurfer/subjects/fsaverage/';
+    addpath(genpath('/home/kevin/Google Drive/MATLAB/iELVis-master'))
 end
 
 % elseif strcmp(user, 'Pedro_iMAC')

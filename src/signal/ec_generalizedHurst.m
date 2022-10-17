@@ -36,7 +36,7 @@
 %%    Tomaso Aste   30/01/2013     %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [mH,sH] = genHurst(S,q,maxT) 
+function [mH,sH] = ec_generalizedHurst(S,q,maxT) 
 if nargin < 2, q = 1; maxT = 19; end
 if nargin < 3,  maxT = 19; end
 if size(S,1)==1 && size(S,2)>1

@@ -25,7 +25,7 @@ if size(mask,1)~=1; error('!'); end
 if size(mask,2) ~= size(x,2); error('!'); end
 
 %% Robust reference
-rnk = getRank(x); % get initial data rank
+rnk = ec_rank(x); % get initial data rank
 
 % Loop across iterations
 for t = 1:nItr
