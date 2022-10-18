@@ -2,7 +2,7 @@
 <a href="https://i.ibb.co/Q9YQg17/s38-ic84-spec.jpg"><img src="https://i.ibb.co/Q9YQg17/s38-ic84-spec.jpg" alt="Summary statistics of a highly-localized neuronal source decomposed by electroCUDA" width="800"/></a>
 <br><sub> Summary statistics of an independent neuronal source decomposed by electroCUDA </sub>
 
-electroCUDA is a collection of accelerated preprocessing & analysis routines for electrophysiology (iEEG/EEG/MEG/LFP). Noise-resistant signal processing & robust statistics are used at each step from preprocessing to final analyses.
+Accelerated preprocessing & analysis routines for electrophysiology (iEEG/EEG/MEG/LFP). Noise-resistant signal processing & robust statistics are used at each step from preprocessing to final analyses.
 
 Unlike many ephysio toolboxes, electroCUDA doesn't shy away from computationally-intensive techniques that improve signal processing, statistical inference & automation. Compute performance is maximized through extensive hardware acceleration & code optimizations. Runs best on workstations, servers & HPC clusters. **CUDA IS REQUIRED FOR GPU FUNCTIONALITY** (sorry Mac users!)
 
