@@ -6,9 +6,7 @@ Fully-automated preprocessing & analysis routines for field potential electrophy
 
 electroCUDA is designed to efficiently leverage HPC-grade compute resources. Computationally-intensive techniques are used to improve signal processing, data mining & hypothesis testing. Compute performance is maximized via multi-layer hardware acceleration & extensive code optimizations. **Nvidia GPU with CUDA is required for GPU functionality** – sorry Mac users!
 
-General proficiency in Matlab & computing are highly recommended – CUDA proficiency is optional. Code is MATLAB-based with calls to compiled CUDA binaries. User-friendly Matlab wrappers abstract away all CUDA operations.
-
-CUDA proficiency is optional: CUDA operations are abstracted by Matlab wrappers. 
+Code is Matlab-based with calls to compiled CUDA binaries. General proficiency in Matlab & computing are highly recommended – CUDA proficiency is optional. All CUDA operations are abstracted by user-friendly Matlab wrappers
 
 ## [See wiki for practical & theoretical documentation](https://github.com/kevmtan/electroCUDA/wiki)
 
