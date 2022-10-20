@@ -50,6 +50,7 @@ arguments
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
     arg.redo logical = false % Redo of previously-preprocessed subject
+    arg.redoN logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
 % x=[]; n=[]; arg.save=0; arg.redo=0;
@@ -90,7 +91,7 @@ if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq 
 %% Prep
 tic;
 % Load metadata
-[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save);
+[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save,redoN=arg.redoN);
 
 % Initialize variables/objects
 %sbjID = n.sbjID;
@@ -111,7 +112,7 @@ nChs = width(x);
 nFrames = height(x);
 
 %% Filter & detrend (within-run to avoid edge artifacts)
-x = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,missing=o.missingInterp);
+[x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,missing=o.missingInterp);
 
 %% Classify bad EEG channels
 if o.doBadCh

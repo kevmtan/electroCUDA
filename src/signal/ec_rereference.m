@@ -30,8 +30,8 @@ rnk = ec_rank(x); % get initial data rank
 % Loop across iterations
 for t = 1:nItr
     % Add 1 to denomenator of mean to avoid losing data rank
-    if floor(rnk)~=nnz(mask); d=1; else; d=0; end
-    rnk = nnz(mask); % Compare num chans/rank with next iteration
+    if t==1 && floor(rnk)<nnz(mask); d=1; else; d=0; end
+    %rnk = nnz(mask); % Compare num chans/rank with next iteration
 
     % Robust reference to good chans
     mn = sum(x(:,mask),2) / sum(mask)+d; % mean timecourse of good chans

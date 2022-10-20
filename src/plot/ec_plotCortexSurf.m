@@ -126,7 +126,7 @@ if isempty(cort)
 end
 
 % Convert to triangulation object
-if ~isa(cort,'triangulation'); cort = readSurfTri(cort); end
+if ~isa(cort,'triangulation'); cort = ec_readSurfTri(cort); end
 
 % Cortical curvature shading (distinguish sulci/gyri for inflated)
 if contains(surfType,"inflated")

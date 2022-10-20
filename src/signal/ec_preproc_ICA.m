@@ -55,9 +55,11 @@ arguments
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
     arg.test logical = false
+    arg.redoN logical = true
+    arg.nIn {isstruct} = []
 end
 blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; o=oICA; arg.save=0; arg.test=1;
+% x=[]; n=[]; o=oICA; arg.nIn=ni; arg.save=0; arg.test=1; arg.redoN=1;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
@@ -67,7 +69,7 @@ if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); en
 if ~isfield(o,'hiPassICA');       o.hiPass=1; end
 if ~isfield(o,'hiPass');          o.hiPass=0.01; end
 % Detrending
-if ~isfield(o,'detrendOrder_ICA'); o.detrendOrder_ICA=10; end  % For ICA decomp: detrend polynomial order for ICA  (suggested=10, skip=0)
+if ~isfield(o,'detrendOrder_ICA'); o.detrendOrder_ICA=[10 30]; end  % For ICA decomp: detrend polynomial order for ICA  (suggested=10, skip=0)
 if ~isfield(o,'detrendOrder');    o.detrendOrder=10; end     % For final output: detrend polynomial order (default=0, skip=0)
 if ~isfield(o,'detrendWin');      o.detrendWin=[]; end       % Detrend timewindow in seconds (all timepoints=[])
 % Bad channel/IC identification
@@ -93,7 +95,7 @@ try parpool('threads'); catch;end
 %% Load & initialize
 tt = tic;
 % Load metadata
-[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,redoN=1,dirs=dirs,save=arg.save);
+[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,redoN=arg.redoN,dirs=dirs,save=arg.save);
 
 % Initialize variables/objects
 ch_bad = chNfo.bad;
@@ -139,11 +141,11 @@ if o.doRereference
 end
 
 %% Prepare for ICA
-[o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,ch_bad,chNfo,sfx1,errors,tt);
+[o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,ch_bad,chNfo,sfx1,errors,tt);
 chNfo.bad = ch_bad;
 
 %% Run ICA decomposition on GPU
-[n,icNfo] = run_cudaica_lfn(x,n,o,dirs,chNfo,chICA,tt);
+[n,icNfo] = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt);
 
 % Initial save of 'n'
 if arg.save
@@ -162,7 +164,7 @@ end
 %% Get correlations between ICs & EEG chans
 [icName,icCh_corr,icCh_corrOrder] = get_icChCorrs(x,xOg);
 
-% Copy to permanent vars
+%% Copy to permanent vars
 icNfo.name = uint16(icName); % Name ICs by its highest-correlated channel
 icNfo.sbjIC = "s"+n.sbjID+"_ic"+icNfo.name;
 icNfo.Properties.RowNames = icNfo.sbjIC;
@@ -181,7 +183,7 @@ if o.doBadFrames
 end
 
 %% Finalize & save
-sfx = erase(sfx,"_");
+sfx = o.suffix;
 
 % Finalize
 n.suffix = o.suffix;
@@ -236,11 +238,8 @@ end
 
 
 %% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,ch_bad,chNfo,sfx1,errors,tt)
+function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,ch_bad,chNfo,sfx1,errors,tt)
 if ~exist('tt','var'); tt = tic; end
-
-% Get Hurst exponent
-hurst = abs(ch_bad.hursP - 0.5); % 0.5 = brownian noise
 
 % Get covariance/correlation of EEG channels
 chCov = cov(x,'partialrows');
@@ -259,42 +258,52 @@ ch_bad = movevars(ch_bad,["cov" "covP"],"After","nan");
 
 
 %% Find channels to use for ICA
-id = find(contains(ch_bad.Properties.VariableNames,"ai"),1,"last");
-chICA = find(~(ch_bad.empty|ch_bad.ref|ch_bad.nan|(chCovOL & ch_bad{:,id})|...
-    ismember(chNfo.pialRAS(:,1),[0 nan])));
-chRank = ec_rank(x(:,chICA)); % Calculate rank
-disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
-
-% If rank-deficient by 1; permute to find which chans to exclude
-if chRank+1 == numel(chICA)
-    chPerm = nan(numel(chICA),1);
-    parfor v = 1:numel(chICA) % See which exclusions result in highest rank
-        xCh = x;
-        ch = chICA(v);
-        id = chICA~=ch; %#ok<PFBNS> 
-        chPerm(v) = ec_rank(xCh(:,chICA(id)));
-    end   
-
-    % Remove chan only if it fixes rank-deficiency
-    if max(chPerm) >= numel(chICA)-1
-        chRank = max(chPerm);
-        chRm = chICA(chPerm==chRank);
-        if numel(chRm)>1
-            [~,id] = min(hurst(chRm));
-            chRm = chRm(id);
-        end
-        chICA(chICA==chRm) = [];
-        disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
-    end
-end
-
-% If rank deficient by more than 1, do PCA
-if chRank < numel(chICA)
-    o.ica_pca = ec_rank(x(:,chICA));
-    warning("setting o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
-    errors{end+1,1} = lastwarn;
-else
+if isfield(arg,"nIn") && isstruct(arg.nIn) && isfield(arg.nIn,"chICA")
+    chICA = arg.nIn.chICA;
+    chRank = ec_rank(x(:,chICA)); % Calculate rank
     o.ica_pca = 0;
+    disp("Using previous ICA params: num_chICA="+numel(chICA)+" | rank="+chRank);
+else
+    id = find(contains(ch_bad.Properties.VariableNames,"ai"),1,"last");
+    chICA = find(~(ch_bad.empty|ch_bad.ref|ch_bad.nan|(chCovOL & ch_bad{:,id})|...
+        ismember(chNfo.pialRAS(:,1),[0 nan])));
+    chRank = ec_rank(x(:,chICA)); % Calculate rank
+    disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
+
+    % Get Hurst exponent
+    hurst = abs(ch_bad.hursP - 0.5); % 0.5 = brownian noise
+
+    % If rank-deficient by 1; permute to find which chans to exclude
+    if chRank+1 == numel(chICA)
+        chPerm = nan(numel(chICA),1);
+        parfor v = 1:numel(chICA) % See which exclusions result in highest rank
+            xCh = x;
+            ch = chICA(v);
+            id = chICA~=ch; %#ok<PFBNS>
+            chPerm(v) = ec_rank(xCh(:,chICA(id)));
+        end
+
+        % Remove chan only if it fixes rank-deficiency
+        if max(chPerm) >= numel(chICA)-1
+            chRank = max(chPerm);
+            chRm = chICA(chPerm==chRank);
+            if numel(chRm)>1
+                [~,id] = min(hurst(chRm));
+                chRm = chRm(id);
+            end
+            chICA(chICA==chRm) = [];
+            disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
+        end
+    end
+
+    % If rank deficient by more than 1, do PCA
+    if chRank < numel(chICA)
+        o.ica_pca = ec_rank(x(:,chICA));
+        warning("setting o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
+        errors{end+1,1} = lastwarn;
+    else
+        o.ica_pca = 0;
+    end
 end
 
 % Copy to permanent tables
@@ -355,21 +364,34 @@ end
 
 
 %% Run CUDAICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [n,icNfo] = run_cudaica_lfn(x,n,o,dirs,chNfo,chICA,tt)
+function [n,icNfo] = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt) %#ok<INUSD> 
 sbj = n.sbj;
 sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
 cd(o.dirOut); system("rm cudaica_"+sfx+"*"); % Remove old cudaica files
+ch_bad = chNfo.bad;
 
-% Infomax ICA compiled in CUDA
-ica = ec_cudaica(x(:,chICA),dirs.cudaica,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
+% Starting weights
+ic_wtsIn = '';
+% if isfield(arg,"nIn") && isstruct(arg.nIn)
+%     try ic_wtsIn = arg.nIn.ica.wts;
+%     catch
+%         ic_wtsIn = arg.nIn.icWeights;
+%     end
+% end
+
+%% Infomax ICA compiled in CUDA
+try reset(gpuDevice(1)); catch; end
+ica = ec_cudaica(x(:,chICA),dirs.cudaica,ic_wtsIn,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
     lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
 nICs = height(ica.wts);
 disp("Finished CUDAICA: "+sbj); toc(tt);
-%[ic_wts,ic_sph] = cudaica_KT(x(~chICA_badIdx,chICA)','extended',1);
 
 %% Estimate channel locations (TO DO: calculate cortex vertices)
+id = find(contains(ch_bad.Properties.VariableNames,"rr"),1,"last");
+idx = ch_bad{chICA,id};
 icWt = abs(ica.winv');
+icWt(:,idx) = nan; % remove bad chans
 icWt = normalize(icWt,2,'range');
 MNI = nan(nICs,3);
 for ic = 1:nICs

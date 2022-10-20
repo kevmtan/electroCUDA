@@ -15,6 +15,7 @@ arguments
     arg.raw logical = false
     arg.save logical = false
     arg.test logical = false
+    arg.redoN logical = true
 end
 dirs=arg.dirs;
 % sbj='S12_38_LK'; proj='MMR'; n=[]; x=[];
@@ -43,7 +44,7 @@ gatherOut=o.gatherOut;
 %% Setup
 tic;
 % Load metadata
-[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,ica=arg.ica,dirs=dirs,save=0,redoN=1);
+[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,ica=arg.ica,dirs=dirs,save=0,redoN=arg.redoN);
 sbjID = n.sbjID;
 nRuns = n.nRuns;
 runIdx = n.runIdx;

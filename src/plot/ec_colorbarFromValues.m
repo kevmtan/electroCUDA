@@ -1,4 +1,4 @@
-function [cols,cIdx,cMap,vals] = colorbarFromValues_KT(vals,cMapName,cLim,a)
+function [cols,cIdx,cMap,vals] = ec_colorbarFromValues(vals,cMapName,cLim,a)
 % Get a colormap from a set of values
 %
 % Limit raw values between [-3 3] & center colorbar at 0

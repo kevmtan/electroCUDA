@@ -1,4 +1,4 @@
-function cort = readSurfTri(cort)
+function cort = ec_readSurfTri(cort)
 % Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 % Reads freesurfer cortex & converts to triangulation object
 

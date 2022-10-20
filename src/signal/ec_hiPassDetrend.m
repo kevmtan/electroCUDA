@@ -82,7 +82,8 @@ for r = 1:nRuns
                 detrendThr(1),detrendItr(1),winLength); %#ok<PFBNS> 
         end
         xr=vertcat(xr{:}); detrendWts{r}=vertcat(dWts{:});
-        disp("Robust polynomial detrended^"+polyOrder(1)+": "+runs(r)); toc(tt);
+        olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
+        disp("Robust polynomial detrended^"+polyOrder(1)+" ol="+olPct+" "+runs(r)); toc(tt);
     end
     x{r} = xr;
 end
@@ -91,10 +92,13 @@ end
 parfor r = 1:nRuns
     if numel(polyOrder)>1 && polyOrder(2)>0
         [x{r},detrendWts{r}] = KT_detrend(x{r},polyOrder(2),detrendWts{r},'polynomials',...
-                detrendThr(end),detrendItr(end),winLength); %#ok<PFBNS> 
-        disp("Robust polynomial detrended^"+polyOrder(2)+": "+runs(r)); toc(tt);
+                detrendThr(end),detrendItr(end),winLength); %#ok<PFBNS>
+        olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
+        disp("Robust polynomial detrended^"+polyOrder(2)+" ol="+olPct+" "+runs(r)); toc(tt);
     end
 end
 x = vertcat(x{:});
+detrendWts = logical(vertcat(detrendWts{:}));
+detrendWts = sparse(~detrendWts);
 if any(polyOrder>0); n.("detrendW"+arg.sfx) = detrendWts; end
 end
