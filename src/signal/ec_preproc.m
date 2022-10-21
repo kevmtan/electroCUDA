@@ -51,13 +51,14 @@ arguments
     arg.save logical = false % Save outputs to disk
     arg.redo logical = false % Redo of previously-preprocessed subject
     arg.redoN logical = false
+    arg.test logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; arg.save=0; arg.redo=0;
+% x=[]; n=[]; arg.save=1; arg.redo=1; arg.redoN=1; arg.test=1;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
-if isempty(blocks); blocks = BlockBySubj(sbj,proj); end
+if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); end
 
 % Filtering
 if ~isfield(o,'hiPass');        o.hiPass=0; end
@@ -91,7 +92,7 @@ if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq 
 %% Prep
 tic;
 % Load metadata
-[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save,redoN=arg.redoN);
+[errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save,redoN=arg.redoN);
 
 % Initialize variables/objects
 %sbjID = n.sbjID;
@@ -108,33 +109,41 @@ if isempty(x)
     [x,errors,chNan] = load_iEEG_LBCN(sbj,proj,blocks,dirs,errors); toc;
     ch_bad.nan(chNan) = true; 
 end
-nChs = width(x);
-nFrames = height(x);
-
-%% Filter & detrend (within-run to avoid edge artifacts)
-[x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,missing=o.missingInterp);
+n.xChs = width(x);
+n.xFrames = height(x);
 
 %% Classify bad EEG channels
+chNoASR = [];
 if o.doBadCh
+    % Find flat channels
+    x_diff = abs(diff(x,1,1));
+    x_diff = mean(x_diff,1,"omitnan");
+    ch_bad.("flat"+sfx) = isoutlier(x_diff,"quartiles","ThresholdFactor",100)';
+
     % Classify
-    [chClass,chNfo.dist] = ec_classifyBadCh(x,chNfo.pialRAS,chNfo.ch);
+    [chClass,chNfo.dist] = ec_classifyBadChs(x,chNfo.pialRAS,chNfo.ch);
     ch_bad.("ai"+sfx) = chClass.bad;
 
     % Hurst exponent
     chHrst = abs(chClass.hurs - 0.5);
-    [~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(~ch_bad.ref|~ch_bad.empty|~chClass.bad),...
-        "median","ThresholdFactor",o.thrHurst);
+    [~,chHrst_lo,~] = isoutlier(chHrst(~ch_bad.ref|~ch_bad.empty|~chClass.bad|...
+        ~ch_bad.("flat"+sfx)),"median","ThresholdFactor",o.thrHurst);
+    [~,~,chHrst_hi] = isoutlier(chHrst(~ch_bad.ref|~ch_bad.empty|~chClass.bad|...
+        ~ch_bad.("flat"+sfx)),"median","ThresholdFactor",o.thrHurst+2);
     ch_bad.("hurstL"+sfx) = chHrst < chHrst_lo;
     ch_bad.("hurstH"+sfx) = chHrst > chHrst_hi;
 
     % Copy
-    ch_bad.("bad"+sfx) = ch_bad.ref|ch_bad.empty|chClass.bad|ch_bad.("hurstL"+sfx);
+    ch_bad.("bad"+sfx) = ch_bad.ref|ch_bad.empty|chClass.bad|ch_bad.("hurstL"+sfx)|...
+        ch_bad.("hurstH"+sfx)|ch_bad.("flat"+sfx);
     chClass.Properties.VariableNames(3:end) =...
         string(chClass.Properties.VariableNames(3:end))+"P"+sfx;
-    ch_bad = [ch_bad,chClass(:,3:end)];
+    ch_bad(:,chClass.Properties.VariableNames(3:end)) = chClass(:,3:end);
     disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
     disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
 
+    % Channels for later
+    chNoASR = ch_bad.empty|ch_bad.ref|ch_bad.("ai"+sfx)|ch_bad.("hurstL"+sfx);
     chGood = ~ch_bad.("bad"+sfx);
 elseif any(ch_bad.Properties.VariableNames=="rr")
     chGood = ~ch_bad.rr;
@@ -143,17 +152,33 @@ elseif any(ch_bad.Properties.VariableNames=="bad")
     chGood = ~ch_bad.bad;
     disp("Bad chans: ch_bad.bad "+sbj);
 else
-    chGood = true(nChs,1);
+    chGood = true(n.xChs,1);
+end
+
+% Make sure no ASR chans
+if isempty(chNoASR)
+    chNoASR = ch_bad.empty|ch_bad.ref|ch_bad.ai|ch_bad.hurstL;
 end
 toc;
 
+%% Filter & detrend (within-run to avoid edge artifacts)
+[x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,...
+    thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp);
+
 %% Robust rereference
 if o.doRereference
-    [x,chGood] = ec_rereference(x,chGood',o.rrThr,o.rrItr);
+    [x,chGood] = ec_rereference(x,chGood',o.rrThr,o.rrItr,ch_bad.ref);
     chGood = chGood';
     ch_bad.("rr"+sfx) = ~chGood;
+    n.refChs = find(chGood);
     disp("Finished robust referencing"); toc;
 end
+
+%% Find flat channels
+x_diff = abs(diff(x,1,1));
+x_diff = mean(x_diff,1,"omitnan");
+ch_bad.("flat"+sfx) = isoutlier(x_diff,"quartiles","ThresholdFactor",100)';
+chNoASR = chNoASR | ch_bad.("flat"+sfx);
 
 %% Power line noise removal
 if o.lineHz > 0
@@ -168,6 +193,13 @@ x_bad.ch = chNfo.ch;
 if o.thrHFO > 0
     [x_bad,ch_bad,n,errors] = hfo_lfn(x,x_bad,ch_bad,dirs,proj,n,o,errors); % Bipolar montage
 end
+chNfo.bad = ch_bad;
+
+%% Artifact subspace reconstruction (ASR)
+x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),...
+    burst=20,chCorr='off',line='off',win='off',flat='off',hiPass='off',...
+    chIgnore=chNoASR,gpu=true);
+ch_bad.("asr"+sfx) = chNoASR;
 
 %% Identify bad frames per chan
 if o.doBadFrames
@@ -179,8 +211,6 @@ end
 %% Organize & save
 sfx = erase(sfx,"_");
 n.suffix = o.suffix;
-n.xChs = nChs;
-n.xFrames = nFrames;
 n.badFrames = x_bad;
 n.chCov = cov(x,'partialrows');
 n.chVar = diag(n.chCov);
@@ -269,41 +299,53 @@ end
 end
 
 
-%% Depreciated
-% % chNfo prep
-% badVars = string(x_bad.Properties.VariableNames(4:end));
-% badVarsOL = insertBefore(badVars,1,"ol_");
-% chNfo{:,badVarsOL} = false;
-% chNfo{:,badVars} = nan;
-%
-% % Parfor loop across channels
-% parfor ch = 1:nChs
-%     badTmp = x_bad(ch,:);
-%     chTmp = chNfo(ch,:);
-%     xCh = squeeze(x(:,ch));
-%     for b = 1:nBlocks
-%         idx = uint32(blockIdx(b,1):blockIdx(b,2)); %#ok<PFBNS>
-%         nFramesB = uint32(1:length(idx));
-%
-%         % Amy method: reject based on outliers of the raw signal and jumps (i.e. difference between consecutive data points)
-%         [~,badIdx_jump] = rejectRawFrames(xCh(idx),o.thrZ,o.thrDiff); %#ok<PFBNS>
-%
-%         % Su method 1: reject based on spikes in LF components of signal
-%         [~,~,~,badIdx_raw_LFspike] = LBCN_filt_bad_timept(xCh(idx),fs,o.thrLF);
-%
-%         % Su method 2: reject based on spikes in HF component of signal
-%         [~,~,~,badIdx_raw_HFspike] = LBCN_filt_bad_timept_noisy(xCh(idx),fs,o.thrHF);
-%
-%         % Copy to badIdx
-%         badTmp.jumpRaw(1,idx) = badIdx_jump.raw(nFramesB);
-%         badTmp.jumpDiff(1,idx) = badIdx_jump.diff(nFramesB);
-%         badTmp.spikeLF(1,idx) = badIdx_raw_LFspike(nFramesB);
-%         badTmp.spikeHF(1,idx) = badIdx_raw_HFspike(nFramesB)
-%     end
-%     for v = 1:numel(badVars)
-%         chTmp.(badVars(v)) = nnz(badTmp.(badVars(v)));
-%     end
-%     chNfo(ch,:) = chTmp;
-%     x_bad(ch,:) = badTmp;
-%     disp(['Identified bad timepoints: ' sbj ' ch' num2str(ch)]);
-% end
+%% ASR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function EEG = ASR_lfn(EEG,oa)
+arguments
+    EEG struct
+    oa.hiPass = [0.25 0.75]
+    oa.flat = 5 % Flatline criterion
+    oa.chCorr = 0.8 % Channel (correlation) criterion
+    oa.chMaxBadTime = 0.5
+    oa.noLocs = 0.45 % NoLocsChannelCriterion 
+    oa.noLocsExcluded  % NoLocsChannelCriterionExcluded
+    oa.line  = 4 % LineNoiseCriterion
+    oa.burst = 20 % BurstCriterion
+    oa.burstRej {mustBeMember(oa.burstRej,["on" "off"])} = 'off'
+    oa.burstMaxBadChs = 0.075
+    oa.burstTols = [-inf 5.5]
+    oa.win = 0.25 % Window criterion
+    oa.winTols = [-inf 7]
+    oa.dist {mustBeMember(oa.dist,["riemannian" "euclidian"])} = 'euclidian'
+    oa.maxMem = [] %ec_ramAvail;
+    oa.chInclude = []
+    oa.chIgnore = []
+    oa.numSamples = 50
+    oa.gpu = false
+end
+% EEG = ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo);
+if oa.gpu; try reset(gpuDevice(1)); catch;end;end
+chNoASR = oa.chIgnore;
+if ~isempty(chNoASR) && any(chNoASR)
+    EEGog = EEG;
+    EEG = pop_select(EEG,'nochannel',cellstr(EEG.chNfo.sbjCh(chNoASR)));
+    disp("Removing these chans for ASR: ");
+    disp(EEG.chNfo.sbjCh(chNoASR));
+end
+EEG = clean_asr(EEG,oa.burst,[],[],[],oa.burstMaxBadChs,oa.burstTols,[], oa.gpu, false, oa.maxMem);
+
+if any(chNoASR)
+    labelsOg = string({EEGog.chanlocs.labels});
+    labels = string({EEG.chanlocs.labels});
+    if all(labelsOg(~chNoASR)==labels)
+        EEGog.data(~chNoASR,:) = EEG.data;
+        EEG = EEGog.data;
+    end
+else
+    EEG = EEG.data;
+end
+EEG = EEG';
+if oa.gpu; try EEG=gather(EEG); reset(gpuDevice(1)); catch;end;end
+
+
+end

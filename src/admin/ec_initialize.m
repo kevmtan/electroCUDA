@@ -29,7 +29,7 @@ errors={};
 fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr+".mat";
 if ~arg.ica || o.suffix=="i"
     fn_base = o.dirOut+"n_"+o.fnStr+".mat";
-else
+elseif arg.ica || startsWith(o.suffix,"i")
     fn_base = o.dirOut+"ni_"+o.fnStr+".mat";
 end
 if isempty(n) || arg.redo || arg.redoN
@@ -41,18 +41,30 @@ if isempty(n) || arg.redo || arg.redoN
         load(dirs.origSbj+"subjVar_"+sbj+".mat","subjVar");
         fs = floor(subjVar.iEEG_rate);
 
-        n = struct;
-        n.suffix = o.suffix;
+        n = struct; 
         n.sbj = sbj;
         n.sbjID = uint16(str2double(extractBetween(sbj,"_","_")));
         n.proj = proj;
-        n.ica = arg.ica;
+        n.suffix = o.suffix;
+        n.fnStr = o.fnStr;
+        n.ICA = arg.ica;
         n.fs = fs;
         n.fs_orig = fs;
         n.fs_Pdio = subjVar.Pdio_rate;
         n.nChs = subjVar.nchan;
     end
 end
+
+% Make sure ICA status
+if arg.ica || contains(o.suffix,"i")
+    n.ICA = true;
+else
+    n.ICA = false;
+end
+
+% Add file strings
+n.fnStr = o.fnStr;
+n.suffix = o.suffix;
 fs = n.fs;
 
 % Figure out downsampling factor
@@ -115,8 +127,7 @@ elseif nargout > 5
 end
 
 %% Finalize
-n.suffix = o.suffix;
-n.fs = fs;
+n.fs = fs; % changed if downsampled
 n.errorPsy = errors;
 
 % Save to disk

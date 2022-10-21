@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preproc_timeFreq(sbj,proj,o,n,x,arg)
+function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,o,n,x,arg)
 % Time-frequency decomposition using continuous wave transform (CWT)
 % CWT uses Morse wavelets (FUTURE: add more CWT options)
 % CWT is used with L1 normalization to mitigate 1/f power decay at higher freqs
@@ -63,7 +63,7 @@ if ~doGPU; try parpool('threads'); catch;end;end
 
 %% Load EEG data
 if isempty(x)
-    if arg.ica; fn=o.dirOut+"xi_"+o.fnStr; else; fn=o.dirOut+"x_"+o.fnStr; end
+    if arg.ica; fn=o.dirOut+"xi_"+o.fnStr; else; fn=o.dirOut+"x_"+o.fnStr+".mat"; end
     if isfile(fn) && ~arg.raw
         load(fn,"x"); disp("LOADED: "+fn);
     else

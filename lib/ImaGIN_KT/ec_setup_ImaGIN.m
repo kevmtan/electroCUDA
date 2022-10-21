@@ -1,7 +1,7 @@
 saveDir = "/home/kt/Documents/MATLAB/";
 
-% Load the train base
-trainBase = load('ImaGIN_trainBaseFeatures_KT.mat');
+% Load the training features
+trainBase = load('ImaGIN_trainBaseFeatures_ec.mat');
 
 %% Train the classifier
 [mdl,validationAccuracy,validationPredictions,validationScores]...

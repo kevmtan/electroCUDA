@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preproc_ICA(sbj,proj,o,n,x,arg)
+function [errors,n,x] = ec_preprocICA(sbj,proj,o,n,x,arg)
 %% CUDA-based ICA for intracranial/scalp electrophysiology
 %  This function is part of electroCUDA (github.com/kevmtan/electroCUDA)
 %  ICA weights are calculated from hipassed/detrended EEG data to mitigate

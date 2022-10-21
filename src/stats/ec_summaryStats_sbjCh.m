@@ -97,7 +97,7 @@ end
 disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
 %% Analysis template
-anT = analysisTemplate_lfn(psy,trialNfo,nh,o); toc;
+anT = analysisTemplate_lfn(psy,trialNfo,ns,o); toc;
 if ~a.test; anT.time=[]; end
 
 %% Spec: denoise & baseline correction

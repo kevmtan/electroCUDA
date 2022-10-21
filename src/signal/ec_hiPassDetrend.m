@@ -1,10 +1,10 @@
-function [x,n] = ec_hiPassDetrend(x,fHi,polyOrder,winLength,n,tt,arg)
+function [x,n] = ec_hiPassDetrend(x,fHi,dOrder,dWin,n,tt,arg)
 % Input validation
 arguments
     x {isfloat}
     fHi {isnumeric,isobject} = 0
-    polyOrder {isnumeric} = 10
-    winLength {isnumeric} = []
+    dOrder {isnumeric} = []
+    dWin {isnumeric} = []
     n struct = struct;
     tt uint64 = tic; % Output from 'tic'
     arg.fs {isnumeric} = []
@@ -12,24 +12,24 @@ arguments
     arg.runs string = ""
     arg.missing string = ""
     arg.gpu logical = true
-    arg.itr {isnumeric} = 3
-    arg.thr {isnumeric} = 3
+    arg.itr {isnumeric} = [10 3]
+    arg.thr {isnumeric} = [8 4]
     arg.sfx {isstring,ischar} = "";
 end
 if isempty(fHi); fHi=0; end
-if isempty(polyOrder); polyOrder=0; end
+if isempty(dOrder); dOrder=0; end
 if ~isempty(arg.fs); fs=arg.fs; else; fs=n.fs; end
 if ~isempty(arg.runIdx); runIdx=arg.runIdx; else; runIdx=n.runIdxOg(:,2); end
 if arg.runs~=""; runs=arg.runs; else; runs=string(n.blocks); end
 doGPU = arg.gpu;
 doMissing = arg.missing;
 nRuns = numel(runs);
-winLength = winLength * fs;
+dWin = dWin * fs;
 d3 = numel(size(x))==3;
 nChs = size(x,2);
 detrendWts = cell(nRuns,1);
-detrendThr = arg.thr;
-detrendItr = arg.itr;
+dThr = arg.thr;
+dItr = arg.itr;
 nWorkers = gcp('nocreate').NumWorkers;
 
 %% Prepare vars 
@@ -41,20 +41,26 @@ x = mat2cell(x,runIdx);
 doHPF = true;
 if class(fHi)~="digitalFilter" && fHi>0
     [~,r] = min(runIdx);
-    [~,fHi] = highpass(x{r},fHi,fs);
+    [~,fHi] = highpass(x{r}(:,1,1),fHi,fs);
 elseif class(fHi)~="digitalFilter"
     doHPF = false;
 end
 
-%% High-pass & detrend (within-run to avoid edge artifacts)
-for r = 1:nRuns
-    xr = x{r};
-    % Interpolate missing frames (filter can't handle NaNs)
-    if ~isempty(doMissing) && doMissing~=""
+%% Main
+
+% Interpolate missing frames (filter can't handle NaNs)
+if ~isempty(doMissing) && doMissing~=""
+    parfor r = 1:nRuns
+        xr = x{r};
         xr = fillmissing(xr,doMissing,1);
         disp("Interpolated missing: "+runs(r)); toc(tt);
+        x{r} = xr;
     end
+end
 
+
+for r = 1:nRuns
+    xr = x{r};
     %% High-pass filter w/ zero-phase IIR (entire run)
     if doHPF
         if doGPU && d3
@@ -70,35 +76,47 @@ for r = 1:nRuns
     end
 
     %% Initial detrend w/ lower-order polynomial (timechunks within run)
-    if any(polyOrder>0) && polyOrder(1)>0
-        idx = diff(1: floor(height(xr)/nWorkers) : height(xr)); % Slice into time chunks
-        idx(end) = idx(end) + (height(xr)-sum(idx));            % numChunks = number of CPU thread
-        xr = mat2cell(xr,idx);
-        dWts = cell(numel(xr),1);
+    if numel(dOrder)>0 && dOrder(1)>0
+        for ii = nWorkers:-3:1
+            idx = diff(1: floor(height(xr)/ii) : height(xr)); % Slice into time chunks
+            idx(end) = idx(end) + (height(xr)-sum(idx));            % numChunks = number of CPU thread
+            xr = mat2cell(xr,idx);
+            dWts = cell(numel(xr),1);
 
-        % Lower-order detrend
-        parfor w = 1:nWorkers
-            [xr{w},dWts{w}] = KT_detrend(xr{w},polyOrder(1),[],'polynomials',...
-                detrendThr(1),detrendItr(1),winLength); %#ok<PFBNS> 
+            % Lower-order detrend
+            parfor w = 1:ii
+                [xr{w},dWts{w}] = KT_detrend(xr{w},dOrder(1),[],'polynomials',...
+                    dThr(1),dItr(1),dWin); %#ok<PFBNS>
+            end
+            xr=vertcat(xr{:}); detrendWts{r}=vertcat(dWts{:});
+            olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
+            disp("Robust polynomial detrended^"+dOrder(1)+" ol="+olPct+" "+runs(r)); toc(tt);
         end
-        xr=vertcat(xr{:}); detrendWts{r}=vertcat(dWts{:});
-        olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
-        disp("Robust polynomial detrended^"+polyOrder(1)+" ol="+olPct+" "+runs(r)); toc(tt);
     end
     x{r} = xr;
 end
 
 %% Final detrend w/ higher-order polynomial (entire run)
-parfor r = 1:nRuns
-    if numel(polyOrder)>1 && polyOrder(2)>0
-        [x{r},detrendWts{r}] = KT_detrend(x{r},polyOrder(2),detrendWts{r},'polynomials',...
-                detrendThr(end),detrendItr(end),winLength); %#ok<PFBNS>
-        olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
-        disp("Robust polynomial detrended^"+polyOrder(2)+" ol="+olPct+" "+runs(r)); toc(tt);
+if numel(dOrder)>1 && dOrder(2)>0
+    parfor r = 1:nRuns
+        xr = x{r};
+        wtsR = detrendWts{r};
+        %if doGPU; xr=gpuArray(xr); wtsR=gpuArray(wtsR); end
+        for ii = 2:numel(dOrder)
+            if dOrder(ii)>0
+                [xr,wtsR] = KT_detrend(xr,dOrder(ii),wtsR,'polynomials',...
+                    dThr(ii),dItr(ii),dWin); %#ok<PFBNS>
+                olPct = nnz(~wtsR)/numel(wtsR);
+                disp("Robust polynomial detrended^"+dOrder(ii)+" ol="+olPct+" "+runs(r)); toc(tt);
+            end
+        end
+        x{r} = xr;
+        detrendWts{r} = wtsR;
+        %x{r} = gather(xr); detrendWts{r} = gather(wtsR);
     end
 end
 x = vertcat(x{:});
 detrendWts = logical(vertcat(detrendWts{:}));
 detrendWts = sparse(~detrendWts);
-if any(polyOrder>0); n.("detrendW"+arg.sfx) = detrendWts; end
+if any(dOrder>0); n.("detrendW"+arg.sfx) = detrendWts; end
 end
