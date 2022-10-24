@@ -196,10 +196,12 @@ end
 chNfo.bad = ch_bad;
 
 %% Artifact subspace reconstruction (ASR)
-x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),...
-    burst=20,chCorr='off',line='off',win='off',flat='off',hiPass='off',...
-    chIgnore=chNoASR,gpu=true);
-ch_bad.("asr"+sfx) = chNoASR;
+if o.doASR
+    x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),...
+        burst=20,chCorr='off',line='off',win='off',flat='off',hiPass='off',...
+        chIgnore=chNoASR,gpu=true);
+    ch_bad.("asr"+sfx) = chNoASR;
+end
 
 %% Identify bad frames per chan
 if o.doBadFrames
@@ -324,6 +326,8 @@ arguments
     oa.gpu = false
 end
 % EEG = ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo);
+
+% Remove excluded channels
 if oa.gpu; try reset(gpuDevice(1)); catch;end;end
 chNoASR = oa.chIgnore;
 if ~isempty(chNoASR) && any(chNoASR)
@@ -332,8 +336,12 @@ if ~isempty(chNoASR) && any(chNoASR)
     disp("Removing these chans for ASR: ");
     disp(EEG.chNfo.sbjCh(chNoASR));
 end
-EEG = clean_asr(EEG,oa.burst,[],[],[],oa.burstMaxBadChs,oa.burstTols,[], oa.gpu, false, oa.maxMem);
 
+% Run ASR
+EEG = ec_ASRclean(EEG,oa.burst,[],[],[],oa.burstMaxBadChs,oa.burstTols,[],...
+    oa.gpu,false,oa.maxMem);
+
+% Copy cleaned channels to data matrix
 if any(chNoASR)
     labelsOg = string({EEGog.chanlocs.labels});
     labels = string({EEG.chanlocs.labels});
@@ -346,6 +354,4 @@ else
 end
 EEG = EEG';
 if oa.gpu; try EEG=gather(EEG); reset(gpuDevice(1)); catch;end;end
-
-
 end

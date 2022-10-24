@@ -1,0 +1,37 @@
+PYTHON=python
+
+.PHONY: clean all
+
+ifeq ($(THISDIR),)
+THISDIR:=$(CURDIR)
+endif
+
+CUDA_CFLAGS = @CUDA_CFLAGS@
+CUDA_DIR = @CUDA_DIR@
+CUDA_LIBS = @CUDA_LIBS@
+CUDA_VERSION = @CUDA_VERSION@
+CUDA_INCLUDE = @CUDA_DIR@/include
+CUDA_LIBS_FOLDER = @CUDA_DIR@/@CUDA_LIBS_SUBFOLDER@
+CUDA_PYTHON_LIBS = @CUDA_PYTHON_LIBS@
+BLAS_LIBS = @BLAS_LIBS@
+LAPACK_LIBS = @LAPACK_LIBS@
+NVCC = @NVCC@
+NVCCFLAGS = @NVCCFLAGS@
+NVCC_VERSION = @NVCC_VERSION@
+R250 = ../@R250@
+all: clean cudaica.so
+
+cudaica.o: ../cudaica.c ../cudaica
+	$(NVCC) $(NVCCFLAGS) -I ../include -c -o $@ ../cudaica.c
+
+cudaica.so: setup.py ../cudaica cudaica.o 
+	$(PYTHON) setup.py -I ../include -I $(CUDA_INCLUDE) -L $(CUDA_LIBS_FOLDER) $(CUDA_PYTHON_LIBS) $(BLAS_LIBS) $(LAPACK_LIBS) -E $(R250)  build
+	cp build/lib.linux-x86_64-*/cudaica*.so ./$@
+	
+../cudaica$(EXEEXT):
+	$(MAKE) -C ../ cudaica$(EXEEXT)
+
+
+clean:
+	rm -rf build/
+	rm -f cudaica.so

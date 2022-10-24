@@ -1,0 +1,6 @@
+#!/bin/sh
+REVISION="`git rev-parse --verify HEAD --short`"
+if [ $? -ne 0 ]; then
+    REVISION=-1
+fi
+echo $REVISION
