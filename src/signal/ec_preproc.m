@@ -59,35 +59,34 @@ blocks=arg.blocks; dirs=arg.dirs;
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
 if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); end
-
-% Filtering
-if ~isfield(o,'hiPass');        o.hiPass=0; end
-% Detrending
-if ~isfield(o,'detrendOrder');  o.detrendOrder=[]; end % Detrend polynomial order (suggested=10, skip=0)
-if ~isfield(o,'detrendWin');    o.detrendWin=[]; end   % Detrend timewindow in seconds (all timepoints=[])
-% Bad channel identification
-if ~isfield(o,'doBadCh');       o.doBadCh=true; end    % true/false
-if ~isfield(o,'badChProp');     o.badChProp=0.5; end   % Criterion proportion of bad samples [default: 0.5]
-if ~isfield(o,'thrHurst');      o.thrHurst=3; end      % Hurst threshold (median absolute deviation)
-% Rereferencing
-if ~isfield(o,'doRereference'); o.doRereference=true; end 
-if ~isfield(o,'rrThr');         o.rrThr=3; end         % Outlier threshold (default=3,skip=0)
-if ~isfield(o,'rrItr');         o.rrItr=5; end         % Number of iterations (default=5)
-% Electric line noise removal
-if ~isfield(o,'lineHz');        o.lineHz=60; end       % Electricity hertz @ EEG recording site (default=50|60, skip=0)
-% Detect epileptic high-frequency oscillations (HFO)
-if ~isfield(o,'thrHFO');        o.thrHFO=2; end        % Threshold for epileptic HFO detection (default=2)
-% Detect within-channel outlier timepoints
-if ~isfield(o,'doBadFrames');   o.doBadFrames=true; end  % true/false
-if ~isfield(o,'thrMAD');        o.thrMAD=10; end       % Z-threshold relative to all data points to exclude timepoints
-if ~isfield(o,'thrDiff');       o.thrDiff=10; end      % Z-threshold for amplitude differences of consecutive timepoints
-if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq spikes
-% % Interpolate bad channels
-% if ~isfield(o,'interpolateCh');    o.interpolateCh=false; end % true/false
-% % Detect outliers: spatiotemporal covariance (slow, often unecessary!)
-% if ~isfield(o,'doOLcov');          o.doOLcov=false; end       % true/false
-% if ~isfield(o,'OLcovThr');         o.OLcovThr=2; end          % Threshold for declaring an outlier
-% if ~isfield(o,'OLcovIter');        o.OLcovIter=2; end         % Number of iterations
+% % Filtering
+% if ~isfield(o,'hiPass');        o.hiPass=0; end
+% % Detrending
+% if ~isfield(o,'detrendOrder');  o.detrendOrder=[]; end % Detrend polynomial order (suggested=10, skip=0)
+% if ~isfield(o,'detrendWin');    o.detrendWin=[]; end   % Detrend timewindow in seconds (all timepoints=[])
+% % Bad channel identification
+% if ~isfield(o,'doBadCh');       o.doBadCh=true; end    % true/false
+% if ~isfield(o,'badChProp');     o.badChProp=0.5; end   % Criterion proportion of bad samples [default: 0.5]
+% if ~isfield(o,'thrHurst');      o.thrHurst=3; end      % Hurst threshold (median absolute deviation)
+% % Rereferencing
+% if ~isfield(o,'doRereference'); o.doRereference=true; end 
+% if ~isfield(o,'rrThr');         o.rrThr=3; end         % Outlier threshold (default=3,skip=0)
+% if ~isfield(o,'rrItr');         o.rrItr=5; end         % Number of iterations (default=5)
+% % Electric line noise removal
+% if ~isfield(o,'lineHz');        o.lineHz=60; end       % Electricity hertz @ EEG recording site (default=50|60, skip=0)
+% % Detect epileptic high-frequency oscillations (HFO)
+% if ~isfield(o,'thrHFO');        o.thrHFO=2; end        % Threshold for epileptic HFO detection (default=2)
+% % Detect within-channel outlier timepoints
+% if ~isfield(o,'doBadFrames');   o.doBadFrames=true; end  % true/false
+% if ~isfield(o,'thrMAD');        o.thrMAD=10; end       % Z-threshold relative to all data points to exclude timepoints
+% if ~isfield(o,'thrDiff');       o.thrDiff=10; end      % Z-threshold for amplitude differences of consecutive timepoints
+% if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq spikes
+% % % Interpolate bad channels
+% % if ~isfield(o,'interpolateCh');    o.interpolateCh=false; end % true/false
+% % % Detect outliers: spatiotemporal covariance (slow, often unecessary!)
+% % if ~isfield(o,'doOLcov');          o.doOLcov=false; end       % true/false
+% % if ~isfield(o,'OLcovThr');         o.OLcovThr=2; end          % Threshold for declaring an outlier
+% % if ~isfield(o,'OLcovIter');        o.OLcovIter=2; end         % Number of iterations
 
 %% Prep
 tic;
@@ -103,6 +102,7 @@ ch_bad = chNfo.bad;
 n.proj = proj;
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 try parpool('threads'); catch;end
+try mkdir(o.dirOut); catch;end
 
 %% Load EEG data
 if isempty(x)
@@ -111,6 +111,7 @@ if isempty(x)
 end
 n.xChs = width(x);
 n.xFrames = height(x);
+n.dirs = dirs;
 
 %% Classify bad EEG channels
 chNoASR = [];
@@ -143,7 +144,7 @@ if o.doBadCh
     disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
 
     % Channels for later
-    chNoASR = ch_bad.empty|ch_bad.ref|ch_bad.("ai"+sfx)|ch_bad.("hurstL"+sfx);
+    chNoASR = ch_bad.empty|ch_bad.("ai"+sfx);
     chGood = ~ch_bad.("bad"+sfx);
 elseif any(ch_bad.Properties.VariableNames=="rr")
     chGood = ~ch_bad.rr;
@@ -154,16 +155,15 @@ elseif any(ch_bad.Properties.VariableNames=="bad")
 else
     chGood = true(n.xChs,1);
 end
-
 % Make sure no ASR chans
 if isempty(chNoASR)
-    chNoASR = ch_bad.empty|ch_bad.ref|ch_bad.ai|ch_bad.hurstL;
+    chNoASR = ch_bad.empty|ch_bad.ai;
 end
 toc;
 
 %% Filter & detrend (within-run to avoid edge artifacts)
 [x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,...
-    thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp);
+    thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp,sfx=sfx,gpu=1);
 
 %% Robust rereference
 if o.doRereference
@@ -173,12 +173,6 @@ if o.doRereference
     n.refChs = find(chGood);
     disp("Finished robust referencing"); toc;
 end
-
-%% Find flat channels
-x_diff = abs(diff(x,1,1));
-x_diff = mean(x_diff,1,"omitnan");
-ch_bad.("flat"+sfx) = isoutlier(x_diff,"quartiles","ThresholdFactor",100)';
-chNoASR = chNoASR | ch_bad.("flat"+sfx);
 
 %% Power line noise removal
 if o.lineHz > 0
@@ -195,11 +189,19 @@ if o.thrHFO > 0
 end
 chNfo.bad = ch_bad;
 
+%% Find flat channels
+idx = find(contains(ch_bad.Properties.VariableNames,"hurstL"),1,"last");
+x_diff = abs(diff(x,1,1));
+x_diff = mean(x_diff,1,"omitnan");
+ch_bad.("flat"+sfx) = isoutlier(x_diff,"median","ThresholdFactor",3)';
+chNoASR = chNoASR |...
+    sum(full([chNoASR,ch_bad.ref,ch_bad.hurstH,ch_bad{:,idx},ch_bad.("flat"+sfx)]),2)>2;
+
 %% Artifact subspace reconstruction (ASR)
-if o.doASR
-    x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),...
-        burst=20,chCorr='off',line='off',win='off',flat='off',hiPass='off',...
-        chIgnore=chNoASR,gpu=true);
+if o.asr.do
+    o.asr.chIgnore = chNoASR;
+    x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),o.asr);
+    %burst=20,chCorr='off',line='off',win='off',flat='off',hiPass='off',...
     ch_bad.("asr"+sfx) = chNoASR;
 end
 
@@ -209,6 +211,23 @@ if o.doBadFrames
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS); 
     disp("Identified bad frames per chan: "+sbj);
 end
+
+%% Covariance/correlation outliers
+
+% Get covariance/correlation of EEG channels
+chCov = cov(x,'partialrows');
+chCorr = corrcov(chCov);
+
+% Get channels with ultra-high covariance
+chCovZ = abs(chCov);
+chCovZ(chCorr==1) = nan;
+chCovZ = mean(chCovZ,2,"omitnan");
+chCovOL = isoutlier(chCovZ,"median","ThresholdFactor",10);
+
+% Copy to permanent tables
+ch_bad.("cov"+sfx) = chCovOL;
+ch_bad.("covP"+sfx) = chCovZ;
+ch_bad = movevars(ch_bad,["cov" "covP"],"After","nan");
 
 %% Organize & save
 sfx = erase(sfx,"_");
@@ -305,25 +324,7 @@ end
 function EEG = ASR_lfn(EEG,oa)
 arguments
     EEG struct
-    oa.hiPass = [0.25 0.75]
-    oa.flat = 5 % Flatline criterion
-    oa.chCorr = 0.8 % Channel (correlation) criterion
-    oa.chMaxBadTime = 0.5
-    oa.noLocs = 0.45 % NoLocsChannelCriterion 
-    oa.noLocsExcluded  % NoLocsChannelCriterionExcluded
-    oa.line  = 4 % LineNoiseCriterion
-    oa.burst = 20 % BurstCriterion
-    oa.burstRej {mustBeMember(oa.burstRej,["on" "off"])} = 'off'
-    oa.burstMaxBadChs = 0.075
-    oa.burstTols = [-inf 5.5]
-    oa.win = 0.25 % Window criterion
-    oa.winTols = [-inf 7]
-    oa.dist {mustBeMember(oa.dist,["riemannian" "euclidian"])} = 'euclidian'
-    oa.maxMem = [] %ec_ramAvail;
-    oa.chInclude = []
-    oa.chIgnore = []
-    oa.numSamples = 50
-    oa.gpu = false
+    oa struct
 end
 % EEG = ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo);
 
@@ -343,12 +344,9 @@ EEG = ec_ASRclean(EEG,oa.burst,[],[],[],oa.burstMaxBadChs,oa.burstTols,[],...
 
 % Copy cleaned channels to data matrix
 if any(chNoASR)
-    labelsOg = string({EEGog.chanlocs.labels});
-    labels = string({EEG.chanlocs.labels});
-    if all(labelsOg(~chNoASR)==labels)
-        EEGog.data(~chNoASR,:) = EEG.data;
-        EEG = EEGog.data;
-    end
+    [~,ia,ib] = intersect({EEGog.chanlocs.labels},{EEG.chanlocs.labels},'stable');
+    EEGog.data(ia,:) = EEG.data(ib,:);
+    EEG = EEGog.data;
 else
     EEG = EEG.data;
 end

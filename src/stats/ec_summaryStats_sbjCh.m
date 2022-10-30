@@ -19,7 +19,7 @@ end
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
 if contains(a.sfx,"i"); a.ICA = true; end
 if a.ICA && ~contains(a.sfx,"i"); a.sfx = a.sfx + "i"; end
-% a.type="hfb"; a.ICA=1; a.test=1; a.stats=1; a.plot=1; a.sfx=sfx;
+% a.type="spec"; a.ICA=1; a.test=1; a.stats=1; a.plot=0; a.sfx="i";
 
 %% Calculate summary stats
 if a.stats
@@ -118,7 +118,7 @@ x = single(x);
 if ~a.test; clear n; clear psy1; clear trialNfo1; end
 
 %% LFP: summary stats
-ss = statsBand_lfn(x,nh,sbjChs,anT,"lfp",o,ss); toc;
+ss = statsBand_lfn(x,ns,sbjChs,anT,"lfp",o,ss); toc;
 
 %% Organize data for plotting
 lats5 = int16(1000 * (o.epoch(1):o.binP:5))';
@@ -178,16 +178,21 @@ sbjID = ns.sbjID;
 %fs = ns.fs; if o.dsTarg>0; fs=o.dsTarg; end
 chNfo = ec_loadSbj(dirs,a.sfx+"s","chNfo");
 if nargin<=3
+    if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
+    else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
+    load(fn,"ss"); disp("LOADED: "+fn);
+
     fn = o.dirOut+"plot_s"+sbjID+".mat";
-    load(fn,"ss","xe","xhe","ssFrq","B","trialNfo"); disp("LOADED: "+fn);
+    load(fn,"xe","xhe","ssFrq","B","trialNfo"); disp("LOADED: "+fn);
 end
 
 %% Prep
 doICA = a.ICA;
-sbj = n.sbj;
+sbj = ns.sbj;
 
 % Get plot options & electrode plotting data
-[d,oP,xNfo,nChs,icWts] = mk_oP_chDat(a,o,n,B,chNfo,doICA);
+[d,oP,xNfo,nChs,icWts] = mk_oP_chDat(a,o,ns,B,chNfo,doICA);
+oP.freqs = ns.freqs;
 % oP.visible=1; oP.save=0; oP.doGPU=0;
 
 %% Parfor loop across channels/ICs
@@ -209,7 +214,13 @@ parfor ch = 1:nChs
     xhCh = squeeze(xhe(:,ch,:));
 
     %% Plot function
-    spec_plotChan(a,sc,xCh,xhCh,dCh,fCh,trialNfo,oP,sbj,xN);
+    spec_plotChan(a,sc,xCh,xhCh,dCh,fCh,trialNfo,B,oP,sbj,xN);
+end
+
+%% Delete plot data
+if ~a.test
+    fn = o.dirOut+"plot_s"+sbjID+".mat";
+    delete(fn(:)); disp("DELETED: "+fn);
 end
 end
 
@@ -237,23 +248,24 @@ hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','none');
 %% Legends
 nexttile;
 if a.ICA % Chan name
-    text(1,1,sbjCh+" ("+xN.ic+")",Interpreter='none',FontSize=20,Units='normalized',...
-        HorizontalAlignment='right',VerticalAlignment='top');
+    text(1,1,sbjCh+" ("+xN.ic+")",Interpreter='none',Units='normalized',FontSize=20,...
+        HorizontalAlignment='right',VerticalAlignment='bottom');
 else
-    text(1,1,sbjCh,Interpreter='none',FontSize=20,Units='normalized',...
-        HorizontalAlignment='right',VerticalAlignment='top');
+    text(1,1,sbjCh,Interpreter='none',Units='normalized',FontSize=20,...
+        HorizontalAlignment='right',VerticalAlignment='bottom');
 end
+
+% Conditions
+hold on
+for c = 1:nConds
+    plot(0,0,'o','Color',oP.col(c,:),'LineWidth',8);
+end
+lgd = legend(conds2,"FontSize",oP.textsize,"Location","southeast","AutoUpdate","off");
+title(lgd,"Condition"); axis off; hold off;
 
 % Z-score colorbar
 colormap(flip(cbrewer2('RdBu'))); clim(oP.clim);
-lgd = colorbar(gca,"west","FontSize",oP.textsize+4); lgd.Label.String = "Z-score"; hold on
-
-% Conditions
-for c = 1:nConds 
-    plot(0,0,'o','Color',oP.col(c,:),'LineWidth',8);
-end
-lgd = legend(conds2,"FontSize",oP.textsize+4,"Location","southeast","AutoUpdate","off");
-title(lgd,"Condition"); axis off; hold off;
+lgd = colorbar(gca,"west","FontSize",oP.textsize); lgd.Label.String = "z-score";
 
 %% Total average spectral magnitude
 frqTicks = 3:10:numel(oP.freqs);
@@ -292,10 +304,11 @@ end
 plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,"medial")
 
 %% ERSP
+scM = sc.ms{:};
 for c = 1:nConds
     nexttile
-    idx = ismember(sc.cond,conds(c)); % & sc.latency>=-200 & sc.latency<=5000;
-    imagesc(sc.x(idx,:)','XData',sc.latency(idx,:)');
+    idx = ismember(scM.cond,conds(c)); % & sc.latency>=-200 & sc.latency<=5000;
+    imagesc(scM.x(idx,:)','XData',scM.latency(idx,:)');
     yticks(frqTicks); yticklabels(frqDisp);
     set(gca,'FontSize',oP.textsize,'YDir','normal','color',[1 1 1]);
     colormap(flip(cbrewer2('RdBu'))); clim(oP.clim);
@@ -303,13 +316,37 @@ for c = 1:nConds
     if c==1; xlabel("Latency (ms)"); ylabel("Frequency (Hz)"); end
 end
 
-%% Plot average timecourses
-plotCondAvg_lfn(B,sc,oP);
+%% Stim-locked avg
+for c = 1:height(B)
+    nexttile;
+    plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
+    set(gca,'FontSize',oP.textsize);
+    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize);
+    xlabel("Latency (ms)",'FontSize',oP.textsize+2);
+    if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize);  end
+    hold on
+    plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
+    plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
+    hold off
+end
+
+%% RT-locked avg
+for c = 1:height(B)
+    nexttile;
+    plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
+    set(gca,'FontSize',oP.textsize);
+    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize);
+    xlabel("RT - Latency (ms)",'FontSize',oP.textsize);
+    hold on
+    plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
+    plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
+    hold off
+end
 
 %% Save fig
 if oP.save
     fn = oP.dirOutSbj+sbjCh+"_spec.jpg";
-    exportgraphics(hl,fn,"Resolution",100);
+    exportgraphics(hl,fn,"Resolution",125);
     disp("SAVED: "+fn);
     close all
 end
@@ -483,6 +520,11 @@ parfor ch = 1:nChs
     %% Plot function
     hfbL_plotChan(a,sc,xCh,xhCh,dCh,trialNfo,oP,sbj,xN);
 end
+
+if ~a.test
+    fn = o.dirOut+"plot_s"+sbjID+".mat";
+    delete(fn(:)); disp("DELETED: "+fn);
+end
 end
 
 
@@ -520,7 +562,7 @@ end; axis off;
 nexttile;
 % Z-score colorbar
 colormap(flip(cbrewer2('RdBu'))); clim(oP.clim); hold on
-lgd = colorbar(gca,"east","FontSize",oP.textsize+4); lgd.Label.String = "Z-score"; 
+lgd = colorbar(gca,"east","FontSize",oP.textsize+4); lgd.Label.String = "Z-score";
 
 % Conditions
 for c = 1:nConds
@@ -715,6 +757,10 @@ parfor ch = 1:nChs
     %% Plot function
     hfb_plotChan(a,sc,xhCh,dCh,trialNfo,oP,sbj,xN);
 end
+if ~a.test
+    fn = o.dirOut+"plot_s"+sbjID+".mat";
+    delete(fn(:)); disp("DELETED: "+fn);
+end
 end
 
 
@@ -740,7 +786,7 @@ hl = tiledlayout(h,3,5,'TileSpacing','compact','Padding','tight');
 
 %% Channel/IC name
 nexttile;
-if a.ICA 
+if a.ICA
     text(1,0.5,sbjCh+" ("+xN.ic+")",Interpreter='none',FontSize=20,Units='normalized',...
         HorizontalAlignment='center',VerticalAlignment='middle');
 else
@@ -937,14 +983,14 @@ thrOL = o.thrOL;
 thrOLbl = o.thrOLbl;
 conds = o.conds;
 detrendOrder = o.detrendOrder;
-detrendWin = o.detrendWin * fs;
 detrendItr = o.detrendItr;
 detrendThr = o.detrendThr;
-d3 = numel(size(xa))==3;
-runIdx = grpstats(psy,"run",["min" "max"],"DataVars","idx"); % Get run indices
-runIdx = sortrows(runIdx,["min_idx" "max_idx"],"ascend");
+runIdx=na.runIdxOg(:,2);
+d3 = length(size(xa))>2;
 try parpool('threads'); catch;end
-nWorkers = gcp('nocreate').NumWorkers;
+% runIdx = grpstats(psy,"run",["min" "max"],"DataVars","idx"); % Get run indices
+% runIdx = sortrows(runIdx,["min_idx" "max_idx"],"ascend");
+%nWorkers = gcp('nocreate').NumWorkers;
 %nTrs = na.nTrials;
 %trialA = trialNfo.trialA;
 %trialAT = anT.trialA;
@@ -971,10 +1017,6 @@ if any(diff(trIdx.min_idx)<1) || any(diff(trIdx.max_idx)<1)
 end
 
 % Prepare filters
-hiPassHz=0; loPassHz=0; %fHi=[]; fLo=[];
-if o.hiPass>0 %&& contains(na.suffix,"s"|"h")
-    hiPassHz = o.hiPass;
-end
 if o.loPass>0 && ~(ds>1 && o.loPass>fsTarg/2) % Antialias if LPF over nyquist frequency
     loPassHz = o.loPass;
     gusSz = floor(fs/loPassHz);
@@ -1008,96 +1050,42 @@ if ~isempty(badFields)
     disp("Removed bad frames: "+sbj);
 end
 
-
-%% High-pass filtering
+%% Detrend & HPF
 [ds1,ds2] = rat(fsTarg/fs); % downsampling factors
-xa = mat2cell(xa,runIdx.GroupCount); % Slice by run
-for r = 1:nRuns
-    % Interpolate missing frames
-    xa{r} = fillmissing(double(xa{r}),missingInterp,1);
-    disp("Interpolated missing frames: "+blocks(r));
-
-    % Initial z-score
-    xa{r} = normalize(xa{r},1,"zscore","robust");
-
-    % HPF (within-run to avoid edge artifacts) -- robust detrending is better alternative
-    if hiPassHz>0 && ~(any(detrendOrder>0) && ~d3)
-        [~,fHi] = highpass(xa{r}(:,1,1),hiPassHz,fs);
-        if d3
-            for ch = 1:nChs
-                xa{r}(:,ch,:) = fHi.filtfilt(gpuArray(squeeze(xa{r}(:,ch,:))));
-            end
-        else
-            xa{r} = gather(fHi.filtfilt(gpuArray(xa{r})));
-        end
-        disp("High-passed: "+blocks(r));
-    end
+if (isstring(o.hiPass) && o.hiPass~="") || nnz(o.hiPass) || nnz(o.detrendOrder)
+    [xa,na] = ec_hiPassDetrend(xa,o.hiPass,o.detrendOrder,o.detrendWin,na,missing="linear");
 end
-
-
-%% Robust polynomial detrending
-
-% 1st robust detrend (numWorkers chunks within-run)
-if numel(detrendOrder)>=1 && detrendOrder(1)>0 && ~d3 %&& contains(na.suffix,"s"|"h")
-    detrendWts = cell(nRuns,1);
-    for r = 1:nRuns
-        xr = xa{r};
-        % Slice into number of threadpool workers
-        idx = diff(1: floor(height(xr)/nWorkers) : height(xr)); % Slice
-        idx(end) = idx(end) + (height(xr)-sum(idx));
-        xr = mat2cell(xr,idx);
-        dWts = cell(nWorkers,1);
-
-        % Detrend across timechunks
-        parfor c = 1:nWorkers
-            [xr{c},dWts{c}] = KT_detrend(xr{c},detrendOrder(1),[],'polynomials',...
-                detrendThr(1),detrendItr(1)); %#ok<PFBNS>
-        end
-        xa{r} = vertcat(xr{:});
-        detrendWts{r} = vertcat(dWts{:});
-        olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
-        disp("Robust polynomial detrended^"+detrendOrder(1)+" ol="+olPct+" "+blocks(r));
-    end
-else
-    detrendWts=ones(size(xa)); detrendWts=mat2cell(detrendWts,runIdx.GroupCount);
-end
-
-% 2nd robust detrend (higher-order, entire run)
-if numel(detrendOrder)>=2 && detrendOrder(2)>0 && ~d3 %&& contains(na.suffix,"s"|"h")
-    parfor r = 1:nRuns
-        [xa{r},detrendWts{r}] = KT_detrend(xa{r},detrendOrder(2),detrendWts{r},'polynomials',...
-                detrendThr(2),detrendItr(2),detrendWin); %#ok<PFBNS>
-        olPct = nnz(~detrendWts{r})/numel(detrendWts{r});
-        disp("Robust polynomial detrended^"+detrendOrder(2)+" ol="+olPct+" "+blocks(r));
-    end
-end
-
-
+xa = mat2cell(xa,runIdx);
 
 %% Outliers, low-pass filter & downsampling (within-run)
-parfor r = 1:nRuns
+for r = 1:nRuns
     xr = xa{r};
-    % Outliers per cond
-    if thrOL>0
-        idr = psy.idx(psy.run==runs(r)); %#ok<PFBNS>
-        for c = 1:numel(conds)
-            idx = psy.cond(idr)==conds(c) & ~psy.stim(idr);
-            xr(idx,:,:) = filloutliers(xr(idx,:,:),"clip","median",1,ThresholdFactor=thrOLbl);
-            bl = median(xr(idx,:,:),1,"omitnan");
-            idx = psy.cond(idr)==conds(c);
-            xr(idx,:,:) = filloutliers(xr(idx,:,:),nan,"median",1,ThresholdFactor=thrOL);
-            xr = fillmissing(xr,missingInterp,1); % Linear interpolation
-            xr(idx,:,:) = xr(idx,:,:) - bl; % Center at avg condition baseline
+    parfor ch = 1:nChs
+        xCh = squeeze(xr(:,ch,:));
+        
+        % Outliers per cond
+        if thrOL>0
+            idr = psy.idx(psy.run==runs(r)); %#ok<PFBNS>
+            for c = 1:numel(conds)
+                idx = psy.cond(idr)==conds(c) & ~psy.stim(idr);
+                xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOLbl);
+                bl = mean(xCh(idx,:),1,"omitnan");
+                idx = psy.cond(idr)==conds(c);
+                xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOL);
+                xCh(idx,:) = fillmissing(xCh(idx,:),missingInterp,1); % Linear interpolation
+                xCh(idx,:) = xCh(idx,:) - bl; % Center at avg condition baseline
+            end
         end
-        disp("Interpolated outliers per condition: "+blocks(r));
-    end
 
-    % Low-pass filter
-    if loPassHz>0
-        %[~,fLo] = lowpass(xr(:,1,1),loPassHz,fs); xr = fLo.filtfilt(xr);
-        xr = convn(xr,gusWin,'same'); % convolve gaussian
-        disp("Low-passed: "+blocks(r));
+        % Low-pass filter
+        if loPassHz>0
+            %[~,fLo] = lowpass(xr(:,1,1),loPassHz,fs); xr = fLo.filtfilt(xr);
+            xCh = convn(xCh,gusWin,'same'); % convolve gaussian
+        end
+        xr(:,ch,:) = xCh;
     end
+    if thrOL>0; disp("Interpolated outliers per condition: "+blocks(r)); end
+    if loPassHz>0; disp("Low-passed: "+blocks(r)); end
 
     % Downsample
     if ds>1
@@ -1119,15 +1107,16 @@ if any(diff(trIdx.min_idx)<1) || any(diff(trIdx.max_idx)<1)
 end
 
 % Slice by trial
-if numel(detrendOrder)>=2 && detrendOrder(2)>0
-    detrendWts=vertcat(detrendWts{:}); detrendWts=detrendWts(anT.iPsy,:,:);
-    detrendWts = mat2cell(detrendWts,trIdx.GroupCount);
-else
-    detrendWts = cell(height(trIdx),1);
-end
 xa=vertcat(xa{:}); xa=xa(anT.iPsy,:,:); % Match xs & anT indices
 xa = mat2cell(xa,trIdx.GroupCount);
 anT = mat2cell(anT,trIdx.GroupCount);
+try detrendWts = full(~na.detrendWts); catch; detrendWts=true(size(xa,[1 2])); end
+% if numel(detrendOrder)>=2 && detrendOrder(2)>0
+%     detrendWts=detrendWts(anT.iPsy,:,:);
+%     detrendWts = mat2cell(detrendWts,trIdx.GroupCount);
+% else
+%     detrendWts = cell(height(trIdx),1);
+% end
 
 % Parfor across trials
 parfor t = 1:height(trIdx)
@@ -1137,9 +1126,9 @@ parfor t = 1:height(trIdx)
     xt = normalize(xt,1,"zscore","robust"); % Median Absolute Deviation
 
     % Final detrend (within-trial)
-    if numel(detrendOrder)>=3 && detrendOrder(3)>0
-        [xt,detrendWts{t}] = KT_detrend(xt,detrendOrder(3),detrendWts{t},...
-            'polynomials',detrendThr(3),detrendItr(3)); %#ok<PFBNS> 
+    if numel(detrendOrder)>=3 && detrendOrder(3)>0 && ~d3
+        [xt,detrendWts{t}] = ec_detrend(xt,detrendOrder(3),detrendWts{t},...
+            'polynomials',detrendThr(3),detrendItr(3)); %#ok<PFBNS>
     end
 
     % Baseline correction (within-trial)
@@ -1148,16 +1137,16 @@ parfor t = 1:height(trIdx)
     xa{t} = xt;
 end
 disp("Robust z-scored (trialwise): "+sbj);
-detrendWts = logical(vertcat(detrendWts{:}));
-olPct = nnz(~detrendWts)/numel(detrendWts);
-detrendWts = sparse(~detrendWts);
-if numel(detrendOrder)>=3 && detrendOrder(3)>0
+if numel(detrendOrder)>=3 && detrendOrder(3)>0 && ~d3
+    detrendWts = logical(vertcat(detrendWts{:}));
+    olPct = nnz(~detrendWts)/numel(detrendWts);
+    detrendWts = sparse(~detrendWts);
+    na.detrendWts = detrendWts;
     disp("Trialwise polynomial detrended^"+detrendOrder(3)+" ol="+olPct+" "+sbj);
 end
 
 % Interpolate baseline outliers & center at baseline mean (within-condition)
 xa=vertcat(xa{:}); anT=vertcat(anT{:});
-na.detrendWts = detrendWts;
 for c = 1:numel(conds)
     idx = anT.cond==conds(c) & anT.pre;
     %xa(idx,:) = filloutliers(xa(idx,:),"clip","median",1,...
@@ -1177,7 +1166,7 @@ sbjID = ns.sbjID;
 nChs = size(xs,2);
 B(cellfun(@isempty,B.freqs),:) = [];
 doICA = ns.ICA;
-if doICA; chNames = ns.icNfo.name; else; chNames=[]; end
+if doICA; chNames = ns.icNfo.name; else; chNames=[1:nChs,1]; end
 if isfield(o,'epoch'); epoch=round(o.epoch*1000); else; epoch=[]; end
 if isfield(o,'epochRT'); epochRT=round(o.epochRT*1000); else; epochRT=[]; end
 if isfield(o,'epochPct'); epochPct=round(o.epochPct*100); else; epochPct=[]; end
@@ -1358,8 +1347,9 @@ parfor ch = 1:nChs
         sp(sp.pct2<epochPct(1) | sp.pct2>epochPct(2),:) = [];
         % Copy to permanent table
         if any(fieldnames(ssCh)=="pct")
-            ssCh.pct.(band) = sp.(band);
-            ssCh.pct.("SE_"+band) = sp.("SE_"+band);
+            [~,iA,iB] = intersect(ssCh.pct.Properties.RowNames,sp.Properties.RowNames,"stable");
+            ssCh.pct.(band)(iA) = sp.(band)(iB);
+            ssCh.pct.("SE_"+band)(iA) = sp.("SE_"+band)(iB);
         else
             ssCh.pct = sp; % Copy
         end
@@ -1437,8 +1427,10 @@ end
 % Get electrode plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN)
 if a.ICA
+    oP.clim = [-oP.clim(2)*(5/6), oP.clim(2)];
     % Color by ICA weights
-    [dCh.col,~,~,dCh.order] = ec_colorbarFromValues(dCh.wts,'RdBu',oP.clim,center=0,zscore=1);
+    [dCh.col,~,~,dCh.order] =...
+        ec_colorbarFromValues(dCh.wts,'RdYlBu',oP.clim,center=0,zscore=1);
     ch = xN.name;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
@@ -1451,7 +1443,7 @@ else
     ch = xN.ch;
     sbjCh = xN.sbjCh;
     dCh.sz(ch) = 12;
-    dCh.col(ch,1:3) = [0.753,0.004,0.133];
+    dCh.col(ch,1:3) = [1,0,0];
     hemN = [nnz(xN.hem=="L") nnz(xN.hem=="R")];
     %dCh.order = dCh.ch;
     %dCh.order(ch) = Inf;
@@ -1462,7 +1454,7 @@ end
 
 
 % Plot electrodes %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,medial) %#ok<INUSD> 
+function plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,medial) %#ok<INUSD>
 if nargin<7; medial=""; end
 %if a.type=="hfb"; span=5; else; span=[1 2]; end
 span = [1 2];
@@ -1523,31 +1515,31 @@ for c = 1:height(B)
     nexttile;
     plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize+2);
-    xlabel("Latency (ms)",'FontSize',oP.textsize+2);
-    if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize+2);  end
+    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize+1);
+    xlabel("Latency (ms)",'FontSize',oP.textsize);
+    if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize);  end
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
     hold off
-    
+
     % RT-locked
     nexttile;
     plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize+2);
-    xlabel("RT - Latency (ms)",'FontSize',oP.textsize+2);
+    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize+1);
+    xlabel("RT - Latency (ms)",'FontSize',oP.textsize);
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
     hold off
-    
+
     % Percent RT
     nexttile;
     plotFrameAvg_lfn(sc.pct{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("RT percent:  "+B.disp(c),'FontSize',oP.textsize+2);
-    xlabel("Latency/RT (%)",'FontSize',oP.textsize+2);
+    title("RT percent:  "+B.disp(c),'FontSize',oP.textsize+1);
+    xlabel("Latency/RT (%)",'FontSize',oP.textsize);
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
     plot([100 100],ylim,'k-','LineWidth',oP.o1D.width);

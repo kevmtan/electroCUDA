@@ -57,39 +57,39 @@ arguments
     arg.test logical = false
     arg.redoN logical = true
     arg.nIn {isstruct} = []
+    arg.raw logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; o=oICA; arg.nIn=ni; arg.save=0; arg.test=1; arg.redoN=1;
+% x=[]; n=[]; o=oICA; arg.raw=false; arg.nIn=[]; arg.save=1; arg.test=1; arg.redoN=0;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
 if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); end
-
-% Filtering
-if ~isfield(o,'hiPassICA');       o.hiPass=1; end
-if ~isfield(o,'hiPass');          o.hiPass=0.01; end
-% Detrending
-if ~isfield(o,'detrendOrder_ICA'); o.detrendOrder_ICA=[10 30]; end  % For ICA decomp: detrend polynomial order for ICA  (suggested=10, skip=0)
-if ~isfield(o,'detrendOrder');    o.detrendOrder=10; end     % For final output: detrend polynomial order (default=0, skip=0)
-if ~isfield(o,'detrendWin');      o.detrendWin=[]; end       % Detrend timewindow in seconds (all timepoints=[])
-% Bad channel/IC identification
-if ~isfield(o,'doBadCh');         o.doBadCh=false; end       % true/false
-if ~isfield(o,'doBadIC');         o.doBadCh=true; end        % true/false
-if ~isfield(o,'badChProp');       o.badChProp=0.5; end       % Criterion proportion of bad samples [default: 0.5]
-if ~isfield(o,'thrHurst');        o.thrHurst=3; end          % Hurst threshold (median absolute deviation)
-% Rereferencing
-if ~isfield(o,'doRereference');   o.doRereference=true; end 
-if ~isfield(o,'rrThr');           o.rrThr=3; end             % Outlier threshold (default=3,skip=0)
-if ~isfield(o,'rrItr');           o.rrItr=5; end             % Number of iterations (default=5)
-% Electric line noise removal
-if ~isfield(o,'lineHz');          o.lineHz=0; end            % Electricity hertz @ EEG recording site (default=0, skip=0)
-% Detect epileptic high-frequency oscillations (HFO)
-if ~isfield(o,'thrHFO');          o.thrHFO=2; end            % Threshold for epileptic HFO detection (default=2)
-% Detect within-channel outlier timepoints
-if ~isfield(o,'doBadFrames');     o.doBadFrames=true; end    % true/false
-if ~isfield(o,'thrMAD');          o.thrMAD=10; end           % Z-threshold relative to all data points to exclude timepoints
-if ~isfield(o,'thrDiff');         o.thrDiff=10; end          % Z-threshold for amplitude differences of consecutive timepoints
-if ~isfield(o,'thrSNS');          o.thrSNS=3; end            % Threshold for low-freq spikes
+% % Filtering
+% if ~isfield(o,'hiPassICA');       o.hiPass=1; end
+% if ~isfield(o,'hiPass');          o.hiPass=0.01; end
+% % Detrending
+% if ~isfield(o,'detrendOrder_ICA'); o.detrendOrder_ICA=[10 30]; end  % For ICA decomp: detrend polynomial order for ICA  (suggested=10, skip=0)
+% if ~isfield(o,'detrendOrder');    o.detrendOrder=10; end     % For final output: detrend polynomial order (default=0, skip=0)
+% if ~isfield(o,'detrendWin');      o.detrendWin=[]; end       % Detrend timewindow in seconds (all timepoints=[])
+% % Bad channel/IC identification
+% if ~isfield(o,'doBadCh');         o.doBadCh=false; end       % true/false
+% if ~isfield(o,'doBadIC');         o.doBadCh=true; end        % true/false
+% if ~isfield(o,'badChProp');       o.badChProp=0.5; end       % Criterion proportion of bad samples [default: 0.5]
+% if ~isfield(o,'thrHurst');        o.thrHurst=3; end          % Hurst threshold (median absolute deviation)
+% % Rereferencing
+% if ~isfield(o,'doRereference');   o.doRereference=true; end
+% if ~isfield(o,'rrThr');           o.rrThr=3; end             % Outlier threshold (default=3,skip=0)
+% if ~isfield(o,'rrItr');           o.rrItr=5; end             % Number of iterations (default=5)
+% % Electric line noise removal
+% if ~isfield(o,'lineHz');          o.lineHz=0; end            % Electricity hertz @ EEG recording site (default=0, skip=0)
+% % Detect epileptic high-frequency oscillations (HFO)
+% if ~isfield(o,'thrHFO');          o.thrHFO=2; end            % Threshold for epileptic HFO detection (default=2)
+% % Detect within-channel outlier timepoints
+% if ~isfield(o,'doBadFrames');     o.doBadFrames=true; end    % true/false
+% if ~isfield(o,'thrMAD');          o.thrMAD=10; end           % Z-threshold relative to all data points to exclude timepoints
+% if ~isfield(o,'thrDiff');         o.thrDiff=10; end          % Z-threshold for amplitude differences of consecutive timepoints
+% if ~isfield(o,'thrSNS');          o.thrSNS=3; end            % Threshold for low-freq spikes
 try parpool('threads'); catch;end
 
 %% Load & initialize
@@ -107,15 +107,21 @@ if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
 cd(o.dirOut);
 
 % Load EEG data
-if isempty(x)
+xOg=[];
+if isempty(x) && arg.raw
     [x,errors,chNan] = load_iEEG_LBCN(sbj,proj,blocks,dirs,errors); toc(tt);
-    ch_bad.nan(chNan) = true; 
+    ch_bad.nan(chNan) = true;
+elseif isempty(x)
+    x = ec_loadSbj(dirs,"","x");
+else
+    xOg = x; % Save input data for later
 end
-xOg = x; % Save raw data for later
+
+n.dirs = dirs;
 
 %% Robust detrending for better ICA decomposition (aggressive)
 [x,n] = ec_hiPassDetrend(x,o.hiPassICA,o.detrendOrder_ICA,o.detrendWin,n,tt,...
-    itr=o.detrendItr_ICA,thr=o.detrendThr_ICA,sfx=sfx1);
+    itr=o.detrendItr_ICA,thr=o.detrendThr_ICA,missing=o.missingInterp,sfx=sfx1,gpu=0);
 
 %% Classify bad chans & frames
 if o.doBadCh
@@ -130,7 +136,7 @@ elseif any(ch_bad.Properties.VariableNames=="bad")
 else
     chGood = true(nChs,1);
 end
-toc(tt);    
+toc(tt);
 
 %% Robust rereference
 if o.doRereference
@@ -155,7 +161,7 @@ end
 
 %% Classify bad ICs
 if o.doBadIC
-    icNfo = classifyBadICs_lfn(xOg,icNfo,n,o,tt); % Classifier doesn't like robust rereferenced data
+    icNfo = classifyBadICs_lfn(icNfo,n,o,tt); % Classifier doesn't like robust rereferenced data
 end
 
 %% Reconstruct IC activity timecourses
@@ -241,69 +247,64 @@ end
 function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,ch_bad,chNfo,sfx1,errors,tt)
 if ~exist('tt','var'); tt = tic; end
 
-% Get covariance/correlation of EEG channels
-chCov = cov(x,'partialrows');
-chCorr = corrcov(chCov);
-
-% Get channels with ultra-high covariance
-chCovZ = abs(chCov);
-chCovZ(chCorr==1) = nan;
-chCovZ = mean(chCovZ,2,"omitnan"); 
-chCovOL = isoutlier(chCovZ,"median","ThresholdFactor",10);
-
-% Copy to permanent tables
-ch_bad.("cov"+sfx1) = chCovOL;
-ch_bad.("covP"+sfx1) = chCovZ;
-ch_bad = movevars(ch_bad,["cov" "covP"],"After","nan");
-
-
-%% Find channels to use for ICA
+% Find channels to use for ICA
 if isfield(arg,"nIn") && isstruct(arg.nIn) && isfield(arg.nIn,"chICA")
     chICA = arg.nIn.chICA;
     chRank = ec_rank(x(:,chICA)); % Calculate rank
     o.ica_pca = 0;
     disp("Using previous ICA params: num_chICA="+numel(chICA)+" | rank="+chRank);
 else
-    id = find(contains(ch_bad.Properties.VariableNames,"ai"),1,"last");
-    chICA = find(~(ch_bad.empty|ch_bad.ref|ch_bad.nan|(chCovOL & ch_bad{:,id})|...
-        ismember(chNfo.pialRAS(:,1),[0 nan])));
-    chRank = ec_rank(x(:,chICA)); % Calculate rank
+    id = find(contains(ch_bad.Properties.VariableNames,"asr"),1,"last");
+    chICA = find(~(ch_bad{:,id}) | ismember(chNfo.pialRAS(:,1),[0 nan]));
+    chBad = find(sum(full([ch_bad.rr,ch_bad.ref,ch_bad.sns,ch_bad.hurstL,ch_bad.hurstH,...
+        ch_bad.flat,ch_bad.cov]),2)>=2);
+    chRank = ec_rank(x(:,chICA),true); % Calculate rank
     disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
 
-    % Get Hurst exponent
-    hurst = abs(ch_bad.hursP - 0.5); % 0.5 = brownian noise
-
     % If rank-deficient by 1; permute to find which chans to exclude
-    if chRank+1 == numel(chICA)
-        chPerm = nan(numel(chICA),1);
+    rankSufficient = 0;
+    if chRank < numel(chICA)
+        
+        chRankz = nan(numel(chICA),1); chRanks=chRankz;
         parfor v = 1:numel(chICA) % See which exclusions result in highest rank
             xCh = x;
             ch = chICA(v);
             id = chICA~=ch; %#ok<PFBNS>
-            chPerm(v) = ec_rank(xCh(:,chICA(id)));
+            chRankz(v) = ec_rank(xCh(:,chICA(id)),false,100); % ultra-coservative rank
+            chRanks(v) = ec_rank(xCh(:,chICA(id))); % normal rank
+        end
+
+        % Find channel(s) w greatest rank deficiency contribution
+        [~,idx] = max(chRankz); % ultra-conservative rank
+        chRank = chRanks(idx); % normal rank
+        chRm = chICA(idx);
+        chRm(~ismember(chRm,chBad)) = [];
+        % If too many chans
+        while numel(chRm) > numel(chICA)-chRank
+            [~,id] = min(chRankz(ismember(chICA,chRm)));
+            try chRm(id)=[]; catch;end
         end
 
         % Remove chan only if it fixes rank-deficiency
-        if max(chPerm) >= numel(chICA)-1
-            chRank = max(chPerm);
-            chRm = chICA(chPerm==chRank);
-            if numel(chRm)>1
-                [~,id] = min(hurst(chRm));
-                chRm = chRm(id);
-            end
+        chRankRm = ec_rank(x(:,chICA(chICA~=chRm)),true);
+        if chRankRm >= numel(chICA) - numel(chRm)
             chICA(chICA==chRm) = [];
-            disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
+            disp("ICA_chans="+numel(chICA)+" | rank="+chRankRm+" | excluded="+chRm);
+            rankSufficient = 1;
         end
+    else; rankSufficient = 1;
     end
 
     % If rank deficient by more than 1, do PCA
-    if chRank < numel(chICA)
-        o.ica_pca = ec_rank(x(:,chICA));
+    chRank = ec_rank(x(:,chICA),true); % Calculate rank
+    if ~rankSufficient && chRank < numel(chICA)
+        o.ica_pca = ec_rank(x(:,chICA),false,50);
         warning("setting o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
         errors{end+1,1} = lastwarn;
     else
         o.ica_pca = 0;
     end
+    disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca);
 end
 
 % Copy to permanent tables
@@ -315,7 +316,7 @@ toc(tt);
 %% Find outlier frames common to all EEG chans for ICA
 % chGMM = fitgmdist(x(:,chICA),2,'RegularizationValue',0.01,... % Fit gaussian mixture model (GMM)
 %     'Options',statset('Display','final','UseParallel',true));
-% 
+%
 % % Get outliers from GMM log-likelihood
 % [~,~,~,chICA_badIdx] = cluster(chGMM,x(:,chICA));
 % chICA_badIdx = isoutlier(chICA_badIdx,"median","ThresholdFactor",4);
@@ -324,7 +325,7 @@ toc(tt);
 % while chRank<numel(chICA) && chPct>0.9
 %     chBad = intersect(chICA,find(~chGood|chCovOL|ch_bad.sus|ch_bad.rr));
 %     [maxCorr,~] = max(chCorr(chICA,chICA),[],'all');
-% 
+%
 %     % Determine ICA channels to look at
 %     if (chPct>=1 || maxCorr>=0.95) && ~isempty(chBad); chB = chBad;
 %     else; chB = chICA; end
@@ -333,16 +334,16 @@ toc(tt);
 %     ch1 = chB(ch1);
 %     ch2 = chB(ch2);
 %     chx = [ch1 ch2];
-%     
+%
 %     % Sum bad metrics per channel
-%     ch1b = chCovZ(ch1)*10 + nnz(ch_bad{ch1,varCh}); % ~chGood(ch1)*5 
-%     ch2b = chCovZ(ch2)*10 + nnz(ch_bad{ch2,varCh}); % ~chGood(ch2)*5 
-%     
+%     ch1b = chCovZ(ch1)*10 + nnz(ch_bad{ch1,varCh}); % ~chGood(ch1)*5
+%     ch2b = chCovZ(ch2)*10 + nnz(ch_bad{ch2,varCh}); % ~chGood(ch2)*5
+%
 %     % Remove chan
 %     if ch1b ~= ch2b % Prioritize worse chans
 %         [~,idx] = max([ch1b ch2b]);
 %     else % If equal, remove highest variance chan (faster rank normalization)
-%         [~,idx] = max(chVar(chx)); 
+%         [~,idx] = max(chVar(chx));
 %     end
 %     chICA(chICA==chx(idx)) = [];
 %     chPct = numel(chICA)/chRankOg;
@@ -364,7 +365,7 @@ end
 
 
 %% Run CUDAICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [n,icNfo] = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt) %#ok<INUSD> 
+function [n,icNfo] = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt) %#ok<INUSD>
 sbj = n.sbj;
 sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
@@ -423,7 +424,7 @@ end
 %% Reconstruct IC activity %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [x,xOg,n] = reconstructICs_lfn(xOg,o,n,chGood,chICA,tt)
 if isempty(xOg)
-    xOg = load_iEEG_LBCN(n.sbj,n.proj,n.blocks,dirs); % Load raw EEG data
+   xOg = ec_loadSbj(n.dirs,"","x");
 end
 
 % Hi-pass & detrend
@@ -449,13 +450,10 @@ end
 
 
 %% Classify bad ICs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function icNfo = classifyBadICs_lfn(xa,icNfo,n,o,tt)
-if isempty(xa)
-    xa = load_iEEG_LBCN(n.sbj,proj,blocks,dirs); 
-end % Load raw EEG data (classifier doesn't work with robust referenced data)
+function icNfo = classifyBadICs_lfn(icNfo,n,o,tt)
 
-% Hi-pass
-%xi = ec_hiPassDetrend(xi,n.fs,o.hiPassICA,[],[],n.runIdx,n.blocks,tt);
+% Load raw EEG data (classifier doesn't work with robust referenced data)
+xa = load_iEEG_LBCN(n.sbj,n.proj,n.blocks,n.dirs);
 
 % Reconstruct IC timecourses
 xa = (n.icW * xa(:,n.chICA)')';

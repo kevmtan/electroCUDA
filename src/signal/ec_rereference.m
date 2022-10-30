@@ -35,7 +35,7 @@ end
 for t = 1:nItr
     % Add 1 to denomenator of mean to avoid losing data rank
     if floor(rnk)<nnz(mask); d=1; else; d=0; end
-    rnk = nnz(mask); % Compare num chans/rank with next iteration
+    rnk = inf; %nnz(mask); % Compare num chans/rank with next iteration
 
     % Robust reference to good chans
     mn = sum(x(:,mask),2,"omitnan") / sum(mask,"om")+d; % mean timecourse of good chans

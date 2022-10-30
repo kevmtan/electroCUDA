@@ -1,7 +1,7 @@
 function [xRank,xRank1,xCov] = ec_rank(x,flag,tol)
 arguments
     x {mustBeFloat}
-    flag (1,1) logical = false
+    flag (1,1) {islogical} = false
     tol (1,1) {isfloat} = 1e-7
 end
 

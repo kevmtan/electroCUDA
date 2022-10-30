@@ -35,7 +35,7 @@ end
 
 % Z-score values
 if numel(a.zscore)==2 || a.zscore
-    vals = normalize(vals,"zscore");
+    vals = normalize(vals,"zscore","robust");
 
     % Get custom z-score limits
     if numel(a.zscore)==2

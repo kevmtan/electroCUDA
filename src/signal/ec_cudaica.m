@@ -59,7 +59,7 @@ nChs = size(x,2);
 if isempty(arg.lrate); arg.lrate=1e-4; end
 if isempty(arg.stop); arg.stop=""; end
 if ~isempty(arg.sfx) && arg.sfx~=""; sfx="_"+arg.sfx; else; sfx=""; end
-if isempty(arg.pca)||pca<=0; nComps=nChs; else; nComps=arg.pca; end
+if isempty(arg.pca)||arg.pca<=0; nComps=nChs; else; nComps=arg.pca; end
 doFlip=true;
 if size(x,2)>size(x,1); x=x'; doFlip=0; warning("data has more channels than frames, flipping..."); end
 

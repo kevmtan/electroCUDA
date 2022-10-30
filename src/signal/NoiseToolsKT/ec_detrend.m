@@ -1,4 +1,4 @@
-function [y,w,r] = KT_detrend(x,order,w,basis,thresh,niter,wsize)
+function [y,w,r] = ec_detrend(x,order,w,basis,thresh,niter,wsize)
 %[y,w,r]=nt_detrend(x,order,w,basis,thresh,niter,wsize) - robustly remove trend
 %
 %  y: detrended data
@@ -29,7 +29,7 @@ if iscell(x)
     if ~isempty(w); error('not implemented'); end
     y=cell(numel(x),1); w=y; r=y;
     for iTrial=1:numel(x)
-        [y{iTrial},w{iTrial},r{iTrial}] = KT_detrend(x{iTrial},order,w,basis,thresh,niter,wsize);
+        [y{iTrial},w{iTrial},r{iTrial}] = ec_detrend(x{iTrial},order,w,basis,thresh,niter,wsize);
     end
     return
 end
@@ -48,7 +48,7 @@ dims = size(x);
 
 if isempty(wsize) || ~wsize
     % standard detrending (trend fit to entire data)
-    [y,w,r] = KT_detrend_helper(x,order,w,basis,thresh,niter);
+    [y,w,r] = ec_detrendHelper(x,order,w,basis,thresh,niter);
 else
     wsize = 2*floor(wsize/2);
 
@@ -90,7 +90,7 @@ else
 
             % detrend this window
             NITER = 1;
-            yy = KT_detrend_helper(x(start:stop,:),order,w(start:stop,:),basis,thresh,NITER);
+            yy = ec_detrendHelper(x(start:stop,:),order,w(start:stop,:),basis,thresh,NITER);
 
             % triangular weighting
             if start==1
@@ -102,8 +102,9 @@ else
             end
 
             % overlap-add to output
-            y(start:stop,:) = y(start:stop,:)+bsxfun(@times,yy,b);
-            trend(start:stop,:) = trend(start:stop,:)+bsxfun(@times,x(start:stop,:)-yy,b);
+            y(start:stop,:) = y(start:stop,:) + (yy.*b); %bsxfun(@times,yy,b);
+            trend(start:stop,:) = trend(start:stop,:) + (x(start:stop,:)-yy).*b;
+            %bsxfun(@times,x(start:stop,:)-yy,b);
 
             a(start:stop,1) = a(start:stop)+b;
 
@@ -117,12 +118,12 @@ else
         end 
         y = bsxfun(@times,y,1./a);
         y(isnan(y)) = 0;
-        trend = bsxfun(@times,trend,1./a); 
+        trend = trend.*(1./a); %bsxfun(@times,trend,1./a); 
         trend(isnan(trend)) = 0;
 
         % find outliers
         d = x-trend;
-        if ~isempty(w); d = bsxfun(@times,d,w); end
+        if ~isempty(w); d = d.*w; end %bsxfun(@times,d,w); end
         ww = ones(size(x));
         ww(abs(d) > thresh*repmat(std(d),dims(1),1)) = 0;
 
@@ -148,7 +149,7 @@ end
 end
 
 %% Original version of detrend (no windows) is called by new version (windows)
-function [y,w,r] = KT_detrend_helper(x,order,w,basis,thresh,niter)
+function [y,w,r] = ec_detrendHelper(x,order,w,basis,thresh,niter)
 %[y,w,r]=nt_detrend(x,order,w,basis,thresh,niter) - robustly remove trend
 %
 %  y: detrended data

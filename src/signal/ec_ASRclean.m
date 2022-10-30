@@ -1,4 +1,4 @@
-function signal = ec_ASRclean(signal,cutoff,windowlen,stepsize,maxdims,ref_maxbadchannels,ref_tolerances,ref_wndlen,usegpu,useriemannian,maxmem)
+function EEG = ec_ASRclean(EEG,cutoff,windowlen,stepsize,maxdims,ref_maxbadchannels,ref_tolerances,ref_wndlen,usegpu,useriemannian,maxmem)
 % Run the ASR method on some high-pass filtered recording.
 % Signal = clean_asr(Signal,StandardDevCutoff,WindowLength,BlockSize,MaxDimensions,ReferenceMaxBadChannels,RefTolerances,ReferenceWindowLength,UseGPU,UseRiemannian,MaxMem)
 %
@@ -68,7 +68,6 @@ function signal = ec_ASRclean(signal,cutoff,windowlen,stepsize,maxdims,ref_maxba
 %                             want to reduce this number so that they don't go into the calibration
 %                             data. Default: 0.075.
 %
-%
 %   ReferenceTolerances : These are the power tolerances outside of which a channel in a
 %                         given time window is considered "bad", in standard deviations relative to
 %                         a robust EEG power distribution (lower and upper bound). Together with the
@@ -126,7 +125,7 @@ function signal = ec_ASRclean(signal,cutoff,windowlen,stepsize,maxdims,ref_maxba
 % USA
 
 if ~exist('cutoff','var') || isempty(cutoff); cutoff = 5; end
-if ~exist('windowlen','var') || isempty(windowlen); windowlen = max(0.5,1.5*signal.nbchan/signal.srate); end
+if ~exist('windowlen','var') || isempty(windowlen); windowlen = max(0.5,1.5*EEG.nbchan/EEG.srate); end
 if ~exist('stepsize','var') || isempty(stepsize); stepsize = []; end
 if ~exist('maxdims','var') || isempty(maxdims); maxdims = 0.66; end
 if ~exist('ref_maxbadchannels','var') || isempty(ref_maxbadchannels); ref_maxbadchannels = 0.075; end
@@ -136,13 +135,13 @@ if ~exist('usegpu','var') || isempty(usegpu); usegpu = false; end
 if ~exist('maxmem','var') || isempty(maxmem); maxmem = []; end
 if ~exist('useriemannian','var') || isempty(useriemannian); useriemannian = false; end
 
-signal.data = double(signal.data);
+EEG.data = double(EEG.data);
 
 %% first determine the reference (calibration) data
 if isnumeric(ref_maxbadchannels) && isnumeric(ref_tolerances) && isnumeric(ref_wndlen)
     disp('Finding a clean section of the data...');
     try
-        ref_section = clean_windows(signal,ref_maxbadchannels,ref_tolerances,ref_wndlen);
+        ref_section = clean_windows(EEG,ref_maxbadchannels,ref_tolerances,ref_wndlen);
     catch e
         disp('An error occurred while trying to identify a subset of clean calibration data from the recording.');
         disp('If this is because do not have EEGLAB loaded or no Statistics toolbox, you can generally');
@@ -150,11 +149,11 @@ if isnumeric(ref_maxbadchannels) && isnumeric(ref_tolerances) && isnumeric(ref_w
         disp('Error details: ');
         hlp_handleerror(e,1);
         disp('Falling back to using the entire data for calibration.')
-        ref_section = signal;
+        ref_section = EEG;
     end
 elseif strcmp(ref_maxbadchannels,'off') || strcmp(ref_tolerances,'off') || strcmp(ref_wndlen,'off')
     disp('Using the entire data for calibration (reference parameters set to ''off'').')
-    ref_section = signal;
+    ref_section = EEG;
 elseif ischar(ref_maxbadchannels) && isvarname(ref_maxbadchannels)
     disp('Using a user-supplied data set in the workspace.');
     ref_section = evalin('base',ref_maxbadchannels);
@@ -183,21 +182,21 @@ end
 clear ref_section;
 
 if isempty(stepsize)
-    stepsize = floor(signal.srate*windowlen/2); end
+    stepsize = floor(EEG.srate*windowlen/2); end
 
 % extrapolate last few samples of the signal
-sig = 2*signal.data(:,end) - signal.data(:,(end-1):-1:end-round(windowlen/2*signal.srate));
+sig = [EEG.data 2*EEG.data(:,end) - EEG.data(:,(end-1):-1:end-round(windowlen/2*EEG.srate))];
 %sig = [signal.data bsxfun(@minus,2*signal.data(:,end),signal.data(:,(end-1):-1:end-round(windowlen/2*signal.srate)))];
 
 %% process signal using ASR
 if useriemannian
-    [signal.data,state] = asr_process_r(sig,signal.srate,state,windowlen,windowlen/2,stepsize,maxdims,maxmem,usegpu);
+    [EEG.data,state] = asr_process_r(sig,EEG.srate,state,windowlen,windowlen/2,stepsize,maxdims,maxmem,usegpu);
 else
-    [signal.data,state] = asr_lfn(sig,signal.srate,state,windowlen,windowlen/2,stepsize,maxdims,maxmem,usegpu);
+    [EEG.data,state] = asr_lfn(sig,EEG.srate,state,windowlen,windowlen/2,stepsize,maxdims,maxmem,usegpu);
 end
 
 % shift signal content back (to compensate for processing delay)
-signal.data(:,1:size(state.carry,2)) = [];
+EEG.data(:,1:size(state.carry,2)) = [];
 end
 
 
@@ -362,7 +361,10 @@ for i=1:splits
         if usegpu && length(range) > 1000
             try X = gpuArray(X); catch,end; end
         % compute running mean covariance (assuming a zero-mean signal)
-        [Xcov,state.cov] = moving_average(N,reshape(bsxfun(@times,reshape(X,1,C,[]),reshape(X,C,1,[])),C*C,[]),state.cov); % ch c ch x range.
+        [Xcov,state.cov] =...
+            moving_average(N,reshape(reshape(X,1,C,[]).*reshape(X,C,1,[]),C*C,[]),state.cov);
+        %[Xcov,state.cov] = moving_average(N,reshape(bsxfun(@times,reshape(X,1,C,[]),reshape(X,C,1,[])),C*C,[]),state.cov); % ch c ch x range.
+
         % extract the subset of time points at which we intend to update
         update_at = min(stepsize:stepsize:(size(Xcov,2)+stepsize-1),size(Xcov,2));
         % if there is no previous R (from the end of the last chunk), we estimate it right at the first sample
@@ -384,7 +386,7 @@ for i=1:splits
             trivial = all(keep);
             % update the reconstruction matrix R (reconstruct artifact components using the mixing matrix)
             if ~trivial
-                R = real(M*pinv(bsxfun(@times,keep',V'*M))*V');
+                R = real(M*pinv(keep'.*V'*M)*V');
             else
                 R = eye(C);
             end
@@ -393,7 +395,9 @@ for i=1:splits
             if ~trivial || ~state.last_trivial
                 subrange = range((last_n+1):n);
                 blend = (1-cos(pi*(1:(n-last_n))/(n-last_n)))/2;
-                data(:,subrange) = bsxfun(@times,blend,R*data(:,subrange)) + bsxfun(@times,1-blend,state.last_R*data(:,subrange));
+                %data(:,subrange) = bsxfun(@times,blend,R*data(:,subrange)) + bsxfun(@times,1-blend,state.last_R*data(:,subrange));
+                data(:,subrange) = blend.*(R*data(:,subrange)) +...
+                    (1-blend).*(state.last_R*data(:,subrange));
             end
             [last_n,state.last_R,state.last_trivial] = deal(n,R,trivial);
         end
@@ -444,7 +448,9 @@ I = [1:M-N; 1+N:M];
 % get sign vector (also alternating, and includes the scaling)
 S = [-ones(1,M-N); ones(1,M-N)]/N;
 % run moving average
-X = cumsum(bsxfun(@times,Y(:,I(:)),S(:)'),2);
+X = cumsum(Y(:,I(:)).*S(:)',2);
+%X = cumsum(bsxfun(@times,Y(:,I(:)),S(:)'),2);
+
 % read out result
 X = X(:,2:2:end);
 

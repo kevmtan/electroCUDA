@@ -24,19 +24,17 @@ dirs=arg.dirs;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
-
-% Options
-if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
-if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
-if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
-if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
-if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
-if ~isfield(o,'single');      o.single=[]; end         % Convert to double to single (single much faster on GPU)
-if ~isfield(o,'thrSpec');     o.thrSpec=15; end        % Threshold for averaged spectral data (e.g. HFB) (z-score threshold relative to all data points) to exclude timepoints
-if ~isfield(o,'doGPU');       o.doGPU=false; end       % Run on GPU, see MATLAB gpuArray requirements (default=false)
-if ~isfield(o,'doGPUarray');  o.doGPUarray=true; end   % Use arrayfun for GPU (faster, more memory)
 if ~isfield(o,'gatherOut');   o.gatherOut=false; end
-if isempty(o.single); if o.doGPU; o.single=true; else; o.single=false; end; end
+% if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
+% if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
+% if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
+% if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
+% if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
+% if ~isfield(o,'single');      o.single=[]; end         % Convert to double to single (single much faster on GPU)
+% if ~isfield(o,'thrSpec');     o.thrSpec=15; end        % Threshold for averaged spectral data (e.g. HFB) (z-score threshold relative to all data points) to exclude timepoints
+% if ~isfield(o,'doGPU');       o.doGPU=false; end       % Run on GPU, see MATLAB gpuArray requirements (default=false)
+% if ~isfield(o,'doGPUarray');  o.doGPUarray=true; end   % Use arrayfun for GPU (faster, more memory)
+% if isempty(o.single); if o.doGPU; o.single=true; else; o.single=false; end; end
 % Make workspace vars
 doGPU=o.doGPU; fMean=o.fMean; dsTarg=o.dsTarg; doSingle=o.single; doGPUarray=o.doGPUarray;
 gatherOut=o.gatherOut;
@@ -57,19 +55,15 @@ else
     sbjChs=n.icNfo.sbjIC;
 end
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
-if ~isfield(o,'dirOut'); o.dirOut=dirs.data+"/robust/s"+sbjID+"/"+proj+"/"; end % Output directory
+if ~isfield(o,'dirOut'); o.dirOut=dirs.robustSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+proj+".mat"; end % Filename ending string
 if ~doGPU; try parpool('threads'); catch;end;end
 
+
 %% Load EEG data
 if isempty(x)
-    if arg.ica; fn=o.dirOut+"xi_"+o.fnStr; else; fn=o.dirOut+"x_"+o.fnStr+".mat"; end
-    if isfile(fn) && ~arg.raw
-        load(fn,"x"); disp("LOADED: "+fn);
-    else
-        [errPreproc,n,x] = robust_preproc(sbj,proj,o,save=0,dirs=dirs);
-        if nnz(~cellfun(@isempty,errPreproc)); errors{end+1}=errPreproc; end 
-    end
+    if arg.ica && o.sfx_src==""; o.sfx_src="i"; end
+    x = ec_loadSbj(dirs,o.sfx_src,"x");
 end
 nChs = size(x,2);
 
