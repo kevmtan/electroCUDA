@@ -1,13 +1,16 @@
 function [cols,cIdx,cMap,vals] = ec_colorbarFromValues(vals,cMapName,cLim,a)
-% Get a colormap from a set of values
+% Get a colormap from a set of values. Enter range for z-score to distinguish
+% raw value & z-score operations
 %
-% Limit raw values between [-3 3] & center colorbar at 0
+% OUTPUTS: [RGB color triplets, colormap index, full colormap, values scaled from -1 to 1]
+%
+% Limit raw values between [-3 3] & center colorbar at value=0
 %    [cols,cIdx,cMap,cOrder] = colorbarFromValues_KT(vals,"viridis",[-3 3],center=0)
 %
-% Z-transform values, center colorbar at z=0 & limit z-scores between [-3 3]:
+% Z-transform & limit scale to z-score=[-3 3] with center at z=0
 %    [cols,cIdx,cMap,cOrder] = colorbarFromValues_KT(vals,"viridis",[-3 3],center=0,zscore=1)
 %
-% Limit raw values between [-8 10], z-transform, center colorbar at z=0 & limit z-scores between [-3 3]:
+% Limit raw values between [-8 10], center at value=0, scale to standard deviation between [-3 3]:
 %    [cols,cIdx,cMap,cOrder] = colorbarFromValues_KT(vals,"viridis",[-8 10],center=0,zscore=[-3 3])
 
 %% Inputs
@@ -15,11 +18,11 @@ arguments
     vals {isnumeric} % Vector of numeric values
     cMapName {ischar,isstring} = "RdBu" % Name of colormap
     cLim {isnumeric} = [] % Raw/z-score value limits to clip: [lowerLimit,upperLimit]
-    a.center (1,1) {isnumeric} = [] % Center raw/zscored values at this number
+    a.center (1,1) {isnumeric,ischar,isstring} = nan % Center raw/zscored values at this number
     a.zscore {isnumeric,islogical} = false % do z-transform (true|false), zscore limits [lowerZ,upperZ]
 end
 
-%% Main
+%% Scale values
 
 % Get number of colors
 nCols = length(vals);
@@ -28,14 +31,18 @@ if nCols<256
 end
 
 % Set value limits
-if numel(cLim)==2 && (numel(a.zscore)==2 || ~a.zscore)
+if numel(cLim)==2 && numel(a.zscore)<=1 
     vals(vals<cLim(1)) = cLim(1);
     vals(vals>cLim(2)) = cLim(2);
 end
 
 % Z-score values
-if numel(a.zscore)==2 || a.zscore
-    vals = normalize(vals,"zscore","robust");
+if any(a.zscore)
+    if any(a.center)
+        vals = normalize(vals,"center",a.center,"scale","std");
+    else
+        vals = normalize(vals,"zscore");
+    end
 
     % Get custom z-score limits
     if numel(a.zscore)==2
@@ -50,7 +57,7 @@ if numel(a.zscore)==2 || a.zscore
 end
 
 % Center colorbar
-if ~isempty(a.center)
+if any(a.center)
     vals = normalize(vals,"center",a.center);
     cLim = [min(vals) max(vals)];
     cLim = [-max(abs(cLim(1)),abs(cLim(2))) max(abs(cLim(1)),abs(cLim(2)))];
@@ -58,19 +65,25 @@ elseif numel(cLim)<2
     cLim = [min(vals) max(vals)];
 end
 
-% Get order of values
+% Get value order & indices 
 vals = (vals-cLim(1))./(cLim(2)-cLim(1));
 cIdx = round(vals.*nCols);
 cIdx(cIdx<1) = 1;
 cIdx(cIdx>nCols) = nCols;
 in = ~isnan(cIdx);
 
-% Get colormap
+%% Colormap the values
 switch cMapName
     case 'parula'
         cMap = parula(nCols);
     case 'viridis'
         cMap = viridis(nCols);
+    case 'jet'
+        cMap = jet(nCols);
+    case 'turbo'
+        cMap = turbo(nCols);
+    case 'hot'
+        cMap = hot(nCols);
     case 'RedBlue'
         cMap = cmRedBlue(nCols);
         cMap = flip(cMap);
@@ -82,7 +95,7 @@ switch cMapName
         cMap = cmYellowGreen(nCols);
     case 'RedsWhite'
         cMap = cmRedsWhite(nCols);
-    case 'BluesWhite' 
+    case 'BluesWhite'
         cMap = cmBluesWhite(nCols);
     otherwise
         cMap = cbrewer2(cMapName, nCols);

@@ -46,7 +46,7 @@ dims = size(x);
 %     end
 % end
 
-if isempty(wsize) || ~wsize
+if isempty(wsize) || ~any(wsize)
     % standard detrending (trend fit to entire data)
     [y,w,r] = ec_detrendHelper(x,order,w,basis,thresh,niter);
 else

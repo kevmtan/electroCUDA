@@ -1,21 +1,26 @@
-function [xRank,xRank1,xCov] = ec_rank(x,flag,tol)
+function [xRank,xEig,xRank1] = ec_rank(x,flag,o)
 arguments
     x {mustBeFloat}
     flag (1,1) {islogical} = false
-    tol (1,1) {isfloat} = 1e-7
+    o.tol (1,1) {isfloat} = 1e-7
+    o.gpu (1,1) {islogical} = false
 end
+if isempty(o.tol); o.tol = 1e-7; end
+if isgpuarray(x); o.gpu = true; end
+if o.gpu && ~isgpuarray(x); x = gpuArray(x);end
+if o.gpu && ~isgpuarray(o.tol); o.tol = gpuArray(o.tol); end
 
 %% Altertative rank computation by Sven Hoffman
-xCov = cov(x,1,'partialrows');
-[~,D] = eig(xCov);
-xRank = sum(diag(D)>tol);
+xEig = cov(x,1,'partialrows');
+xEig = eig(xEig);
+xRank = sum(xEig>o.tol);
 
 %% Default rank computation in Matlab
-if nargout>1 || flag
+if nargout>=3 || flag
     xRank1 = rank(x);
     if xRank ~= xRank1
-        warning("Rank computation inconsistency: Hoffman="+xRank+" Matlab="+xRank1);
-        if nargout<=1 && flag
+        if ~o.gpu; warning("Rank computation inconsistency: Hoffman="+xRank+" Matlab="+xRank1); end
+        if nargout<=2 && flag
             xRank = min(xRank,xRank1); %max(xRank,xRank1);
         end
     end

@@ -49,6 +49,7 @@ runIdx = n.runIdx;
 blocks = string(n.blocks);
 fsOg = floor(n.fs_orig);
 n.proj = proj;
+n.suffix = o.suffix;
 if ~arg.ica
     sbjChs=chNfo.sbjCh;
 else
@@ -57,8 +58,10 @@ end
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.robustSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+proj+".mat"; end % Filename ending string
-if ~doGPU; try parpool('threads'); catch;end;end
-
+if doGPU
+    if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice, 0, []); end
+    try reset(gpuDevice(1)); catch; end
+end
 
 %% Load EEG data
 if isempty(x)
@@ -186,12 +189,7 @@ if o.doBadFrames && ~arg.ica
     % Identify
     [chNfo.bad,x_bad] = ec_findBadFrames(x,chNfo.bad,x_bad,sfx,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    
     n.badFrames = x_bad;
-    if arg.save % Save
-        fn = o.dirOut+"chNfo_"+o.fnStr;
-        save(fn,"chNfo","-v7"); disp("SAVED: "+fn);
-    end
     disp("Identified bad frames per chan: "+sbj); 
 elseif o.doBadFrames
     [ic_bad,x_bad] = ec_findBadFrames(x,[],n.icNfo(:,["ic" "name"]),...
@@ -204,8 +202,7 @@ end
 toc;
 
 %% Finalize
-sfx = erase(sfx,"_");
-n.suffix = o.suffix;
+sfx = o.suffix;
 n.("o"+sfx) = o;
 if fMean
     if ~arg.ica
@@ -219,6 +216,7 @@ if fMean
     end
 end
 
+% Reset GPU
 if doGPU
     if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice, 0, []); end
     try reset(gpuDevice(1)); catch; end
@@ -226,13 +224,19 @@ end
 
 % Save
 if arg.save
+    % Save chNfo
+    if o.doBadFrames && ~arg.ica
+        fn = o.dirOut+"chNfo_"+o.fnStr;
+        save(fn,'chNfo','-v7'); disp("SAVED: "+fn)
+    end
+
     % Save n struct
     fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
-    save(fn,"n"); disp("SAVED: "+fn);
-    
+    save(fn,"n","-v7.3"); disp("SAVED: "+fn);
+
     % Save processed iEEG data
     fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
-    save(fn,"x","-v7.3","-nocompression"); disp("SAVED: "+fn);
+    savefast(fn,'x'); disp("SAVED: "+fn);
 end
 toc;
 end

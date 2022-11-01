@@ -91,7 +91,8 @@ if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); en
 %% Prep
 tic;
 % Load metadata
-[errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save,redoN=arg.redoN);
+[errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save,...
+    redo=arg.redo,redoN=arg.redoN);
 
 % Initialize variables/objects
 %sbjID = n.sbjID;
@@ -115,36 +116,39 @@ n.dirs = dirs;
 
 %% Classify bad EEG channels
 chNoASR = [];
+sfxB = "";
 if o.doBadCh
+    sfxB = sfx;
     % Find flat channels
     x_diff = abs(diff(x,1,1));
     x_diff = mean(x_diff,1,"omitnan");
-    ch_bad.("flat"+sfx) = isoutlier(x_diff,"quartiles","ThresholdFactor",100)';
+    ch_bad.("flat"+sfx) = isoutlier(x_diff,"quartiles","ThresholdFactor",20)';
 
     % Classify
     [chClass,chNfo.dist] = ec_classifyBadChs(x,chNfo.pialRAS,chNfo.ch);
     ch_bad.("ai"+sfx) = chClass.bad;
+    ch_bad.("xcorr"+sfx) = isoutlier(chClass.xcorr);
+    ch_bad.("dev"+sfx) = isoutlier(chClass.dev);
+    ch_bad.("grad"+sfx) = isoutlier(chClass.grad);
 
     % Hurst exponent
     chHrst = abs(chClass.hurs - 0.5);
-    [~,chHrst_lo,~] = isoutlier(chHrst(~ch_bad.ref|~ch_bad.empty|~chClass.bad|...
-        ~ch_bad.("flat"+sfx)),"median","ThresholdFactor",o.thrHurst);
-    [~,~,chHrst_hi] = isoutlier(chHrst(~ch_bad.ref|~ch_bad.empty|~chClass.bad|...
-        ~ch_bad.("flat"+sfx)),"median","ThresholdFactor",o.thrHurst+2);
+    [~,chHrst_lo,~] = isoutlier(chHrst(~(ch_bad.empty|ch_bad.nan|chClass.bad|...
+        ch_bad.("flat"+sfx)|ch_bad.("xcorr"+sfx))),"median","ThresholdFactor",o.thrHurst);
+    [~,~,chHrst_hi] = isoutlier(chHrst(~(ch_bad.empty|ch_bad.nan|chClass.bad|...
+        ch_bad.("flat"+sfx)|ch_bad.("xcorr"+sfx))),"median","ThresholdFactor",o.thrHurst+2);
     ch_bad.("hurstL"+sfx) = chHrst < chHrst_lo;
     ch_bad.("hurstH"+sfx) = chHrst > chHrst_hi;
 
     % Copy
-    ch_bad.("bad"+sfx) = ch_bad.ref|ch_bad.empty|chClass.bad|ch_bad.("hurstL"+sfx)|...
-        ch_bad.("hurstH"+sfx)|ch_bad.("flat"+sfx);
-    chClass.Properties.VariableNames(3:end) =...
-        string(chClass.Properties.VariableNames(3:end))+"P"+sfx;
-    ch_bad(:,chClass.Properties.VariableNames(3:end)) = chClass(:,3:end);
+    ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|chClass.bad|sum([ch_bad.("xcorr"+sfx),ch_bad.("dev"+sfx),...
+        ch_bad.("grad"+sfx),ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx),ch_bad.("flat"+sfx)],2)>=3;
+    ch_bad(:,string(chClass.Properties.VariableNames(3:end))+"P"+sfx) = chClass(:,3:end);
     disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
     disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
 
     % Channels for later
-    chNoASR = ch_bad.empty|ch_bad.("ai"+sfx);
+    chNoASR = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx);
     chGood = ~ch_bad.("bad"+sfx);
 elseif any(ch_bad.Properties.VariableNames=="rr")
     chGood = ~ch_bad.rr;
@@ -157,13 +161,13 @@ else
 end
 % Make sure no ASR chans
 if isempty(chNoASR)
-    chNoASR = ch_bad.empty|ch_bad.ai;
+    chNoASR = ch_bad.empty|ch_bad.nan|ch_bad.ai;
 end
 toc;
 
 %% Filter & detrend (within-run to avoid edge artifacts)
 [x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,...
-    thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp,sfx=sfx,gpu=1);
+    thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp,sfx=o.suffix);
 
 %% Robust rereference
 if o.doRereference
@@ -180,6 +184,19 @@ if o.lineHz > 0
     disp([sbj ': finished power line noise removal']); toc;
 end
 
+%% Finalize ASR channels
+chCov = cov(x,'partialrows');
+chCov(corrcov(chCov)==1) = nan;
+chCov = mean(chCov,2,"omitnan");
+chCov = isoutlier(chCov,"median",ThresholdFactor=10);
+
+% Convergent bad ch metrics & classifier results
+chNoASR = chNoASR | all([chCov,ch_bad.("dev"+sfxB),...
+    ch_bad.("grad"+sfxB),ch_bad.("hurstL"+sfxB),ch_bad.("flat"+sfxB)],2);
+ch_bad.("asr"+sfx) = chNoASR;
+chRank = ec_rank(x(:,~chNoASR));
+disp("ASR_chans="+nnz(~chNoASR)+" | rank="+chRank); toc;
+
 %% Detect epileptic high-frequency oscillations (HFOs)
 x_bad = table;
 x_bad.sbjCh = chNfo.sbjCh;
@@ -189,20 +206,10 @@ if o.thrHFO > 0
 end
 chNfo.bad = ch_bad;
 
-%% Find flat channels
-idx = find(contains(ch_bad.Properties.VariableNames,"hurstL"),1,"last");
-x_diff = abs(diff(x,1,1));
-x_diff = mean(x_diff,1,"omitnan");
-ch_bad.("flat"+sfx) = isoutlier(x_diff,"median","ThresholdFactor",3)';
-chNoASR = chNoASR |...
-    sum(full([chNoASR,ch_bad.ref,ch_bad.hurstH,ch_bad{:,idx},ch_bad.("flat"+sfx)]),2)>2;
-
 %% Artifact subspace reconstruction (ASR)
 if o.asr.do
     o.asr.chIgnore = chNoASR;
     x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),o.asr);
-    %burst=20,chCorr='off',line='off',win='off',flat='off',hiPass='off',...
-    ch_bad.("asr"+sfx) = chNoASR;
 end
 
 %% Identify bad frames per chan
@@ -213,43 +220,37 @@ if o.doBadFrames
 end
 
 %% Covariance/correlation outliers
-
-% Get covariance/correlation of EEG channels
 chCov = cov(x,'partialrows');
 chCorr = corrcov(chCov);
-
 % Get channels with ultra-high covariance
 chCovZ = abs(chCov);
 chCovZ(chCorr==1) = nan;
 chCovZ = mean(chCovZ,2,"omitnan");
-chCovOL = isoutlier(chCovZ,"median","ThresholdFactor",10);
-
 % Copy to permanent tables
-ch_bad.("cov"+sfx) = chCovOL;
+ch_bad.("cov"+sfx) = isoutlier(chCovZ,"median","ThresholdFactor",10);
 ch_bad.("covP"+sfx) = chCovZ;
-ch_bad = movevars(ch_bad,["cov" "covP"],"After","nan");
 
 %% Organize & save
 sfx = erase(sfx,"_");
 n.suffix = o.suffix;
 n.badFrames = x_bad;
-n.chCov = cov(x,'partialrows');
+n.chCov = chCov;
 n.chVar = diag(n.chCov);
-n.chCorr = corrcov(n.chCov);
+n.chCorr = chCorr;
 n.("o"+sfx) = o;
 chNfo.bad = ch_bad;
 
 % Save
 if arg.save
-    % Save n struct
-    fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
-    save(fn,"n"); disp("SAVED: "+fn);
     % Save chNfo
     fn = o.dirOut+"chNfo_"+o.fnStr;
     save(fn,"chNfo","-v7"); disp("SAVED: "+fn)
+    % Save n struct
+    fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
+    save(fn,"n","-v7.3"); disp("SAVED: "+fn);
     % Save processed iEEG data
     fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
-    save(fn,"x","-v7.3","-nocompression"); disp("SAVED: "+fn);
+    savefast(fn,'x'); disp("SAVED: "+fn);
 end
 toc;
 end

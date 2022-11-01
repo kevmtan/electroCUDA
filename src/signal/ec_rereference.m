@@ -26,22 +26,24 @@ end
 if size(mask,2) ~= size(x,2); error("Mask length must equal number of channels (width of x)"); end
 
 %% Robust reference
+mask(refChs) = false;
 rnk = ec_rank(x); % get initial data rank
-if rnk==width(x) && ~isempty(refChs) && any(refChs)
-    rnk = rnk-1;
-end
+disp("Robust rereference: all_chs="+width(x)+" | avg_chs="+nnz(mask)+" | rank="+rnk); 
 
 % Loop across iterations
 for t = 1:nItr
     % Add 1 to denomenator of mean to avoid losing data rank
-    if floor(rnk)<nnz(mask); d=1; else; d=0; end
-    rnk = inf; %nnz(mask); % Compare num chans/rank with next iteration
+    if rnk<width(x) || (t==1 && any(refChs)); d=1; else; d=0; end
 
     % Robust reference to good chans
-    mn = sum(x(:,mask),2,"omitnan") / sum(mask,"om")+d; % mean timecourse of good chans
-    x = x-mn; % reference all chans to good chans
+    mn = sum(x(:,mask),2,"omitnan") / (sum(mask,"omitnan")+d); % mean timecourse of good chans
+    x = x - mn; % reference all chans to good chans
     xx = x(:,mask); % good chan timecourses
-    mask(std(x,"omitnan")/std(xx(:),"omitnan") > thresh) = 0; % remove outlier chans from good chans
+    mask(mad(x,1)/mad(xx(:),1) > thresh) = 0; % remove outlier chans from good chans
+
+    % Check rank
+    rnk = ec_rank(x); % Compare num chans/rank with next iteration
+    disp("Robust rereference: all_chs="+width(x)+" | avg_chs="+nnz(mask)+" | rank="+rnk); 
 end
 disp(['proportion channels used for mean: ', num2str(mean(mask))])
 

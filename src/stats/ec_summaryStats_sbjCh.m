@@ -153,14 +153,14 @@ try reset(gpuDevice(1)); catch;end
 if o.save
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
     else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
-    save(fn,"ss","-v7.3");
+    savefast(fn,'ss');
     disp("SAVED: "+fn);
 end
 
 %% Initialize plotting
 if ~a.plot
     fn = o.dirOut+"plot_s"+sbjID+".mat";
-    save(fn,"xe","xhe","ssFrq","B","trialNfo","-v7.3","-nocompression");
+    savefast(fn,'xe','xhe','ssFrq','B','trialNfo');
     disp("SAVED: "+fn);
 else
     try delete(gcp('nocreate')); catch; end
@@ -346,7 +346,7 @@ end
 %% Save fig
 if oP.save
     fn = oP.dirOutSbj+sbjCh+"_spec.jpg";
-    exportgraphics(hl,fn,"Resolution",125);
+    exportgraphics(hl,fn,"Resolution",150);
     disp("SAVED: "+fn);
     close all
 end
@@ -459,14 +459,14 @@ try reset(gpuDevice(1)); catch;end
 if o.save
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
     else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
-    save(fn,"ss","-v7.3");
+    savefast(fn,'ss');
     disp("SAVED: "+fn);
 end
 
 %% Initialize plotting
 if ~a.plot
     fn = o.dirOut+"plot_s"+sbjID+".mat";
-    save(fn,"xe","xhe","B","trialNfo","-v7.3","-nocompression");
+    savefast(fn,'xe','xhe','B','trialNfo');
     disp("SAVED: "+fn);
 else
     try delete(gcp('nocreate')); catch; end
@@ -698,14 +698,14 @@ try reset(gpuDevice(1)); catch;end
 if o.save
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
     else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
-    save(fn,"ss","-v7.3");
+    savefast(fn,'ss',"-v7.3");
     disp("SAVED: "+fn);
 end
 
 %% Initialize plotting
 if ~a.plot
     fn = o.dirOut+"plot_s"+sbjID+".mat";
-    save(fn,"xhe","B","trialNfo","-v7.3","-nocompression");
+    savefast(fn,'xhe','B','trialNfo');
     disp("SAVED: "+fn);
 else
     try delete(gcp('nocreate')); catch; end
@@ -1427,29 +1427,27 @@ end
 % Get electrode plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN)
 if a.ICA
-    oP.clim = [-oP.clim(2)*(5/6), oP.clim(2)];
     % Color by ICA weights
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdYlBu',oP.clim,center=0,zscore=1);
+        ec_colorbarFromValues(dCh.wts,'RdBu',center=0,zscore=floor(oP.clim*2));
     ch = xN.name;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
     dCh.col(dCh.order==-Inf,1:3) = 0;
     hemN = [nnz(dCh.hem=="L") nnz(dCh.hem=="R")];
-    %dCh.order = abs(dCh.order-0.5);
+    dCh.order = abs(dCh.order-0.5);
     %dCh.order(dCh.order==Inf) = -Inf;
-    %dCh = sortrows(dCh,'order','ascend');
 else
     ch = xN.ch;
     sbjCh = xN.sbjCh;
     dCh.sz(ch) = 12;
     dCh.col(ch,1:3) = [1,0,0];
     hemN = [nnz(xN.hem=="L") nnz(xN.hem=="R")];
-    %dCh.order = dCh.ch;
-    %dCh.order(ch) = Inf;
-    %dCh = sortrows(dCh,'order','ascend');
+    dCh.order = dCh.ch;
+    dCh.order(ch) = Inf;
 end
 dCh(ismember(dCh.pialRAS(:,1),[0 nan]),:) = [];
+dCh = sortrows(dCh,'order','ascend');
 end
 
 
@@ -1460,7 +1458,7 @@ if nargin<7; medial=""; end
 span = [1 2];
 
 %% Plot lateral electrodes on native cortex
-if medial=="" || medial=="lateral"
+if ismember(medial,["lateral" ""])
     if nnz(hemN)>1
         plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) & dCh.hem=="L",:),...
             "latero-anterior","pialRAS","pial",sbj,oP);
@@ -1475,7 +1473,7 @@ end
 
 %% Plot medial electrodes on native cortex
 %if a.type=="hfb"; span=9; end
-if medial=="" || medial=="medial"
+if ismember(medial,["medial" ""])
     if nnz(hemN)>1
         plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) & dCh.hem=="L",:),...
             "medio-posterior","pialRAS","pial",sbj,oP);

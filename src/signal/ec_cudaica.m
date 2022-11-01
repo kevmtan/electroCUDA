@@ -83,22 +83,25 @@ if ~isempty(wtsIn)
 end
 
 %% Ensure data not rank-deficient
-xRank = ec_rank(x);
+xRank = ec_rank(x,true);
 disp("Num components="+nChs+" | Data rank="+xRank);
-if nComps>xRank && (isempty(arg.pca) || arg.pca>0)
-    nComps = xRank;
+if nComps>xRank && (isempty(arg.pca) || arg.pca==1)
     arg.pca = xRank;
+    nComps = xRank;
     warning("[ec_cudaica] Data is rank deficient, reducing to "+xRank+" components with PCA");
-elseif isempty(arg.pca)
+elseif arg.pca>1
+    arg.pca = arg.pca;
+    nComps = arg.pca;
+elseif isempty(arg.pca) || arg.pca<=0
     arg.pca = 0;
+    nComps = nChs;
 end
 
 %% PCA (doing in Matlab because broken in cudaica)
-if arg.pca > 0
+if arg.pca > 1
     [wtsPCA,x] = pca(x,NumComponents=nComps,Centered=false);
     disp("[ec_cudaica] Reducing to "+nComps+" components with PCA");
 end
-
 
 %% Make CUDAICA config script
 sc = repmat("",27,2);
@@ -131,11 +134,11 @@ ica.cfg = sc;
 writematrix(sc,fnSc,'Delimiter',' ',"FileType","text");
 
 %% Write data
-prec="float";
+prec='float';
 
 % EEG data
-if doFlip; x = x'; end
-fID = fopen(fnDat,"w");
+x = x';
+fID = fopen(fnDat,'w');
 fwrite(fID,x,prec);
 fclose(fID);
 
@@ -168,14 +171,14 @@ if arg.pca > 0
     ica.w = wts*sph*wtsPCA';
     ica.sph = eye(nChs);
     ica.pca = wtsPCA;
-    ica.sph_og = sph;
-    ica.w_og = wts*sph;
-    ica.winv_og = pinv(wts*sph); 
 else
     ica.w = wts*sph;
 end
 ica.winv = pinv(ica.w);
 ica.log = cmdout;
+ica.sph_og = sph;
+ica.w_og = wts*sph;
+ica.winv_og = pinv(wts*sph);
 
 % Reconstruct IC activity
 if nargout > 1

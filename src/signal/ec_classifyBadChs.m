@@ -4,7 +4,7 @@ arguments
     pos {mustBeNumeric}
     chNames {isnumeric,isstring,ischar,iscellstr} = [];
     mdl struct = []
-    arg.nn {isnumeric} = 10
+    arg.nn {isnumeric} = floor(width(x)*.25)
 end
 logScale = 1;
 
