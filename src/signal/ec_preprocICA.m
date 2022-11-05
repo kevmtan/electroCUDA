@@ -257,19 +257,18 @@ else
     chHrst = abs(ch_bad.("hursP"+sfxB) - 0.5);
     chICAog = chICA;
 
-    % Find rank using ultra-conservative tolerance
-    tol = floor(prctile(eig(cov(x(:,chICA),'partialrows')),10));
-    chRank = ec_rank(x(:,chICA)); % Calculate rank
+    % Find rank using conservative tolerance
+    tol = min([1 prctile(ec_rank(x(:,chICA),eig=1),5)]);
+    chRank = ec_rank(x(:,chICA),tol=tol); % Calculate rank
     chRankOg=chRank; doGPU=0;
     disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
 
     %% If rank-deficient, try channel exclusions
-    if chRank<numel(chICA) && o.ica_pca<=0
+    if chRank<numel(chICA) && o.ica_pca<=0 && numel(chICAbad)>0
         % Setup leave-one-out
-        chs=chNfo.ch; chRm=cell(numel(chICAbad),1); chRankz=nan(numel(chs),1);
+        chs=chNfo.ch; chRm=cell(numel(chICAbad),1); chEigs=nan(numel(chs),1);
         xCh=x;
         try xCh=gpuArray(xCh); doGPU=arrayfun(@isnumeric,xCh(1,1)); catch;end
-        if doGPU; tol = gpuArray(tol); end
         for v = 1:numel(chICAbad)
             ch = chICAbad(v);
             chRm{v} = ismember(chs,chICA) & chs~=ch;
@@ -277,12 +276,13 @@ else
         end
  
         % Calculate channel deficiency contribution via leave-one-out perms
-        chRankz(chICAbad) = arrayfun(@(rm) ec_rank(xCh(:,rm{:}),tol=tol),chRm,'UniformOutput',true);
+        chEigs(chICAbad) = arrayfun(@(rm) min(ec_rank(xCh(:,rm{:}),eig=true)),...
+            chRm,'UniformOutput',true);
 
         % Remove channels w greatest deficiency contribution until rank-sufficient
-        while chRank<numel(chICA) && numel(chICA)>floor(chRankOg*.95) && numel(chICAbad)>0
-            [~,chRm] = max(chRankz(chICAbad)); % ultra-conservative rank
-            chRm = chICAbad(chRm);
+        while chRank<numel(chICA) && floor(chRankOg*.95)<numel(chICA) && numel(chICAbad)>0
+            [~,chRm] = min(chEigs(chICAbad)); % ultra-conservative rank
+            chRm = chICAbad(gather(chRm));
             if numel(chRm)>1
                 [~,id] = max(chBadr(chRm));
                 chRm = chRm(id);
@@ -293,15 +293,16 @@ else
             end
             chICA(chICA==chRm) = [];
             chICAbad = intersect(chICA,chBad);
-            chRank = gather(ec_rank(xCh(:,chICA)));
+            chRank = gather(ec_rank(xCh(:,chICA),tol=tol));
             disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
         end
+        clear xCh;
     end
 
     %% Do PCA if still rank-deficient (using all redeemable chans)
     if chRank<numel(chICA) && o.ica_pca>=0
         chICA = chICAog;
-        chRank = gather(rank(xCh(:,chICA)));
+        chRank = ec_rank(x(:,chICA),tol=tol);
         o.ica_pca = chRank;
         warning("setting o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
         errors{end+1,1} = lastwarn;
@@ -316,7 +317,7 @@ chNfo.("ica"+sfx1)(:) = false;
 chNfo.("ica"+sfx1)(chICA) = true; % indicate ICA channels
 ch_bad.("ica"+sfx1) = chNfo.("ica"+sfx1);
 disp("Finished ICA prep: "+chNfo.sbj(1)); toc(tt);
-if doGPU; reset(gpuDevice(1)); end
+if doGPU; try reset(gpuDevice(1)); catch;end;end
 end
 
 

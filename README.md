@@ -16,7 +16,7 @@ See [Tan et al., 2022](https://doi.org/10.1038/s41467-022-29510-2) for the first
 <br>
 
 ### Development status: PRE-ALPHA
-*[Oct 14, 2022]* Hello world! This first commit is a glorified dump from my personal codebase: pre-alpha with absolutely no guarantees. Developed on Ubuntu 22.04, Matlab 2022b & CUDA 11.8 using AMD Epyc Milan x64 & Nvidia RTX3060 12gb
+*[Oct 14, 2022]* Hello world! This first commit is a glorified dump from my personal codebase: pre-alpha with absolutely no guarantees.
 
 ### Acknowledgements 
 This work was supported by National Science Foundation Graduate Research Fellowship DGE-1650604. Please see wiki for full acknowledgements.
@@ -27,8 +27,8 @@ electroCUDA is free and open-source under GNU GPL 3.0
 ### Terms of use
 This code is for research purposes only and is **not intended for clinical or medical use**. 
 
-Use this code at your own risk. Users assume full responsibility for any eventuality related to the use of repository content. The author of this respository makes no guarantees related to repository content.
+Use this code at your own risk. Users assume full responsibility for any eventuality related to the use of content herein. The author of this repository makes no guarantees related to the content herein.
 
-USE AND DISTRIBUTION OF THIS SOFTWARE UNDER GNU GPL IS FULLY COMPLIANT WITH UNITED STATES MANDATES FOR FEDERALLY-FUNDED RESEARCH AND UNIVERSITY OF CALIFORNIA INTELLECTUAL PROPERTY POLICY.
+USE AND DISTRIBUTION OF THIS SOFTWARE UNDER GENERAL PUBLIC LICENSE (GNU GPLv3) IS FULLY COMPLIANT WITH UNITED STATES MANDATES FOR FEDERALLY-FUNDED RESEARCH AND UNIVERSITY OF CALIFORNIA INTELLECTUAL PROPERTY POLICY.
 
-THE CONTENT OF THIS REPOSITORY IS PROVIDED "AS IS" WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES. IN NO EVENT SHALL THE AUTHORS AND CONTRIBUTORS OF CONTENT HEREIN BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES OR ADVERSE OUTCOMES RELATED IN ANY WAY TO THE USE OF THIS CONTENT. ANY USE OF THE CONTENT HEREIN IMPLIES ACCEPTANCE OF THESE TERMS.
+THE CONTENT HEREIN IS PROVIDED "AS IS" WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES. IN NO EVENT SHALL THE AUTHORS AND CONTRIBUTORS OF CONTENT HEREIN BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES OR ADVERSE OUTCOMES RELATED IN ANY WAY TO THE USE OF THIS CONTENT. ANY USE OF THE CONTENT HEREIN IMPLIES ACCEPTANCE OF THESE TERMS.

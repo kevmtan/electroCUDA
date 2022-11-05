@@ -191,9 +191,10 @@ chCov = mean(chCov,2,"omitnan");
 chCov = isoutlier(chCov,"median",ThresholdFactor=10);
 
 % Convergent bad ch metrics & classifier results
-chNoASR = chNoASR | all([chCov,ch_bad.("dev"+sfxB),...
+chNoASR = chNoASR | ~any(chNfo.pialRAS(:,1),2) | all([chCov,ch_bad.("dev"+sfxB),...
     ch_bad.("grad"+sfxB),ch_bad.("hurstL"+sfxB),ch_bad.("flat"+sfxB)],2);
 ch_bad.("asr"+sfx) = chNoASR;
+n.chNoASR = find(chNoASR);
 chRank = ec_rank(x(:,~chNoASR));
 disp("ASR_chans="+nnz(~chNoASR)+" | rank="+chRank); toc;
 
