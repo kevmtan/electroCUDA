@@ -1,4 +1,4 @@
-function [x,n] = ec_hiPassDetrend(x,fHi,dOrder,dWin,n,tt,arg)
+function [x,n] = ec_detrendHPF(x,fHi,dOrder,dWin,n,tt,arg)
 % Input validation
 arguments
     x {isfloat}
@@ -18,7 +18,8 @@ arguments
     arg.sfxOg {isstring,ischar} = '';
 end
 if isempty(fHi); fHi=0; end
-if isempty(dOrder); dOrder=0; end
+if isempty(dOrder)||~any(dOrder); dOrder=0; else
+    dOrder=dOrder(dOrder>0); dOrder=dOrder(:); end
 if ~isempty(arg.fs); fs=arg.fs; else; fs=n.fs; end
 if ~isempty(arg.runIdx); runIdx=arg.runIdx; else; runIdx=n.runIdxOg(:,2); end
 if arg.runs~=""; runs=arg.runs; else; runs=string(n.blocks); end
@@ -33,7 +34,7 @@ nRuns = numel(runs);
 dWin = dWin * fs;
 d3 = numel(size(x))==3;
 nChs = size(x,2);
-nWorkers = gcp('nocreate').NumWorkers;
+%nWorkers = gcp('nocreate').NumWorkers;
 
 %% Prepare vars
 x = double(x);
@@ -44,7 +45,7 @@ detrendWts = mat2cell(detrendWts,runIdx);
 doHPF = true;
 if class(fHi)=="digitalFilter"
 elseif (isstring(fHi) || ischar(fHi)) && fHi=="ASR"
-    fHi = ec_designFiltASR(fs); % if arg.gpu; fHi = gpuArray(fHi); end
+    fHi = ec_designFiltASR(fs);
 elseif (isstring(fHi) || ischar(fHi)) && fHi=="asr"
     fHi = designfilt('highpassfir',StopbandFrequency=0.25,PassbandFrequency=0.75,...
         StopbandAttenuation=80,DesignMethod="kaiserwin",SampleRate=fs);
@@ -63,7 +64,7 @@ if doHPF
     %if arg.gpu; try reset(gpuDevice(1)); catch;end;end
 end
 
-%% Main
+%% Within-run processing (loop across runs)
 for r = 1:nRuns
     xr = x{r};
     dr = detrendWts{r};
@@ -76,42 +77,32 @@ for r = 1:nRuns
         disp("Interpolated missing: "+runs(r)); toc(tt);
     end
 
-    %% Initial detrend w/ lower-order polynomial (timechunks within run)
-    if numel(dOrder)>=1 && dOrder(1)>0 && ~d3
-        try dWinN=dWin(1); catch; dWinN=[]; end
-        xr = ec_detrend(xr,dOrder(1),dr,'polynomials',dThr(1),dItr(1),dWinN);
-        for ii = 3:3:nWorkers
-            idx = diff(1: floor(height(xr)/ii) : height(xr)); % Slice into time chunks
-            idx(end) = idx(end) + (height(xr)-sum(idx));      % numChunks = number of CPU thread
-            xr = mat2cell(xr,idx);
-            dr = mat2cell(dr,idx);
+    %% Robust polynomial detrend
+    if nnz(dOrder)
+        disp("Starting detrend... "+runs(r)); toc(tt);
+        olPct = zeros(numel(dOrder),nChs);
 
-            % Lower-order detrend
-            parfor w = 1:numel(dr)
-                [xr{w},dr{w}] = ec_detrend(xr{w},dOrder(1),dr{w},'polynomials',...
-                    dThr(1),dItr(1),dWinN*fs); %#ok<PFBNS>
-            end
-            xr = vertcat(xr{:});
-            dr = vertcat(dr{:}); olPct = nnz(~dr)/numel(dr);
-            disp("Robust polynomial detrended^"+dOrder(1)+" ol="+olPct+" "+runs(r)); toc(tt);
-        end
-    end
-
-    %% Final detrend w/ higher-order polynomial (entire run)
-    if numel(dOrder)>=2
-        for ii = 2:numel(dOrder)
-            if ~dOrder(ii); continue; end
-            try dWinN=dWin(ii); catch; dWinN=[]; end
-            parfor ch = 1:nChs
+        % Parallel across channels
+        parfor ch = 1:nChs
+            olPctCh = squeeze(olPct(:,ch));
+            % Loop across specified polynomial orders
+            for ii = 1:numel(dOrder)
                 [xr(:,ch,:),dr(:,ch,:)] = ec_detrend(squeeze(xr(:,ch,:)),...
-                    dOrder(ii),squeeze(dr(:,ch,:)),'polynomials',dThr(ii),dItr(ii),dWinN*fs); %#ok<PFBNS>
+                    dOrder(ii),squeeze(dr(:,ch,:)),'polynomials',dThr(ii),dItr(ii),dWin(ii)*fs); %#ok<PFBNS>
+                olPctCh(ii) = nnz(~dr(:,ch,:));
             end
-            olPct = nnz(~dr)/numel(dr);
-            disp("Robust polynomial detrended^"+dOrder(ii)+" ol="+olPct+" "+runs(r)); toc(tt);
+            olPct(:,ch) = olPctCh;
         end
+
+        % Display outliers per order
+        for ii = 1:numel(dOrder)
+            olPct1 = sum(olPct(ii,:),"all")/numel(dr);
+            disp("Robust polynomial detrended^"+dOrder(ii)+" ol="+olPct1+" "+runs(r));
+        end
+        toc(tt);
     end
 
-    %% High-pass filter zero phase shift (entire run)
+    %% Zero-phase high-pass filtering (HPF)
     if doHPF
         if arg.gpu && d3 && class(fHi)=="digitalFilter"
             for ch = 1:nChs
@@ -145,8 +136,28 @@ end
 x = vertcat(x{:});
 detrendWts = logical(vertcat(detrendWts{:}));
 detrendWts = sparse(~detrendWts);
-if any(dOrder>0); n.("detrendW"+arg.sfx) = detrendWts; end
+if any(dOrder); n.("detrendW"+arg.sfx) = detrendWts; end
 if arg.gpu && doHPF; try reset(gpuDevice(1)); catch;end;end
 end
 
-
+%% Depreciated
+% %% Initial detrend w/ lower-order polynomial (timechunks within run)
+% if numel(dOrder)>=1 && dOrder(1)>0 && ~d3
+%     try dWinN=dWin(1); catch; dWinN=[]; end
+%     xr = ec_detrend(xr,dOrder(1),dr,'polynomials',dThr(1),dItr(1),dWinN);
+%     for ii = 3:3:nWorkers
+%         idx = diff(1: floor(height(xr)/ii) : height(xr)); % Slice into time chunks
+%         idx(end) = idx(end) + (height(xr)-sum(idx));      % numChunks = number of CPU thread
+%         xr = mat2cell(xr,idx);
+%         dr = mat2cell(dr,idx);
+%
+%         % Lower-order detrend
+%         parfor w = 1:numel(dr)
+%             [xr{w},dr{w}] = ec_detrend(xr{w},dOrder(1),dr{w},'polynomials',...
+%                 dThr(1),dItr(1),dWinN*fs); %#ok<PFBNS>
+%         end
+%         xr = vertcat(xr{:});
+%         dr = vertcat(dr{:}); olPct = nnz(~dr)/numel(dr);
+%         disp("Robust polynomial detrended^"+dOrder(1)+" ol="+olPct+" "+runs(r)); toc(tt);
+%     end
+% end

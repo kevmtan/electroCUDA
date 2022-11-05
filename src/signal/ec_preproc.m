@@ -132,16 +132,16 @@ if o.doBadCh
     ch_bad.("grad"+sfx) = isoutlier(chClass.grad);
 
     % Hurst exponent
+    idx = ~(ch_bad.empty|ch_bad.nan|chClass.bad|ch_bad.("dev"+sfx)|ch_bad.("flat"+sfx)|...
+        ch_bad.("grad"+sfx));
     chHrst = abs(chClass.hurs - 0.5);
-    [~,chHrst_lo,~] = isoutlier(chHrst(~(ch_bad.empty|ch_bad.nan|chClass.bad|...
-        ch_bad.("flat"+sfx)|ch_bad.("xcorr"+sfx))),"median","ThresholdFactor",o.thrHurst);
-    [~,~,chHrst_hi] = isoutlier(chHrst(~(ch_bad.empty|ch_bad.nan|chClass.bad|...
-        ch_bad.("flat"+sfx)|ch_bad.("xcorr"+sfx))),"median","ThresholdFactor",o.thrHurst+2);
+    [~,chHrst_lo,~] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst);
+    [~,~,chHrst_hi] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst+2);
     ch_bad.("hurstL"+sfx) = chHrst < chHrst_lo;
     ch_bad.("hurstH"+sfx) = chHrst > chHrst_hi;
 
     % Copy
-    ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|chClass.bad|sum([ch_bad.("xcorr"+sfx),ch_bad.("dev"+sfx),...
+    ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|chClass.bad|sum([ch_bad.("dev"+sfx),...
         ch_bad.("grad"+sfx),ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx),ch_bad.("flat"+sfx)],2)>=3;
     ch_bad(:,string(chClass.Properties.VariableNames(3:end))+"P"+sfx) = chClass(:,3:end);
     disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
@@ -166,7 +166,7 @@ end
 toc;
 
 %% Filter & detrend (within-run to avoid edge artifacts)
-[x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,...
+[x,n] = ec_detrendHPF(x,o.hiPass,o.detrendOrder,o.detrendWin,n,...
     thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp,sfx=o.suffix);
 
 %% Robust rereference
@@ -340,8 +340,8 @@ if ~isempty(chNoASR) && any(chNoASR)
 end
 
 % Run ASR
-EEG = ec_ASRclean(EEG,oa.burst,[],[],[],oa.burstMaxBadChs,oa.burstTols,[],...
-    oa.gpu,false,oa.maxMem);
+EEG = ec_ASRclean(EEG,oa.burst,[],[],oa.maxDims,oa.burstMaxBadChs,oa.burstTols,...
+    oa.refWinLength,oa.gpu,oa.reimann,oa.maxMem);
 
 % Copy cleaned channels to data matrix
 if any(chNoASR)

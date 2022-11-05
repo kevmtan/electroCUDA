@@ -113,10 +113,10 @@ function state = asr_calibrate_r(X,srate,cutoff,blocksize,B,A,window_len,window_
 [C,S] = size(X);
 
 if nargin < 3 || isempty(cutoff)
-    cutoff = 3; end
+    cutoff = 5; end
 if nargin < 4 || isempty(blocksize)
     blocksize = 10; end
-if ~exist('maxmem', 'var')
+if ~exist('maxmem', 'var') || isempty(maxmem)
     maxmem = hlp_memfree/(2^21); end
 blocksize = max(blocksize,ceil((C*C*S*8*3*2)/(maxmem*(2^21))));
 %blocksize = max(blocksize,ceil((C*C*S*8*3*2)/hlp_memfree));
@@ -124,8 +124,10 @@ blocksize = max(blocksize,ceil((C*C*S*8*3*2)/(maxmem*(2^21))));
 if nargin < 6 || isempty(A) || isempty(B)
     try
         % try to use yulewalk to design the filter (Signal Processing toolbox required)
-        freqvals = [[0 2 3 13 16 40 min(80,srate/2-1)]*2/srate 1];
-        amps     = [3 0.75 0.33 0.33 1 1 3 3];
+        %freqvals = [[0 2    3    13   16 40 min(80,srate/2-1)]*2/srate 1];
+        %amps     =  [3 0.75 0.33 0.33 1  1  3 3];
+        freqvals = [[0 2    3 13 16 60 100 120 min(300,srate/2-1)]*2/srate 1];
+        amps     =  [2 .75 .5 .5 1  2  2   1   1 1];
         if srate < 80
             freqvals(end-2) = [];
             amps(    end)   = []; % we do not want to attenuate min(80,srate/2-1) since it is below 40 Hz
@@ -174,7 +176,7 @@ if any(~isfinite(X(:)))
 U = zeros(length(1:blocksize:S),C*C);
 for k=1:blocksize
     range = min(S,k:blocksize:(S+k-1));
-    U = U + reshape(bsxfun(@times,reshape(X(range,:),[],1,C),reshape(X(range,:),[],C,1)),size(U));
+    U = U + reshape(reshape(X(range,:),[],1,C).*reshape(X(range,:),[],C,1),size(U));
 end
 
 % get the mixing matrix M
@@ -187,14 +189,15 @@ N = round(window_len*srate);
 fprintf('Determining per-component thresholds...');
 %[V1,D1] = eig(M); %#ok<NASGU>
 [V,D] = rasr_nonlinear_eigenspace(M, C);
-[D, order] = sort(reshape(diag(D),1,C));
+[~, order] = sort(reshape(diag(D),1,C));
 V = V(:,order); 
 
 X = abs(X*V);
 for c = C:-1:1
     % compute RMS amplitude for each window...
     rms = X(:,c).^2;
-    rms = sqrt(sum(rms(bsxfun(@plus,round(1:N*(1-window_overlap):S-N),(0:N-1)')))/N);
+    %rms = sqrt(sum(rms(bsxfun(@plus,round(1:N*(1-window_overlap):S-N),(0:N-1)')))/N);
+    rms = sqrt(sum(rms(round(1:N*(1-window_overlap):S-N) + (0:N-1)'))/N);
     % fit a distribution to the clean part
     [mu(c),sig(c)] = fit_eeg_distribution(rms,min_clean_fraction,max_dropout_fraction);
 end
@@ -272,8 +275,10 @@ if ~exist('max_iter','var') || isempty(max_iter)
     max_iter = 500; end
 
 for i=1:max_iter
-    invnorms = 1./sqrt(sum(bsxfun(@minus,X,y).^2,2));
-    [y,oldy] = deal(sum(bsxfun(@times,X,invnorms)) / sum(invnorms),y);
+    %invnorms = 1./sqrt(sum(bsxfun(@minus,X,y).^2,2));
+    %[y,oldy] = deal(sum(bsxfun(@times,X,invnorms)) / sum(invnorms),y);
+    invnorms = 1./sqrt(sum((X-y).^2,2));
+    [y,oldy] = deal(sum(X.*invnorms) / sum(invnorms),y);
     if norm(y-oldy)/norm(y) < tol
         break; end
 end

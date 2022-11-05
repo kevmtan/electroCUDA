@@ -109,21 +109,6 @@ function EEG = ec_ASRclean(EEG,cutoff,windowlen,stepsize,maxdims,ref_maxbadchann
 %
 %                                Christian Kothe, Swartz Center for Computational Neuroscience, UCSD
 %                                2012-10-15
-
-% Copyright (C) Christian Kothe, SCCN, 2012, ckothe@ucsd.edu
-%
-% This program is free software; you can redistribute it and/or modify it under the terms of the GNU
-% General Public License as published by the Free Software Foundation; either version 2 of the
-% License, or (at your option) any later version.
-%
-% This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
-% even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-% General Public License for more details.
-%
-% You should have received a copy of the GNU General Public License along with this program; if not,
-% write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
-% USA
-
 if ~exist('cutoff','var') || isempty(cutoff); cutoff = 5; end
 if ~exist('windowlen','var') || isempty(windowlen); windowlen = max(0.5,1.5*EEG.nbchan/EEG.srate); end
 if ~exist('stepsize','var') || isempty(stepsize); stepsize = []; end
@@ -373,7 +358,7 @@ for i=1:splits
             state.last_R = eye(C);
         end
         Xcov = reshape(Xcov(:,update_at),C,C,[]);
-        if usegpu
+        if isgpuarray(Xcov)
             Xcov = gather(Xcov); end
         % do the reconstruction in intervals of length stepsize (or shorter if at the end of a chunk)
         last_n = 0;
@@ -414,7 +399,7 @@ state.carry = state.carry(:,(end-P+1):end);
 
 % finalize outputs
 outdata = data(:,1:(end-P));
-if usegpu
+if isgpuarray(state.cov)
     state.iir = gather(state.iir);
     state.cov = gather(state.cov);
 end

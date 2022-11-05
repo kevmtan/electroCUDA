@@ -243,16 +243,16 @@ if ~oP.save
 else
     h = figure('Position',[0 0 1920 1080],'color','white','MenuBar','none','ToolBar','none','Visible','off');
 end
-hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','none');
+hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','tight');
 
 %% Legends
 nexttile;
 if a.ICA % Chan name
     text(1,1,sbjCh+" ("+xN.ic+")",Interpreter='none',Units='normalized',FontSize=20,...
-        HorizontalAlignment='right',VerticalAlignment='bottom');
+        HorizontalAlignment='right',VerticalAlignment='top');
 else
     text(1,1,sbjCh,Interpreter='none',Units='normalized',FontSize=20,...
-        HorizontalAlignment='right',VerticalAlignment='bottom');
+        HorizontalAlignment='right',VerticalAlignment='top');
 end
 
 % Conditions
@@ -260,12 +260,12 @@ hold on
 for c = 1:nConds
     plot(0,0,'o','Color',oP.col(c,:),'LineWidth',8);
 end
-lgd = legend(conds2,"FontSize",oP.textsize,"Location","southeast","AutoUpdate","off");
+lgd = legend(conds2,"FontSize",oP.textsize+4,"Location","southeast","AutoUpdate","off");
 title(lgd,"Condition"); axis off; hold off;
 
 % Z-score colorbar
 colormap(flip(cbrewer2('RdBu'))); clim(oP.clim);
-lgd = colorbar(gca,"west","FontSize",oP.textsize); lgd.Label.String = "z-score";
+lgd = colorbar(gca,"west","FontSize",oP.textsize+2); lgd.Label.String = "z-score";
 
 %% Total average spectral magnitude
 frqTicks = 3:10:numel(oP.freqs);
@@ -276,15 +276,15 @@ for c = 1:nConds
 end
 hold off
 xticks(frqTicks); xticklabels(frqDisp); xlim([1 numel(oP.freqs)])
-title("Spectrum (1-300Hz)"); set(gca,'Fontsize',oP.textsize);
-ylabel("Magnitude");
+set(gca,'Fontsize',oP.textsize); ylabel("Magnitude");
+title("Spectrum (1-300Hz)","FontSize",oP.textsize+2);
 
 %% LFP single-trial
 for c = 1:nConds
     nexttile;
     plotSingleTrials_lfn(xCh(:,trialNfo.cond==conds(c))',lats5, oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials: LFP");
+    title(conds2(c)+" trials: LFP","FontSize",oP.textsize+2)
     if c==1; xlabel("Latency (ms)"); ylabel("Trials by RT"); end
 end
 
@@ -296,7 +296,7 @@ for c = 1:nConds
     nexttile;
     plotSingleTrials_lfn(xhCh(:,trialNfo.cond==conds(c))',lats5, oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials: "+B.disp(B.name=="hfb"));
+    title(conds2(c)+" trials: "+B.disp(B.name=="hfb"),"FontSize",oP.textsize+2);
     if c==1; xlabel("Latency (ms)"); ylabel("Trials by RT"); end
 end
 
@@ -312,7 +312,7 @@ for c = 1:nConds
     yticks(frqTicks); yticklabels(frqDisp);
     set(gca,'FontSize',oP.textsize,'YDir','normal','color',[1 1 1]);
     colormap(flip(cbrewer2('RdBu'))); clim(oP.clim);
-    title(conds2(c)+": ERSP")
+    title(conds2(c)+": ERSP","FontSize",oP.textsize+2);
     if c==1; xlabel("Latency (ms)"); ylabel("Frequency (Hz)"); end
 end
 
@@ -321,9 +321,8 @@ for c = 1:height(B)
     nexttile;
     plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize);
-    xlabel("Latency (ms)",'FontSize',oP.textsize+2);
-    if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize);  end
+    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize+2);
+    if c==1; xlabel("Latency (ms)"); ylabel("z-score"); end
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
@@ -335,8 +334,8 @@ for c = 1:height(B)
     nexttile;
     plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize);
-    xlabel("RT - Latency (ms)",'FontSize',oP.textsize);
+    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize+2);
+    if c==1; xlabel("RT - Latency (ms)"); ylabel("z-score"); end
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
@@ -582,8 +581,8 @@ for c = 1:nConds
     nexttile;
     plotSingleTrials_lfn(xhCh(:,trialNfo.cond==conds(c))',lats5,oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials:  HFB",'FontSize',oP.textsize+2);
-    if c==1; ylabel("Trials by RT",'FontSize',oP.textsize+2); end
+    title(conds2(c)+" trials:  HFB",'FontSize',oP.textsize);
+    if c==1; ylabel("Trials by RT",'FontSize',oP.textsize); end
 end
 
 %% LFP single-trial
@@ -591,8 +590,8 @@ for c = 1:nConds
     nexttile;
     plotSingleTrials_lfn(xCh(:,trialNfo.cond==conds(c))',lats5,oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials:  LFP",'FontSize',oP.textsize+2);
-    if c==1; ylabel("Trials by RT",'FontSize',oP.textsize+2); end
+    title(conds2(c)+" trials:  LFP",'FontSize',oP.textsize);
+    if c==1; ylabel("Trials by RT",'FontSize',oP.textsize); end
     xlabel("Latency (ms)");
 end
 
@@ -824,8 +823,8 @@ for c = 1:nConds
     nexttile;
     plotSingleTrials_lfn(xhCh(:,trialNfo.cond==conds(c))',lats5,oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials:  HFB",'FontSize',oP.textsize+2);
-    if c==1; ylabel("Trials by RT",'FontSize',oP.textsize+2); end
+    title(conds2(c)+" trials:  HFB",'FontSize',oP.textsize);
+    if c==1; ylabel("Trials by RT",'FontSize',oP.textsize); end
     xlabel("Latency (ms)",'FontSize',oP.textsize+2);
 end
 
@@ -1053,7 +1052,7 @@ end
 %% Detrend & HPF
 [ds1,ds2] = rat(fsTarg/fs); % downsampling factors
 if (isstring(o.hiPass) && o.hiPass~="") || nnz(o.hiPass) || nnz(o.detrendOrder)
-    [xa,na] = ec_hiPassDetrend(xa,o.hiPass,o.detrendOrder,o.detrendWin,na,missing="linear");
+    [xa,na] = ec_detrendHPF(xa,o.hiPass,o.detrendOrder,o.detrendWin,na,missing="linear");
 end
 xa = mat2cell(xa,runIdx);
 
@@ -1415,8 +1414,8 @@ end
 nChs = n.xChs;
 if doICA
     nChs = n.nICs;
-    icWts = n.ica.winv';
     xNfo = n.icNfo;
+    icWts = zscore(n.ica.winv',1,'all');
 else
     xNfo = chNfo;
     icWts = zeros(nChs,1);
@@ -1429,14 +1428,14 @@ function [dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN)
 if a.ICA
     % Color by ICA weights
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdBu',center=0,zscore=floor(oP.clim*2));
+        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
     ch = xN.name;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
     dCh.col(dCh.order==-Inf,1:3) = 0;
     hemN = [nnz(dCh.hem=="L") nnz(dCh.hem=="R")];
     dCh.order = abs(dCh.order-0.5);
-    %dCh.order(dCh.order==Inf) = -Inf;
+    dCh.order(dCh.order==Inf) = -Inf;
 else
     ch = xN.ch;
     sbjCh = xN.sbjCh;
@@ -1513,7 +1512,7 @@ for c = 1:height(B)
     nexttile;
     plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize+1);
+    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize);
     xlabel("Latency (ms)",'FontSize',oP.textsize);
     if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize);  end
     hold on
@@ -1525,7 +1524,7 @@ for c = 1:height(B)
     nexttile;
     plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize+1);
+    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize);
     xlabel("RT - Latency (ms)",'FontSize',oP.textsize);
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
@@ -1536,7 +1535,7 @@ for c = 1:height(B)
     nexttile;
     plotFrameAvg_lfn(sc.pct{1},B.name(c),oP);
     set(gca,'FontSize',oP.textsize);
-    title("RT percent:  "+B.disp(c),'FontSize',oP.textsize+1);
+    title("RT percent:  "+B.disp(c),'FontSize',oP.textsize);
     xlabel("Latency/RT (%)",'FontSize',oP.textsize);
     hold on
     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);

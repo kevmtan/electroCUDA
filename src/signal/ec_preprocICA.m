@@ -100,8 +100,6 @@ tt = tic;
 % Initialize variables/objects
 ch_bad = chNfo.bad;
 n.proj = proj;
-% runIdx = grpstats(psy,"run",["min" "max"],"DataVars","idx"); % Get run indices
-% runIdx = sortrows(runIdx,["min_idx" "max_idx"],"ascend");
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
 cd(o.dirOut);
@@ -137,7 +135,7 @@ end
 toc(tt);
 
 %% Robust detrending for better ICA decomposition (aggressive)
-[x,n] = ec_hiPassDetrend(x,o.hiPassICA,o.detrendOrder_ICA,o.detrendWin_ICA,n,tt,...
+[x,n] = ec_detrendHPF(x,o.hiPassICA,o.detrendOrder_ICA,o.detrendWin_ICA,n,tt,...
     itr=o.detrendItr_ICA,thr=o.detrendThr_ICA,missing=o.missingInterp,...
     sfx=o.sfx_src); %sfxOg=o.sfx_src);
 
@@ -260,12 +258,9 @@ else
     chICAog = chICA;
 
     % Find rank using ultra-conservative tolerance
-    tol = prctile(eig(cov(x(:,chICA),'partialrows')),5);
-    if tol>200; tol=200; elseif tol>100; tol=100; elseif tol>50; tol=50; elseif tol>10; tol=10;...
-    elseif tol>1; tol=1; else; tol=1e-7; end
-    chRank = ec_rank(x(:,chICA),tol=1); % Calculate rank
-    chRankOg = chRank;
-    doGPU=0;
+    tol = floor(prctile(eig(cov(x(:,chICA),'partialrows')),10));
+    chRank = ec_rank(x(:,chICA)); % Calculate rank
+    chRankOg=chRank; doGPU=0;
     disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
 
     %% If rank-deficient, try channel exclusions
@@ -280,11 +275,11 @@ else
             chRm{v} = ismember(chs,chICA) & chs~=ch;
             if doGPU; chRm{v} = gpuArray(chRm{v}); end
         end
-        
+ 
         % Calculate channel deficiency contribution via leave-one-out perms
         chRankz(chICAbad) = arrayfun(@(rm) ec_rank(xCh(:,rm{:}),tol=tol),chRm,'UniformOutput',true);
 
-        %% Remove channel(s) w greatest rank deficiency contribution
+        % Remove channels w greatest deficiency contribution until rank-sufficient
         while chRank<numel(chICA) && numel(chICA)>floor(chRankOg*.95) && numel(chICAbad)>0
             [~,chRm] = max(chRankz(chICAbad)); % ultra-conservative rank
             chRm = chICAbad(chRm);
@@ -396,7 +391,7 @@ disp("Reconstructed IC timecourses: "+n.sbj); toc(tt);
 
 % Hi-pass & detrend
 if any(o.hiPass) || any(o.detrendOrder)
-    [x,n] = ec_hiPassDetrend(x,o.hiPass,o.detrendOrder,o.detrendWin,n,tt,...
+    [x,n] = ec_detrendHPF(x,o.hiPass,o.detrendOrder,o.detrendWin,n,tt,...
         itr=o.detrendItr,thr=o.detrendThr,sfx=sfx);
 end
 

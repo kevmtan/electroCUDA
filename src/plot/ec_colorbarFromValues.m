@@ -31,7 +31,7 @@ if nCols<256
 end
 
 % Set value limits
-if numel(cLim)==2 && numel(a.zscore)<=1 
+if numel(cLim)==2
     vals(vals<cLim(1)) = cLim(1);
     vals(vals>cLim(2)) = cLim(2);
 end
@@ -39,29 +39,25 @@ end
 % Z-score values
 if any(a.zscore)
     if any(a.center)
-        vals = normalize(vals,"center",a.center,"scale","std");
+        vals = normalize(vals,center=a.center,scale="std");
     else
         vals = normalize(vals,"zscore");
     end
 
-    % Get custom z-score limits
+    % Clip z-scores at limits
     if numel(a.zscore)==2
         cLim = a.zscore;
-    end
-
-    % Clip z-scores at limits
-    if numel(cLim)==2
         vals(vals<cLim(1)) = cLim(1);
         vals(vals>cLim(2)) = cLim(2);
-    end
-end
-
-% Center colorbar
-if any(a.center)
+    end 
+elseif any(a.center) % Center colorbar
     vals = normalize(vals,"center",a.center);
     cLim = [min(vals) max(vals)];
     cLim = [-max(abs(cLim(1)),abs(cLim(2))) max(abs(cLim(1)),abs(cLim(2)))];
-elseif numel(cLim)<2
+end
+
+% Use range if no specified clim
+if numel(cLim)<2
     cLim = [min(vals) max(vals)];
 end
 

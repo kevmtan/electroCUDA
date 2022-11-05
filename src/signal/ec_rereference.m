@@ -27,16 +27,18 @@ if size(mask,2) ~= size(x,2); error("Mask length must equal number of channels (
 
 %% Robust reference
 mask(refChs) = false;
+maskSz = nnz(mask);
 rnk = ec_rank(x); % get initial data rank
 disp("Robust rereference: all_chs="+width(x)+" | avg_chs="+nnz(mask)+" | rank="+rnk); 
 
 % Loop across iterations
 for t = 1:nItr
     % Add 1 to denomenator of mean to avoid losing data rank
-    if rnk<width(x) || (t==1 && any(refChs)); d=1; else; d=0; end
+    if rnk<width(x) || maskSz~=nnz(mask) || any(refChs); d=1; else; d=0; end
+    maskSz = nnz(mask);
 
     % Robust reference to good chans
-    mn = sum(x(:,mask),2,"omitnan") / (sum(mask,"omitnan")+d); % mean timecourse of good chans
+    mn = sum(x(:,mask),2,"omitnan") / (nnz(mask)+d); % d in denominator for rank correction
     x = x - mn; % reference all chans to good chans
     xx = x(:,mask); % good chan timecourses
     mask(mad(x,1)/mad(xx(:),1) > thresh) = 0; % remove outlier chans from good chans

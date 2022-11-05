@@ -62,9 +62,11 @@ function [Xsol, S0] = rasr_nonlinear_eigenspace(L, k, alpha)
     X = U*V';
     [U0, S0, ~] = eigs(L + alpha*diag(L\(sum(X.^2, 2))), k); %,'sm'); %#ok<NASGU,ASGLU>
     X0 = U0;
+
+    options = getGlobalDefaults;
   
     % Call manoptsolve to automatically call an appropriate solver.
     % Note: it calls the trust regions solver as we have all the required
     % ingredients, namely, gradient and Hessian, information.
-    Xsol = manoptsolve(problem, X0);
+    Xsol = manoptsolve(problem, X0,options);
 end

@@ -94,6 +94,8 @@ function [outdata,outstate, Y] = asr_process_r(data,srate,state,windowlen,lookah
 % preparation).
 
 disp('THIS IS RIEMANN ADAPTED PROCESSING!!!');
+data = double(data);
+
 if nargin < 4 || isempty(windowlen)
     windowlen = 0.1; end
 windowlen = max(windowlen,1.5*size(data,1)/srate);
@@ -106,19 +108,20 @@ if nargin < 7 || isempty(maxdims)
 if nargin < 9 || isempty(usegpu)
     usegpu = false; end
 if nargin < 8 || isempty(maxmem)
-    if usegpu
-        dev = gpuDevice(); maxmem = dev.FreeMemory/2^20;
-    else
-        maxmem = hlp_memfree/(2^21);
-    end
 end
+if usegpu
+    dev = gpuDevice(); maxmem = dev.FreeMemory/2^20;
+else
+    maxmem = hlp_memfree/(2^21);
+end
+
 if maxdims < 1
     maxdims = round(size(data,1)*maxdims); end
 if isempty(data)
     outdata = data; outstate = state; return; end
 
 [C,S] = size(data);
-N = round(windowlen*srate);
+%N = round(windowlen*srate);
 P = round(lookahead*srate);
 [T,M,A,B] = deal(state.T,state.M,state.A,state.B);
 
@@ -169,7 +172,11 @@ for i=1:splits
             update_at = [1 update_at];
             state.last_R = eye(C);
         end
-       
+
+        % Gather from GPU
+        if isgpuarray(Xcov)
+            Xcov = gather(Xcov); end
+
         % function from manopt toolbox, adapted to this use case. manopt needs to be in the path
         %[V1,D1] = eig(Xcov)
         [V, D] = rasr_nonlinear_eigenspace(Xcov, C);
@@ -184,7 +191,7 @@ for i=1:splits
         
         % update the reconstruction matrix R (reconstruct artifact components using the mixing matrix)
         if ~trivial
-            R = real(M*pinv(bsxfun(@times,keep',V'*M))*V');
+            R = real(M*pinv(keep'.*V'*M)*V');
         else
             R = eye(C);
         end
