@@ -135,9 +135,9 @@ end
 toc(tt);
 
 %% Robust detrending for better ICA decomposition (aggressive)
-[x,n] = ec_detrendHPF(x,o.hiPassICA,o.detrendOrder_ICA,o.detrendWin_ICA,n,tt,...
+[x,n] = ec_detrendHPF(x,o.hiPassICA,o.detrendOrder_ICA,n,tt,win=o.detrendWin_ICA,...
     itr=o.detrendItr_ICA,thr=o.detrendThr_ICA,missing=o.missingInterp,...
-    sfx=o.sfx_src); %sfxOg=o.sfx_src);
+    sfx=o.sfx_src, sfxOg=o.sfx_src);
 
 %% Robust rereference
 if o.doRereference
@@ -148,7 +148,7 @@ if o.doRereference
 end
 
 %% Prepare for ICA
-[o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,ch_bad,chNfo,sfxB,sfx1,errors,tt);
+[o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,n,o,arg,ch_bad,chNfo,sfxB,sfx1,errors,tt);
 chNfo.bad = ch_bad;
 
 %% Run ICA decomposition on GPU
@@ -234,13 +234,15 @@ end
 
 
 %% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,ch_bad,chNfo,sfxB,sfx1,errors,tt)
+function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,n,o,arg,ch_bad,chNfo,sfxB,sfx1,errors,tt)
 if ~exist('tt','var'); tt = tic; end
+fn=string(fieldnames(n)); fn=fn(contains(fn,"detrendW")); fn=fn(end);
+xCh = x(~n.(fn),:);
 
 % Find channels to use for ICA
 if isfield(arg,"nIn") && isstruct(arg.nIn) && isfield(arg.nIn,"chICA")
     chICA = arg.nIn.chICA;
-    chRank = ec_rank(x(:,chICA)); % Calculate rank
+    chRank = ec_rank(xCh(:,chICA)); % Calculate rank
     o.ica_pca = arg.nIn.ica.pca;
     disp("Using previous ICA params: num_chICA="+numel(chICA)+" | rank="+chRank);
 else
@@ -258,8 +260,8 @@ else
     chICAog = chICA;
 
     % Find rank using conservative tolerance
-    tol = min([1 prctile(ec_rank(x(:,chICA),eig=1),5)]);
-    chRank = ec_rank(x(:,chICA),tol=tol); % Calculate rank
+    tol = min([1 prctile(ec_rank(xCh(:,chICA),eig=1),5)]);
+    chRank = ec_rank(xCh(:,chICA),tol=tol); % Calculate rank
     chRankOg=chRank; doGPU=0;
     disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
 
@@ -267,7 +269,6 @@ else
     if chRank<numel(chICA) && o.ica_pca<=0 && numel(chICAbad)>0
         % Setup leave-one-out
         chs=chNfo.ch; chRm=cell(numel(chICAbad),1); chEigs=nan(numel(chs),1);
-        xCh=x;
         try xCh=gpuArray(xCh); doGPU=arrayfun(@isnumeric,xCh(1,1)); catch;end
         for v = 1:numel(chICAbad)
             ch = chICAbad(v);
@@ -296,13 +297,12 @@ else
             chRank = gather(ec_rank(xCh(:,chICA),tol=tol));
             disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | excluded="+chRm);
         end
-        clear xCh;
     end
 
     %% Do PCA if still rank-deficient (using all redeemable chans)
     if chRank<numel(chICA) && o.ica_pca>=0
         chICA = chICAog;
-        chRank = ec_rank(x(:,chICA),tol=tol);
+        chRank = gather(ec_rank(xCh(:,chICA),tol=tol));
         o.ica_pca = chRank;
         warning("setting o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
         errors{end+1,1} = lastwarn;
@@ -317,6 +317,9 @@ chNfo.("ica"+sfx1)(:) = false;
 chNfo.("ica"+sfx1)(chICA) = true; % indicate ICA channels
 ch_bad.("ica"+sfx1) = chNfo.("ica"+sfx1);
 disp("Finished ICA prep: "+chNfo.sbj(1)); toc(tt);
+
+% Clear VRAM
+clear xCh;
 if doGPU; try reset(gpuDevice(1)); catch;end;end
 end
 
@@ -327,8 +330,9 @@ sbj = n.sbj;
 sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
 ch_bad = chNfo.bad;
+fn=string(fieldnames(n)); fn=fn(contains(fn,"detrendW")); fn=fn(end);
+idxICA = full(~n.(fn));
 cd(o.dirOut); try system("rm cudaica_"+sfx+"*"); catch;end % Remove old cudaica files
-
 
 % Starting weights
 ic_wtsIn = '';
@@ -337,7 +341,7 @@ if isfield(arg,"nIn")
 end
 
 %% Infomax ICA compiled in CUDA
-ica = ec_cudaica(x(:,chICA),dirs.cudaica,ic_wtsIn,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
+ica = ec_cudaica(x(idxICA,chICA),dirs.cudaica,ic_wtsIn,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
     lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
 nICs = height(ica.wts);
 disp("Finished CUDAICA: "+sbj); toc(tt);

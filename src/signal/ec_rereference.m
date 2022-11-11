@@ -27,15 +27,13 @@ if size(mask,2) ~= size(x,2); error("Mask length must equal number of channels (
 
 %% Robust reference
 mask(refChs) = false;
-maskSz = nnz(mask);
 rnk = ec_rank(x); % get initial data rank
-disp("Robust rereference: all_chs="+width(x)+" | avg_chs="+nnz(mask)+" | rank="+rnk); 
+disp("START robust rereference: all_chs="+width(x)+" | avg_chs="+nnz(mask)+" | rank="+rnk); 
 
 % Loop across iterations
 for t = 1:nItr
     % Add 1 to denomenator of mean to avoid losing data rank
-    if rnk<width(x) || maskSz~=nnz(mask) || any(refChs); d=1; else; d=0; end
-    maskSz = nnz(mask);
+    if rnk<width(x) || width(x)~=nnz(mask) || any(refChs); d=1; else; d=0; end
 
     % Robust reference to good chans
     mn = sum(x(:,mask),2,"omitnan") / (nnz(mask)+d); % d in denominator for rank correction

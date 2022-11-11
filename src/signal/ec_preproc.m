@@ -54,7 +54,7 @@ arguments
     arg.test logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; arg.save=1; arg.redo=1; arg.redoN=1; arg.test=1;
+% x=[]; n=[]; arg.save=0; arg.redo=1; arg.redoN=1; arg.test=1;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
@@ -95,9 +95,6 @@ tic;
     redo=arg.redo,redoN=arg.redoN);
 
 % Initialize variables/objects
-%sbjID = n.sbjID;
-%nRuns = n.nRuns;
-%runIdx = n.runIdx;
 fs = floor(n.fs);
 ch_bad = chNfo.bad;
 n.proj = proj;
@@ -110,19 +107,23 @@ if isempty(x)
     [x,errors,chNan] = load_iEEG_LBCN(sbj,proj,blocks,dirs,errors); toc;
     ch_bad.nan(chNan) = true; 
 end
+if arg.test; xOg=x; end %#ok<NASGU> 
 n.xChs = width(x);
 n.xFrames = height(x);
 n.dirs = dirs;
 
 %% Classify bad EEG channels
-chNoASR = [];
-sfxB = "";
 if o.doBadCh
-    sfxB = sfx;
-    % Find flat channels
+    % Find flat channels (1st order differential)
     x_diff = abs(diff(x,1,1));
     x_diff = mean(x_diff,1,"omitnan");
     ch_bad.("flat"+sfx) = isoutlier(x_diff,"quartiles","ThresholdFactor",20)';
+
+    % Weird covariance channels
+    x_cov = cov(x,'partialrows');
+    x_cov(corrcov(x_cov)==1) = nan;
+    x_cov = mean(x_cov,2,"omitnan");
+    ch_bad.("cov"+sfx) = isoutlier(x_cov,"median",ThresholdFactor=10);
 
     % Classify
     [chClass,chNfo.dist] = ec_classifyBadChs(x,chNfo.pialRAS,chNfo.ch);
@@ -132,24 +133,21 @@ if o.doBadCh
     ch_bad.("grad"+sfx) = isoutlier(chClass.grad);
 
     % Hurst exponent
-    idx = ~(ch_bad.empty|ch_bad.nan|chClass.bad|ch_bad.("dev"+sfx)|ch_bad.("flat"+sfx)|...
-        ch_bad.("grad"+sfx));
+    idx = ~(ch_bad.empty|ch_bad.nan|chClass.bad|ch_bad.("flat"+sfx)|ch_bad.("cov"+sfx)|...
+        ch_bad.("dev"+sfx)|ch_bad.("grad"+sfx));
     chHrst = abs(chClass.hurs - 0.5);
-    [~,chHrst_lo,~] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst);
-    [~,~,chHrst_hi] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst+2);
+    [~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst);
     ch_bad.("hurstL"+sfx) = chHrst < chHrst_lo;
     ch_bad.("hurstH"+sfx) = chHrst > chHrst_hi;
 
     % Copy
-    ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|chClass.bad|sum([ch_bad.("dev"+sfx),...
-        ch_bad.("grad"+sfx),ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx),ch_bad.("flat"+sfx)],2)>=3;
+    ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx)|...
+        sum([ch_bad.("flat"+sfx),ch_bad.("cov"+sfx),ch_bad.("dev"+sfx),ch_bad.("grad"+sfx),...
+        ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx)],2)>=3;
     ch_bad(:,string(chClass.Properties.VariableNames(3:end))+"P"+sfx) = chClass(:,3:end);
+    chGood = ~ch_bad.("bad"+sfx);
     disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
     disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
-
-    % Channels for later
-    chNoASR = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx);
-    chGood = ~ch_bad.("bad"+sfx);
 elseif any(ch_bad.Properties.VariableNames=="rr")
     chGood = ~ch_bad.rr;
     disp("Bad chans: ch_bad.rr "+sbj);
@@ -159,15 +157,24 @@ elseif any(ch_bad.Properties.VariableNames=="bad")
 else
     chGood = true(n.xChs,1);
 end
-% Make sure no ASR chans
-if isempty(chNoASR)
-    chNoASR = ch_bad.empty|ch_bad.nan|ch_bad.ai;
+
+% Channels for ASR
+if o.doBadCh
+    chNoASR = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx)|...
+        sum([ch_bad.("flat"+sfx),ch_bad.("cov"+sfx),ch_bad.("dev"+sfx),ch_bad.("grad"+sfx),...
+        ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx)],2)>=5;
+else
+    chNoASR = ch_bad.empty|ch_bad.nan|ch_bad.ai|...
+        sum([ch_bad.flat,ch_bad.cov,ch_bad.dev,ch_bad.grad,ch_bad.hurstL,ch_bad.hurstH],2)>=5;
 end
+ch_bad.("asr"+sfx) = chNoASR;
+n.chNoASR = find(chNoASR);
+disp("No ASR chans:"); disp(n.chNoASR');
 toc;
 
-%% Filter & detrend (within-run to avoid edge artifacts)
-[x,n] = ec_detrendHPF(x,o.hiPass,o.detrendOrder,o.detrendWin,n,...
-    thr=o.detrendThr,itr=o.detrendItr,missing=o.missingInterp,sfx=o.suffix);
+%% Initial filter & detrend (within-run to avoid edge artifacts)
+[x,n] = ec_detrendHPF(x,n,poly=o.detrendOrder,win=o.detrendWin,thr=o.detrendThr,...
+    itr=o.detrendItr,missing=o.missingInterp,sfx=o.suffix);
 
 %% Robust rereference
 if o.doRereference
@@ -178,25 +185,15 @@ if o.doRereference
     disp("Finished robust referencing"); toc;
 end
 
+%% Final filter & detrend (within-run to avoid edge artifacts)
+[x,n] = ec_detrendHPF(x,n,hpf=o.hiPass,poly=o.detrendOrder2,win=o.detrendWin2,...
+    thr=o.detrendThr2,itr=o.detrendItr2,missing=o.missingInterp,sfx=o.suffix,gpu=o.hiPassGPU);
+
 %% Power line noise removal
 if o.lineHz > 0
-    [x,~,n.lineNoise] = KT_zapline_plus(x,fs,'noisefreqs',o.lineHz);
+    [x,~,n.lineNoise] = ec_zaplinePlus(x,fs,'noisefreqs',o.lineHz);
     disp([sbj ': finished power line noise removal']); toc;
 end
-
-%% Finalize ASR channels
-chCov = cov(x,'partialrows');
-chCov(corrcov(chCov)==1) = nan;
-chCov = mean(chCov,2,"omitnan");
-chCov = isoutlier(chCov,"median",ThresholdFactor=10);
-
-% Convergent bad ch metrics & classifier results
-chNoASR = chNoASR | ~any(chNfo.pialRAS(:,1),2) | all([chCov,ch_bad.("dev"+sfxB),...
-    ch_bad.("grad"+sfxB),ch_bad.("hurstL"+sfxB),ch_bad.("flat"+sfxB)],2);
-ch_bad.("asr"+sfx) = chNoASR;
-n.chNoASR = find(chNoASR);
-chRank = ec_rank(x(:,~chNoASR));
-disp("ASR_chans="+nnz(~chNoASR)+" | rank="+chRank); toc;
 
 %% Detect epileptic high-frequency oscillations (HFOs)
 x_bad = table;
@@ -209,9 +206,11 @@ chNfo.bad = ch_bad;
 
 %% Artifact subspace reconstruction (ASR)
 if o.asr.do
+    disp("Starting ASR: chans="+nnz(~chNoASR)+" | rank="+ec_rank(x(:,~chNoASR)));
     o.asr.chIgnore = chNoASR;
     x = ASR_lfn(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo),o.asr);
 end
+%vis_artifacts(ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo), ec_exportEEGLAB(dirs,n,xOg,psy,trialNfo,chNfo));
 
 %% Identify bad frames per chan
 if o.doBadFrames
@@ -221,10 +220,10 @@ if o.doBadFrames
 end
 
 %% Covariance/correlation outliers
-chCov = cov(x,'partialrows');
-chCorr = corrcov(chCov);
+x_cov = cov(x,'partialrows');
+chCorr = corrcov(x_cov);
 % Get channels with ultra-high covariance
-chCovZ = abs(chCov);
+chCovZ = abs(x_cov);
 chCovZ(chCorr==1) = nan;
 chCovZ = mean(chCovZ,2,"omitnan");
 % Copy to permanent tables
@@ -235,7 +234,7 @@ ch_bad.("covP"+sfx) = chCovZ;
 sfx = erase(sfx,"_");
 n.suffix = o.suffix;
 n.badFrames = x_bad;
-n.chCov = chCov;
+n.chCov = x_cov;
 n.chVar = diag(n.chCov);
 n.chCorr = chCorr;
 n.("o"+sfx) = o;
@@ -331,7 +330,7 @@ end
 % EEG = ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo);
 
 % Remove excluded channels
-if oa.gpu; try reset(gpuDevice(1)); catch;end;end
+if oa.gpu; try reset(gpuDevice()); catch;end;end
 chNoASR = oa.chIgnore;
 if ~isempty(chNoASR) && any(chNoASR)
     EEGog = EEG;
@@ -341,8 +340,8 @@ if ~isempty(chNoASR) && any(chNoASR)
 end
 
 % Run ASR
-EEG = ec_ASRclean(EEG,oa.burst,[],[],oa.maxDims,oa.burstMaxBadChs,oa.burstTols,...
-    oa.refWinLength,oa.gpu,oa.reimann,oa.maxMem);
+EEG = ec_ASR(EEG,oa.burst,oa.winLength,[],oa.maxDims,oa.burstMaxBadChs,oa.burstTols,...
+    oa.refWinLength,oa.gpu,oa.reimann,oa.maxMem,oa.filtAmps);
 
 % Copy cleaned channels to data matrix
 if any(chNoASR)
@@ -353,5 +352,5 @@ else
     EEG = EEG.data;
 end
 EEG = EEG';
-if oa.gpu; try EEG=gather(EEG); reset(gpuDevice(1)); catch;end;end
+if oa.gpu; try EEG=gather(EEG); reset(gpuDevice()); catch;end;end
 end

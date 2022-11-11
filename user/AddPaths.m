@@ -3,12 +3,12 @@ function [dirFreesurfer,dirMain,dirCode,path_cudaica] = AddPaths(user)
 
 if strcmp(user,'Kevin_DMN')
     dirMain = '/proj/lbcn/d/';
-    dirCode = '/home/kevin/Gdrive/Git/electroCUDA/';
+    dirCode = '/home/kt/Gdrive/Git/electroCUDA/';
     dirFreesurfer = '/proj/lbcn/d/freesurfer/';
     path_cudaica = '/home/kt/Documents/MATLAB/cudaica-master/cudaica';
 elseif strcmp(user,'Kevin_DMNpp')
     dirMain = '/proj/lbcn/d/';
-    dirCode = '/home/kevin/Gdrive/Git/electroCUDA/';
+    dirCode = '/home/kt/Gdrive/Git/electroCUDA/';
     dirFreesurfer = '/mnt/KT_MMRraw/';
     path_cudaica = '/home/kt/Documents/MATLAB/cudaica-master/cudaica';
 elseif strcmp(user,'Kevin_UCLA')

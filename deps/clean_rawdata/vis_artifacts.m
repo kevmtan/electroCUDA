@@ -178,15 +178,15 @@ set(hFig, 'ResizeFcn', @on_window_resized);
 
     function repaint(relPos,moved)
         % repaint the current data
-        
+
         % if this happens, we are maxing out MATLAB's graphics pipeline: let it catch up
         if relPos == lastPos && moved
             return; end
-        
+
         % axes
         cla(hAxis);
-        gca = hAxis;
-        
+        %gca = hAxis;
+
         % compute pixel range from axis properties
         xl = get(hAxis,'XLim');
         yl = get(hAxis,'YLim');
@@ -195,19 +195,19 @@ set(hFig, 'ResizeFcn', @on_window_resized);
         pixels = (fp(3))*(ap(3)-ap(1));
         ylr = yl(1) + opts.yrange*(yl(2)-yl(1));
         channel_y = (ylr(2):(ylr(1)-ylr(2))/(size(new.data,1)-1):ylr(1))';
-        
+
         % Add channel labels to y axis
         if isfield(old.chanlocs,'labels')
             set(hAxis,'ytick',flipud(channel_y));
             set(hAxis,'yticklabel',fliplr({old.chanlocs.labels}));
         end
-        
+
         % compute sample range
         wndsamples = opts.wndlen * new.srate;
         pos = floor((size(new.data,2)-wndsamples)*relPos);
         wndindices = 1 + floor(0:wndsamples/pixels:(wndsamples-1));
         wndrange = pos+wndindices;
-        
+
         oldwnd = old.data(:,wndrange);
         newwnd = new.data(:,wndrange);
         switch opts.scale_by
@@ -229,18 +229,18 @@ set(hFig, 'ResizeFcn', @on_window_resized);
         scale(scale>median(scale)*3) = median(scale);
         scale = scale(:);
         scale = repmat(scale,1,length(wndindices));
-        
+
         % draw
         if opts.show_setname
             tit = sprintf('%s - ',[old.filepath filesep old.filename]);
         else
             tit = '';
         end
-        
+
         if ~isempty(wndrange)
             tit = [tit sprintf('[%.1f - %.1f]',new.xmin + (wndrange(1)-1)/new.srate, new.xmin + (wndrange(end)-1)/new.srate)];
         end
-        
+
         xrange = xl(1):(xl(2)-xl(1))/(length(wndindices)-1):xl(2);
         yoffset = repmat(channel_y,1,length(wndindices));
         switch opts.display_mode
@@ -258,7 +258,7 @@ set(hFig, 'ResizeFcn', @on_window_resized);
                 title([tit '; difference'],'Interpreter','none');
                 plot(xrange, (yoffset + scale.*(oldwnd-newwnd))','Color',opts.newcol,'LineWidth',opts.line_width(1));
         end
-        
+
         % also plot events
         if opts.show_events && ~isempty(old.event)
             evtlats = [old.event.latency];
@@ -294,13 +294,13 @@ set(hFig, 'ResizeFcn', @on_window_resized);
             end
         end
         axis([0 1 0 1]);
-        
+
         if opts.add_legend && ~have_signallegend
             legend([h_old(1);h_new(1)],'Original','Corrected');
             have_signallegend = 1;
         end
         drawnow;
-        
+
         lastPos = relPos;
     end
 

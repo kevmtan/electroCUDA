@@ -1,22 +1,25 @@
-function freqs = genFreqs(freqName)
+function [freqs,voicesPerOctave] = genFreqs(freqName)
+% Generate frequencies in hertz per band
 
+voicesPerOctave = 32;
 switch freqName
-    case 'HFB'
-        freqs = 2.^(6.15:0.05:7.4);   
-    case 'Spec'
-        freqs = 2.^([0:0.5:2,2.3:0.3:5,5.2:0.2:7.4]);
-    case 'SpecDenseLF'
-        freqs = 2.^([0:0.3:6,6.15:0.15:8]);        
-    case 'SpecDense'
-        freqs = 2.^([0:0.25:2,2.15:0.15:5,5.1:0.1:8]);
-    case 'Delta'
-        freqs = 2.^(-1:0.4:1.8);
-    case 'Theta'
-        freqs = 2.^(2:0.2:2.8);
-    case 'Alpha'
-        freqs = 2.^(3:0.2:4) - 0.9;
-    case 'Beta'
-        freqs = 2.^(4:0.2:5) - 0.1;
-    case 'Gamma'
-        freqs = 2.^(5:0.2:5.9);
+    case "spec" % continuous spectrum
+        freqs = [1 300];
+        voicesPerOctave = 10;
+    case "delta"
+        freqs = [1 4];
+    case "theta"
+        freqs = [4 8];
+    case "alpha"
+        freqs = [8 13];
+    case "beta"
+        freqs = [13 30];
+    case "gamma"
+        freqs = [30 60];
+    case "hfb"
+        freqs = [60 180];
+    case "uhfb"
+        freqs = [180 300];
+    case "hfw"
+        freqs = [60 300];
 end

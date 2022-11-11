@@ -25,19 +25,17 @@ dirs=arg.dirs;
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
 if ~isfield(o,'gatherOut');   o.gatherOut=false; end
-% if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
-% if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
-% if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
-% if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
-% if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
-% if ~isfield(o,'single');      o.single=[]; end         % Convert to double to single (single much faster on GPU)
-% if ~isfield(o,'thrSpec');     o.thrSpec=15; end        % Threshold for averaged spectral data (e.g. HFB) (z-score threshold relative to all data points) to exclude timepoints
-% if ~isfield(o,'doGPU');       o.doGPU=false; end       % Run on GPU, see MATLAB gpuArray requirements (default=false)
-% if ~isfield(o,'doGPUarray');  o.doGPUarray=true; end   % Use arrayfun for GPU (faster, more memory)
-% if isempty(o.single); if o.doGPU; o.single=true; else; o.single=false; end; end
+if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
+if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
+if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
+if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
+if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
+if ~isfield(o,'single');      o.single=[]; end         % Convert to double to single (single much faster on GPU)
+if ~isfield(o,'singleOut');   o.singleOut=[]; end      % Run as double (accuracy) & save as single for smaller HDD size
+if ~isfield(o,'thrSpec');     o.thrSpec=15; end        % Threshold for averaged spectral data (e.g. HFB) (z-score threshold relative to all data points) to exclude timepoints
+if ~isfield(o,'doGPU');       o.doGPU=false; end       % Run on GPU, see MATLAB gpuArray requirements (default=false)
 % Make workspace vars
-doGPU=o.doGPU; fMean=o.fMean; dsTarg=o.dsTarg; doSingle=o.single; doGPUarray=o.doGPUarray;
-gatherOut=o.gatherOut;
+doGPU=o.doGPU; fMean=o.fMean; dsTarg=o.dsTarg; singleOut=o.singleOut;
 
 %% Setup
 tic;
@@ -78,24 +76,33 @@ else; ds1=1; ds2=1;
 end
 
 % Transfer vars to GPU
-if doGPU; fMean=gpuArray(logical(fMean)); gatherOut=gpuArray(logical(gatherOut)); end
-if ~doGPU; try parpool('threads'); catch;end;end
+if doGPU
+    if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice, 0, []); end
+    try reset(gpuDevice()); catch; end
+    fMean=gpuArray(logical(fMean)); singleOut=gpuArray(logical(singleOut));
+    ds1=gpuArray(ds1); ds2=gpuArray(ds2);
+    memMax=gpuDevice(); memMax=memMax.AvailableMemory;
+else
+    try parpool('threads'); catch;end
+end
 
 
-%% Continuous Wavelet Transform (L1 normalization for 1/f decay)
+
+%% Continuous Wavelet Transform with L1-norm for 1/freq decay
 xf = cell(nRuns,1);
 cwtHz = xf;
-for b = 1:nRuns % CWT within blocks (avoid artifacts at block transitions)
+% CWT within-run (avoid edge artifacts at run transitions)
+for b = 1:nRuns
     idx = runIdx(b,1):runIdx(b,2);
     bLength = length(idx);
     block = blocks(b);
 
     % Get block iEEG data
     xa = x(idx,:);
-    xb = cell(1,nChs);
-    %if doSingle; xa = single(xa); end
+    if o,single; xa = single(xa); end
+    xa = num2cell(xa,1);
 
-    % Get CWT filter
+    % Generate CWT filter
     fb = cwtfilterbank(SignalLength=bLength,VoicesPerOctave=o.fVoices,...
         SamplingFrequency=fsOg,FrequencyLimits=o.fLims);
     cwtHz{b} = fb.centerFrequencies';
@@ -103,52 +110,41 @@ for b = 1:nRuns % CWT within blocks (avoid artifacts at block transitions)
     % Do CWT
     if ~doGPU
         % CPU parfor-loop (slower, no GPU required)
+        disp("Starting wavelet transform (CPU): "+sbj+" "+block+"..."); toc  
         parfor ch = 1:nChs
-            xb{ch} = cwt_lfn(fb,xa(:,ch),fMean,false);
-            disp(sbjChs(ch)+" "+block+": wavelet transform (CPU)");
+            xa{ch} = cwt_lfn(fb,xa{ch},fMean,ds1,ds2,singleOut);
         end
-    else % Use GPU
-        bFin = false;
-        if doSingle; xa = single(xa); end
-        % GPU arrayfun (fastest, requires more VRAM)
-        if doGPUarray
-            xa = num2cell(xa,1);
-            xa = cellfun(@gpuArray,xa,'UniformOutput',false);
-            try disp("Starting wavelet transform (GPU arrayfun): "+block);
-                xb = arrayfun(@(xCh) cwt_lfn(fb,xCh{:},fMean,gatherOut),...
-                    xa,'UniformOutput',false);
-                bFin = true;
-            catch ME; getReport(ME)
-                warning(sbj+" "+block+": wavelet arrayfun error, switching GPU for-loop");
-                xb = cell(1,nChs);
-                if doSingle; xa=single(x(idx,:)); else; xa=x(idx,:); end
-                bFin = false; gatherOut = gpuArray(true);
-            end
+    else % Use GPU (faster, requires nVidia CUDA GPU)
+        disp("Starting wavelet transform (GPU): "+sbj+" "+block+"..."); toc  
+        chFin = false(nChs,1);
+        
+        % Get number of chans that will fit in VRAM
+        memIn=xa{1}; memIn=whos('memIn'); memIn=memIn.bytes; memOut=memIn; %#ok<NASGU> 
+        %if o.singleOut && isdouble(xa{1}); memOut=memOut/2; end
+        if ~fMean; memOut=memOut*nnz(cwtHz{b}); end
+        memChs=floor(memMax/(memIn+memOut)); memChs=floor(nChs/memItr); %#ok<NASGU> 
+        
+        % gpuArray per number of chans in VRAM
+        for v = 1:numel(memChs:memChs:nChs)
+            idx=find(~chFin,memChs);
+            xa(idx) = cellfun(@gpuArray,xa(idx),'UniformOutput',false);
+            xa(idx) = arrayfun(@(xCh) cwt_lfn(fb,xCh{:},fMean,ds1,ds2,singleOut),...
+                xa(idx),'UniformOutput',false);
+            xa(idx) = cellfun(@gather,xa(idx),'UniformOutput',false);
+            chFin(idx) = true;
+            disp("Finished wavelet transform (GPU): "+sbj+" "+block+" "+idx(end)+"/"+nChs);
         end
-
-        % GPU for-loop (faster, requires less VRAM)
-        if ~bFin
-            for ch = 1:nChs
-                xb{ch} = cwt_lfn(fb,xa(:,ch),fMean,gatherOut);
-                disp(sbjChs(ch)+" "+block+": wavelet transform (GPU)");
-            end 
-        end
-        xb = cellfun(@gather,xb,'UniformOutput',false);
+        xa = cellfun(@gather,xa,'UniformOutput',false);
     end
     if ~arg.test; clear xa; end
 
-    %% Downsample & reshape
-    if ds2>1 % downsample
-        xb = arrayfun(@(xCh) resample(xCh{:},ds1,ds2),xb,'UniformOutput',false);
+    %% Finalize
+    if fMean
+        xa = horzcat(xa{:});
+    else % reshape
+        xa = permute(cat(3,xa{:}),[1 3 2]);
     end
-    if doSingle; xb = cellfun(@single,xb,'UniformOutput',false); end % convert to single
-    if fMean % reshape
-        xb = horzcat(xb{:});
-    else
-        xb = permute(cat(3,xb{:}),[1 3 2]);
-    end
-    xf{b} = xb; % copy to main
-    if ~arg.test; clear xb; end
+    xf{b} = xa; % copy to main
     disp("Finished wavelet transform: "+sbj+" "+block); toc;
 end
 
@@ -163,15 +159,6 @@ n.xChs = size(x,2);
 n.nFreqs = size(x,3);
 n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
-
-%% Downsample event indices (if needed)
-[errPsy,o,n] = ec_initialize(sbj,proj,o,n,dirs=dirs,dsTarg=dsTarg,save=arg.save);
-if nnz(~cellfun(@isempty,errPsy)); errors{end+1}=errPsy; end
-% Downsample bad chICA frames
-if any(fieldnames(n)=="chICA_badFrames") && numel(n.chICA_badFrames)~=height(x)
-    n.chICA_badFrames = double(full(n.chICA_badFrames));
-    n.chICA_badFrames = resample(n.chICA_badFrames,ds1,ds2) > 0.5;
-end
 
 %% Identify bad frames per chan
 if o.doBadFrames && ~arg.ica
@@ -242,39 +229,16 @@ toc;
 end
 
 
-
-%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%
-
-
-
 %% CWT local function
-function wt = cwt_lfn(fb,xch,fMean,gatherOut)
+function wt = cwt_lfn(fb,xch,fMean,ds1,ds2,singleOut)
 if fMean
     wt = fb.scaleSpectrum(xch)'; % dims: wt(time,1)
 else
     wt = abs(fb.wt(xch))'; % dims: wt(time,freq)
 end
-if gatherOut; wt = gather(wt); end
+if ds2>1
+    wt = resample(wt,ds1,ds2);
+end
+if singleOut; wt = single(wt); end
 end
 %wt = wt.^2; % power = magnitude squared
-
-
-%% DEPRECIATED
-% chG = gpuArray(1);
-% for ch = 1:gpuArray(nChs)
-%     try
-%         xb{ch} = cwt_lfn(fb,xa{ch},fMean,gatherOut);
-%         xa{ch} = [];
-%         disp(sbjChs(ch)+" "+block+": Wavelet decomposition (GPU)");
-%     catch ME
-%         if ~strcmp(ME.identifier,'parallel:gpu:array:OOM'); error(ME); end
-%         % Gather finished data & delete from GPU
-%         disp(sbjChs(ch)+" "+block+": gathering from GPU...");
-%         xb(chG:ch-1) = cellfun(@gather,xb(chG:ch-1),'UniformOutput',false); %xa(chG:ch-1) = cellfun(@(ch) true,xa(chG:ch-1),'UniformOutput',false);
-%         chG = ch-1;
-%         % Finish channel
-%         xb{ch} = cwt_lfn(fb,xa{ch},fMean,gatherOut);
-%         xa{ch} = [];
-%         disp(sbjChs(ch)+" "+block+": Wavelet decomposition (GPU)");
-%     end
-% end

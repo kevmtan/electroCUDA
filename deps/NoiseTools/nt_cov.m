@@ -53,7 +53,8 @@ if isempty(w)
             c=c+xx'*xx;
         end
         tw=size(xx,1)*o;
-    else error('!'); end   
+    else; error('!');
+    end   
 else
     %% weights
     if isnumeric(x)
@@ -90,5 +91,6 @@ else
         end
         tw=sum(w(:));
     end       
+end
 end
 

@@ -48,7 +48,7 @@ end
 
 %% Sensor-specific noise
 if thr.sns > 0
-    ol = KT_sns(x,nChs); % remove sensor specific
+    ol = ec_sensorNoise(x,nChs); % remove sensor specific
     ol = ol-x; % residual
     ol = abs(ol) > median(abs(ol),1,"omitnan")*thr.sns;
     if length(size(ol))==3; ol=permute(ol,[2 1 3]); else; ol=ol'; end

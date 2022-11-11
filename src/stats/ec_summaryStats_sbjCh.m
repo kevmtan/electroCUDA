@@ -1049,6 +1049,11 @@ if ~isempty(badFields)
     disp("Removed bad frames: "+sbj);
 end
 
+%% Log-normal to normal distribution for time-frequency data (CWT outputs are log-normal)
+if o.logSpec && contains(na.suffix,"s"|"d"|"t"|"a"|"b"|"g"|"h")
+    xa = ec_abs2norm(xa);
+end
+
 %% Detrend & HPF
 [ds1,ds2] = rat(fsTarg/fs); % downsampling factors
 if (isstring(o.hiPass) && o.hiPass~="") || nnz(o.hiPass) || nnz(o.detrendOrder)
@@ -1078,13 +1083,17 @@ for r = 1:nRuns
 
         % Low-pass filter
         if loPassHz>0
-            %[~,fLo] = lowpass(xr(:,1,1),loPassHz,fs); xr = fLo.filtfilt(xr);
             xCh = convn(xCh,gusWin,'same'); % convolve gaussian
         end
         xr(:,ch,:) = xCh;
     end
     if thrOL>0; disp("Interpolated outliers per condition: "+blocks(r)); end
     if loPassHz>0; disp("Low-passed: "+blocks(r)); end
+
+    % LPF
+    %if loPassHz > 0
+    %    xr = lowpass(xr,loPassHz,fs,ImpulseResponse="fir");
+    %end
 
     % Downsample
     if ds>1
@@ -1427,6 +1436,7 @@ end
 function [dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN)
 if a.ICA
     % Color by ICA weights
+    dCh.wts = normalize(dCh.wts,"range",oP.climICA);
     [dCh.col,~,~,dCh.order] =...
         ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
     ch = xN.name;
