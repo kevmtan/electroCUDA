@@ -5,7 +5,7 @@ addpath(genpath('src_mex'));
 
 %% Setup GPU with GUI (first compile)
 % sudo update-alternatives --set gcc /usr/bin/gcc-10
-%gpucoderSetup
+gpucoderSetup
 
 %% Compile ec_filtfilt: zero-phase filtering
 clear all; close all; %#ok<*CLALL> 
@@ -129,3 +129,18 @@ codegen ec_CWTdouble -config cfg -args {arg1,arg2,arg3,arg4,arg5}
 movefile([pwd filesep 'codegen' filesep 'mex' filesep 'ec_CWTdouble'],...
     [pwd filesep 'private'],"f");
 try system('rm -rf codegen');catch;end
+
+%% VLFeat
+clear all; close all; %#ok<*CLALL> 
+dirs = ec_getDirs;
+run(dirs.code+"deps"+filesep+"vlfeat-0.9.21"+filesep+"toolbox"+filesep+"vl_setup")
+
+
+%% MatConvNet
+% change paths for 'cudaRoot' and 'cudnnRoot' for your machine
+clear all; close all; %#ok<*CLALL> 
+dirs = ec_getDirs;
+cd(dirs.code+"deps");
+try reset(gpuDevice()); catch;end
+ec_vl_compilenn('enableGpu',true,'CudaMethod','nvcc','EnableDouble',true,...
+    'cudaRoot','/usr/local/cuda');

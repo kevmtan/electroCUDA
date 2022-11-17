@@ -1,0 +1,2 @@
+sm -c test.db dog.ppm hand1.ppm hand2.ppm
+sm -m 1 test.db
