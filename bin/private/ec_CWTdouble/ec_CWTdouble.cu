@@ -564,12 +564,16 @@ static boolean_T c_emlrt_marshallIn(const mxArray *doAvg,
   return y;
 }
 
+//
+//
 static void cwt_free()
 {
   emxFree_real_T(&psidft);
   emxFree_real_T(&cf);
 }
 
+//
+//
 static void cwt_init()
 {
   emxInit_real_T(&cf, 1, &emlrtRTEI, false);
@@ -1826,6 +1830,8 @@ static real_T rt_powd_snf(real_T u0, real_T u1)
   return y;
 }
 
+//
+// function [wt,freqs,coi] = ec_CWTdouble(x,fs,freqLims,doAvg,freqsPerOctave)
 void ec_CWTdouble(const emxArray_real_T *x, real_T fs, real_T freqLims[2],
                   boolean_T doAvg, real_T freqsPerOctave, emxArray_real_T *wt,
                   emxArray_real_T *freqs, emxArray_real_T *coi)
@@ -1918,17 +1924,29 @@ void ec_CWTdouble(const emxArray_real_T *x, real_T fs, real_T freqLims[2],
   coi_dirtyOnGpu = false;
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   //  Input validation
+  // 'ec_CWTdouble:3' if ~fs || fs<1
   if ((!(fs != 0.0)) || (fs < 1.0)) {
+    // 'ec_CWTdouble:3' ;
+    // 'ec_CWTdouble:3' fs=1000;
     fs = 1000.0;
   }
+  // 'ec_CWTdouble:4' if freqLims(1)<=0
   if (freqLims[0] <= 0.0) {
+    // 'ec_CWTdouble:4' ;
+    // 'ec_CWTdouble:4' freqLims(1)=1;
     freqLims[0] = 1.0;
   }
+  // 'ec_CWTdouble:5' if freqLims(2)>fs/2
   if (freqLims[1] > fs / 2.0) {
+    // 'ec_CWTdouble:5' ;
+    // 'ec_CWTdouble:5' freqLims(2)=fs/2;
     freqLims[1] = fs / 2.0;
   }
   //  Initialize
+  // 'ec_CWTdouble:8' coder.gpu.kernelfun;
   //  Add kernelfun pragma to trigger kernel creation
+  // 'ec_CWTdouble:9' [wt,freqs,coi] =
+  // cwt(x,'morse',fs,VoicesPerOctave=freqsPerOctave,FrequencyLimits=freqLims);
   if (!psidft_not_empty) {
     real_T maxscale;
     boolean_T exitg1;
@@ -2424,6 +2442,7 @@ void ec_CWTdouble(const emxArray_real_T *x, real_T fs, real_T freqLims[2],
     freqs_dirtyOnGpu = true;
     gpuEmxMemcpyGpuToCpu_real_T(cf, &gpu_cf);
   }
+  // 'ec_CWTdouble:10' wt = abs(wt)';
   N = cfs->size[0] * cfs->size[1] - 1;
   for (k = 0; k < 2; k++) {
     xSize[k] = static_cast<uint32_T>(cfs->size[k]);
@@ -2458,7 +2477,9 @@ void ec_CWTdouble(const emxArray_real_T *x, real_T fs, real_T freqLims[2],
     wt_dirtyOnGpu = true;
   }
   emxFree_real_T(&d_y);
+  // 'ec_CWTdouble:11' if doAvg
   if (doAvg) {
+    // 'ec_CWTdouble:12' wt = mean(wt,2);
     emxInit_real_T(&e_y, 1, &u_emlrtRTEI, true);
     Npad = wt->size[1];
     if (wt->size[1] == 0) {

@@ -1590,6 +1590,8 @@ static void c_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   emlrtDestroyArray(&src);
 }
 
+//
+//
 namespace coder
 {
   namespace internal
@@ -1749,6 +1751,8 @@ namespace coder
       }
     }
 
+    //
+    //
     static void b_warning()
     {
       static const int32_T iv[2]{ 1, 7 };
@@ -1801,6 +1805,8 @@ namespace coder
       feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
     }
 
+    //
+    //
     static void c_warning()
     {
       static const int32_T iv[2]{ 1, 7 };
@@ -1835,6 +1841,8 @@ namespace coder
       feval(y, b_feval(b_y, c_y, &emlrtMCI), &b_emlrtMCI);
     }
 
+    //
+    //
     static void insertionsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
       const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
       *cmp_workspace_b)
@@ -1873,6 +1881,8 @@ namespace coder
       }
     }
 
+    //
+    //
     static void introsort(emxArray_int32_T *x, int32_T xend, const
                           emxArray_int32_T *cmp_workspace_a, const
                           emxArray_int32_T *cmp_workspace_b)
@@ -2071,6 +2081,8 @@ namespace coder
       emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
     }
 
+    //
+    //
     static void warning(int32_T varargin_1, const char_T varargin_2[14])
     {
       static const int32_T iv[2]{ 1, 7 };
@@ -2118,6 +2130,8 @@ namespace coder
       feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
     }
 
+    //
+    //
     static void warning()
     {
       static const int32_T iv[2]{ 1, 7 };
@@ -8201,6 +8215,8 @@ static void gpuEmxReset_uint32_T(emxArray_uint32_T *gpu)
   std::memset(gpu, 0, sizeof(emxArray_uint32_T));
 }
 
+//
+// function xx = ec_filtfilt(x,coef)
 void ec_filtfilt(const emxArray_real_T *x, const emxArray_real_T *coef,
                  emxArray_real_T *xx)
 {
@@ -8929,9 +8945,11 @@ void ec_filtfilt(const emxArray_real_T *x, const emxArray_real_T *coef,
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
 
   //  Add kernelfun pragma to trigger kernel creation
+  // 'ec_filtfilt:3' coder.gpu.kernelfun;
   // nCh = size(x,2);
   // xx = coder.nullcopy(zeros(size(x)));
   //  Zero-phase filtering
+  // 'ec_filtfilt:8' xx = filtfilt(coef,1,x);
   emxInit_real_T(&b, 2, &c_emlrtRTEI, true);
   emxInit_real_T(&zi, 1, &ed_emlrtRTEI, true);
   emxInit_real_T(&b2, 1, &ed_emlrtRTEI, true);

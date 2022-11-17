@@ -18,13 +18,14 @@ gpuNfo = gpuDevice();
 % sudo update-alternatives --set gcc /usr/bin/gcc-10
 
 % Config
-cfg = coder.gpuConfig( "mex" );
+cfg = coder.gpuConfig("mex");
 cfg.DeepLearningConfig = coder.DeepLearningConfigBase.empty();
 cfg.TargetLang = "C++";
 cfg.DynamicMemoryAllocation = "AllVariableSizeArrays";
 cfg.FilePartitionMethod = "SingleFile";
 cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits";
 cfg.HighlightLoopControlIssues = true;
+cfg.MATLABSourceComments = true;
 cfg.GenerateReport = true;
 cfg.PreserveVariableNames = "UserNames";
 cfg.ReportInfoVarName = "coder_report";
@@ -63,6 +64,7 @@ cfg.DynamicMemoryAllocation = "AllVariableSizeArrays";
 cfg.FilePartitionMethod = "SingleFile";
 cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits";
 cfg.HighlightLoopControlIssues = true;
+cfg.MATLABSourceComments = true;
 cfg.GenerateReport = true;
 cfg.PreserveVariableNames = "UserNames";
 cfg.ReportInfoVarName = "coder_report";
@@ -103,6 +105,7 @@ cfg.DynamicMemoryAllocation = "AllVariableSizeArrays";
 cfg.FilePartitionMethod = "SingleFile";
 cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits";
 cfg.HighlightLoopControlIssues = true;
+cfg.MATLABSourceComments = true;
 cfg.GenerateReport = true;
 cfg.PreserveVariableNames = "UserNames";
 cfg.ReportInfoVarName = "coder_report";
