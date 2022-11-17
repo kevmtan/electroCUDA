@@ -129,6 +129,7 @@ end
 %% Finalize
 n.fs = fs; % changed if downsampled
 n.errorPsy = errors;
+n.dirs = dirs;
 
 % Save to disk
 if arg.save

@@ -1,50 +1,50 @@
 function [errors,n,x] = ec_preprocICA(sbj,proj,o,n,x,arg)
-%% CUDA-based ICA for intracranial/scalp electrophysiology
-%  This function is part of electroCUDA (github.com/kevmtan/electroCUDA)
-%  ICA weights are calculated from hipassed/detrended EEG data to mitigate
-%  non-stationarity. IC timecourses are extracted by appling ICA weights to
-%  non-hipassed/detrended EEG data to avoid artifacts.
+%% electroCUDA - Independent Components Analysis (ICA)
+% This function performs ICA on preprocesssed data from 'ec_preproc'
+% Additional denoising, detrending & high-pass filtering (HPF) can be temporarily
+% applied to improve ICA decomposition. Final output data forgo these additional
+% steps to avoid artifacts from denoising & filtering.
 %
-%  Call this function using its wrapper:
-%                             ~/electroCUDA/1/pipeline/pre5_robustPreproc.m
+% For example, aggressive HPF often improves ICA decomposition but produces
+% problematic filtering artifacts. Thus, HPF can be applied to temporary dataset
+% used for ICA. The resulting ICA weights can be applied to pre-HPF data 
+% (e.g. original input data) to reconstruct IC timecourses ('x' output var).
+% This avoids HPF artifacts while retaining the benefits of HPF for ICA.
 %
-% MAIN INPUTS:
+% SEE WIKI FOR MORE INFO: github.com/kevmtan/electroCUDA/wiki
+%
+% INPUTS:
 %    sbj = subject name
 %    proj = project name
-%    o = struct of options & parameters (described below in "Options struct validation")
+%    o = struct of options & parameters (TO DO: describe all options)
 %    n = preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
-%    x = raw EEG recordings: rows=frames, columns=channels (OPTIONAL)
-%
-% NAME-VALUE INPUTS:
-%    see below sections: "Main input validation" & "Options struct validation"
+%    x = preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
+%    arg = Name-Value Arguments (see "Input validation" below)
 %
 % OUTPUTS:
-%   xi = Preprocessed EEG data indexed as: x(timeframe,channel)
-%   ni = Struct of preprocessing info with ICA weights
-%
-% ALGORITHM SEQUENCE:
-%    power line denoise, detrend, detect bad channels, detect spatiotemporal outliers (channel covariance),
-%    robust rereferencing, detect epileptic HFOs, calculate ICA weights,
-%    apply ICA to non-hipassed EEG data, detect noisy timepoints (within-IC)
-%
-% ALGORITHM OPTIONS: see below section "Options struct validation"
-%
-% HARDWARE ACCELERATION: threaded CPU parallelization (see MATLAB ThreadPool)
-%
-%
-%               Kevin Tan, 2022 (http://github.com/kevmtan/electroCUDA)
-%
+%   errors = cell array of any errors or warnings
+%   n = Struct of preprocessing info & results
+%   x = Preprocessed EEG data indexed as: x(timeframe,channel)
+%      NOTE: 'n' and 'x' are saved to disk by default
 %
 % ACKNOWLEDGEMENTS:
 %    * Stanford Parvizi Lab (Pedro Pinhiero-Chagas, Amy Daitch, Su Liu, et al.)
 %    * Laboratoire des Systèmes Perceptifs (NoiseTools: Alain de Cheveigné, et al.)
-% LICENSE: GNU General Public License
-% DISCLAIMER: Use this code at your own risk. Author assumes no responsibility
-%    for any adverse outcomes related this code or its use. Author makes no
-%    guarantees on the performance or accuracy of this code. This code is for
-%    research purposes only. NOT INTENDED FOR MEDICAL USE.
+%    * Full acknowledgements in Wiki (github.com/kevmtan/electroCUDA/wiki)
+%
+% LICENSE: General Public License (GNU GPLv3)  
+% DISCLAIMERS:
+%    Use and distribution of this software must comply with GNU GPLv3.
+%    This software may be subject to University of California intellectual
+%    property rights.
+%    Use this code at your own risk. Users assume full responsibility for
+%    any eventualities related to the content herein.
+%    This code is for research purposes only and NOT INTENDED FOR CLINICAL USE.
+%    
+%
+%                 Kevin Tan, 2022 (github.io/kevmtan)
 
-%% Main input validation
+%% Input validation
 arguments
     sbj % Subject name
     proj {mustBeText} = 'MMR' % Project name
@@ -60,52 +60,21 @@ arguments
     arg.raw logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; o=oICA; arg.raw=false; arg.nIn=[]; arg.save=0; arg.test=1; arg.redoN=1;
-
-%% Options struct validation (non-exhaustive, see individual functions below)
 if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
 if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); end
-% % Filtering
-% if ~isfield(o,'hiPassICA');       o.hiPass=1; end
-% if ~isfield(o,'hiPass');          o.hiPass=0.01; end
-% % Detrending
-% if ~isfield(o,'detrendOrder_ICA'); o.detrendOrder_ICA=[10 30]; end  % For ICA decomp: detrend polynomial order for ICA  (suggested=10, skip=0)
-% if ~isfield(o,'detrendOrder');    o.detrendOrder=10; end     % For final output: detrend polynomial order (default=0, skip=0)
-% if ~isfield(o,'detrendWin');      o.detrendWin=[]; end       % Detrend timewindow in seconds (all timepoints=[])
-% % Bad channel/IC identification
-% if ~isfield(o,'doBadCh');         o.doBadCh=false; end       % true/false
-% if ~isfield(o,'doBadIC');         o.doBadCh=true; end        % true/false
-% if ~isfield(o,'badChProp');       o.badChProp=0.5; end       % Criterion proportion of bad samples [default: 0.5]
-% if ~isfield(o,'thrHurst');        o.thrHurst=3; end          % Hurst threshold (median absolute deviation)
-% % Rereferencing
-% if ~isfield(o,'doRereference');   o.doRereference=true; end
-% if ~isfield(o,'rrThr');           o.rrThr=3; end             % Outlier threshold (default=3,skip=0)
-% if ~isfield(o,'rrItr');           o.rrItr=5; end             % Number of iterations (default=5)
-% % Electric line noise removal
-% if ~isfield(o,'lineHz');          o.lineHz=0; end            % Electricity hertz @ EEG recording site (default=0, skip=0)
-% % Detect epileptic high-frequency oscillations (HFO)
-% if ~isfield(o,'thrHFO');          o.thrHFO=2; end            % Threshold for epileptic HFO detection (default=2)
-% % Detect within-channel outlier timepoints
-% if ~isfield(o,'doBadFrames');     o.doBadFrames=true; end    % true/false
-% if ~isfield(o,'thrMAD');          o.thrMAD=10; end           % Z-threshold relative to all data points to exclude timepoints
-% if ~isfield(o,'thrDiff');         o.thrDiff=10; end          % Z-threshold for amplitude differences of consecutive timepoints
-% if ~isfield(o,'thrSNS');          o.thrSNS=3; end            % Threshold for low-freq spikes
 try parpool('threads'); catch;end
+% x=[]; n=[]; o=oICA; arg.raw=false; arg.nIn=[]; arg.save=0; arg.test=1; arg.redoN=1;
 
-%% Load & initialize
+%% Initialize & load data
 tt = tic;
+
 % Load metadata
 [errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,redoN=arg.redoN,dirs=dirs,save=arg.save);
-
-% Initialize variables/objects
-ch_bad = chNfo.bad;
-n.proj = proj;
-if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
-if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
-cd(o.dirOut);
+ch_bad = chNfo.bad; % extract nested table of bad channels
+cd(o.dirOut); % set working directory to subject dir
 
 % Load EEG data
-xOg=[];
+xOg = [];
 if isempty(x) && arg.raw
     [x,errors,chNan] = load_iEEG_LBCN(sbj,proj,blocks,dirs,errors); toc(tt);
     ch_bad.nan(chNan) = true;
@@ -115,7 +84,9 @@ else
     xOg = x; % Save input data for later
 end
 
-n.dirs = dirs;
+% Suffixes
+if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
+if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
 
 %% Classify bad chans & frames
 sfxB = "";

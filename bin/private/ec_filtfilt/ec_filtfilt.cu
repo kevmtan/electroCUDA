@@ -10,232 +10,155 @@
 
 // Include files
 #include "ec_filtfilt.h"
-#include "_coder_ec_filtfilt_mex.h"
+#include "ec_filtfilt_data.h"
+#include "ec_filtfilt_emxutil.h"
 #include "ec_filtfilt_types.h"
+#include "gpufilterImpl.h"
+#include "introsort.h"
 #include "rt_nonfinite.h"
+#include "warning.h"
 #include "MWCUBLASUtils.hpp"
 #include "MWCudaDimUtility.hpp"
 #include "MWCudaMemoryFunctions.hpp"
 #include "MWLaunchParametersUtilities.hpp"
-#include "MWMemoryManager.hpp"
 #include "cs.h"
 #include "makeCXSparseMatrix.h"
 #include "solve_from_lu.h"
 #include "solve_from_qr.h"
-#include <algorithm>
 #include <cmath>
 #include <cstring>
 
-// Type Definitions
-struct struct_T
-{
-  int32_T xstart;
-  int32_T xend;
-  int32_T depth;
-};
-
-struct emxArray_int32_T
-{
-  int32_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_uint32_T
-{
-  uint32_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_boolean_T
-{
-  boolean_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_int8_T
-{
-  int8_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_struct_T
-{
-  struct_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
 // Variable Definitions
-emlrtCTX emlrtRootTLSGlobal{ nullptr };
-
-emlrtContext emlrtContextGlobal{ true, // bFirstTime
-  false,                               // bInitialized
-  131627U,                             // fVersionInfo
-  nullptr,                             // fErrorFunction
-  "ec_filtfilt",                       // fFunctionName
-  nullptr,                             // fRTCallStack
-  false,                               // bDebugMode
-
-  { 3615363707U, 2875872051U, 2733369800U, 3255517249U },// fSigWrd
-  nullptr                              // fSigMem
-};
-
-static emlrtMCInfo emlrtMCI{ 14,       // lineNo
-  25,                                  // colNo
-  "warning",                           // fName
-  "/usr/local/MATLAB/R2022b/toolbox/shared/coder/coder/lib/+coder/+internal/warning.m"// pName
-};
-
-static emlrtMCInfo b_emlrtMCI{ 14,     // lineNo
-  9,                                   // colNo
-  "warning",                           // fName
-  "/usr/local/MATLAB/R2022b/toolbox/shared/coder/coder/lib/+coder/+internal/warning.m"// pName
-};
-
 static emlrtMCInfo c_emlrtMCI{ 53,     // lineNo
   19,                                  // colNo
   "flt2str",                           // fName
   "/usr/local/MATLAB/R2022b/toolbox/eml/eml/+coder/+internal/flt2str.m"// pName
 };
 
-static emlrtRTEInfo emlrtRTEI{ 1,      // lineNo
-  1,                                   // colNo
-  "_coder_ec_filtfilt_api",            // fName
-  ""                                   // pName
-};
-
-static emlrtRTEInfo b_emlrtRTEI{ 132,  // lineNo
+static emlrtRTEInfo emlrtRTEI{ 132,    // lineNo
   9,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo c_emlrtRTEI{ 130,  // lineNo
+static emlrtRTEInfo b_emlrtRTEI{ 130,  // lineNo
   9,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo d_emlrtRTEI{ 138,  // lineNo
+static emlrtRTEInfo c_emlrtRTEI{ 138,  // lineNo
   56,                                  // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo e_emlrtRTEI{ 180,  // lineNo
+static emlrtRTEInfo d_emlrtRTEI{ 180,  // lineNo
   25,                                  // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo f_emlrtRTEI{ 239,  // lineNo
+static emlrtRTEInfo e_emlrtRTEI{ 239,  // lineNo
   9,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo g_emlrtRTEI{ 108,  // lineNo
+static emlrtRTEInfo f_emlrtRTEI{ 108,  // lineNo
   18,                                  // colNo
   "filtord",                           // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtord.m"// pName
 };
 
-static emlrtRTEInfo h_emlrtRTEI{ 240,  // lineNo
+static emlrtRTEInfo g_emlrtRTEI{ 240,  // lineNo
   9,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo i_emlrtRTEI{ 110,  // lineNo
+static emlrtRTEInfo h_emlrtRTEI{ 110,  // lineNo
   13,                                  // colNo
   "filtord",                           // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtord.m"// pName
 };
 
-static emlrtRTEInfo j_emlrtRTEI{ 108,  // lineNo
+static emlrtRTEInfo i_emlrtRTEI{ 108,  // lineNo
   13,                                  // colNo
   "filtord",                           // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtord.m"// pName
 };
 
-static emlrtRTEInfo k_emlrtRTEI{ 253,  // lineNo
+static emlrtRTEInfo j_emlrtRTEI{ 253,  // lineNo
   13,                                  // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo l_emlrtRTEI{ 30,   // lineNo
+static emlrtRTEInfo k_emlrtRTEI{ 30,   // lineNo
   21,                                  // colNo
   "applyScalarFunction",               // fName
   "/usr/local/MATLAB/R2022b/toolbox/eml/eml/+coder/+internal/applyScalarFunction.m"// pName
 };
 
-static emlrtRTEInfo m_emlrtRTEI{ 28,   // lineNo
+static emlrtRTEInfo l_emlrtRTEI{ 28,   // lineNo
   9,                                   // colNo
   "colon",                             // fName
   "/usr/local/MATLAB/R2022b/toolbox/eml/lib/matlab/ops/colon.m"// pName
 };
 
-static emlrtRTEInfo n_emlrtRTEI{ 397,  // lineNo
+static emlrtRTEInfo m_emlrtRTEI{ 397,  // lineNo
   5,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo o_emlrtRTEI{ 829,  // lineNo
+static emlrtRTEInfo n_emlrtRTEI{ 829,  // lineNo
   21,                                  // colNo
   "unaryMinOrMax",                     // fName
   "/usr/local/MATLAB/R2022b/toolbox/eml/eml/+coder/+internal/unaryMinOrMax.m"// pName
 };
 
-static emlrtRTEInfo p_emlrtRTEI{ 266,  // lineNo
+static emlrtRTEInfo o_emlrtRTEI{ 266,  // lineNo
   17,                                  // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo q_emlrtRTEI{ 145,  // lineNo
+static emlrtRTEInfo p_emlrtRTEI{ 145,  // lineNo
   8,                                   // colNo
   "filtord",                           // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtord.m"// pName
 };
 
-static emlrtRTEInfo r_emlrtRTEI{ 10,   // lineNo
-  5,                                   // colNo
-  "ec_filtfilt",                       // fName
-  "/home/kt/Gdrive/Git/electroCUDA/bin/src_mex/ec_filtfilt.m"// pName
-};
-
-static emlrtRTEInfo s_emlrtRTEI{ 291,  // lineNo
+static emlrtRTEInfo q_emlrtRTEI{ 291,  // lineNo
   5,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo t_emlrtRTEI{ 162,  // lineNo
+static emlrtRTEInfo r_emlrtRTEI{ 154,  // lineNo
+  13,                                  // colNo
+  "filtfilt",                          // fName
+  "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
+};
+
+static emlrtRTEInfo s_emlrtRTEI{ 162,  // lineNo
   25,                                  // colNo
   "filtord",                           // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtord.m"// pName
 };
 
-static emlrtRTEInfo u_emlrtRTEI{ 339,  // lineNo
+static emlrtRTEInfo t_emlrtRTEI{ 339,  // lineNo
   9,                                   // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
+};
+
+static emlrtRTEInfo u_emlrtRTEI{ 8,    // lineNo
+  1,                                   // colNo
+  "ec_filtfilt",                       // fName
+  "/home/kt/Gdrive/Git/electroCUDA/bin/src_mex/ec_filtfilt.m"// pName
 };
 
 static emlrtRTEInfo v_emlrtRTEI{ 149,  // lineNo
@@ -314,12 +237,6 @@ static emlrtRTEInfo ib_emlrtRTEI{ 401, // lineNo
   25,                                  // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
-};
-
-static emlrtRTEInfo jb_emlrtRTEI{ 1,   // lineNo
-  1,                                   // colNo
-  "gpufilterImpl",                     // fName
-  "/usr/local/MATLAB/R2022b/toolbox/eml/lib/matlab/datafun/private/gpufilterImpl.p"// pName
 };
 
 static emlrtRTEInfo kb_emlrtRTEI{ 211, // lineNo
@@ -587,7 +504,7 @@ static emlrtRTEInfo dd_emlrtRTEI{ 373, // lineNo
 };
 
 static emlrtRTEInfo ed_emlrtRTEI{ 1,   // lineNo
-  14,                                  // colNo
+  15,                                  // colNo
   "ec_filtfilt",                       // fName
   "/home/kt/Gdrive/Git/electroCUDA/bin/src_mex/ec_filtfilt.m"// pName
 };
@@ -736,48 +653,11 @@ static emlrtRTEInfo de_emlrtRTEI{ 356, // lineNo
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
-static emlrtRTEInfo ee_emlrtRTEI{ 41,  // lineNo
-  1,                                   // colNo
-  "introsort",                         // fName
-  "/usr/local/MATLAB/R2022b/toolbox/shared/coder/coder/lib/+coder/+internal/introsort.m"// pName
-};
-
 // Function Declarations
 static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   *msgId, char_T ret[14]);
-static void b_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
-  *parentId, emxArray_real_T *y);
-static void b_emlrt_marshallIn(const mxArray *coef, const char_T *identifier,
-  emxArray_real_T *y);
-static const mxArray *b_feval(const mxArray *m1, const mxArray *m2, emlrtMCInfo *
-  location);
 static const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
   emlrtMCInfo *location);
-static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2);
-static void c_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
-  *msgId, emxArray_real_T *ret);
-namespace coder
-{
-  namespace internal
-  {
-    static void b_heapsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
-      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
-      *cmp_workspace_b);
-    static void b_warning();
-    static void c_warning();
-    static void insertionsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
-      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
-      *cmp_workspace_b);
-    static void introsort(emxArray_int32_T *x, int32_T xend, const
-                          emxArray_int32_T *cmp_workspace_a, const
-                          emxArray_int32_T *cmp_workspace_b);
-    static void warning(int32_T varargin_1, const char_T varargin_2[14]);
-    static void warning();
-  }
-}
-
-static void d_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
-  *msgId, emxArray_real_T *ret);
 static int32_T div_s32(int32_T numerator, int32_T denominator);
 static
 #ifdef __CUDACC__
@@ -787,647 +667,608 @@ __device__
 
 int32_T div_s32_device(int32_T numerator, int32_T denominator);
 static __global__ void ec_filtfilt_kernel1(const emxArray_real_T x, int32_T b_x,
-  emxArray_real_T xCol);
-static __global__ void ec_filtfilt_kernel10(const emxArray_int32_T y, int32_T
-  loop_ub, const int32_T coef_dim1, emxArray_int32_T rows);
-static __global__ void ec_filtfilt_kernel100(int32_T idx, emxArray_real_T
+  emxArray_real_T xx);
+static __global__ void ec_filtfilt_kernel10(int32_T loop_ub, emxArray_int32_T
+  rows);
+static __global__ void ec_filtfilt_kernel100(const int32_T b_dim0, uint32_T
+  zfSize[2]);
+static __global__ void ec_filtfilt_kernel101(int32_T idx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel101(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel102(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv4);
-static __global__ void ec_filtfilt_kernel102(const emxArray_int32_T y, int32_T
+static __global__ void ec_filtfilt_kernel103(const emxArray_int32_T y, int32_T
   b_y, emxArray_int32_T iv5);
-static __global__ void ec_filtfilt_kernel103(const emxArray_real_T xCol, const
-  emxArray_int32_T iv5, const emxArray_int32_T iv4, const int32_T b_xCol,
-  int32_T c_xCol, const int32_T expanded_dim0, const int32_T xCol_dim0,
-  emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel104(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel104(const emxArray_real_T xx, const
+  emxArray_int32_T iv5, const emxArray_int32_T iv4, const int32_T b_xx, int32_T
+  c_xx, const int32_T expanded_dim0, const int32_T xx_dim0, emxArray_real_T
+  expanded);
+static __global__ void ec_filtfilt_kernel105(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, const int32_T idx,
   int32_T c, const int32_T b_dim0, const int32_T convOut_dim0, const int32_T
   expanded_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel105(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel106(const emxArray_real_T zfIIR, const
   emxArray_real_T convOut, const int32_T b_zfIIR, int32_T b_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, const int32_T zfIIR_dim0,
   emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel106(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel107(const emxArray_real_T convOut,
   const int32_T b_convOut, int32_T c_convOut, const int32_T convOut_dim0, const
   int32_T b_convOut_dim0, emxArray_real_T d_convOut);
-static __global__ void ec_filtfilt_kernel107(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel108(const emxArray_real_T zfIIR, const
   int32_T b_zfIIR, int32_T ns, const int32_T convOut_dim0, emxArray_real_T
   convOut);
-static __global__ void ec_filtfilt_kernel108(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel109(const emxArray_real_T zfIIR, const
   int32_T b_zfIIR, int32_T ns, const int32_T convOut_dim0, const int32_T
   zfIIR_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel109(const emxArray_real_T a, int32_T ns,
-  const int32_T xCol_dim0, const int32_T a_dim0, const int32_T convOut_dim0,
-  emxArray_real_T convOut);
 static __global__ void ec_filtfilt_kernel11(const emxArray_int32_T y, int32_T
-  loop_ub, const int32_T coef_dim1, const int32_T y_dim1, emxArray_int32_T rows);
-static __global__ void ec_filtfilt_kernel110(const emxArray_real_T convOut,
+  loop_ub, const int32_T coef_dim1, emxArray_int32_T rows);
+static __global__ void ec_filtfilt_kernel110(const emxArray_real_T a, int32_T ns,
+  const int32_T xx_dim0, const int32_T a_dim0, const int32_T convOut_dim0,
+  emxArray_real_T convOut);
+static __global__ void ec_filtfilt_kernel111(const emxArray_real_T convOut,
   const int32_T ns, const int32_T outridx, int32_T b_convOut, const int32_T
   zfIIR_dim0, const int32_T convOut_dim0, emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel111(const emxArray_real_T convOut,
-  const emxArray_real_T a, const int32_T b_a, int32_T ns, const int32_T a_dim0,
-  const int32_T zfIIR_dim0, const int32_T xCol_dim0, const int32_T convOut_dim0,
-  emxArray_real_T zfIIR);
 static __global__ void ec_filtfilt_kernel112(const emxArray_real_T convOut,
-  const int32_T xCol, int32_T b_convOut, const int32_T convOut_dim0, const
-  int32_T b_convOut_dim0, emxArray_real_T c_convOut);
+  const emxArray_real_T a, const int32_T b_a, int32_T ns, const int32_T a_dim0,
+  const int32_T zfIIR_dim0, const int32_T xx_dim0, const int32_T convOut_dim0,
+  emxArray_real_T zfIIR);
 static __global__ void ec_filtfilt_kernel113(const emxArray_real_T convOut,
+  const int32_T xx, int32_T b_convOut, const int32_T convOut_dim0, const int32_T
+  b_convOut_dim0, emxArray_real_T c_convOut);
+static __global__ void ec_filtfilt_kernel114(const emxArray_real_T convOut,
   int32_T ns, int32_T outridx, emxArray_real_T yc2);
-static __global__ void ec_filtfilt_kernel114(const emxArray_real_T xCol, const
-  int32_T outridx, int32_T b_xCol, const int32_T xCol_dim0, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel115(const emxArray_real_T xCol, const
+static __global__ void ec_filtfilt_kernel115(const emxArray_real_T xx, const
+  int32_T outridx, int32_T b_xx, const int32_T xx_dim0, emxArray_real_T y);
+static __global__ void ec_filtfilt_kernel116(const emxArray_real_T xx, const
   emxArray_real_T y, const real_T nfact, const int32_T outridx, const int32_T ns,
-  const int32_T xt, int32_T vlen, const int32_T xt_dim0, const int32_T xCol_dim0,
+  const int32_T xt, int32_T vlen, const int32_T xt_dim0, const int32_T xx_dim0,
   emxArray_real_T b_xt);
-static __global__ void ec_filtfilt_kernel116(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel117(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel117(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel118(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel118(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel119(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel119(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel12(const emxArray_int32_T y, int32_T
+  loop_ub, const int32_T coef_dim1, const int32_T y_dim1, emxArray_int32_T rows);
+static __global__ void ec_filtfilt_kernel120(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel12(int32_T coef, emxArray_int32_T y);
-static __global__ void ec_filtfilt_kernel120(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel121(int32_T idx, emxArray_real_T
+static __global__ void ec_filtfilt_kernel121(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel122(int32_T idx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel122(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel123(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv9);
-static __global__ void ec_filtfilt_kernel123(const emxArray_int32_T y, int32_T
+static __global__ void ec_filtfilt_kernel124(const emxArray_int32_T y, int32_T
   b_y, emxArray_int32_T iv10);
-static __global__ void ec_filtfilt_kernel124(const emxArray_real_T xt, const
+static __global__ void ec_filtfilt_kernel125(const emxArray_real_T xt, const
   emxArray_int32_T iv10, const emxArray_int32_T iv9, const int32_T b_xt, int32_T
   c_xt, const int32_T expanded_dim0, const int32_T xt_dim0, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel125(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel126(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, const int32_T idx,
   int32_T c, const int32_T b_dim0, const int32_T convOut_dim0, const int32_T
   expanded_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel126(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel127(const emxArray_real_T zfIIR, const
   emxArray_real_T convOut, const int32_T b_zfIIR, int32_T b_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, const int32_T zfIIR_dim0,
   emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel127(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel128(const emxArray_real_T convOut,
   const int32_T b_convOut, int32_T c_convOut, const int32_T convOut_dim0, const
   int32_T b_convOut_dim0, emxArray_real_T d_convOut);
-static __global__ void ec_filtfilt_kernel128(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel129(const emxArray_real_T zfIIR, const
   int32_T b_zfIIR, int32_T ns, const int32_T convOut_dim0, emxArray_real_T
   convOut);
-static __global__ void ec_filtfilt_kernel129(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel13(int32_T coef, emxArray_int32_T y);
+static __global__ void ec_filtfilt_kernel130(const emxArray_real_T zfIIR, const
   int32_T b_zfIIR, int32_T ns, const int32_T convOut_dim0, const int32_T
   zfIIR_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel13(int32_T coef, emxArray_int32_T y);
-static __global__ void ec_filtfilt_kernel130(const emxArray_real_T a, int32_T ns,
+static __global__ void ec_filtfilt_kernel131(const emxArray_real_T a, int32_T ns,
   const int32_T xt_dim0, const int32_T a_dim0, const int32_T convOut_dim0,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel131(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel132(const emxArray_real_T convOut,
   const int32_T xt, int32_T b_convOut, const int32_T convOut_dim0, const int32_T
   b_convOut_dim0, emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel132(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel133(const emxArray_real_T convOut,
   int32_T ns, int32_T outridx, emxArray_real_T yc3);
-static __global__ void ec_filtfilt_kernel133(const emxArray_real_T yc3, const
+static __global__ void ec_filtfilt_kernel134(const emxArray_real_T yc3, const
   int32_T ns, const emxArray_real_T zi, const int32_T b_zi, int32_T loop_ub,
   const int32_T y_dim0, const int32_T yc3_dim0, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel134(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel135(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel135(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel136(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel136(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel137(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel137(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel138(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel138(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel139(int32_T idx, emxArray_real_T
+static __global__ void ec_filtfilt_kernel139(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel14(int32_T coef, emxArray_int32_T y);
+static __global__ void ec_filtfilt_kernel140(int32_T idx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel14(int32_T loop_ub, emxArray_int32_T
-  cols);
-static __global__ void ec_filtfilt_kernel140(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel141(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv12);
-static __global__ void ec_filtfilt_kernel141(const emxArray_int32_T y, int32_T
+static __global__ void ec_filtfilt_kernel142(const emxArray_int32_T y, int32_T
   b_y, emxArray_int32_T iv13);
-static __global__ void ec_filtfilt_kernel142(const emxArray_real_T yc3, const
+static __global__ void ec_filtfilt_kernel143(const emxArray_real_T yc3, const
   emxArray_int32_T iv13, const emxArray_int32_T iv12, const int32_T b_yc3,
   int32_T c_yc3, const int32_T expanded_dim0, const int32_T yc3_dim0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel143(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel144(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, const int32_T idx,
   int32_T c, const int32_T b_dim0, const int32_T convOut_dim0, const int32_T
   expanded_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel144(const emxArray_real_T y, const
+static __global__ void ec_filtfilt_kernel145(const emxArray_real_T y, const
   emxArray_real_T convOut, const int32_T b_y, int32_T b_convOut, const int32_T
   convOut_dim0, const int32_T b_convOut_dim0, const int32_T y_dim0,
   emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel145(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel146(const emxArray_real_T convOut,
   const int32_T b_convOut, int32_T c_convOut, const int32_T convOut_dim0, const
   int32_T b_convOut_dim0, emxArray_real_T d_convOut);
-static __global__ void ec_filtfilt_kernel146(const emxArray_real_T y, const
-  int32_T b_y, int32_T ns, const int32_T convOut_dim0, emxArray_real_T convOut);
 static __global__ void ec_filtfilt_kernel147(const emxArray_real_T y, const
+  int32_T b_y, int32_T ns, const int32_T convOut_dim0, emxArray_real_T convOut);
+static __global__ void ec_filtfilt_kernel148(const emxArray_real_T y, const
   int32_T b_y, int32_T ns, const int32_T convOut_dim0, const int32_T y_dim0,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel148(const emxArray_real_T a, int32_T ns,
+static __global__ void ec_filtfilt_kernel149(const emxArray_real_T a, int32_T ns,
   const int32_T yc3_dim0, const int32_T a_dim0, const int32_T convOut_dim0,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel149(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel15(int32_T loop_ub, emxArray_int32_T
+  cols);
+static __global__ void ec_filtfilt_kernel150(const emxArray_real_T convOut,
   const int32_T ns, const int32_T outridx, int32_T b_convOut, const int32_T
   zfIIR_dim0, const int32_T convOut_dim0, emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel15(const emxArray_int32_T y, const
-  int32_T iv_dim1, int32_T loop_ub, emxArray_int32_T cols);
-static __global__ void ec_filtfilt_kernel150(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel151(const emxArray_real_T convOut,
   const emxArray_real_T a, const int32_T b_a, int32_T ns, const int32_T a_dim0,
   const int32_T zfIIR_dim0, const int32_T yc3_dim0, const int32_T convOut_dim0,
   emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel151(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel152(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel152(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel153(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel153(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel154(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel154(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel155(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel155(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel156(int32_T idx, emxArray_real_T
+static __global__ void ec_filtfilt_kernel156(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel157(int32_T idx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel157(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel158(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv14);
-static __global__ void ec_filtfilt_kernel158(const emxArray_int32_T y, int32_T
+static __global__ void ec_filtfilt_kernel159(const emxArray_int32_T y, int32_T
   b_y, emxArray_int32_T iv15);
-static __global__ void ec_filtfilt_kernel159(const emxArray_real_T yc2, const
+static __global__ void ec_filtfilt_kernel16(const emxArray_int32_T y, const
+  int32_T iv_dim1, int32_T loop_ub, emxArray_int32_T cols);
+static __global__ void ec_filtfilt_kernel160(const emxArray_real_T yc2, const
   emxArray_int32_T iv15, const emxArray_int32_T iv14, const int32_T b_yc2,
   int32_T c_yc2, const int32_T expanded_dim0, const int32_T yc2_dim0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel16(const emxArray_int32_T y, const
-  int32_T iv_dim1, int32_T loop_ub, const int32_T y_dim1, emxArray_int32_T cols);
-static __global__ void ec_filtfilt_kernel160(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel161(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, const int32_T idx,
   int32_T c, const int32_T b_dim0, const int32_T convOut_dim0, const int32_T
   expanded_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel161(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel162(const emxArray_real_T zfIIR, const
   emxArray_real_T convOut, const int32_T b_zfIIR, int32_T b_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, const int32_T zfIIR_dim0,
   emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel162(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel163(const emxArray_real_T convOut,
   const int32_T b_convOut, int32_T c_convOut, const int32_T convOut_dim0, const
   int32_T b_convOut_dim0, emxArray_real_T d_convOut);
-static __global__ void ec_filtfilt_kernel163(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel164(const emxArray_real_T zfIIR, const
   int32_T b_zfIIR, int32_T ns, const int32_T convOut_dim0, emxArray_real_T
   convOut);
-static __global__ void ec_filtfilt_kernel164(const emxArray_real_T zfIIR, const
+static __global__ void ec_filtfilt_kernel165(const emxArray_real_T zfIIR, const
   int32_T b_zfIIR, int32_T ns, const int32_T convOut_dim0, const int32_T
   zfIIR_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel165(const emxArray_real_T a, int32_T ns,
+static __global__ void ec_filtfilt_kernel166(const emxArray_real_T a, int32_T ns,
   const int32_T yc2_dim0, const int32_T a_dim0, const int32_T convOut_dim0,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel166(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel167(const emxArray_real_T convOut,
   const int32_T yc2, int32_T b_convOut, const int32_T convOut_dim0, const
   int32_T b_convOut_dim0, emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel167(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel168(const emxArray_real_T convOut,
   int32_T ns, int32_T outridx, emxArray_real_T yc5);
-static __global__ void ec_filtfilt_kernel168(const emxArray_real_T yc5, const
-  int32_T b_yc5, int32_T c_yc5, const int32_T xCol_dim0, const int32_T yc5_dim0,
-  emxArray_real_T xCol);
-static __global__ void ec_filtfilt_kernel169(const emxArray_real_T a2, real_T
+static __global__ void ec_filtfilt_kernel169(const emxArray_real_T yc5, const
+  int32_T b_yc5, int32_T c_yc5, const int32_T xx_dim0, const int32_T yc5_dim0,
+  emxArray_real_T xx);
+static __global__ void ec_filtfilt_kernel17(const emxArray_int32_T y, const
+  int32_T iv_dim1, int32_T loop_ub, const int32_T y_dim1, emxArray_int32_T cols);
+static __global__ void ec_filtfilt_kernel170(const emxArray_real_T a2, real_T
   *a1, real_T *b_a1, real_T *c_a1, real_T *d_a1, real_T *e_a1);
-static __global__ void ec_filtfilt_kernel17(const emxArray_real_T a2,
-  emxArray_int8_T vals);
-static __global__ void ec_filtfilt_kernel170(const real_T *d1, const
-  emxArray_real_T xCol, const int32_T i, emxArray_real_T xt);
-static __global__ void ec_filtfilt_kernel171(const real_T val, const
+static __global__ void ec_filtfilt_kernel171(const real_T *d1, const
+  emxArray_real_T xx, const int32_T *i, emxArray_real_T xt);
+static __global__ void ec_filtfilt_kernel172(const real_T val, const
   emxArray_real_T zi, int32_T b_zi, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel172(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel173(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel173(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel174(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel174(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel175(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel175(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel176(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel176(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel177(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel177(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel178(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel178(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel179(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv);
-static __global__ void ec_filtfilt_kernel179(const emxArray_real_T xt, const
+static __global__ void ec_filtfilt_kernel18(const emxArray_real_T a2,
+  emxArray_int8_T vals);
+static __global__ void ec_filtfilt_kernel180(const emxArray_real_T xt, const
   emxArray_int32_T iv, int32_T b_xt, emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel18(const emxArray_real_T a2, const
-  int32_T x, int32_T loop_ub, emxArray_int8_T vals);
-static __global__ void ec_filtfilt_kernel180(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel181(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel181(const emxArray_real_T y, int32_T ns,
+static __global__ void ec_filtfilt_kernel182(const emxArray_real_T y, int32_T ns,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel182(const emxArray_real_T y,
+static __global__ void ec_filtfilt_kernel183(const emxArray_real_T y,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel183(const emxArray_real_T convOut,
-  const int32_T ns, int32_T outridx, emxArray_real_T zfIIR);
 static __global__ void ec_filtfilt_kernel184(const emxArray_real_T convOut,
+  const int32_T ns, int32_T outridx, emxArray_real_T zfIIR);
+static __global__ void ec_filtfilt_kernel185(const emxArray_real_T convOut,
   const emxArray_real_T a, int32_T ns, const int32_T a_dim0, const int32_T
   xt_dim0, emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel185(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel186(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel186(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel187(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel187(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel188(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel188(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel189(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel189(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel19(const int32_T x, const int32_T ns,
-  int32_T loop_ub, emxArray_int8_T vals);
-static __global__ void ec_filtfilt_kernel190(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel19(const emxArray_real_T a2, const
+  int32_T x, int32_T loop_ub, emxArray_int8_T vals);
+static __global__ void ec_filtfilt_kernel190(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel191(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel191(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel192(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv7);
-static __global__ void ec_filtfilt_kernel192(const emxArray_real_T xCol, const
-  emxArray_int32_T iv7, int32_T b_xCol, emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel193(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel193(const emxArray_real_T xx, const
+  emxArray_int32_T iv7, int32_T b_xx, emxArray_real_T expanded);
+static __global__ void ec_filtfilt_kernel194(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel194(const emxArray_real_T zfIIR,
-  int32_T ns, emxArray_real_T convOut);
 static __global__ void ec_filtfilt_kernel195(const emxArray_real_T zfIIR,
+  int32_T ns, emxArray_real_T convOut);
+static __global__ void ec_filtfilt_kernel196(const emxArray_real_T zfIIR,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel196(const emxArray_real_T convOut,
-  const int32_T ns, int32_T outridx, emxArray_real_T zfIIR);
 static __global__ void ec_filtfilt_kernel197(const emxArray_real_T convOut,
+  const int32_T ns, int32_T outridx, emxArray_real_T zfIIR);
+static __global__ void ec_filtfilt_kernel198(const emxArray_real_T convOut,
   const emxArray_real_T a, int32_T ns, const int32_T a_dim0, const int32_T
-  xCol_dim0, emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel198(const real_T *d1, const
-  emxArray_real_T xCol, const int32_T outridx, real_T d, emxArray_real_T xt);
-static __global__ void ec_filtfilt_kernel199(const emxArray_real_T b2, int32_T
+  xx_dim0, emxArray_real_T zfIIR);
+static __global__ void ec_filtfilt_kernel199(const real_T *d1, const
+  emxArray_real_T xx, const int32_T outridx, real_T d, emxArray_real_T xt);
+static __global__ void ec_filtfilt_kernel2(const int32_T xx_dim0, const int32_T
+  xx_dim1, int32_T *i);
+static __global__ void ec_filtfilt_kernel20(const int32_T x, const int32_T ns,
+  int32_T loop_ub, emxArray_int8_T vals);
+static __global__ void ec_filtfilt_kernel200(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel2(const emxArray_real_T x, const
-  int32_T b_x, int32_T c_x, const int32_T xCol_dim0, const int32_T x_dim0,
-  emxArray_real_T xCol);
-static __global__ void ec_filtfilt_kernel20(const int32_T iv_dim1, const int32_T
-  x, const int32_T ns, int32_T loop_ub, emxArray_int8_T vals);
-static __global__ void ec_filtfilt_kernel200(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel201(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel201(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel202(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel202(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel203(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel203(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel204(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel204(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel205(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel205(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel206(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv11);
-static __global__ void ec_filtfilt_kernel206(const emxArray_real_T xt, const
+static __global__ void ec_filtfilt_kernel207(const emxArray_real_T xt, const
   emxArray_int32_T iv11, int32_T b_xt, emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel207(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel208(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel208(const emxArray_real_T zfIIR,
-  int32_T ns, emxArray_real_T convOut);
 static __global__ void ec_filtfilt_kernel209(const emxArray_real_T zfIIR,
+  int32_T ns, emxArray_real_T convOut);
+static __global__ void ec_filtfilt_kernel21(const int32_T iv_dim1, const int32_T
+  x, const int32_T ns, int32_T loop_ub, emxArray_int8_T vals);
+static __global__ void ec_filtfilt_kernel210(const emxArray_real_T zfIIR,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel21(const emxArray_real_T a2, const
-  real_T val, const emxArray_real_T b2, int32_T coef, emxArray_real_T rhs);
-static __global__ void ec_filtfilt_kernel210(const real_T val, const
+static __global__ void ec_filtfilt_kernel211(const real_T val, const
   emxArray_real_T zi, int32_T b_zi, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel211(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel212(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel212(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel213(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel213(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel214(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel214(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel215(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel215(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel216(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel216(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel217(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel217(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel218(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv16);
-static __global__ void ec_filtfilt_kernel218(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel219(const emxArray_real_T convOut,
   const int32_T k, const emxArray_int32_T iv16, int32_T outridx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel219(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel22(const emxArray_real_T a2, const
+  real_T val, const emxArray_real_T b2, int32_T coef, emxArray_real_T rhs);
+static __global__ void ec_filtfilt_kernel220(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel22(const emxArray_int32_T rows, int32_T
-  ns, emxArray_int32_T ridxInt);
-static __global__ void ec_filtfilt_kernel220(const emxArray_real_T y, int32_T ns,
+static __global__ void ec_filtfilt_kernel221(const emxArray_real_T y, int32_T ns,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel221(const emxArray_real_T y,
+static __global__ void ec_filtfilt_kernel222(const emxArray_real_T y,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel222(const emxArray_real_T convOut,
-  const int32_T ns, int32_T outridx, emxArray_real_T zfIIR);
 static __global__ void ec_filtfilt_kernel223(const emxArray_real_T convOut,
+  const int32_T ns, int32_T outridx, emxArray_real_T zfIIR);
+static __global__ void ec_filtfilt_kernel224(const emxArray_real_T convOut,
   const emxArray_real_T a, int32_T ns, const int32_T a_dim0, const int32_T
   xt_dim0, emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel224(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel225(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel225(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel226(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel226(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel227(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel227(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel228(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel228(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel229(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel229(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel23(const emxArray_int32_T rows, int32_T
+  ns, emxArray_int32_T ridxInt);
+static __global__ void ec_filtfilt_kernel230(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel23(const emxArray_int32_T cols, int32_T
-  ns, emxArray_int32_T cidxInt);
-static __global__ void ec_filtfilt_kernel230(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel231(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv17);
-static __global__ void ec_filtfilt_kernel231(const emxArray_real_T convOut,
-  const emxArray_int32_T iv17, int32_T xCol, const int32_T xCol_dim0,
+static __global__ void ec_filtfilt_kernel232(const emxArray_real_T convOut,
+  const emxArray_int32_T iv17, int32_T xx, const int32_T xx_dim0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel232(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel233(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel233(const emxArray_real_T zfIIR,
-  int32_T ns, emxArray_real_T convOut);
 static __global__ void ec_filtfilt_kernel234(const emxArray_real_T zfIIR,
+  int32_T ns, emxArray_real_T convOut);
+static __global__ void ec_filtfilt_kernel235(const emxArray_real_T zfIIR,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel235(const emxArray_real_T convOut,
-  const int32_T outridx, emxArray_real_T b_convOut);
 static __global__ void ec_filtfilt_kernel236(const emxArray_real_T convOut,
-  int32_T ns, emxArray_real_T xCol);
-static __global__ void ec_filtfilt_kernel237(const emxArray_real_T a2, real_T
+  const int32_T outridx, emxArray_real_T b_convOut);
+static __global__ void ec_filtfilt_kernel237(const emxArray_real_T convOut,
+  int32_T ns, emxArray_real_T xx);
+static __global__ void ec_filtfilt_kernel238(const emxArray_real_T a2, real_T
   *a1, real_T *b_a1);
-static __global__ void ec_filtfilt_kernel238(const emxArray_real_T xCol, real_T *
-  d1);
-static __global__ void ec_filtfilt_kernel239(const emxArray_real_T xCol, const
-  int32_T i, const real_T *d1, int32_T loop_ub, emxArray_real_T ytemp);
-static __global__ void ec_filtfilt_kernel24(int32_T nc, emxArray_int32_T
-  sortedIndices);
-static __global__ void ec_filtfilt_kernel240(const real_T val, const
+static __global__ void ec_filtfilt_kernel239(const emxArray_real_T xx, real_T
+  *d1);
+static __global__ void ec_filtfilt_kernel24(const emxArray_int32_T cols, int32_T
+  ns, emxArray_int32_T cidxInt);
+static __global__ void ec_filtfilt_kernel240(const emxArray_real_T xx, const
+  int32_T *i, const real_T *d1, int32_T loop_ub, emxArray_real_T ytemp);
+static __global__ void ec_filtfilt_kernel241(const real_T val, const
   emxArray_real_T zi, int32_T b_zi, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel241(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel242(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel242(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel243(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel243(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel244(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel244(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel245(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel245(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel246(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel246(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel247(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel247(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel248(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv1);
-static __global__ void ec_filtfilt_kernel248(const emxArray_real_T ytemp, const
+static __global__ void ec_filtfilt_kernel249(const emxArray_real_T ytemp, const
   emxArray_int32_T iv1, int32_T b_ytemp, emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel249(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel25(int32_T nc, emxArray_int32_T
+  sortedIndices);
+static __global__ void ec_filtfilt_kernel250(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel25(const emxArray_int32_T cidxInt,
-  int32_T b_cidxInt, emxArray_int32_T t);
-static __global__ void ec_filtfilt_kernel250(const emxArray_real_T y, int32_T ns,
+static __global__ void ec_filtfilt_kernel251(const emxArray_real_T y, int32_T ns,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel251(const emxArray_real_T y,
+static __global__ void ec_filtfilt_kernel252(const emxArray_real_T y,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel252(const emxArray_real_T convOut,
-  int32_T ytemp, emxArray_real_T dv3);
 static __global__ void ec_filtfilt_kernel253(const emxArray_real_T convOut,
+  int32_T ytemp, emxArray_real_T dv3);
+static __global__ void ec_filtfilt_kernel254(const emxArray_real_T convOut,
   const int32_T k, emxArray_real_T ytemp);
-static __global__ void ec_filtfilt_kernel254(const real_T val, const
+static __global__ void ec_filtfilt_kernel255(const real_T val, const
   emxArray_real_T zi, int32_T b_zi, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel255(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel256(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel256(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel257(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel257(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel258(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel258(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel259(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel259(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel26(const emxArray_int32_T t, const
-  emxArray_int32_T sortedIndices, int32_T ns, emxArray_int32_T cidxInt);
-static __global__ void ec_filtfilt_kernel260(int32_T idx, uint32_T window_idx_0,
+static __global__ void ec_filtfilt_kernel26(const emxArray_int32_T cidxInt,
+  int32_T b_cidxInt, emxArray_int32_T t);
+static __global__ void ec_filtfilt_kernel260(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel261(int32_T idx, uint32_T window_idx_0,
   emxArray_real_T expanded);
-static __global__ void ec_filtfilt_kernel261(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel262(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv6);
-static __global__ void ec_filtfilt_kernel262(const emxArray_real_T convOut,
+static __global__ void ec_filtfilt_kernel263(const emxArray_real_T convOut,
   const int32_T k, const emxArray_int32_T iv6, int32_T outridx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel263(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel264(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, int32_T idx, const
   int32_T b_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel264(const emxArray_real_T y, int32_T ns,
+static __global__ void ec_filtfilt_kernel265(const emxArray_real_T y, int32_T ns,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel265(const emxArray_real_T y,
+static __global__ void ec_filtfilt_kernel266(const emxArray_real_T y,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel266(const emxArray_real_T convOut,
-  const int32_T outridx, const int32_T ns, int32_T vlen, emxArray_real_T xCol);
-static __global__ void ec_filtfilt_kernel267(const emxArray_real_T xCol, const
-  int32_T b_xCol, int32_T c_xCol, const int32_T x_dim0, const int32_T xCol_dim0,
-  emxArray_real_T x);
-static __global__ void ec_filtfilt_kernel268(const emxArray_real_T xCol, const
-  int32_T b_xCol, int32_T c_xCol, const int32_T x_dim0, const int32_T xCol_dim0,
-  emxArray_real_T x);
-static __global__ void ec_filtfilt_kernel27(const emxArray_int32_T ridxInt,
+static __global__ void ec_filtfilt_kernel267(const emxArray_real_T convOut,
+  const int32_T outridx, const int32_T ns, int32_T vlen, emxArray_real_T xx);
+static __global__ void ec_filtfilt_kernel268(const emxArray_real_T xx, const
+  int32_T b_xx, int32_T c_xx, const int32_T xx_dim0, const int32_T b_xx_dim0,
+  emxArray_real_T d_xx);
+static __global__ void ec_filtfilt_kernel269(const emxArray_real_T xx, int32_T
+  b_xx, emxArray_real_T c_xx);
+static __global__ void ec_filtfilt_kernel27(const emxArray_int32_T t, const
+  emxArray_int32_T sortedIndices, int32_T ns, emxArray_int32_T cidxInt);
+static __global__ void ec_filtfilt_kernel28(const emxArray_int32_T ridxInt,
   int32_T b_ridxInt, emxArray_int32_T t);
-static __global__ void ec_filtfilt_kernel28(const emxArray_int32_T t, const
+static __global__ void ec_filtfilt_kernel29(const emxArray_int32_T t, const
   emxArray_int32_T sortedIndices, int32_T ns, emxArray_int32_T ridxInt);
-static __global__ void ec_filtfilt_kernel29(int32_T cols, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel3(const emxArray_real_T x, const
+  int32_T b_x, const int32_T x_dim0, emxArray_real_T xx);
+static __global__ void ec_filtfilt_kernel30(int32_T cols, emxArray_int32_T
   y_rowidx, emxArray_real_T y_d);
-static __global__ void ec_filtfilt_kernel3(const emxArray_real_T coef, int32_T
-  b_coef, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel30(const emxArray_int8_T vals, const
+static __global__ void ec_filtfilt_kernel31(const emxArray_int8_T vals, const
   emxArray_int32_T sortedIndices, int32_T nc, emxArray_real_T y_d);
-static __global__ void ec_filtfilt_kernel31(int32_T ns, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel32(int32_T ns, emxArray_int32_T
   y_rowidx, emxArray_real_T y_d);
-static __global__ void ec_filtfilt_kernel32(int32_T thism, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel33(int32_T thism, emxArray_int32_T
   y_colidx);
-static __global__ void ec_filtfilt_kernel33(int32_T nc, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel34(int32_T nc, emxArray_int32_T
   y_colidx);
-static __global__ void ec_filtfilt_kernel34(const int32_T y_colidx_dim0,
+static __global__ void ec_filtfilt_kernel35(const int32_T y_colidx_dim0,
   emxArray_int32_T y_colidx);
-static __global__ void ec_filtfilt_kernel35(int32_T ns, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel36(int32_T ns, emxArray_int32_T
   y_colidx);
-static __global__ void ec_filtfilt_kernel36(int32_T thism, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel37(int32_T thism, emxArray_int32_T
   counts);
-static __global__ void ec_filtfilt_kernel37(const emxArray_real_T rhs, int32_T
+static __global__ void ec_filtfilt_kernel38(const emxArray_real_T rhs, int32_T
   nc, emxArray_real_T outBuff);
-static __global__ void ec_filtfilt_kernel38(const emxArray_real_T outBuff,
-  int32_T i, emxArray_real_T zi);
-static __global__ void ec_filtfilt_kernel39(int32_T ns, emxArray_int32_T
-  y_rowidx, emxArray_real_T y_d);
+static __global__ void ec_filtfilt_kernel39(const emxArray_real_T outBuff,
+  int32_T *i, emxArray_real_T zi);
 static __global__ void ec_filtfilt_kernel4(const emxArray_real_T coef, int32_T
-  b_coef, emxArray_real_T b2);
-static __global__ void ec_filtfilt_kernel40(int32_T thism, emxArray_int32_T
-  y_colidx);
-static __global__ void ec_filtfilt_kernel41(int32_T nc, emxArray_int32_T
-  y_colidx);
-static __global__ void ec_filtfilt_kernel42(const int32_T y_colidx_dim0,
-  emxArray_int32_T y_colidx);
-static __global__ void ec_filtfilt_kernel43(int32_T ns, emxArray_int32_T
-  y_colidx);
-static __global__ void ec_filtfilt_kernel44(int32_T thism, emxArray_int32_T
-  counts);
-static __global__ void ec_filtfilt_kernel45(const emxArray_real_T rhs, int32_T
-  b_rhs, emxArray_real_T zi);
-static __global__ void ec_filtfilt_kernel46(int32_T ns, emxArray_int32_T
+  b_coef, emxArray_real_T b);
+static __global__ void ec_filtfilt_kernel40(int32_T ns, emxArray_int32_T
   y_rowidx, emxArray_real_T y_d);
-static __global__ void ec_filtfilt_kernel47(int32_T thism, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel41(int32_T thism, emxArray_int32_T
   y_colidx);
-static __global__ void ec_filtfilt_kernel48(int32_T nc, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel42(int32_T nc, emxArray_int32_T
   y_colidx);
-static __global__ void ec_filtfilt_kernel49(const int32_T y_colidx_dim0,
+static __global__ void ec_filtfilt_kernel43(const int32_T y_colidx_dim0,
   emxArray_int32_T y_colidx);
-static __global__ void ec_filtfilt_kernel5(emxArray_real_T a2);
-static __global__ void ec_filtfilt_kernel50(int32_T ns, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel44(int32_T ns, emxArray_int32_T
   y_colidx);
-static __global__ void ec_filtfilt_kernel51(int32_T thism, emxArray_int32_T
+static __global__ void ec_filtfilt_kernel45(int32_T thism, emxArray_int32_T
   counts);
-static __global__ void ec_filtfilt_kernel52(const emxArray_real_T rhs, int32_T
+static __global__ void ec_filtfilt_kernel46(const emxArray_real_T rhs, int32_T
+  b_rhs, emxArray_real_T zi);
+static __global__ void ec_filtfilt_kernel47(int32_T ns, emxArray_int32_T
+  y_rowidx, emxArray_real_T y_d);
+static __global__ void ec_filtfilt_kernel48(int32_T thism, emxArray_int32_T
+  y_colidx);
+static __global__ void ec_filtfilt_kernel49(int32_T nc, emxArray_int32_T
+  y_colidx);
+static __global__ void ec_filtfilt_kernel5(const emxArray_real_T coef, int32_T
+  b_coef, emxArray_real_T b2);
+static __global__ void ec_filtfilt_kernel50(const int32_T y_colidx_dim0,
+  emxArray_int32_T y_colidx);
+static __global__ void ec_filtfilt_kernel51(int32_T ns, emxArray_int32_T
+  y_colidx);
+static __global__ void ec_filtfilt_kernel52(int32_T thism, emxArray_int32_T
+  counts);
+static __global__ void ec_filtfilt_kernel53(const emxArray_real_T rhs, int32_T
   nc, emxArray_real_T outBuff);
-static __global__ void ec_filtfilt_kernel53(const emxArray_real_T outBuff,
-  int32_T i, emxArray_real_T zi);
-static __global__ void ec_filtfilt_kernel54(const emxArray_real_T coef,
+static __global__ void ec_filtfilt_kernel54(const emxArray_real_T outBuff,
+  int32_T *i, emxArray_real_T zi);
+static __global__ void ec_filtfilt_kernel55(const emxArray_real_T coef,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel55(const emxArray_real_T b, int32_T b_b,
+static __global__ void ec_filtfilt_kernel56(const emxArray_real_T b, int32_T b_b,
   emxArray_real_T b1);
-static __global__ void ec_filtfilt_kernel56(const emxArray_real_T b,
+static __global__ void ec_filtfilt_kernel57(const emxArray_real_T b,
   emxArray_real_T b1);
-static __global__ void ec_filtfilt_kernel57(const emxArray_real_T b1, int32_T nc,
+static __global__ void ec_filtfilt_kernel58(const emxArray_real_T b1, int32_T nc,
   emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel58(const int32_T vlen, const
+static __global__ void ec_filtfilt_kernel59(const int32_T vlen, const
   emxArray_real_T y, const int32_T nc, const int32_T ns, emxArray_real_T
   maxCoefNum);
-static __global__ void ec_filtfilt_kernel59(const emxArray_real_T maxCoefNum,
+static __global__ void ec_filtfilt_kernel6(emxArray_real_T a2);
+static __global__ void ec_filtfilt_kernel60(const emxArray_real_T maxCoefNum,
   int32_T b_maxCoefNum, emxArray_boolean_T x);
-static __global__ void ec_filtfilt_kernel6(int32_T loop_ub, emxArray_real_T a2);
-static __global__ void ec_filtfilt_kernel60(const real_T val, int32_T i,
+static __global__ void ec_filtfilt_kernel61(const real_T val, int32_T *i,
   emxArray_real_T b1);
-static __global__ void ec_filtfilt_kernel61(const emxArray_real_T b1, int32_T
+static __global__ void ec_filtfilt_kernel62(const emxArray_real_T b1, int32_T
   b_b1, emxArray_boolean_T x);
-static __global__ void ec_filtfilt_kernel62(const emxArray_int32_T ii, int32_T
+static __global__ void ec_filtfilt_kernel63(const emxArray_int32_T ii, int32_T
   b_ii, emxArray_uint32_T nZeroLastDen);
-static __global__ void ec_filtfilt_kernel63(const emxArray_real_T b, real_T a0[3]);
-static __global__ void ec_filtfilt_kernel64(const emxArray_real_T b, const
+static __global__ void ec_filtfilt_kernel64(const emxArray_real_T b, real_T a0[3]);
+static __global__ void ec_filtfilt_kernel65(const emxArray_real_T b, const
   real_T a0[3], emxArray_real_T b2, emxArray_real_T a2);
-static __global__ void ec_filtfilt_kernel65(const emxArray_real_T a2, const
+static __global__ void ec_filtfilt_kernel66(const emxArray_real_T a2, const
   real_T val, const emxArray_real_T b2, real_T rhs[2]);
-static __global__ void ec_filtfilt_kernel66(int8_T b_I[4]);
 static __global__ void ec_filtfilt_kernel67(int8_T b_I[4]);
-static __global__ void ec_filtfilt_kernel68(const emxArray_real_T a2, const
+static __global__ void ec_filtfilt_kernel68(int8_T b_I[4]);
+static __global__ void ec_filtfilt_kernel69(const emxArray_real_T a2, const
   int8_T b_I[4], real_T A[4]);
-static __global__ void ec_filtfilt_kernel69(const real_T A[4], const real_T val,
+static __global__ void ec_filtfilt_kernel7(int32_T loop_ub, emxArray_real_T a2);
+static __global__ void ec_filtfilt_kernel70(const real_T A[4], const real_T val,
   const int32_T ns, const real_T rhs[2], const int32_T nc, real_T Y[2]);
-static __global__ void ec_filtfilt_kernel7(int32_T coef, emxArray_int32_T y);
-static __global__ void ec_filtfilt_kernel70(const real_T A[4], const real_T rhs
+static __global__ void ec_filtfilt_kernel71(const real_T A[4], const real_T rhs
   [2], const int32_T ns, real_T Y[2]);
-static __global__ void ec_filtfilt_kernel71(const real_T Y[2], emxArray_real_T
+static __global__ void ec_filtfilt_kernel72(const real_T Y[2], emxArray_real_T
   zi);
-static __global__ void ec_filtfilt_kernel72(const emxArray_real_T a2, real_T *a1,
+static __global__ void ec_filtfilt_kernel73(const emxArray_real_T a2, real_T *a1,
   real_T *b_a1, real_T *c_a1, real_T *d_a1, real_T *e_a1);
-static __global__ void ec_filtfilt_kernel73(const emxArray_real_T xCol, int32_T
-  b_xCol, const int32_T xCol_dim0, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel74(const emxArray_real_T xCol, const
+static __global__ void ec_filtfilt_kernel74(const emxArray_real_T xx, int32_T
+  b_xx, const int32_T xx_dim0, emxArray_real_T y);
+static __global__ void ec_filtfilt_kernel75(const emxArray_real_T xx, const
   emxArray_real_T y, const real_T nfact, const int32_T outridx, const int32_T ns,
-  const int32_T xt, int32_T vlen, const int32_T xt_dim0, const int32_T xCol_dim0,
+  const int32_T xt, int32_T vlen, const int32_T xt_dim0, const int32_T xx_dim0,
   emxArray_real_T b_xt);
-static __global__ void ec_filtfilt_kernel75(const emxArray_real_T xt, const
+static __global__ void ec_filtfilt_kernel76(const emxArray_real_T xt, const
   emxArray_real_T zi, const int32_T b_zi, int32_T loop_ub, const int32_T y_dim0,
   const int32_T xt_dim0, emxArray_real_T y);
-static __global__ void ec_filtfilt_kernel76(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel77(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel77(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel78(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel78(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel79(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel79(const real_T *a1, int32_T na,
-  emxArray_real_T a);
 static __global__ void ec_filtfilt_kernel8(int32_T coef, emxArray_int32_T y);
-static __global__ void ec_filtfilt_kernel80(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel81(const int32_T b_dim0, uint32_T
+static __global__ void ec_filtfilt_kernel80(const real_T *a1, int32_T na,
+  emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel81(emxArray_real_T a);
+static __global__ void ec_filtfilt_kernel82(const int32_T b_dim0, uint32_T
   zfSize[2]);
-static __global__ void ec_filtfilt_kernel82(int32_T idx, emxArray_real_T
+static __global__ void ec_filtfilt_kernel83(int32_T idx, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel83(const int32_T nc, const
+static __global__ void ec_filtfilt_kernel84(const int32_T nc, const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv2);
-static __global__ void ec_filtfilt_kernel84(const emxArray_int32_T y, int32_T
+static __global__ void ec_filtfilt_kernel85(const emxArray_int32_T y, int32_T
   b_y, emxArray_int32_T iv3);
-static __global__ void ec_filtfilt_kernel85(const emxArray_real_T xt, const
+static __global__ void ec_filtfilt_kernel86(const emxArray_real_T xt, const
   emxArray_int32_T iv3, const emxArray_int32_T iv2, const int32_T b_xt, int32_T
   c_xt, const int32_T expanded_dim0, const int32_T xt_dim0, emxArray_real_T
   expanded);
-static __global__ void ec_filtfilt_kernel86(const emxArray_real_T expanded,
+static __global__ void ec_filtfilt_kernel87(const emxArray_real_T expanded,
   const emxArray_int32_T rows, const emxArray_real_T b, const int32_T idx,
   int32_T c, const int32_T b_dim0, const int32_T convOut_dim0, const int32_T
   expanded_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel87(const emxArray_real_T y, const
+static __global__ void ec_filtfilt_kernel88(const emxArray_real_T y, const
   emxArray_real_T convOut, const int32_T b_y, int32_T b_convOut, const int32_T
   convOut_dim0, const int32_T b_convOut_dim0, const int32_T y_dim0,
   emxArray_real_T c_convOut);
-static __global__ void ec_filtfilt_kernel88(const emxArray_real_T convOut, const
+static __global__ void ec_filtfilt_kernel89(const emxArray_real_T convOut, const
   int32_T b_convOut, int32_T c_convOut, const int32_T convOut_dim0, const
   int32_T b_convOut_dim0, emxArray_real_T d_convOut);
-static __global__ void ec_filtfilt_kernel89(const emxArray_real_T y, const
-  int32_T b_y, int32_T ns, const int32_T convOut_dim0, emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel9(int32_T loop_ub, emxArray_int32_T
-  rows);
+static __global__ void ec_filtfilt_kernel9(int32_T coef, emxArray_int32_T y);
 static __global__ void ec_filtfilt_kernel90(const emxArray_real_T y, const
+  int32_T b_y, int32_T ns, const int32_T convOut_dim0, emxArray_real_T convOut);
+static __global__ void ec_filtfilt_kernel91(const emxArray_real_T y, const
   int32_T b_y, int32_T ns, const int32_T convOut_dim0, const int32_T y_dim0,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel91(const emxArray_real_T a, int32_T ns,
+static __global__ void ec_filtfilt_kernel92(const emxArray_real_T a, int32_T ns,
   const int32_T xt_dim0, const int32_T a_dim0, const int32_T convOut_dim0,
   emxArray_real_T convOut);
-static __global__ void ec_filtfilt_kernel92(const emxArray_real_T convOut, const
+static __global__ void ec_filtfilt_kernel93(const emxArray_real_T convOut, const
   int32_T ns, const int32_T outridx, int32_T b_convOut, const int32_T zfIIR_dim0,
   const int32_T convOut_dim0, emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel93(const emxArray_real_T convOut, const
+static __global__ void ec_filtfilt_kernel94(const emxArray_real_T convOut, const
   emxArray_real_T a, const int32_T b_a, int32_T ns, const int32_T a_dim0, const
   int32_T zfIIR_dim0, const int32_T xt_dim0, const int32_T convOut_dim0,
   emxArray_real_T zfIIR);
-static __global__ void ec_filtfilt_kernel94(const emxArray_real_T b2, int32_T
+static __global__ void ec_filtfilt_kernel95(const emxArray_real_T b2, int32_T
   b_b2, emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel95(const emxArray_real_T a2, int32_T
+static __global__ void ec_filtfilt_kernel96(const emxArray_real_T a2, int32_T
   b_a2, emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel96(const real_T *a1, int32_T nb,
+static __global__ void ec_filtfilt_kernel97(const real_T *a1, int32_T nb,
   emxArray_real_T b);
-static __global__ void ec_filtfilt_kernel97(const real_T *a1, int32_T na,
+static __global__ void ec_filtfilt_kernel98(const real_T *a1, int32_T na,
   emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel98(emxArray_real_T a);
-static __global__ void ec_filtfilt_kernel99(const int32_T b_dim0, uint32_T
-  zfSize[2]);
-static void ec_filtfilt_once();
-static void emlrt_marshallIn(const mxArray *x, const char_T *identifier,
-  emxArray_real_T *y);
-static void emlrt_marshallIn(const mxArray *a__output_of_sprintf_, const char_T *
-  identifier, char_T y[14]);
-static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
-  *parentId, emxArray_real_T *y);
+static __global__ void ec_filtfilt_kernel99(emxArray_real_T a);
 static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   *parentId, char_T y[14]);
-static void emlrt_marshallOut(const emxArray_real_T *u, const mxArray *y);
-static void emxEnsureCapacity_boolean_T(emxArray_boolean_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation);
-static void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation);
-static void emxEnsureCapacity_int8_T(emxArray_int8_T *emxArray, int32_T oldNumel,
-  const emlrtRTEInfo *srcLocation);
-static void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel,
-  const emlrtRTEInfo *srcLocation);
-static void emxEnsureCapacity_struct_T(emxArray_struct_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation);
-static void emxEnsureCapacity_uint32_T(emxArray_uint32_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation);
-static void emxFree_boolean_T(emxArray_boolean_T **pEmxArray);
-static void emxFree_int32_T(emxArray_int32_T **pEmxArray);
-static void emxFree_int8_T(emxArray_int8_T **pEmxArray);
-static void emxFree_real_T(emxArray_real_T **pEmxArray);
-static void emxFree_struct_T(emxArray_struct_T **pEmxArray);
-static void emxFree_uint32_T(emxArray_uint32_T **pEmxArray);
-static void emxInit_boolean_T(emxArray_boolean_T **pEmxArray, int32_T
-  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
-static void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
-  const emlrtRTEInfo *srcLocation, boolean_T doPush);
-static void emxInit_int8_T(emxArray_int8_T **pEmxArray, int32_T numDimensions,
-  const emlrtRTEInfo *srcLocation, boolean_T doPush);
-static void emxInit_real_T(emxArray_real_T **pEmxArray, int32_T numDimensions,
-  const emlrtRTEInfo *srcLocation, boolean_T doPush);
-static void emxInit_struct_T(emxArray_struct_T **pEmxArray, int32_T
-  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
-static void emxInit_uint32_T(emxArray_uint32_T **pEmxArray, int32_T
-  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
-static const mxArray *feval(const mxArray *m1, const mxArray *m2, const mxArray *
-  m3, const mxArray *m4, emlrtMCInfo *location);
-static void feval(const mxArray *m, const mxArray *m1, emlrtMCInfo *location);
+static void emlrt_marshallIn(const mxArray *a__output_of_sprintf_, const char_T *
+  identifier, char_T y[14]);
 static void gpuEmxEnsureCapacity_boolean_T(const emxArray_boolean_T *cpu,
   emxArray_boolean_T *gpu);
 static void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
@@ -1462,24 +1303,6 @@ static void gpuEmxReset_real_T(emxArray_real_T *gpu);
 static void gpuEmxReset_uint32_T(emxArray_uint32_T *gpu);
 
 // Function Definitions
-static void b_emlrt_marshallIn(const mxArray *coef, const char_T *identifier,
-  emxArray_real_T *y)
-{
-  emlrtMsgIdentifier thisId;
-  thisId.fIdentifier = const_cast<const char_T *>(identifier);
-  thisId.fParent = nullptr;
-  thisId.bParentIsCell = false;
-  b_emlrt_marshallIn(emlrtAlias(coef), &thisId, y);
-  emlrtDestroyArray(&coef);
-}
-
-static void b_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
-  *parentId, emxArray_real_T *y)
-{
-  d_emlrt_marshallIn(emlrtAlias(u), parentId, y);
-  emlrtDestroyArray(&u);
-}
-
 static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   *msgId, char_T ret[14])
 {
@@ -1491,17 +1314,6 @@ static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   emlrtDestroyArray(&src);
 }
 
-static const mxArray *b_feval(const mxArray *m1, const mxArray *m2, emlrtMCInfo *
-  location)
-{
-  const mxArray *pArrays[2];
-  const mxArray *m;
-  pArrays[0] = m1;
-  pArrays[1] = m2;
-  return emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 2, &pArrays[0],
-    "feval", true, location);
-}
-
 static const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
   emlrtMCInfo *location)
 {
@@ -1511,676 +1323,6 @@ static const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
   pArrays[1] = m2;
   return emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 2, &pArrays[0],
     "sprintf", true, location);
-}
-
-static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2)
-{
-  emxArray_real_T *b_in1;
-  int32_T aux_0_1;
-  int32_T aux_1_1;
-  int32_T b;
-  int32_T i;
-  int32_T stride_0_1;
-  int32_T stride_1_1;
-  emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
-  emxInit_real_T(&b_in1, 2, &jb_emlrtRTEI, true);
-  i = b_in1->size[0] * b_in1->size[1];
-  b_in1->size[0] = in2->size[0];
-  if (in2->size[1] == 1) {
-    b_in1->size[1] = in1->size[1];
-  } else {
-    b_in1->size[1] = in2->size[1];
-  }
-
-  emxEnsureCapacity_real_T(b_in1, i, &jb_emlrtRTEI);
-  stride_0_1 = (in1->size[1] != 1);
-  stride_1_1 = (in2->size[1] != 1);
-  aux_0_1 = 0;
-  aux_1_1 = 0;
-  if (in2->size[1] == 1) {
-    b = in1->size[1];
-  } else {
-    b = in2->size[1];
-  }
-
-  for (i = 0; i < b; i++) {
-    for (int32_T i1{0}; i1 < in2->size[0]; i1++) {
-      b_in1->data[i1 + b_in1->size[0] * i] = in1->data[i1 + in1->size[0] *
-        aux_0_1] + in2->data[i1 + in2->size[0] * aux_1_1];
-    }
-
-    aux_1_1 += stride_1_1;
-    aux_0_1 += stride_0_1;
-  }
-
-  for (i = 0; i < b_in1->size[1]; i++) {
-    for (int32_T i1{0}; i1 < b_in1->size[0]; i1++) {
-      in1->data[i1 + in1->size[0] * i] = b_in1->data[i1 + b_in1->size[0] * i];
-    }
-  }
-
-  emxFree_real_T(&b_in1);
-  emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
-}
-
-static void c_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
-  *msgId, emxArray_real_T *ret)
-{
-  static const int32_T dims[2]{ -1, -1 };
-
-  int32_T iv[2];
-  int32_T i;
-  const boolean_T bv[2]{ true, true };
-
-  emlrtCheckVsBuiltInR2012b(emlrtRootTLSGlobal, msgId, src, "double", false, 2U,
-    (const void *)&dims[0], &bv[0], &iv[0]);
-  ret->allocatedSize = iv[0] * iv[1];
-  i = ret->size[0] * ret->size[1];
-  ret->size[0] = iv[0];
-  ret->size[1] = iv[1];
-  emxEnsureCapacity_real_T(ret, i, static_cast<emlrtRTEInfo *>(nullptr));
-  ret->data = static_cast<real_T *>(emlrtMxGetData(src));
-  ret->canFreeData = false;
-  emlrtDestroyArray(&src);
-}
-
-namespace coder
-{
-  namespace internal
-  {
-    static void b_heapsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
-      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
-      *cmp_workspace_b)
-    {
-      int32_T cmpIdx;
-      int32_T extremum;
-      int32_T extremumIdx;
-      int32_T leftIdx;
-      int32_T n;
-      int32_T xcmp;
-      boolean_T changed;
-      boolean_T exitg1;
-      boolean_T varargout_1;
-      n = xend - xstart;
-      for (int32_T idx{0}; idx <= n; idx++) {
-        leftIdx = (n - idx) - 1;
-        changed = true;
-        extremumIdx = leftIdx + xstart;
-        leftIdx = (((leftIdx + 2) << 1) + xstart) - 2;
-        exitg1 = false;
-        while ((!exitg1) && (leftIdx + 1 < xend)) {
-          changed = false;
-          extremum = x->data[extremumIdx];
-          cmpIdx = leftIdx;
-          xcmp = x->data[leftIdx];
-          if (cmp_workspace_a->data[x->data[leftIdx] - 1] <
-              cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[x->data[leftIdx] - 1] ==
-                     cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
-            varargout_1 = (cmp_workspace_b->data[x->data[leftIdx] - 1] <
-                           cmp_workspace_b->data[x->data[leftIdx + 1] - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            cmpIdx = leftIdx + 1;
-            xcmp = x->data[leftIdx + 1];
-          }
-
-          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
-              cmp_workspace_a->data[xcmp - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
-                     cmp_workspace_a->data[xcmp - 1]) {
-            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
-                           cmp_workspace_b->data[xcmp - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            x->data[extremumIdx] = xcmp;
-            x->data[cmpIdx] = extremum;
-            extremumIdx = cmpIdx;
-            leftIdx = ((((cmpIdx - xstart) + 2) << 1) + xstart) - 2;
-            changed = true;
-          } else {
-            exitg1 = true;
-          }
-        }
-
-        if (changed && (leftIdx + 1 <= xend)) {
-          extremum = x->data[extremumIdx];
-          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
-              cmp_workspace_a->data[x->data[leftIdx] - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
-                     cmp_workspace_a->data[x->data[leftIdx] - 1]) {
-            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
-                           cmp_workspace_b->data[x->data[leftIdx] - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            x->data[extremumIdx] = x->data[leftIdx];
-            x->data[leftIdx] = extremum;
-          }
-        }
-      }
-
-      for (int32_T idx{0}; idx < n; idx++) {
-        leftIdx = x->data[(xend - idx) - 1];
-        x->data[(xend - idx) - 1] = x->data[xstart - 1];
-        x->data[xstart - 1] = leftIdx;
-        changed = true;
-        extremumIdx = xstart - 1;
-        leftIdx = xstart;
-        exitg1 = false;
-        while ((!exitg1) && (leftIdx + 1 < (xend - idx) - 1)) {
-          changed = false;
-          extremum = x->data[extremumIdx];
-          cmpIdx = leftIdx;
-          xcmp = x->data[leftIdx];
-          if (cmp_workspace_a->data[x->data[leftIdx] - 1] <
-              cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[x->data[leftIdx] - 1] ==
-                     cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
-            varargout_1 = (cmp_workspace_b->data[x->data[leftIdx] - 1] <
-                           cmp_workspace_b->data[x->data[leftIdx + 1] - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            cmpIdx = leftIdx + 1;
-            xcmp = x->data[leftIdx + 1];
-          }
-
-          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
-              cmp_workspace_a->data[xcmp - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
-                     cmp_workspace_a->data[xcmp - 1]) {
-            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
-                           cmp_workspace_b->data[xcmp - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            x->data[extremumIdx] = xcmp;
-            x->data[cmpIdx] = extremum;
-            extremumIdx = cmpIdx;
-            leftIdx = ((((cmpIdx - xstart) + 2) << 1) + xstart) - 2;
-            changed = true;
-          } else {
-            exitg1 = true;
-          }
-        }
-
-        if (changed && (leftIdx + 1 <= (xend - idx) - 1)) {
-          extremum = x->data[extremumIdx];
-          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
-              cmp_workspace_a->data[x->data[leftIdx] - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
-                     cmp_workspace_a->data[x->data[leftIdx] - 1]) {
-            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
-                           cmp_workspace_b->data[x->data[leftIdx] - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            x->data[extremumIdx] = x->data[leftIdx];
-            x->data[leftIdx] = extremum;
-          }
-        }
-      }
-    }
-
-    static void b_warning()
-    {
-      static const int32_T iv[2]{ 1, 7 };
-
-      static const int32_T iv1[2]{ 1, 7 };
-
-      static const int32_T iv2[2]{ 1, 22 };
-
-      static const int32_T iv3[2]{ 1, 3 };
-
-      static const int32_T iv4[2]{ 1, 3 };
-
-      static const char_T msgID[22]{ 's', 'i', 'g', 'n', 'a', 'l', ':', 'f', 'i',
-        'l', 't', 'f', 'i', 'l', 't', ':', 'P', 'a', 'r', 's', 'e', 'B' };
-
-      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
-
-      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
-
-      static const char_T varargin_1[3]{ 'a', '0', '1' };
-
-      static const char_T varargin_2[3]{ 'S', 'O', 'S' };
-
-      const mxArray *b_y;
-      const mxArray *c_y;
-      const mxArray *d_y;
-      const mxArray *e_y;
-      const mxArray *m;
-      const mxArray *y;
-      y = nullptr;
-      m = emlrtCreateCharArray(2, &iv[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
-      emlrtAssign(&y, m);
-      b_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv1[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
-      emlrtAssign(&b_y, m);
-      c_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv2[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 22, m, &msgID[0]);
-      emlrtAssign(&c_y, m);
-      d_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv3[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 3, m, &varargin_1[0]);
-      emlrtAssign(&d_y, m);
-      e_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv4[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 3, m, &varargin_2[0]);
-      emlrtAssign(&e_y, m);
-      feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
-    }
-
-    static void c_warning()
-    {
-      static const int32_T iv[2]{ 1, 7 };
-
-      static const int32_T iv1[2]{ 1, 7 };
-
-      static const int32_T iv2[2]{ 1, 21 };
-
-      static const char_T msgID[21]{ 'M', 'A', 'T', 'L', 'A', 'B', ':', 's', 'i',
-        'n', 'g', 'u', 'l', 'a', 'r', 'M', 'a', 't', 'r', 'i', 'x' };
-
-      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
-
-      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
-
-      const mxArray *b_y;
-      const mxArray *c_y;
-      const mxArray *m;
-      const mxArray *y;
-      y = nullptr;
-      m = emlrtCreateCharArray(2, &iv[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
-      emlrtAssign(&y, m);
-      b_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv1[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
-      emlrtAssign(&b_y, m);
-      c_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv2[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 21, m, &msgID[0]);
-      emlrtAssign(&c_y, m);
-      feval(y, b_feval(b_y, c_y, &emlrtMCI), &b_emlrtMCI);
-    }
-
-    static void insertionsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
-      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
-      *cmp_workspace_b)
-    {
-      int32_T i;
-      i = xstart + 1;
-      for (int32_T k{0}; k <= xend - i; k++) {
-        int32_T idx;
-        int32_T xc;
-        boolean_T exitg1;
-        idx = xstart + k;
-        xc = x->data[idx] - 1;
-        exitg1 = false;
-        while ((!exitg1) && (idx >= xstart)) {
-          boolean_T varargout_1;
-          if (cmp_workspace_a->data[xc] < cmp_workspace_a->data[x->data[idx - 1]
-              - 1]) {
-            varargout_1 = true;
-          } else if (cmp_workspace_a->data[xc] == cmp_workspace_a->data[x->
-                     data[idx - 1] - 1]) {
-            varargout_1 = (cmp_workspace_b->data[xc] < cmp_workspace_b->data
-                           [x->data[idx - 1] - 1]);
-          } else {
-            varargout_1 = false;
-          }
-
-          if (varargout_1) {
-            x->data[idx] = x->data[idx - 1];
-            idx--;
-          } else {
-            exitg1 = true;
-          }
-        }
-
-        x->data[idx] = xc + 1;
-      }
-    }
-
-    static void introsort(emxArray_int32_T *x, int32_T xend, const
-                          emxArray_int32_T *cmp_workspace_a, const
-                          emxArray_int32_T *cmp_workspace_b)
-    {
-      emxArray_struct_T *st_d;
-      struct_T frame;
-      emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
-      emxInit_struct_T(&st_d, 1, &ee_emlrtRTEI, true);
-      if (xend > 1) {
-        if (xend <= 32) {
-          insertionsort(x, 1, xend, cmp_workspace_a, cmp_workspace_b);
-        } else {
-          int32_T MAXDEPTH;
-          int32_T pivot;
-          int32_T pmax;
-          int32_T pmin;
-          int32_T pow2p;
-          boolean_T exitg1;
-          pmax = 31;
-          pmin = 0;
-          exitg1 = false;
-          while ((!exitg1) && (pmax - pmin > 1)) {
-            pivot = (pmin + pmax) >> 1;
-            pow2p = 1 << pivot;
-            if (pow2p == xend) {
-              pmax = pivot;
-              exitg1 = true;
-            } else if (pow2p > xend) {
-              pmax = pivot;
-            } else {
-              pmin = pivot;
-            }
-          }
-
-          MAXDEPTH = (pmax - 1) << 1;
-          frame.xstart = 1;
-          frame.xend = xend;
-          frame.depth = 0;
-          pmax = MAXDEPTH << 1;
-          pmin = st_d->size[0];
-          st_d->size[0] = pmax;
-          emxEnsureCapacity_struct_T(st_d, pmin, &ee_emlrtRTEI);
-          for (pmin = 0; pmin < pmax; pmin++) {
-            st_d->data[pmin] = frame;
-          }
-
-          st_d->data[0] = frame;
-          pow2p = 1;
-          while (pow2p > 0) {
-            frame = st_d->data[pow2p - 1];
-            pmax = st_d->data[pow2p - 1].xstart - 1;
-            xend = st_d->data[pow2p - 1].xend;
-            pow2p--;
-            if ((frame.xend - frame.xstart) + 1 <= 32) {
-              insertionsort(x, frame.xstart, frame.xend, cmp_workspace_a,
-                            cmp_workspace_b);
-            } else if (frame.depth == MAXDEPTH) {
-              b_heapsort(x, frame.xstart, frame.xend, cmp_workspace_a,
-                         cmp_workspace_b);
-            } else {
-              int32_T t;
-              boolean_T varargout_1;
-              pmin = (frame.xstart + (frame.xend - frame.xstart) / 2) - 1;
-              if (cmp_workspace_a->data[x->data[pmin] - 1] <
-                  cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
-                varargout_1 = true;
-              } else if (cmp_workspace_a->data[x->data[pmin] - 1] ==
-                         cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
-                varargout_1 = (cmp_workspace_b->data[x->data[pmin] - 1] <
-                               cmp_workspace_b->data[x->data[pmax] - 1]);
-              } else {
-                varargout_1 = false;
-              }
-
-              if (varargout_1) {
-                t = x->data[frame.xstart - 1];
-                x->data[frame.xstart - 1] = x->data[pmin];
-                x->data[pmin] = t;
-              }
-
-              if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] <
-                  cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
-                varargout_1 = true;
-              } else if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] ==
-                         cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
-                varargout_1 = (cmp_workspace_b->data[x->data[xend - 1] - 1] <
-                               cmp_workspace_b->data[x->data[pmax] - 1]);
-              } else {
-                varargout_1 = false;
-              }
-
-              if (varargout_1) {
-                t = x->data[frame.xstart - 1];
-                x->data[frame.xstart - 1] = x->data[frame.xend - 1];
-                x->data[frame.xend - 1] = t;
-              }
-
-              if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] <
-                  cmp_workspace_a->data[x->data[pmin] - 1]) {
-                varargout_1 = true;
-              } else if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] ==
-                         cmp_workspace_a->data[x->data[pmin] - 1]) {
-                varargout_1 = (cmp_workspace_b->data[x->data[xend - 1] - 1] <
-                               cmp_workspace_b->data[x->data[pmin] - 1]);
-              } else {
-                varargout_1 = false;
-              }
-
-              if (varargout_1) {
-                t = x->data[pmin];
-                x->data[pmin] = x->data[frame.xend - 1];
-                x->data[frame.xend - 1] = t;
-              }
-
-              pivot = x->data[pmin] - 1;
-              x->data[pmin] = x->data[frame.xend - 2];
-              x->data[frame.xend - 2] = pivot + 1;
-              pmax = frame.xstart - 1;
-              pmin = frame.xend - 2;
-              int32_T exitg2;
-              do {
-                int32_T exitg3;
-                exitg2 = 0;
-                pmax++;
-                do {
-                  exitg3 = 0;
-                  if (cmp_workspace_a->data[x->data[pmax] - 1] <
-                      cmp_workspace_a->data[pivot]) {
-                    varargout_1 = true;
-                  } else if (cmp_workspace_a->data[x->data[pmax] - 1] ==
-                             cmp_workspace_a->data[pivot]) {
-                    varargout_1 = (cmp_workspace_b->data[x->data[pmax] - 1] <
-                                   cmp_workspace_b->data[pivot]);
-                  } else {
-                    varargout_1 = false;
-                  }
-
-                  if (varargout_1) {
-                    pmax++;
-                  } else {
-                    exitg3 = 1;
-                  }
-                } while (exitg3 == 0);
-
-                pmin--;
-                do {
-                  exitg3 = 0;
-                  if (cmp_workspace_a->data[pivot] < cmp_workspace_a->data
-                      [x->data[pmin] - 1]) {
-                    varargout_1 = true;
-                  } else if (cmp_workspace_a->data[pivot] ==
-                             cmp_workspace_a->data[x->data[pmin] - 1]) {
-                    varargout_1 = (cmp_workspace_b->data[pivot] <
-                                   cmp_workspace_b->data[x->data[pmin] - 1]);
-                  } else {
-                    varargout_1 = false;
-                  }
-
-                  if (varargout_1) {
-                    pmin--;
-                  } else {
-                    exitg3 = 1;
-                  }
-                } while (exitg3 == 0);
-
-                if (pmax + 1 >= pmin + 1) {
-                  exitg2 = 1;
-                } else {
-                  t = x->data[pmax];
-                  x->data[pmax] = x->data[pmin];
-                  x->data[pmin] = t;
-                }
-              } while (exitg2 == 0);
-
-              x->data[frame.xend - 2] = x->data[pmax];
-              x->data[pmax] = pivot + 1;
-              if (pmax + 2 < frame.xend) {
-                st_d->data[pow2p].xstart = pmax + 2;
-                st_d->data[pow2p].xend = frame.xend;
-                st_d->data[pow2p].depth = frame.depth + 1;
-                pow2p++;
-              }
-
-              if (frame.xstart < pmax + 1) {
-                st_d->data[pow2p].xstart = frame.xstart;
-                st_d->data[pow2p].xend = pmax + 1;
-                st_d->data[pow2p].depth = frame.depth + 1;
-                pow2p++;
-              }
-            }
-          }
-        }
-      }
-
-      emxFree_struct_T(&st_d);
-      emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
-    }
-
-    static void warning(int32_T varargin_1, const char_T varargin_2[14])
-    {
-      static const int32_T iv[2]{ 1, 7 };
-
-      static const int32_T iv1[2]{ 1, 7 };
-
-      static const int32_T iv2[2]{ 1, 32 };
-
-      static const int32_T iv3[2]{ 1, 14 };
-
-      static const char_T msgID[32]{ 'C', 'o', 'd', 'e', 'r', ':', 'M', 'A', 'T',
-        'L', 'A', 'B', ':', 'r', 'a', 'n', 'k', 'D', 'e', 'f', 'i', 'c', 'i',
-        'e', 'n', 't', 'M', 'a', 't', 'r', 'i', 'x' };
-
-      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
-
-      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
-
-      const mxArray *b_y;
-      const mxArray *c_y;
-      const mxArray *d_y;
-      const mxArray *e_y;
-      const mxArray *m;
-      const mxArray *y;
-      y = nullptr;
-      m = emlrtCreateCharArray(2, &iv[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
-      emlrtAssign(&y, m);
-      b_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv1[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
-      emlrtAssign(&b_y, m);
-      c_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv2[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 32, m, &msgID[0]);
-      emlrtAssign(&c_y, m);
-      d_y = nullptr;
-      m = emlrtCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL);
-      *static_cast<int32_T *>(emlrtMxGetData(m)) = varargin_1;
-      emlrtAssign(&d_y, m);
-      e_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv3[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 14, m, &varargin_2[0]);
-      emlrtAssign(&e_y, m);
-      feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
-    }
-
-    static void warning()
-    {
-      static const int32_T iv[2]{ 1, 7 };
-
-      static const int32_T iv1[2]{ 1, 7 };
-
-      static const int32_T iv2[2]{ 1, 24 };
-
-      static const int32_T iv3[2]{ 1, 3 };
-
-      static const char_T msgID[24]{ 's', 'i', 'g', 'n', 'a', 'l', ':', 'f', 'i',
-        'l', 't', 'f', 'i', 'l', 't', ':', 'P', 'a', 'r', 's', 'e', 'S', 'O',
-        'S' };
-
-      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
-
-      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
-
-      static const char_T varargin_1[3]{ 'S', 'O', 'S' };
-
-      const mxArray *b_y;
-      const mxArray *c_y;
-      const mxArray *d_y;
-      const mxArray *e_y;
-      const mxArray *m;
-      const mxArray *y;
-      y = nullptr;
-      m = emlrtCreateCharArray(2, &iv[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
-      emlrtAssign(&y, m);
-      b_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv1[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
-      emlrtAssign(&b_y, m);
-      c_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv2[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 24, m, &msgID[0]);
-      emlrtAssign(&c_y, m);
-      d_y = nullptr;
-      m = emlrtCreateCharArray(2, &iv3[0]);
-      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 3, m, &varargin_1[0]);
-      emlrtAssign(&d_y, m);
-      e_y = nullptr;
-      m = emlrtCreateString1R2022a(emlrtRootTLSGlobal, 'G');
-      emlrtAssign(&e_y, m);
-      feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
-    }
-  }
-}
-
-static void d_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
-  *msgId, emxArray_real_T *ret)
-{
-  static const int32_T dims[2]{ 1, -1 };
-
-  int32_T iv[2];
-  int32_T i;
-  const boolean_T bv[2]{ false, true };
-
-  emlrtCheckVsBuiltInR2012b(emlrtRootTLSGlobal, msgId, src, "double", false, 2U,
-    (const void *)&dims[0], &bv[0], &iv[0]);
-  ret->allocatedSize = iv[0] * iv[1];
-  i = ret->size[0] * ret->size[1];
-  ret->size[0] = iv[0];
-  ret->size[1] = iv[1];
-  emxEnsureCapacity_real_T(ret, i, static_cast<emlrtRTEInfo *>(nullptr));
-  ret->data = static_cast<real_T *>(emlrtMxGetData(src));
-  ret->canFreeData = false;
-  emlrtDestroyArray(&src);
 }
 
 static int32_T div_s32(int32_T numerator, int32_T denominator)
@@ -2250,7 +1392,7 @@ static __device__ int32_T div_s32_device(int32_T numerator, int32_T denominator)
 }
 
 static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel1(const
-  emxArray_real_T x, int32_T b_x, emxArray_real_T xCol)
+  emxArray_real_T x, int32_T b_x, emxArray_real_T xx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2261,13 +1403,12 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel1(const
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    xCol.data[iv0] = x.data[iv0];
+    xx.data[iv0] = x.data[iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel10(const
-  emxArray_int32_T y, int32_T loop_ub, const int32_T coef_dim1, emxArray_int32_T
-  rows)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel10(int32_T
+  loop_ub, emxArray_int32_T rows)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2278,11 +1419,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel10(const
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    rows.data[(iv0 + coef_dim1) - 1] = y.data[iv0];
+    rows.data[iv0] = iv0 + 1;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel100(int32_T
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel100(const
+  int32_T b_dim0, uint32_T zfSize[2])
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    zfSize[0] = static_cast<uint32_T>(b_dim0 - 1);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel101(int32_T
   idx, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -2298,7 +1451,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel100(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel101(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel102(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv4)
 {
   uint64_T loopEnd;
@@ -2324,7 +1477,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel101(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel102(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel103(const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv5)
 {
   uint64_T loopEnd;
@@ -2340,30 +1493,30 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel102(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel103(const
-  emxArray_real_T xCol, const emxArray_int32_T iv5, const emxArray_int32_T iv4,
-  const int32_T b_xCol, int32_T c_xCol, const int32_T expanded_dim0, const
-  int32_T xCol_dim0, emxArray_real_T expanded)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel104(const
+  emxArray_real_T xx, const emxArray_int32_T iv5, const emxArray_int32_T iv4,
+  const int32_T b_xx, int32_T c_xx, const int32_T expanded_dim0, const int32_T
+  xx_dim0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(b_xCol) + 1UL) * (static_cast<uint64_T>
-    (c_xCol) + 1UL) - 1UL;
+  loopEnd = (static_cast<uint64_T>(b_xx) + 1UL) * (static_cast<uint64_T>(c_xx) +
+    1UL) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     int32_T ix;
-    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_xCol) + 1UL));
-    iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) / (static_cast<
-      uint64_T>(b_xCol) + 1UL));
-    expanded.data[iv4.data[ix] + expanded_dim0 * iv5.data[iv0]] = xCol.data[ix +
-      xCol_dim0 * iv0];
+    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_xx) + 1UL));
+    iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) /
+      (static_cast<uint64_T>(b_xx) + 1UL));
+    expanded.data[iv4.data[ix] + expanded_dim0 * iv5.data[iv0]] = xx.data[ix +
+      xx_dim0 * iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel104(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel105(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   const int32_T idx, int32_T c, const int32_T b_dim0, const int32_T convOut_dim0,
   const int32_T expanded_dim0, emxArray_real_T convOut)
@@ -2400,7 +1553,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel104(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel105(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel106(const
   emxArray_real_T zfIIR, const emxArray_real_T convOut, const int32_T b_zfIIR,
   int32_T b_convOut, const int32_T convOut_dim0, const int32_T b_convOut_dim0,
   const int32_T zfIIR_dim0, emxArray_real_T c_convOut)
@@ -2423,7 +1576,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel105(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel106(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel107(const
   emxArray_real_T convOut, const int32_T b_convOut, int32_T c_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T d_convOut)
 {
@@ -2445,7 +1598,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel106(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel107(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel108(const
   emxArray_real_T zfIIR, const int32_T b_zfIIR, int32_T ns, const int32_T
   convOut_dim0, emxArray_real_T convOut)
 {
@@ -2466,7 +1619,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel107(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel108(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel109(const
   emxArray_real_T zfIIR, const int32_T b_zfIIR, int32_T ns, const int32_T
   convOut_dim0, const int32_T zfIIR_dim0, emxArray_real_T convOut)
 {
@@ -2487,8 +1640,25 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel108(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel109(const
-  emxArray_real_T a, int32_T ns, const int32_T xCol_dim0, const int32_T a_dim0,
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel11(const
+  emxArray_int32_T y, int32_T loop_ub, const int32_T coef_dim1, emxArray_int32_T
+  rows)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    rows.data[(iv0 + coef_dim1) - 1] = y.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel110(const
+  emxArray_real_T a, int32_T ns, const int32_T xx_dim0, const int32_T a_dim0,
   const int32_T convOut_dim0, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -2501,7 +1671,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel109(const
     int32_T ix;
     int32_T m;
     m = static_cast<int32_T>(idx);
-    ix = (xCol_dim0 + a_dim0) - 1;
+    ix = (xx_dim0 + a_dim0) - 1;
     for (int32_T i{0}; i < ix; i++) {
       int32_T bcoef;
       bcoef = static_cast<int32_T>(fmin(static_cast<real_T>(i) + 1.0,
@@ -2514,24 +1684,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel109(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel11(const
-  emxArray_int32_T y, int32_T loop_ub, const int32_T coef_dim1, const int32_T
-  y_dim1, emxArray_int32_T rows)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    rows.data[((iv0 + coef_dim1) + y_dim1) - 1] = y.data[iv0];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel110(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel111(const
   emxArray_real_T convOut, const int32_T ns, const int32_T outridx, int32_T
   b_convOut, const int32_T zfIIR_dim0, const int32_T convOut_dim0,
   emxArray_real_T zfIIR)
@@ -2554,9 +1707,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel110(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel111(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel112(const
   emxArray_real_T convOut, const emxArray_real_T a, const int32_T b_a, int32_T
-  ns, const int32_T a_dim0, const int32_T zfIIR_dim0, const int32_T xCol_dim0,
+  ns, const int32_T a_dim0, const int32_T zfIIR_dim0, const int32_T xx_dim0,
   const int32_T convOut_dim0, emxArray_real_T zfIIR)
 {
   uint64_T loopEnd;
@@ -2576,14 +1729,14 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel111(const
     bcoef = static_cast<int32_T>(fmin(static_cast<real_T>(i) + 2.0,
       static_cast<real_T>(a_dim0))) - 1;
     for (int32_T iv0{0}; iv0 < bcoef; iv0++) {
-      zfIIR.data[(i + zfIIR_dim0 * m) + 1] += convOut.data[((xCol_dim0 + i) -
-        iv0) + convOut_dim0 * m] * a.data[iv0 + 1];
+      zfIIR.data[(i + zfIIR_dim0 * m) + 1] += convOut.data[((xx_dim0 + i) - iv0)
+        + convOut_dim0 * m] * a.data[iv0 + 1];
     }
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel112(const
-  emxArray_real_T convOut, const int32_T xCol, int32_T b_convOut, const int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel113(const
+  emxArray_real_T convOut, const int32_T xx, int32_T b_convOut, const int32_T
   convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T c_convOut)
 {
   uint64_T loopEnd;
@@ -2591,20 +1744,20 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel112(const
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(xCol) + 1UL) * (static_cast<uint64_T>
-    (b_convOut) + 1UL) - 1UL;
+  loopEnd = (static_cast<uint64_T>(xx) + 1UL) * (static_cast<uint64_T>(b_convOut)
+    + 1UL) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     int32_T ix;
-    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(xCol) + 1UL));
+    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(xx) + 1UL));
     iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) / (static_cast<
-      uint64_T>(xCol) + 1UL));
+      uint64_T>(xx) + 1UL));
     c_convOut.data[ix + convOut_dim0 * iv0] = convOut.data[ix + b_convOut_dim0 *
       iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel113(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel114(const
   emxArray_real_T convOut, int32_T ns, int32_T outridx, emxArray_real_T yc2)
 {
   uint64_T loopEnd;
@@ -2620,27 +1773,27 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel113(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel114(const
-  emxArray_real_T xCol, const int32_T outridx, int32_T b_xCol, const int32_T
-  xCol_dim0, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel115(const
+  emxArray_real_T xx, const int32_T outridx, int32_T b_xx, const int32_T xx_dim0,
+  emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_xCol);
+  loopEnd = static_cast<uint64_T>(b_xx);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    y.data[iv0] = 2.0 * xCol.data[outridx + xCol_dim0 * iv0];
+    y.data[iv0] = 2.0 * xx.data[outridx + xx_dim0 * iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel115(const
-  emxArray_real_T xCol, const emxArray_real_T y, const real_T nfact, const
-  int32_T outridx, const int32_T ns, const int32_T xt, int32_T vlen, const
-  int32_T xt_dim0, const int32_T xCol_dim0, emxArray_real_T b_xt)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel116(const
+  emxArray_real_T xx, const emxArray_real_T y, const real_T nfact, const int32_T
+  outridx, const int32_T ns, const int32_T xt, int32_T vlen, const int32_T
+  xt_dim0, const int32_T xx_dim0, emxArray_real_T b_xt)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2655,13 +1808,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel115(const
     i = static_cast<int32_T>(idx % (static_cast<uint64_T>(xt) + 1UL));
     m = static_cast<int32_T>((idx - static_cast<uint64_T>(i)) /
       (static_cast<uint64_T>(xt) + 1UL));
-    b_xt.data[i + xt_dim0 * m] = y.data[ns * m] - xCol.data[((xCol_dim0 - (
-      static_cast<int32_T>(-((0.0 - nfact) - -1.0)) + 1 != 1) * i) + xCol_dim0 *
+    b_xt.data[i + xt_dim0 * m] = y.data[ns * m] - xx.data[((xx_dim0 - (
+      static_cast<int32_T>(-((0.0 - nfact) - -1.0)) + 1 != 1) * i) + xx_dim0 *
       (outridx * m)) - 2];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel116(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel117(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -2677,7 +1830,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel116(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel117(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel118(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -2693,7 +1846,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel117(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel118(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel119(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -2709,7 +1862,24 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel118(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel119(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel12(const
+  emxArray_int32_T y, int32_T loop_ub, const int32_T coef_dim1, const int32_T
+  y_dim1, emxArray_int32_T rows)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    rows.data[((iv0 + coef_dim1) + y_dim1) - 1] = y.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel120(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -2725,23 +1895,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel119(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel12(int32_T
-  coef, emxArray_int32_T y)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    y.data[iv0] = iv0 + 2;
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel120
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel121
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -2753,7 +1907,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel120
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel121(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel122(int32_T
   idx, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -2769,7 +1923,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel121(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel122(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel123(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv9)
 {
   uint64_T loopEnd;
@@ -2795,7 +1949,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel122(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel123(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel124(const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv10)
 {
   uint64_T loopEnd;
@@ -2811,7 +1965,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel123(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel124(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel125(const
   emxArray_real_T xt, const emxArray_int32_T iv10, const emxArray_int32_T iv9,
   const int32_T b_xt, int32_T c_xt, const int32_T expanded_dim0, const int32_T
   xt_dim0, emxArray_real_T expanded)
@@ -2834,7 +1988,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel124(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel125(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel126(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   const int32_T idx, int32_T c, const int32_T b_dim0, const int32_T convOut_dim0,
   const int32_T expanded_dim0, emxArray_real_T convOut)
@@ -2871,7 +2025,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel125(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel126(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel127(const
   emxArray_real_T zfIIR, const emxArray_real_T convOut, const int32_T b_zfIIR,
   int32_T b_convOut, const int32_T convOut_dim0, const int32_T b_convOut_dim0,
   const int32_T zfIIR_dim0, emxArray_real_T c_convOut)
@@ -2894,7 +2048,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel126(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel127(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel128(const
   emxArray_real_T convOut, const int32_T b_convOut, int32_T c_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T d_convOut)
 {
@@ -2916,7 +2070,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel127(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel128(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel129(const
   emxArray_real_T zfIIR, const int32_T b_zfIIR, int32_T ns, const int32_T
   convOut_dim0, emxArray_real_T convOut)
 {
@@ -2937,7 +2091,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel128(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel129(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel13(int32_T
+  coef, emxArray_int32_T y)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    y.data[iv0] = iv0 + 2;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel130(const
   emxArray_real_T zfIIR, const int32_T b_zfIIR, int32_T ns, const int32_T
   convOut_dim0, const int32_T zfIIR_dim0, emxArray_real_T convOut)
 {
@@ -2958,23 +2128,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel129(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel13(int32_T
-  coef, emxArray_int32_T y)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    y.data[iv0] = iv0 + 2;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel130(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel131(const
   emxArray_real_T a, int32_T ns, const int32_T xt_dim0, const int32_T a_dim0,
   const int32_T convOut_dim0, emxArray_real_T convOut)
 {
@@ -3001,7 +2155,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel130(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel131(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel132(const
   emxArray_real_T convOut, const int32_T xt, int32_T b_convOut, const int32_T
   convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T c_convOut)
 {
@@ -3023,7 +2177,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel131(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel132(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel133(const
   emxArray_real_T convOut, int32_T ns, int32_T outridx, emxArray_real_T yc3)
 {
   uint64_T loopEnd;
@@ -3039,7 +2193,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel132(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel133(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel134(const
   emxArray_real_T yc3, const int32_T ns, const emxArray_real_T zi, const int32_T
   b_zi, int32_T loop_ub, const int32_T y_dim0, const int32_T yc3_dim0,
   emxArray_real_T y)
@@ -3061,7 +2215,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel133(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel134(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel135(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -3077,7 +2231,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel134(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel135(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel136(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -3093,7 +2247,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel135(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel136(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel137(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -3109,7 +2263,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel136(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel137(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel138(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -3125,7 +2279,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel137(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel138
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel139
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -3137,7 +2291,23 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel138
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel139(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel14(int32_T
+  coef, emxArray_int32_T y)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    y.data[iv0] = iv0 + 2;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel140(int32_T
   idx, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -3153,23 +2323,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel139(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel14(int32_T
-  loop_ub, emxArray_int32_T cols)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    cols.data[iv0] = 1;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel140(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel141(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv12)
 {
   uint64_T loopEnd;
@@ -3195,7 +2349,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel140(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel141(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel142(const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv13)
 {
   uint64_T loopEnd;
@@ -3211,7 +2365,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel141(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel142(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel143(const
   emxArray_real_T yc3, const emxArray_int32_T iv13, const emxArray_int32_T iv12,
   const int32_T b_yc3, int32_T c_yc3, const int32_T expanded_dim0, const int32_T
   yc3_dim0, emxArray_real_T expanded)
@@ -3234,7 +2388,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel142(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel143(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel144(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   const int32_T idx, int32_T c, const int32_T b_dim0, const int32_T convOut_dim0,
   const int32_T expanded_dim0, emxArray_real_T convOut)
@@ -3271,7 +2425,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel143(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel144(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel145(const
   emxArray_real_T y, const emxArray_real_T convOut, const int32_T b_y, int32_T
   b_convOut, const int32_T convOut_dim0, const int32_T b_convOut_dim0, const
   int32_T y_dim0, emxArray_real_T c_convOut)
@@ -3294,7 +2448,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel144(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel145(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel146(const
   emxArray_real_T convOut, const int32_T b_convOut, int32_T c_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T d_convOut)
 {
@@ -3316,7 +2470,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel145(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel146(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel147(const
   emxArray_real_T y, const int32_T b_y, int32_T ns, const int32_T convOut_dim0,
   emxArray_real_T convOut)
 {
@@ -3337,7 +2491,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel146(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel147(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel148(const
   emxArray_real_T y, const int32_T b_y, int32_T ns, const int32_T convOut_dim0,
   const int32_T y_dim0, emxArray_real_T convOut)
 {
@@ -3358,7 +2512,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel147(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel148(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel149(const
   emxArray_real_T a, int32_T ns, const int32_T yc3_dim0, const int32_T a_dim0,
   const int32_T convOut_dim0, emxArray_real_T convOut)
 {
@@ -3385,7 +2539,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel148(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel149(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel15(int32_T
+  loop_ub, emxArray_int32_T cols)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    cols.data[iv0] = 1;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel150(const
   emxArray_real_T convOut, const int32_T ns, const int32_T outridx, int32_T
   b_convOut, const int32_T zfIIR_dim0, const int32_T convOut_dim0,
   emxArray_real_T zfIIR)
@@ -3408,24 +2578,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel149(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel15(const
-  emxArray_int32_T y, const int32_T iv_dim1, int32_T loop_ub, emxArray_int32_T
-  cols)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    cols.data[iv0 + iv_dim1] = y.data[iv0];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel150(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel151(const
   emxArray_real_T convOut, const emxArray_real_T a, const int32_T b_a, int32_T
   ns, const int32_T a_dim0, const int32_T zfIIR_dim0, const int32_T yc3_dim0,
   const int32_T convOut_dim0, emxArray_real_T zfIIR)
@@ -3453,7 +2606,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel150(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel151(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel152(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -3469,7 +2622,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel151(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel152(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel153(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -3485,7 +2638,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel152(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel153(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel154(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -3501,7 +2654,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel153(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel154(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel155(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -3517,7 +2670,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel154(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel155
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel156
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -3529,7 +2682,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel155
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel156(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel157(int32_T
   idx, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -3545,7 +2698,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel156(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel157(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel158(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv14)
 {
   uint64_T loopEnd;
@@ -3571,7 +2724,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel157(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel158(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel159(const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv15)
 {
   uint64_T loopEnd;
@@ -3587,7 +2740,24 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel158(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel159(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel16(const
+  emxArray_int32_T y, const int32_T iv_dim1, int32_T loop_ub, emxArray_int32_T
+  cols)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    cols.data[iv0 + iv_dim1] = y.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel160(const
   emxArray_real_T yc2, const emxArray_int32_T iv15, const emxArray_int32_T iv14,
   const int32_T b_yc2, int32_T c_yc2, const int32_T expanded_dim0, const int32_T
   yc2_dim0, emxArray_real_T expanded)
@@ -3610,24 +2780,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel159(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel16(const
-  emxArray_int32_T y, const int32_T iv_dim1, int32_T loop_ub, const int32_T
-  y_dim1, emxArray_int32_T cols)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    cols.data[(iv0 + iv_dim1) + y_dim1] = y.data[iv0];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel160(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel161(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   const int32_T idx, int32_T c, const int32_T b_dim0, const int32_T convOut_dim0,
   const int32_T expanded_dim0, emxArray_real_T convOut)
@@ -3664,7 +2817,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel160(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel161(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel162(const
   emxArray_real_T zfIIR, const emxArray_real_T convOut, const int32_T b_zfIIR,
   int32_T b_convOut, const int32_T convOut_dim0, const int32_T b_convOut_dim0,
   const int32_T zfIIR_dim0, emxArray_real_T c_convOut)
@@ -3687,7 +2840,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel161(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel162(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel163(const
   emxArray_real_T convOut, const int32_T b_convOut, int32_T c_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T d_convOut)
 {
@@ -3709,7 +2862,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel162(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel163(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel164(const
   emxArray_real_T zfIIR, const int32_T b_zfIIR, int32_T ns, const int32_T
   convOut_dim0, emxArray_real_T convOut)
 {
@@ -3730,7 +2883,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel163(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel164(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel165(const
   emxArray_real_T zfIIR, const int32_T b_zfIIR, int32_T ns, const int32_T
   convOut_dim0, const int32_T zfIIR_dim0, emxArray_real_T convOut)
 {
@@ -3751,7 +2904,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel164(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel165(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel166(const
   emxArray_real_T a, int32_T ns, const int32_T yc2_dim0, const int32_T a_dim0,
   const int32_T convOut_dim0, emxArray_real_T convOut)
 {
@@ -3778,7 +2931,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel165(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel166(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel167(const
   emxArray_real_T convOut, const int32_T yc2, int32_T b_convOut, const int32_T
   convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T c_convOut)
 {
@@ -3800,7 +2953,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel166(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel167(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel168(const
   emxArray_real_T convOut, int32_T ns, int32_T outridx, emxArray_real_T yc5)
 {
   uint64_T loopEnd;
@@ -3816,9 +2969,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel167(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel168(const
-  emxArray_real_T yc5, const int32_T b_yc5, int32_T c_yc5, const int32_T
-  xCol_dim0, const int32_T yc5_dim0, emxArray_real_T xCol)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel169(const
+  emxArray_real_T yc5, const int32_T b_yc5, int32_T c_yc5, const int32_T xx_dim0,
+  const int32_T yc5_dim0, emxArray_real_T xx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -3833,12 +2986,29 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel168(const
     ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_yc5) + 1UL));
     iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) /
       (static_cast<uint64_T>(b_yc5) + 1UL));
-    xCol.data[ix + xCol_dim0 * iv0] = yc5.data[((yc5_dim0 - ix) + yc5_dim0 * iv0)
-      - 1];
+    xx.data[ix + xx_dim0 * iv0] = yc5.data[((yc5_dim0 - ix) + yc5_dim0 * iv0) -
+      1];
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel169(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel17(const
+  emxArray_int32_T y, const int32_T iv_dim1, int32_T loop_ub, const int32_T
+  y_dim1, emxArray_int32_T cols)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    cols.data[(iv0 + iv_dim1) + y_dim1] = y.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel170(const
   emxArray_real_T a2, real_T *a1, real_T *b_a1, real_T *c_a1, real_T *d_a1,
   real_T *e_a1)
 {
@@ -3855,35 +3025,23 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel169(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel17(const
-  emxArray_real_T a2, emxArray_int8_T vals)
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    vals.data[0] = static_cast<int8_T>(static_cast<int32_T>(a2.data[1]) + 1);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel170(const
-  real_T *d1, const emxArray_real_T xCol, const int32_T i, emxArray_real_T xt)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel171(const
+  real_T *d1, const emxArray_real_T xx, const int32_T *i, emxArray_real_T xt)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(i - 1);
+  loopEnd = static_cast<uint64_T>(*i - 1);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    xt.data[iv0] = -xCol.data[i - iv0] + *d1;
+    xt.data[iv0] = -xx.data[*i - iv0] + *d1;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel171(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel172(const
   real_T val, const emxArray_real_T zi, int32_T b_zi, emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -3899,7 +3057,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel171(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel172(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel173(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -3915,7 +3073,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel172(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel173(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel174(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -3931,7 +3089,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel173(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel174(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel175(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -3947,7 +3105,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel174(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel175(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel176(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -3963,7 +3121,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel175(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel176
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel177
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -3975,7 +3133,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel176
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel177(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel178(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -3991,7 +3149,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel177(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel178(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel179(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv)
 {
   uint64_T loopEnd;
@@ -4017,7 +3175,19 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel178(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel179(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel18(const
+  emxArray_real_T a2, emxArray_int8_T vals)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    vals.data[0] = static_cast<int8_T>(static_cast<int32_T>(a2.data[1]) + 1);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel180(const
   emxArray_real_T xt, const emxArray_int32_T iv, int32_T b_xt, emxArray_real_T
   expanded)
 {
@@ -4034,23 +3204,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel179(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel18(const
-  emxArray_real_T a2, const int32_T x, int32_T loop_ub, emxArray_int8_T vals)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    vals.data[iv0 + 1] = static_cast<int8_T>(a2.data[x + iv0]);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel180(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel181(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -4081,7 +3235,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel180(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel181(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel182(const
   emxArray_real_T y, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -4097,7 +3251,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel181(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel182(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel183(const
   emxArray_real_T y, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -4109,7 +3263,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel182(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel183(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel184(const
   emxArray_real_T convOut, const int32_T ns, int32_T outridx, emxArray_real_T
   zfIIR)
 {
@@ -4126,7 +3280,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel183(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel184(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel185(const
   emxArray_real_T convOut, const emxArray_real_T a, int32_T ns, const int32_T
   a_dim0, const int32_T xt_dim0, emxArray_real_T zfIIR)
 {
@@ -4148,7 +3302,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel184(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel185(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel186(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4164,7 +3318,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel185(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel186(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel187(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4180,7 +3334,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel186(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel187(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel188(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4196,7 +3350,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel187(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel188(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel189(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4212,7 +3366,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel188(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel189
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel19(const
+  emxArray_real_T a2, const int32_T x, int32_T loop_ub, emxArray_int8_T vals)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    vals.data[iv0 + 1] = static_cast<int8_T>(a2.data[x + iv0]);
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel190
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -4224,23 +3394,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel189
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel19(const
-  int32_T x, const int32_T ns, int32_T loop_ub, emxArray_int8_T vals)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    vals.data[((iv0 + ns) - x) + 2] = 1;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel190(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel191(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -4256,7 +3410,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel190(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel191(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel192(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv7)
 {
   uint64_T loopEnd;
@@ -4282,24 +3436,24 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel191(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel192(const
-  emxArray_real_T xCol, const emxArray_int32_T iv7, int32_T b_xCol,
-  emxArray_real_T expanded)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel193(const
+  emxArray_real_T xx, const emxArray_int32_T iv7, int32_T b_xx, emxArray_real_T
+  expanded)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_xCol);
+  loopEnd = static_cast<uint64_T>(b_xx);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    expanded.data[iv7.data[iv0]] = xCol.data[iv0];
+    expanded.data[iv7.data[iv0]] = xx.data[iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel193(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel194(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -4330,7 +3484,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel193(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel194(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel195(const
   emxArray_real_T zfIIR, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -4346,7 +3500,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel194(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel195(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel196(const
   emxArray_real_T zfIIR, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -4358,7 +3512,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel195(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel196(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel197(const
   emxArray_real_T convOut, const int32_T ns, int32_T outridx, emxArray_real_T
   zfIIR)
 {
@@ -4375,9 +3529,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel196(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel197(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel198(const
   emxArray_real_T convOut, const emxArray_real_T a, int32_T ns, const int32_T
-  a_dim0, const int32_T xCol_dim0, emxArray_real_T zfIIR)
+  a_dim0, const int32_T xx_dim0, emxArray_real_T zfIIR)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -4392,13 +3546,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel197(const
     bcoef = static_cast<int32_T>(fmin(static_cast<real_T>(i) + 2.0, static_cast<
       real_T>(a_dim0))) - 2;
     for (int32_T iv0{0}; iv0 <= bcoef; iv0++) {
-      zfIIR.data[i + 1] += convOut.data[(xCol_dim0 + i) - iv0] * a.data[iv0 + 1];
+      zfIIR.data[i + 1] += convOut.data[(xx_dim0 + i) - iv0] * a.data[iv0 + 1];
     }
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel198(const
-  real_T *d1, const emxArray_real_T xCol, const int32_T outridx, real_T d,
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel199(const
+  real_T *d1, const emxArray_real_T xx, const int32_T outridx, real_T d,
   emxArray_real_T xt)
 {
   uint64_T loopEnd;
@@ -4410,11 +3564,39 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel198(const
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    xt.data[iv0] = -xCol.data[(outridx - iv0) - 1] + *d1;
+    xt.data[iv0] = -xx.data[(outridx - iv0) - 1] + *d1;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel199(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel2(const
+  int32_T xx_dim0, const int32_T xx_dim1, int32_T *i)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    *i = xx_dim0 * xx_dim1;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel20(const
+  int32_T x, const int32_T ns, int32_T loop_ub, emxArray_int8_T vals)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    vals.data[((iv0 + ns) - x) + 2] = 1;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel200(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4430,45 +3612,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel199(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel2(const
-  emxArray_real_T x, const int32_T b_x, int32_T c_x, const int32_T xCol_dim0,
-  const int32_T x_dim0, emxArray_real_T xCol)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(b_x) + 1UL) * (static_cast<uint64_T>(c_x) +
-    1UL) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    int32_T ix;
-    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_x) + 1UL));
-    iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) / (static_cast<
-      uint64_T>(b_x) + 1UL));
-    xCol.data[ix + xCol_dim0 * iv0] = x.data[iv0 + x_dim0 * ix];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel20(const
-  int32_T iv_dim1, const int32_T x, const int32_T ns, int32_T loop_ub,
-  emxArray_int8_T vals)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    vals.data[(((iv0 + ns) - x) + iv_dim1) + 2] = -1;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel200(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel201(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4484,7 +3628,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel200(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel201(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel202(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4500,7 +3644,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel201(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel202(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel203(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4516,7 +3660,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel202(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel203
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel204
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -4528,7 +3672,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel203
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel204(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel205(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -4544,7 +3688,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel204(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel205(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel206(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv11)
 {
   uint64_T loopEnd;
@@ -4570,7 +3714,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel205(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel206(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel207(const
   emxArray_real_T xt, const emxArray_int32_T iv11, int32_T b_xt, emxArray_real_T
   expanded)
 {
@@ -4587,7 +3731,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel206(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel207(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel208(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -4618,7 +3762,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel207(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel208(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel209(const
   emxArray_real_T zfIIR, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -4634,7 +3778,24 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel208(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel209(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel21(const
+  int32_T iv_dim1, const int32_T x, const int32_T ns, int32_T loop_ub,
+  emxArray_int8_T vals)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    vals.data[(((iv0 + ns) - x) + iv_dim1) + 2] = -1;
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel210(const
   emxArray_real_T zfIIR, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -4646,24 +3807,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel209(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel21(const
-  emxArray_real_T a2, const real_T val, const emxArray_real_T b2, int32_T coef,
-  emxArray_real_T rhs)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    rhs.data[iv0] = b2.data[iv0 + 1] - val * a2.data[iv0 + 1];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel210(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel211(const
   real_T val, const emxArray_real_T zi, int32_T b_zi, emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -4679,7 +3823,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel210(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel211(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel212(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4695,7 +3839,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel211(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel212(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel213(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4711,7 +3855,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel212(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel213(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel214(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4727,7 +3871,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel213(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel214(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel215(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4743,7 +3887,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel214(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel215
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel216
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -4755,7 +3899,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel215
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel216(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel217(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -4771,7 +3915,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel216(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel217(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel218(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv16)
 {
   uint64_T loopEnd;
@@ -4797,7 +3941,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel217(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel218(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel219(const
   emxArray_real_T convOut, const int32_T k, const emxArray_int32_T iv16, int32_T
   outridx, emxArray_real_T expanded)
 {
@@ -4814,7 +3958,24 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel218(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel219(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel22(const
+  emxArray_real_T a2, const real_T val, const emxArray_real_T b2, int32_T coef,
+  emxArray_real_T rhs)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    rhs.data[iv0] = b2.data[iv0 + 1] - val * a2.data[iv0 + 1];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel220(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -4845,23 +4006,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel219(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel22(const
-  emxArray_int32_T rows, int32_T ns, emxArray_int32_T ridxInt)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(ns);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T m;
-    m = static_cast<int32_T>(idx);
-    ridxInt.data[m] = rows.data[m];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel220(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel221(const
   emxArray_real_T y, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -4877,7 +4022,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel220(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel221(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel222(const
   emxArray_real_T y, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -4889,7 +4034,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel221(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel222(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel223(const
   emxArray_real_T convOut, const int32_T ns, int32_T outridx, emxArray_real_T
   zfIIR)
 {
@@ -4906,7 +4051,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel222(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel223(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel224(const
   emxArray_real_T convOut, const emxArray_real_T a, int32_T ns, const int32_T
   a_dim0, const int32_T xt_dim0, emxArray_real_T zfIIR)
 {
@@ -4928,7 +4073,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel223(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel224(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel225(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4944,7 +4089,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel224(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel225(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel226(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4960,7 +4105,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel225(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel226(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel227(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -4976,7 +4121,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel226(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel227(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel228(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -4992,7 +4137,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel227(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel228
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel229
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -5004,7 +4149,23 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel228
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel229(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel23(const
+  emxArray_int32_T rows, int32_T ns, emxArray_int32_T ridxInt)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(ns);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T m;
+    m = static_cast<int32_T>(idx);
+    ridxInt.data[m] = rows.data[m];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel230(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -5020,23 +4181,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel229(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel23(const
-  emxArray_int32_T cols, int32_T ns, emxArray_int32_T cidxInt)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(ns);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T m;
-    m = static_cast<int32_T>(idx);
-    cidxInt.data[m] = cols.data[m];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel230(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel231(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv17)
 {
   uint64_T loopEnd;
@@ -5062,24 +4207,24 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel230(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel231(const
-  emxArray_real_T convOut, const emxArray_int32_T iv17, int32_T xCol, const
-  int32_T xCol_dim0, emxArray_real_T expanded)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel232(const
+  emxArray_real_T convOut, const emxArray_int32_T iv17, int32_T xx, const
+  int32_T xx_dim0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(xCol);
+  loopEnd = static_cast<uint64_T>(xx);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    expanded.data[iv17.data[iv0]] = convOut.data[(xCol_dim0 - iv0) - 1];
+    expanded.data[iv17.data[iv0]] = convOut.data[(xx_dim0 - iv0) - 1];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel232(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel233(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -5110,7 +4255,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel232(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel233(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel234(const
   emxArray_real_T zfIIR, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -5126,7 +4271,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel233(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel234(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel235(const
   emxArray_real_T zfIIR, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -5138,7 +4283,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel234(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel235(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel236(const
   emxArray_real_T convOut, const int32_T outridx, emxArray_real_T b_convOut)
 {
   uint64_T loopEnd;
@@ -5154,8 +4299,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel235(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel236(const
-  emxArray_real_T convOut, int32_T ns, emxArray_real_T xCol)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel237(const
+  emxArray_real_T convOut, int32_T ns, emxArray_real_T xx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -5166,11 +4311,11 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel236(const
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    xCol.data[iv0] = convOut.data[iv0];
+    xx.data[iv0] = convOut.data[iv0];
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel237(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel238(const
   emxArray_real_T a2, real_T *a1, real_T *b_a1)
 {
   uint64_T threadId;
@@ -5183,20 +4328,36 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel237(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel238(const
-  emxArray_real_T xCol, real_T *d1)
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel239(const
+  emxArray_real_T xx, real_T *d1)
 {
   uint64_T threadId;
   int32_T tmpIdx;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   tmpIdx = static_cast<int32_T>(threadId);
   if (tmpIdx < 1) {
-    *d1 = 2.0 * xCol.data[0];
+    *d1 = 2.0 * xx.data[0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel239(const
-  emxArray_real_T xCol, const int32_T i, const real_T *d1, int32_T loop_ub,
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel24(const
+  emxArray_int32_T cols, int32_T ns, emxArray_int32_T cidxInt)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(ns);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T m;
+    m = static_cast<int32_T>(idx);
+    cidxInt.data[m] = cols.data[m];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel240(const
+  emxArray_real_T xx, const int32_T *i, const real_T *d1, int32_T loop_ub,
   emxArray_real_T ytemp)
 {
   uint64_T loopEnd;
@@ -5208,27 +4369,11 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel239(const
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    ytemp.data[iv0] = *d1 - xCol.data[i - iv0];
+    ytemp.data[iv0] = *d1 - xx.data[*i - iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel24(int32_T
-  nc, emxArray_int32_T sortedIndices)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(nc);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T m;
-    m = static_cast<int32_T>(idx);
-    sortedIndices.data[m] = m + 1;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel240(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel241(const
   real_T val, const emxArray_real_T zi, int32_T b_zi, emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -5244,7 +4389,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel240(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel241(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel242(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -5260,7 +4405,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel241(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel242(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel243(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -5276,7 +4421,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel242(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel243(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel244(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -5292,7 +4437,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel243(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel244(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel245(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -5308,7 +4453,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel244(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel245
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel246
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -5320,7 +4465,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel245
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel246(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel247(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -5336,7 +4481,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel246(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel247(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel248(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv1)
 {
   uint64_T loopEnd;
@@ -5362,7 +4507,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel247(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel248(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel249(const
   emxArray_real_T ytemp, const emxArray_int32_T iv1, int32_T b_ytemp,
   emxArray_real_T expanded)
 {
@@ -5379,7 +4524,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel248(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel249(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel25(int32_T
+  nc, emxArray_int32_T sortedIndices)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(nc);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T m;
+    m = static_cast<int32_T>(idx);
+    sortedIndices.data[m] = m + 1;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel250(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -5410,23 +4571,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel249(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel25(const
-  emxArray_int32_T cidxInt, int32_T b_cidxInt, emxArray_int32_T t)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_cidxInt);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    t.data[iv0] = cidxInt.data[iv0];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel250(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel251(const
   emxArray_real_T y, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -5442,7 +4587,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel250(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel251(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel252(const
   emxArray_real_T y, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -5454,7 +4599,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel251(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel252(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel253(const
   emxArray_real_T convOut, int32_T ytemp, emxArray_real_T dv3)
 {
   uint64_T loopEnd;
@@ -5470,7 +4615,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel252(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel253(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel254(const
   emxArray_real_T convOut, const int32_T k, emxArray_real_T ytemp)
 {
   uint64_T loopEnd;
@@ -5486,7 +4631,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel253(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel254(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel255(const
   real_T val, const emxArray_real_T zi, int32_T b_zi, emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -5502,7 +4647,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel254(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel255(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel256(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -5518,7 +4663,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel255(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel256(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel257(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -5534,7 +4679,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel256(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel257(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel258(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -5550,7 +4695,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel257(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel258(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel259(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -5566,7 +4711,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel258(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel259
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel26(const
+  emxArray_int32_T cidxInt, int32_T b_cidxInt, emxArray_int32_T t)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_cidxInt);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    t.data[iv0] = cidxInt.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel260
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -5578,24 +4739,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel259
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel26(const
-  emxArray_int32_T t, const emxArray_int32_T sortedIndices, int32_T ns,
-  emxArray_int32_T cidxInt)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(ns);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T m;
-    m = static_cast<int32_T>(idx);
-    cidxInt.data[m] = t.data[sortedIndices.data[m] - 1];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel260(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel261(int32_T
   idx, uint32_T window_idx_0, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -5611,7 +4755,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel260(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel261(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel262(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv6)
 {
   uint64_T loopEnd;
@@ -5637,7 +4781,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel261(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel262(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel263(const
   emxArray_real_T convOut, const int32_T k, const emxArray_int32_T iv6, int32_T
   outridx, emxArray_real_T expanded)
 {
@@ -5654,7 +4798,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel262(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel263(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel264(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   int32_T idx, const int32_T b_dim0, emxArray_real_T convOut)
 {
@@ -5685,7 +4829,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel263(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel264(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel265(const
   emxArray_real_T y, int32_T ns, emxArray_real_T convOut)
 {
   uint64_T loopEnd;
@@ -5701,7 +4845,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel264(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel265(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel266(const
   emxArray_real_T y, emxArray_real_T convOut)
 {
   uint64_T threadId;
@@ -5713,9 +4857,9 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel265(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel266(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel267(const
   emxArray_real_T convOut, const int32_T outridx, const int32_T ns, int32_T vlen,
-  emxArray_real_T xCol)
+  emxArray_real_T xx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -5726,53 +4870,65 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel266(const
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    xCol.data[iv0] = convOut.data[(ns + outridx * iv0) - 1];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel267(const
-  emxArray_real_T xCol, const int32_T b_xCol, int32_T c_xCol, const int32_T
-  x_dim0, const int32_T xCol_dim0, emxArray_real_T x)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(b_xCol) + 1UL) * (static_cast<uint64_T>
-    (c_xCol) + 1UL) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    int32_T ix;
-    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_xCol) + 1UL));
-    iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) / (static_cast<
-      uint64_T>(b_xCol) + 1UL));
-    x.data[ix + x_dim0 * iv0] = xCol.data[ix + xCol_dim0 * iv0];
+    xx.data[iv0] = convOut.data[(ns + outridx * iv0) - 1];
   }
 }
 
 static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel268(const
-  emxArray_real_T xCol, const int32_T b_xCol, int32_T c_xCol, const int32_T
-  x_dim0, const int32_T xCol_dim0, emxArray_real_T x)
+  emxArray_real_T xx, const int32_T b_xx, int32_T c_xx, const int32_T xx_dim0,
+  const int32_T b_xx_dim0, emxArray_real_T d_xx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(b_xCol) + 1UL) * (static_cast<uint64_T>
-    (c_xCol) + 1UL) - 1UL;
+  loopEnd = (static_cast<uint64_T>(b_xx) + 1UL) * (static_cast<uint64_T>(c_xx) +
+    1UL) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     int32_T ix;
-    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_xCol) + 1UL));
+    ix = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_xx) + 1UL));
     iv0 = static_cast<int32_T>((idx - static_cast<uint64_T>(ix)) /
-      (static_cast<uint64_T>(b_xCol) + 1UL));
-    x.data[ix + x_dim0 * iv0] = xCol.data[iv0 + xCol_dim0 * ix];
+      (static_cast<uint64_T>(b_xx) + 1UL));
+    d_xx.data[ix + xx_dim0 * iv0] = xx.data[iv0 + b_xx_dim0 * ix];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel269(const
+  emxArray_real_T xx, int32_T b_xx, emxArray_real_T c_xx)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_xx);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    c_xx.data[iv0] = xx.data[iv0];
   }
 }
 
 static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel27(const
+  emxArray_int32_T t, const emxArray_int32_T sortedIndices, int32_T ns,
+  emxArray_int32_T cidxInt)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(ns);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T m;
+    m = static_cast<int32_T>(idx);
+    cidxInt.data[m] = t.data[sortedIndices.data[m] - 1];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel28(const
   emxArray_int32_T ridxInt, int32_T b_ridxInt, emxArray_int32_T t)
 {
   uint64_T loopEnd;
@@ -5788,7 +4944,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel27(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel28(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel29(const
   emxArray_int32_T t, const emxArray_int32_T sortedIndices, int32_T ns,
   emxArray_int32_T ridxInt)
 {
@@ -5805,7 +4961,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel28(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel29(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel3(const
+  emxArray_real_T x, const int32_T b_x, const int32_T x_dim0, emxArray_real_T xx)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_x);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_x) + 1UL));
+    xx.data[iv0] = x.data[x_dim0 * iv0];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel30(int32_T
   cols, emxArray_int32_T y_rowidx, emxArray_real_T y_d)
 {
   uint64_T loopEnd;
@@ -5822,23 +4994,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel29(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel3(const
-  emxArray_real_T coef, int32_T b_coef, emxArray_real_T b)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    b.data[iv0] = coef.data[iv0];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel30(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel31(const
   emxArray_int8_T vals, const emxArray_int32_T sortedIndices, int32_T nc,
   emxArray_real_T y_d)
 {
@@ -5855,7 +5011,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel30(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel31(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel32(int32_T
   ns, emxArray_int32_T y_rowidx, emxArray_real_T y_d)
 {
   uint64_T loopEnd;
@@ -5872,7 +5028,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel31(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel32(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel33(int32_T
   thism, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -5888,7 +5044,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel32(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel33(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel34(int32_T
   nc, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -5904,7 +5060,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel33(int32_T
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel34(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel35(const
   int32_T y_colidx_dim0, emxArray_int32_T y_colidx)
 {
   uint64_T threadId;
@@ -5916,7 +5072,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel34(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel35(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel36(int32_T
   ns, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -5932,7 +5088,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel35(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel36(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel37(int32_T
   thism, emxArray_int32_T counts)
 {
   uint64_T loopEnd;
@@ -5948,7 +5104,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel36(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel37(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel38(const
   emxArray_real_T rhs, int32_T nc, emxArray_real_T outBuff)
 {
   uint64_T loopEnd;
@@ -5964,15 +5120,15 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel37(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel38(const
-  emxArray_real_T outBuff, int32_T i, emxArray_real_T zi)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel39(const
+  emxArray_real_T outBuff, int32_T *i, emxArray_real_T zi)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(i);
+  loopEnd = static_cast<uint64_T>(*i);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
@@ -5980,7 +5136,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel38(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel39(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel4(const
+  emxArray_real_T coef, int32_T b_coef, emxArray_real_T b)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    b.data[iv0] = coef.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel40(int32_T
   ns, emxArray_int32_T y_rowidx, emxArray_real_T y_d)
 {
   uint64_T loopEnd;
@@ -5997,23 +5169,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel39(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel4(const
-  emxArray_real_T coef, int32_T b_coef, emxArray_real_T b2)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    b2.data[iv0] = coef.data[iv0];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel40(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel41(int32_T
   thism, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -6029,7 +5185,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel40(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel41(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel42(int32_T
   nc, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -6045,7 +5201,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel41(int32_T
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel42(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel43(const
   int32_T y_colidx_dim0, emxArray_int32_T y_colidx)
 {
   uint64_T threadId;
@@ -6057,7 +5213,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel42(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel43(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel44(int32_T
   ns, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -6073,7 +5229,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel43(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel44(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel45(int32_T
   thism, emxArray_int32_T counts)
 {
   uint64_T loopEnd;
@@ -6089,7 +5245,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel44(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel45(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel46(const
   emxArray_real_T rhs, int32_T b_rhs, emxArray_real_T zi)
 {
   uint64_T loopEnd;
@@ -6105,7 +5261,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel45(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel46(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel47(int32_T
   ns, emxArray_int32_T y_rowidx, emxArray_real_T y_d)
 {
   uint64_T loopEnd;
@@ -6122,7 +5278,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel46(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel47(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel48(int32_T
   thism, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -6138,7 +5294,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel47(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel48(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel49(int32_T
   nc, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -6154,7 +5310,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel48(int32_T
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel49(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel5(const
+  emxArray_real_T coef, int32_T b_coef, emxArray_real_T b2)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    b2.data[iv0] = coef.data[iv0];
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel50(const
   int32_T y_colidx_dim0, emxArray_int32_T y_colidx)
 {
   uint64_T threadId;
@@ -6166,19 +5338,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel49(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel5
-  (emxArray_real_T a2)
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    a2.data[0] = 1.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel50(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel51(int32_T
   ns, emxArray_int32_T y_colidx)
 {
   uint64_T loopEnd;
@@ -6194,7 +5354,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel50(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel51(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel52(int32_T
   thism, emxArray_int32_T counts)
 {
   uint64_T loopEnd;
@@ -6210,7 +5370,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel51(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel52(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel53(const
   emxArray_real_T rhs, int32_T nc, emxArray_real_T outBuff)
 {
   uint64_T loopEnd;
@@ -6226,15 +5386,15 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel52(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel53(const
-  emxArray_real_T outBuff, int32_T i, emxArray_real_T zi)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel54(const
+  emxArray_real_T outBuff, int32_T *i, emxArray_real_T zi)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(i);
+  loopEnd = static_cast<uint64_T>(*i);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
@@ -6242,7 +5402,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel53(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel54(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel55(const
   emxArray_real_T coef, emxArray_real_T b)
 {
   uint64_T threadId;
@@ -6254,7 +5414,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel54(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel55(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel56(const
   emxArray_real_T b, int32_T b_b, emxArray_real_T b1)
 {
   uint64_T loopEnd;
@@ -6270,7 +5430,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel55(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel56(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel57(const
   emxArray_real_T b, emxArray_real_T b1)
 {
   uint64_T threadId;
@@ -6282,7 +5442,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel56(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel57(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel58(const
   emxArray_real_T b1, int32_T nc, emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -6298,7 +5458,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel57(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel58(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel59(const
   int32_T vlen, const emxArray_real_T y, const int32_T nc, const int32_T ns,
   emxArray_real_T maxCoefNum)
 {
@@ -6333,7 +5493,19 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel58(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel59(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel6
+  (emxArray_real_T a2)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    a2.data[0] = 1.0;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel60(const
   emxArray_real_T maxCoefNum, int32_T b_maxCoefNum, emxArray_boolean_T x)
 {
   uint64_T loopEnd;
@@ -6349,31 +5521,15 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel59(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel6(int32_T
-  loop_ub, emxArray_real_T a2)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel61(const
+  real_T val, int32_T *i, emxArray_real_T b1)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    a2.data[iv0 + 1] = 0.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel60(const
-  real_T val, int32_T i, emxArray_real_T b1)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(i - 1);
+  loopEnd = static_cast<uint64_T>(*i - 1);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
@@ -6381,7 +5537,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel60(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel61(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel62(const
   emxArray_real_T b1, int32_T b_b1, emxArray_boolean_T x)
 {
   uint64_T loopEnd;
@@ -6397,7 +5553,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel61(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel62(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel63(const
   emxArray_int32_T ii, int32_T b_ii, emxArray_uint32_T nZeroLastDen)
 {
   uint64_T loopEnd;
@@ -6411,7 +5567,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel62(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel63(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel64(const
   emxArray_real_T b, real_T a0[3])
 {
   uint64_T threadId;
@@ -6423,7 +5579,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel63(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel64(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel65(const
   emxArray_real_T b, const real_T a0[3], emxArray_real_T b2, emxArray_real_T a2)
 {
   uint64_T threadId;
@@ -6436,7 +5592,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel64(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel65(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel66(const
   emxArray_real_T a2, const real_T val, const emxArray_real_T b2, real_T rhs[2])
 {
   uint64_T threadId;
@@ -6448,7 +5604,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel65(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel66(int8_T b_I
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel67(int8_T b_I
   [4])
 {
   uint64_T threadId;
@@ -6460,7 +5616,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel66(int8_T b_I
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel67(int8_T b_I
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel68(int8_T b_I
   [4])
 {
   uint64_T threadId;
@@ -6473,7 +5629,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel67(int8_T b_I
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel68(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel69(const
   emxArray_real_T a2, const int8_T b_I[4], real_T A[4])
 {
   uint64_T threadId;
@@ -6486,7 +5642,23 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel68(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel69(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel7(int32_T
+  loop_ub, emxArray_real_T a2)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(loop_ub);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    a2.data[iv0 + 1] = 0.0;
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel70(const
   real_T A[4], const real_T val, const int32_T ns, const real_T rhs[2], const
   int32_T nc, real_T Y[2])
 {
@@ -6499,23 +5671,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel69(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel7(int32_T
-  coef, emxArray_int32_T y)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    y.data[iv0] = iv0 + 2;
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel70(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel71(const
   real_T A[4], const real_T rhs[2], const int32_T ns, real_T Y[2])
 {
   uint64_T threadId;
@@ -6527,7 +5683,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel70(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel71(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel72(const
   real_T Y[2], emxArray_real_T zi)
 {
   uint64_T threadId;
@@ -6539,7 +5695,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel71(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel72(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel73(const
   emxArray_real_T a2, real_T *a1, real_T *b_a1, real_T *c_a1, real_T *d_a1,
   real_T *e_a1)
 {
@@ -6556,27 +5712,26 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel72(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel73(const
-  emxArray_real_T xCol, int32_T b_xCol, const int32_T xCol_dim0, emxArray_real_T
-  y)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel74(const
+  emxArray_real_T xx, int32_T b_xx, const int32_T xx_dim0, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_xCol);
+  loopEnd = static_cast<uint64_T>(b_xx);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T iv0;
     iv0 = static_cast<int32_T>(idx);
-    y.data[iv0] = 2.0 * xCol.data[xCol_dim0 * iv0];
+    y.data[iv0] = 2.0 * xx.data[xx_dim0 * iv0];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel74(const
-  emxArray_real_T xCol, const emxArray_real_T y, const real_T nfact, const
-  int32_T outridx, const int32_T ns, const int32_T xt, int32_T vlen, const
-  int32_T xt_dim0, const int32_T xCol_dim0, emxArray_real_T b_xt)
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel75(const
+  emxArray_real_T xx, const emxArray_real_T y, const real_T nfact, const int32_T
+  outridx, const int32_T ns, const int32_T xt, int32_T vlen, const int32_T
+  xt_dim0, const int32_T xx_dim0, emxArray_real_T b_xt)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -6591,13 +5746,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel74(const
     i = static_cast<int32_T>(idx % (static_cast<uint64_T>(xt) + 1UL));
     m = static_cast<int32_T>((idx - static_cast<uint64_T>(i)) /
       (static_cast<uint64_T>(xt) + 1UL));
-    b_xt.data[i + xt_dim0 * m] = y.data[ns * m] - xCol.data
-      [((static_cast<int32_T>(nfact + 1.0) - (static_cast<int32_T>(nfact + 1.0)
-          - 1 != 1) * i) + xCol_dim0 * (outridx * m)) - 1];
+    b_xt.data[i + xt_dim0 * m] = y.data[ns * m] - xx.data[((static_cast<int32_T>
+      (nfact + 1.0) - (static_cast<int32_T>(nfact + 1.0) - 1 != 1) * i) +
+      xx_dim0 * (outridx * m)) - 1];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel75(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel76(const
   emxArray_real_T xt, const emxArray_real_T zi, const int32_T b_zi, int32_T
   loop_ub, const int32_T y_dim0, const int32_T xt_dim0, emxArray_real_T y)
 {
@@ -6618,7 +5773,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel75(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel76(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel77(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -6634,7 +5789,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel76(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel77(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel78(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -6650,7 +5805,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel77(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel78(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel79(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -6666,7 +5821,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel78(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel79(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel8(int32_T
+  coef, emxArray_int32_T y)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    y.data[iv0] = iv0 + 2;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel80(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -6682,23 +5853,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel79(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel8(int32_T
-  coef, emxArray_int32_T y)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(coef);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    y.data[iv0] = iv0 + 1;
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel80
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel81
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -6710,7 +5865,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel80
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel81(const
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel82(const
   int32_T b_dim0, uint32_T zfSize[2])
 {
   uint64_T threadId;
@@ -6722,7 +5877,7 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel81(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel82(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel83(int32_T
   idx, emxArray_real_T expanded)
 {
   uint64_T loopEnd;
@@ -6738,7 +5893,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel82(int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel83(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel84(const
   int32_T nc, const emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv2)
 {
   uint64_T loopEnd;
@@ -6764,7 +5919,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel83(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel84(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel85(const
   emxArray_int32_T y, int32_T b_y, emxArray_int32_T iv3)
 {
   uint64_T loopEnd;
@@ -6780,7 +5935,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel84(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel85(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel86(const
   emxArray_real_T xt, const emxArray_int32_T iv3, const emxArray_int32_T iv2,
   const int32_T b_xt, int32_T c_xt, const int32_T expanded_dim0, const int32_T
   xt_dim0, emxArray_real_T expanded)
@@ -6803,7 +5958,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel85(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel86(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel87(const
   emxArray_real_T expanded, const emxArray_int32_T rows, const emxArray_real_T b,
   const int32_T idx, int32_T c, const int32_T b_dim0, const int32_T convOut_dim0,
   const int32_T expanded_dim0, emxArray_real_T convOut)
@@ -6840,7 +5995,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel86(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel87(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel88(const
   emxArray_real_T y, const emxArray_real_T convOut, const int32_T b_y, int32_T
   b_convOut, const int32_T convOut_dim0, const int32_T b_convOut_dim0, const
   int32_T y_dim0, emxArray_real_T c_convOut)
@@ -6863,7 +6018,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel87(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel88(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel89(const
   emxArray_real_T convOut, const int32_T b_convOut, int32_T c_convOut, const
   int32_T convOut_dim0, const int32_T b_convOut_dim0, emxArray_real_T d_convOut)
 {
@@ -6885,7 +6040,23 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel88(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel89(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel9(int32_T
+  coef, emxArray_int32_T y)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(coef);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T iv0;
+    iv0 = static_cast<int32_T>(idx);
+    y.data[iv0] = iv0 + 1;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel90(const
   emxArray_real_T y, const int32_T b_y, int32_T ns, const int32_T convOut_dim0,
   emxArray_real_T convOut)
 {
@@ -6906,23 +6077,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel89(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel9(int32_T
-  loop_ub, emxArray_int32_T rows)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(loop_ub);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T iv0;
-    iv0 = static_cast<int32_T>(idx);
-    rows.data[iv0] = iv0 + 1;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel90(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel91(const
   emxArray_real_T y, const int32_T b_y, int32_T ns, const int32_T convOut_dim0,
   const int32_T y_dim0, emxArray_real_T convOut)
 {
@@ -6943,7 +6098,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel90(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel91(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel92(const
   emxArray_real_T a, int32_T ns, const int32_T xt_dim0, const int32_T a_dim0,
   const int32_T convOut_dim0, emxArray_real_T convOut)
 {
@@ -6970,7 +6125,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel91(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel92(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel93(const
   emxArray_real_T convOut, const int32_T ns, const int32_T outridx, int32_T
   b_convOut, const int32_T zfIIR_dim0, const int32_T convOut_dim0,
   emxArray_real_T zfIIR)
@@ -6993,7 +6148,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel92(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel93(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel94(const
   emxArray_real_T convOut, const emxArray_real_T a, const int32_T b_a, int32_T
   ns, const int32_T a_dim0, const int32_T zfIIR_dim0, const int32_T xt_dim0,
   const int32_T convOut_dim0, emxArray_real_T zfIIR)
@@ -7021,7 +6176,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel93(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel94(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel95(const
   emxArray_real_T b2, int32_T b_b2, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -7037,7 +6192,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel94(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel95(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel96(const
   emxArray_real_T a2, int32_T b_a2, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -7053,7 +6208,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel95(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel96(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel97(const
   real_T *a1, int32_T nb, emxArray_real_T b)
 {
   uint64_T loopEnd;
@@ -7069,7 +6224,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel96(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel97(const
+static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel98(const
   real_T *a1, int32_T na, emxArray_real_T a)
 {
   uint64_T loopEnd;
@@ -7085,7 +6240,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_filtfilt_kernel97(const
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel98
+static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel99
   (emxArray_real_T a)
 {
   uint64_T threadId;
@@ -7095,23 +6250,6 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel98
   if (tmpIdx < 1) {
     a.data[0] = 1.0;
   }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel99(const
-  int32_T b_dim0, uint32_T zfSize[2])
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    zfSize[0] = static_cast<uint32_T>(b_dim0 - 1);
-  }
-}
-
-static void ec_filtfilt_once()
-{
-  mwMemoryManagerInit(256U, 1U, 8U, 2048U);
 }
 
 static void emlrt_marshallIn(const mxArray *a__output_of_sprintf_, const char_T *
@@ -7130,628 +6268,6 @@ static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
 {
   b_emlrt_marshallIn(emlrtAlias(u), parentId, y);
   emlrtDestroyArray(&u);
-}
-
-static void emlrt_marshallIn(const mxArray *x, const char_T *identifier,
-  emxArray_real_T *y)
-{
-  emlrtMsgIdentifier thisId;
-  thisId.fIdentifier = const_cast<const char_T *>(identifier);
-  thisId.fParent = nullptr;
-  thisId.bParentIsCell = false;
-  emlrt_marshallIn(emlrtAlias(x), &thisId, y);
-  emlrtDestroyArray(&x);
-}
-
-static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
-  *parentId, emxArray_real_T *y)
-{
-  c_emlrt_marshallIn(emlrtAlias(u), parentId, y);
-  emlrtDestroyArray(&u);
-}
-
-static void emlrt_marshallOut(const emxArray_real_T *u, const mxArray *y)
-{
-  emlrtMxSetData((mxArray *)y, &u->data[0]);
-  emlrtSetDimensions((mxArray *)y, &u->size[0], 2);
-}
-
-static void emxEnsureCapacity_boolean_T(emxArray_boolean_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation)
-{
-  int32_T i;
-  int32_T newNumel;
-  void *newData;
-  if (oldNumel < 0) {
-    oldNumel = 0;
-  }
-
-  newNumel = 1;
-  for (i = 0; i < emxArray->numDimensions; i++) {
-    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
-      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
-      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
-  }
-
-  if (newNumel > emxArray->allocatedSize) {
-    i = emxArray->allocatedSize;
-    if (i < 16) {
-      i = 16;
-    }
-
-    while (i < newNumel) {
-      if (i > 1073741823) {
-        i = MAX_int32_T;
-      } else {
-        i *= 2;
-      }
-    }
-
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(boolean_T));
-    if (newData == nullptr) {
-      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-    }
-
-    if (emxArray->data != nullptr) {
-      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
-                static_cast<boolean_T *>(newData));
-      if (emxArray->canFreeData) {
-        emlrtFreeMex(emxArray->data);
-      }
-    }
-
-    emxArray->data = static_cast<boolean_T *>(newData);
-    emxArray->allocatedSize = i;
-    emxArray->canFreeData = true;
-  }
-}
-
-static void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation)
-{
-  int32_T i;
-  int32_T newNumel;
-  void *newData;
-  if (oldNumel < 0) {
-    oldNumel = 0;
-  }
-
-  newNumel = 1;
-  for (i = 0; i < emxArray->numDimensions; i++) {
-    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
-      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
-      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
-  }
-
-  if (newNumel > emxArray->allocatedSize) {
-    i = emxArray->allocatedSize;
-    if (i < 16) {
-      i = 16;
-    }
-
-    while (i < newNumel) {
-      if (i > 1073741823) {
-        i = MAX_int32_T;
-      } else {
-        i *= 2;
-      }
-    }
-
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(int32_T));
-    if (newData == nullptr) {
-      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-    }
-
-    if (emxArray->data != nullptr) {
-      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
-                static_cast<int32_T *>(newData));
-      if (emxArray->canFreeData) {
-        emlrtFreeMex(emxArray->data);
-      }
-    }
-
-    emxArray->data = static_cast<int32_T *>(newData);
-    emxArray->allocatedSize = i;
-    emxArray->canFreeData = true;
-  }
-}
-
-static void emxEnsureCapacity_int8_T(emxArray_int8_T *emxArray, int32_T oldNumel,
-  const emlrtRTEInfo *srcLocation)
-{
-  int32_T i;
-  int32_T newNumel;
-  void *newData;
-  if (oldNumel < 0) {
-    oldNumel = 0;
-  }
-
-  newNumel = 1;
-  for (i = 0; i < emxArray->numDimensions; i++) {
-    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
-      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
-      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
-  }
-
-  if (newNumel > emxArray->allocatedSize) {
-    i = emxArray->allocatedSize;
-    if (i < 16) {
-      i = 16;
-    }
-
-    while (i < newNumel) {
-      if (i > 1073741823) {
-        i = MAX_int32_T;
-      } else {
-        i *= 2;
-      }
-    }
-
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(int8_T));
-    if (newData == nullptr) {
-      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-    }
-
-    if (emxArray->data != nullptr) {
-      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
-                static_cast<int8_T *>(newData));
-      if (emxArray->canFreeData) {
-        emlrtFreeMex(emxArray->data);
-      }
-    }
-
-    emxArray->data = static_cast<int8_T *>(newData);
-    emxArray->allocatedSize = i;
-    emxArray->canFreeData = true;
-  }
-}
-
-static void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel,
-  const emlrtRTEInfo *srcLocation)
-{
-  int32_T i;
-  int32_T newNumel;
-  void *newData;
-  if (oldNumel < 0) {
-    oldNumel = 0;
-  }
-
-  newNumel = 1;
-  for (i = 0; i < emxArray->numDimensions; i++) {
-    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
-      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
-      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
-  }
-
-  if (newNumel > emxArray->allocatedSize) {
-    i = emxArray->allocatedSize;
-    if (i < 16) {
-      i = 16;
-    }
-
-    while (i < newNumel) {
-      if (i > 1073741823) {
-        i = MAX_int32_T;
-      } else {
-        i *= 2;
-      }
-    }
-
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(real_T));
-    if (newData == nullptr) {
-      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-    }
-
-    if (emxArray->data != nullptr) {
-      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
-                static_cast<real_T *>(newData));
-      if (emxArray->canFreeData) {
-        emlrtFreeMex(emxArray->data);
-      }
-    }
-
-    emxArray->data = static_cast<real_T *>(newData);
-    emxArray->allocatedSize = i;
-    emxArray->canFreeData = true;
-  }
-}
-
-static void emxEnsureCapacity_struct_T(emxArray_struct_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation)
-{
-  int32_T i;
-  int32_T newNumel;
-  void *newData;
-  if (oldNumel < 0) {
-    oldNumel = 0;
-  }
-
-  newNumel = 1;
-  for (i = 0; i < emxArray->numDimensions; i++) {
-    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
-      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
-      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
-  }
-
-  if (newNumel > emxArray->allocatedSize) {
-    i = emxArray->allocatedSize;
-    if (i < 16) {
-      i = 16;
-    }
-
-    while (i < newNumel) {
-      if (i > 1073741823) {
-        i = MAX_int32_T;
-      } else {
-        i *= 2;
-      }
-    }
-
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(struct_T));
-    if (newData == nullptr) {
-      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-    }
-
-    if (emxArray->data != nullptr) {
-      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
-                static_cast<struct_T *>(newData));
-      if (emxArray->canFreeData) {
-        emlrtFreeMex(emxArray->data);
-      }
-    }
-
-    emxArray->data = static_cast<struct_T *>(newData);
-    emxArray->allocatedSize = i;
-    emxArray->canFreeData = true;
-  }
-}
-
-static void emxEnsureCapacity_uint32_T(emxArray_uint32_T *emxArray, int32_T
-  oldNumel, const emlrtRTEInfo *srcLocation)
-{
-  int32_T i;
-  int32_T newNumel;
-  void *newData;
-  if (oldNumel < 0) {
-    oldNumel = 0;
-  }
-
-  newNumel = 1;
-  for (i = 0; i < emxArray->numDimensions; i++) {
-    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
-      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
-      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
-  }
-
-  if (newNumel > emxArray->allocatedSize) {
-    i = emxArray->allocatedSize;
-    if (i < 16) {
-      i = 16;
-    }
-
-    while (i < newNumel) {
-      if (i > 1073741823) {
-        i = MAX_int32_T;
-      } else {
-        i *= 2;
-      }
-    }
-
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(uint32_T));
-    if (newData == nullptr) {
-      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-    }
-
-    if (emxArray->data != nullptr) {
-      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
-                static_cast<uint32_T *>(newData));
-      if (emxArray->canFreeData) {
-        emlrtFreeMex(emxArray->data);
-      }
-    }
-
-    emxArray->data = static_cast<uint32_T *>(newData);
-    emxArray->allocatedSize = i;
-    emxArray->canFreeData = true;
-  }
-}
-
-static void emxFree_boolean_T(emxArray_boolean_T **pEmxArray)
-{
-  if (*pEmxArray != static_cast<emxArray_boolean_T *>(nullptr)) {
-    if (((*pEmxArray)->data != static_cast<boolean_T *>(nullptr)) && (*pEmxArray)
-        ->canFreeData) {
-      emlrtFreeMex((*pEmxArray)->data);
-    }
-
-    emlrtFreeMex((*pEmxArray)->size);
-    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
-    emlrtFreeEmxArray(*pEmxArray);
-    *pEmxArray = static_cast<emxArray_boolean_T *>(nullptr);
-  }
-}
-
-static void emxFree_int32_T(emxArray_int32_T **pEmxArray)
-{
-  if (*pEmxArray != static_cast<emxArray_int32_T *>(nullptr)) {
-    if (((*pEmxArray)->data != static_cast<int32_T *>(nullptr)) && (*pEmxArray
-        )->canFreeData) {
-      emlrtFreeMex((*pEmxArray)->data);
-    }
-
-    emlrtFreeMex((*pEmxArray)->size);
-    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
-    emlrtFreeEmxArray(*pEmxArray);
-    *pEmxArray = static_cast<emxArray_int32_T *>(nullptr);
-  }
-}
-
-static void emxFree_int8_T(emxArray_int8_T **pEmxArray)
-{
-  if (*pEmxArray != static_cast<emxArray_int8_T *>(nullptr)) {
-    if (((*pEmxArray)->data != static_cast<int8_T *>(nullptr)) && (*pEmxArray)
-        ->canFreeData) {
-      emlrtFreeMex((*pEmxArray)->data);
-    }
-
-    emlrtFreeMex((*pEmxArray)->size);
-    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
-    emlrtFreeEmxArray(*pEmxArray);
-    *pEmxArray = static_cast<emxArray_int8_T *>(nullptr);
-  }
-}
-
-static void emxFree_real_T(emxArray_real_T **pEmxArray)
-{
-  if (*pEmxArray != static_cast<emxArray_real_T *>(nullptr)) {
-    if (((*pEmxArray)->data != static_cast<real_T *>(nullptr)) && (*pEmxArray)
-        ->canFreeData) {
-      emlrtFreeMex((*pEmxArray)->data);
-    }
-
-    emlrtFreeMex((*pEmxArray)->size);
-    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
-    emlrtFreeEmxArray(*pEmxArray);
-    *pEmxArray = static_cast<emxArray_real_T *>(nullptr);
-  }
-}
-
-static void emxFree_struct_T(emxArray_struct_T **pEmxArray)
-{
-  if (*pEmxArray != static_cast<emxArray_struct_T *>(nullptr)) {
-    if (((*pEmxArray)->data != static_cast<struct_T *>(nullptr)) && (*pEmxArray
-        )->canFreeData) {
-      emlrtFreeMex((*pEmxArray)->data);
-    }
-
-    emlrtFreeMex((*pEmxArray)->size);
-    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
-    emlrtFreeEmxArray(*pEmxArray);
-    *pEmxArray = static_cast<emxArray_struct_T *>(nullptr);
-  }
-}
-
-static void emxFree_uint32_T(emxArray_uint32_T **pEmxArray)
-{
-  if (*pEmxArray != static_cast<emxArray_uint32_T *>(nullptr)) {
-    if (((*pEmxArray)->data != static_cast<uint32_T *>(nullptr)) && (*pEmxArray
-        )->canFreeData) {
-      emlrtFreeMex((*pEmxArray)->data);
-    }
-
-    emlrtFreeMex((*pEmxArray)->size);
-    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
-    emlrtFreeEmxArray(*pEmxArray);
-    *pEmxArray = static_cast<emxArray_uint32_T *>(nullptr);
-  }
-}
-
-static void emxInit_boolean_T(emxArray_boolean_T **pEmxArray, int32_T
-  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush)
-{
-  emxArray_boolean_T *emxArray;
-  *pEmxArray = static_cast<emxArray_boolean_T *>(emlrtMallocEmxArray(sizeof
-    (emxArray_boolean_T)));
-  if ((void *)*pEmxArray == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  if (doPush) {
-    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
-      pEmxArray, (void *)&emxFree_boolean_T, nullptr, nullptr, nullptr);
-  }
-
-  emxArray = *pEmxArray;
-  emxArray->data = static_cast<boolean_T *>(nullptr);
-  emxArray->numDimensions = numDimensions;
-  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
-    static_cast<uint32_T>(numDimensions)));
-  if ((void *)emxArray->size == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  emxArray->allocatedSize = 0;
-  emxArray->canFreeData = true;
-  for (int32_T i{0}; i < numDimensions; i++) {
-    emxArray->size[i] = 0;
-  }
-}
-
-static void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
-  const emlrtRTEInfo *srcLocation, boolean_T doPush)
-{
-  emxArray_int32_T *emxArray;
-  *pEmxArray = static_cast<emxArray_int32_T *>(emlrtMallocEmxArray(sizeof
-    (emxArray_int32_T)));
-  if ((void *)*pEmxArray == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  if (doPush) {
-    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
-      pEmxArray, (void *)&emxFree_int32_T, nullptr, nullptr, nullptr);
-  }
-
-  emxArray = *pEmxArray;
-  emxArray->data = static_cast<int32_T *>(nullptr);
-  emxArray->numDimensions = numDimensions;
-  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
-    static_cast<uint32_T>(numDimensions)));
-  if ((void *)emxArray->size == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  emxArray->allocatedSize = 0;
-  emxArray->canFreeData = true;
-  for (int32_T i{0}; i < numDimensions; i++) {
-    emxArray->size[i] = 0;
-  }
-}
-
-static void emxInit_int8_T(emxArray_int8_T **pEmxArray, int32_T numDimensions,
-  const emlrtRTEInfo *srcLocation, boolean_T doPush)
-{
-  emxArray_int8_T *emxArray;
-  *pEmxArray = static_cast<emxArray_int8_T *>(emlrtMallocEmxArray(sizeof
-    (emxArray_int8_T)));
-  if ((void *)*pEmxArray == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  if (doPush) {
-    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
-      pEmxArray, (void *)&emxFree_int8_T, nullptr, nullptr, nullptr);
-  }
-
-  emxArray = *pEmxArray;
-  emxArray->data = static_cast<int8_T *>(nullptr);
-  emxArray->numDimensions = numDimensions;
-  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
-    static_cast<uint32_T>(numDimensions)));
-  if ((void *)emxArray->size == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  emxArray->allocatedSize = 0;
-  emxArray->canFreeData = true;
-  for (int32_T i{0}; i < numDimensions; i++) {
-    emxArray->size[i] = 0;
-  }
-}
-
-static void emxInit_real_T(emxArray_real_T **pEmxArray, int32_T numDimensions,
-  const emlrtRTEInfo *srcLocation, boolean_T doPush)
-{
-  emxArray_real_T *emxArray;
-  *pEmxArray = static_cast<emxArray_real_T *>(emlrtMallocEmxArray(sizeof
-    (emxArray_real_T)));
-  if ((void *)*pEmxArray == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  if (doPush) {
-    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
-      pEmxArray, (void *)&emxFree_real_T, nullptr, nullptr, nullptr);
-  }
-
-  emxArray = *pEmxArray;
-  emxArray->data = static_cast<real_T *>(nullptr);
-  emxArray->numDimensions = numDimensions;
-  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
-    static_cast<uint32_T>(numDimensions)));
-  if ((void *)emxArray->size == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  emxArray->allocatedSize = 0;
-  emxArray->canFreeData = true;
-  for (int32_T i{0}; i < numDimensions; i++) {
-    emxArray->size[i] = 0;
-  }
-}
-
-static void emxInit_struct_T(emxArray_struct_T **pEmxArray, int32_T
-  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush)
-{
-  emxArray_struct_T *emxArray;
-  *pEmxArray = static_cast<emxArray_struct_T *>(emlrtMallocEmxArray(sizeof
-    (emxArray_struct_T)));
-  if ((void *)*pEmxArray == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  if (doPush) {
-    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
-      pEmxArray, (void *)&emxFree_struct_T, nullptr, nullptr, nullptr);
-  }
-
-  emxArray = *pEmxArray;
-  emxArray->data = static_cast<struct_T *>(nullptr);
-  emxArray->numDimensions = numDimensions;
-  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
-    static_cast<uint32_T>(numDimensions)));
-  if ((void *)emxArray->size == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  emxArray->allocatedSize = 0;
-  emxArray->canFreeData = true;
-  for (int32_T i{0}; i < numDimensions; i++) {
-    emxArray->size[i] = 0;
-  }
-}
-
-static void emxInit_uint32_T(emxArray_uint32_T **pEmxArray, int32_T
-  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush)
-{
-  emxArray_uint32_T *emxArray;
-  *pEmxArray = static_cast<emxArray_uint32_T *>(emlrtMallocEmxArray(sizeof
-    (emxArray_uint32_T)));
-  if ((void *)*pEmxArray == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  if (doPush) {
-    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
-      pEmxArray, (void *)&emxFree_uint32_T, nullptr, nullptr, nullptr);
-  }
-
-  emxArray = *pEmxArray;
-  emxArray->data = static_cast<uint32_T *>(nullptr);
-  emxArray->numDimensions = numDimensions;
-  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
-    static_cast<uint32_T>(numDimensions)));
-  if ((void *)emxArray->size == nullptr) {
-    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
-  }
-
-  emxArray->allocatedSize = 0;
-  emxArray->canFreeData = true;
-  for (int32_T i{0}; i < numDimensions; i++) {
-    emxArray->size[i] = 0;
-  }
-}
-
-static const mxArray *feval(const mxArray *m1, const mxArray *m2, const mxArray *
-  m3, const mxArray *m4, emlrtMCInfo *location)
-{
-  const mxArray *pArrays[4];
-  const mxArray *m;
-  pArrays[0] = m1;
-  pArrays[1] = m2;
-  pArrays[2] = m3;
-  pArrays[3] = m4;
-  return emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 4, &pArrays[0],
-    "feval", true, location);
-}
-
-static void feval(const mxArray *m, const mxArray *m1, emlrtMCInfo *location)
-{
-  const mxArray *pArrays[2];
-  pArrays[0] = m;
-  pArrays[1] = m1;
-  emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 0, nullptr, 2, &pArrays[0], "feval",
-                        true, location);
 }
 
 static void gpuEmxEnsureCapacity_boolean_T(const emxArray_boolean_T *cpu,
@@ -8186,7 +6702,8 @@ static void gpuEmxReset_uint32_T(emxArray_uint32_T *gpu)
   std::memset(gpu, 0, sizeof(emxArray_uint32_T));
 }
 
-void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
+void ec_filtfilt(const emxArray_real_T *x, const emxArray_real_T *coef,
+                 emxArray_real_T *xx)
 {
   static const int32_T iv8[2]{ 1, 6 };
 
@@ -8346,6 +6863,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxArray_real_T b_gpu_outBuff;
   emxArray_real_T b_gpu_rhs;
   emxArray_real_T b_gpu_xt;
+  emxArray_real_T b_gpu_xx;
   emxArray_real_T b_gpu_y_d;
   emxArray_real_T b_gpu_zfIIR;
   emxArray_real_T c_gpu_a;
@@ -8390,8 +6908,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxArray_real_T gpu_maxCoefNum;
   emxArray_real_T gpu_outBuff;
   emxArray_real_T gpu_x;
-  emxArray_real_T gpu_xCol;
   emxArray_real_T gpu_xt;
+  emxArray_real_T gpu_xx;
   emxArray_real_T gpu_y;
   emxArray_real_T gpu_y_d;
   emxArray_real_T gpu_yc2;
@@ -8446,6 +6964,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxArray_real_T *b_expanded;
   emxArray_real_T *b_outBuff;
   emxArray_real_T *b_xt;
+  emxArray_real_T *b_xx;
   emxArray_real_T *b_y;
   emxArray_real_T *b_y_d;
   emxArray_real_T *b_zfIIR;
@@ -8520,7 +7039,6 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxArray_real_T *s_y;
   emxArray_real_T *t_convOut;
   emxArray_real_T *u_convOut;
-  emxArray_real_T *xCol;
   emxArray_real_T *xt;
   emxArray_real_T *y_d;
   emxArray_real_T *yc2;
@@ -8547,6 +7065,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   real_T *gpu_a1;
   real_T *gpu_d1;
   int32_T b_iv[2];
+  int32_T i;
+  int32_T *gpu_i;
   uint32_T dv1[2];
   uint32_T zfSize[2];
   uint32_T (*gpu_zfSize)[2];
@@ -8572,7 +7092,6 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   boolean_T c_convOut_dirtyOnCpu;
   boolean_T c_convOut_dirtyOnGpu;
   boolean_T c_counts_dirtyOnGpu;
-  boolean_T c_x_dirtyOnGpu;
   boolean_T c_y_d_dirtyOnGpu;
   boolean_T c_y_rowidx_dirtyOnGpu;
   boolean_T c_zfIIR_dirtyOnGpu;
@@ -8628,10 +7147,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   boolean_T maxCoefNum_dirtyOnGpu;
   boolean_T nZeroLastDen_dirtyOnGpu;
   boolean_T ridxInt_dirtyOnGpu;
-  boolean_T xCol_dirtyOnCpu;
-  boolean_T xCol_dirtyOnGpu;
-  boolean_T x_dirtyOnCpu;
   boolean_T x_dirtyOnGpu;
+  boolean_T xx_dirtyOnCpu;
+  boolean_T xx_dirtyOnGpu;
   boolean_T y_d_dirtyOnGpu;
   boolean_T y_dirtyOnGpu;
   boolean_T y_rowidx_dirtyOnGpu;
@@ -8686,6 +7204,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   gpuEmxReset_real_T(&j_gpu_a);
   gpuEmxReset_int32_T(&gpu_iv12);
   gpuEmxReset_int32_T(&w_gpu_y);
+  gpuEmxReset_real_T(&b_gpu_xx);
   gpuEmxReset_real_T(&l_gpu_b);
   gpuEmxReset_real_T(&gpu_yc5);
   gpuEmxReset_real_T(&h_gpu_expanded);
@@ -8818,8 +7337,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   gpuEmxReset_real_T(&gpu_b2);
   gpuEmxReset_real_T(&gpu_b);
   gpuEmxReset_real_T(&gpu_coef);
-  gpuEmxReset_real_T(&gpu_xCol);
   gpuEmxReset_real_T(&gpu_x);
+  mwCudaMalloc(&gpu_i, 4UL);
+  gpuEmxReset_real_T(&gpu_xx);
   l_convOut_dirtyOnGpu = false;
   g_a_dirtyOnGpu = false;
   l_b_dirtyOnGpu = false;
@@ -8871,12 +7391,11 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   a_dirtyOnGpu = false;
   b_b_dirtyOnGpu = false;
   b_dirtyOnGpu = false;
-  c_x_dirtyOnGpu = false;
-  ytemp_dirtyOnGpu = false;
   b_x_dirtyOnGpu = false;
+  ytemp_dirtyOnGpu = false;
+  x_dirtyOnGpu = false;
   maxCoefNum_dirtyOnGpu = false;
   b2_dirtyOnGpu = false;
-  xCol_dirtyOnGpu = false;
   l_convOut_dirtyOnCpu = false;
   l_b_dirtyOnCpu = false;
   k_convOut_dirtyOnCpu = false;
@@ -8905,42 +7424,38 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   b_dirtyOnCpu = false;
   zi_dirtyOnCpu = false;
   ytemp_dirtyOnCpu = false;
-  xCol_dirtyOnCpu = false;
   coef_dirtyOnCpu = true;
-  x_dirtyOnGpu = false;
-  x_dirtyOnCpu = true;
+  xx_dirtyOnGpu = false;
+  xx_dirtyOnCpu = true;
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
 
   //  Add kernelfun pragma to trigger kernel creation
   // nCh = size(x,2);
-  // nFrames = size(x,1);
-  // x = x(:);
   // xx = coder.nullcopy(zeros(size(x)));
   //  Zero-phase filtering
-  emxInit_real_T(&xCol, 2, &c_emlrtRTEI, true);
-  emxInit_real_T(&b, 2, &d_emlrtRTEI, true);
+  emxInit_real_T(&b, 2, &c_emlrtRTEI, true);
   emxInit_real_T(&zi, 1, &ed_emlrtRTEI, true);
   emxInit_real_T(&b2, 1, &ed_emlrtRTEI, true);
   emxInit_real_T(&a2, 1, &ed_emlrtRTEI, true);
-  emxInit_real_T(&b1, 2, &j_emlrtRTEI, true);
+  emxInit_real_T(&b1, 2, &i_emlrtRTEI, true);
   emxInit_int32_T(&y, 2, &fd_emlrtRTEI, true);
   emxInit_uint32_T(&nZeroLastDen, 1, &gd_emlrtRTEI, true);
   emxInit_real_T(&b_y, 2, &hd_emlrtRTEI, true);
-  emxInit_boolean_T(&b_x, 1, &t_emlrtRTEI, true);
+  emxInit_boolean_T(&b_x, 1, &s_emlrtRTEI, true);
   emxInit_int32_T(&c_y, 2, &id_emlrtRTEI, true);
-  emxInit_int32_T(&rows, 2, &p_emlrtRTEI, true);
+  emxInit_int32_T(&rows, 2, &o_emlrtRTEI, true);
   emxInit_real_T(&maxCoefNum, 1, &jd_emlrtRTEI, true);
   emxInit_int32_T(&d_y, 2, &kd_emlrtRTEI, true);
   emxInit_int32_T(&ii, 1, &ld_emlrtRTEI, true);
-  emxInit_boolean_T(&c_x, 1, &q_emlrtRTEI, true);
-  emxInit_real_T(&xt, 1, &u_emlrtRTEI, true);
+  emxInit_boolean_T(&c_x, 1, &p_emlrtRTEI, true);
+  emxInit_real_T(&xt, 1, &t_emlrtRTEI, true);
   emxInit_int32_T(&e_y, 2, &md_emlrtRTEI, true);
   emxInit_real_T(&f_y, 1, &nd_emlrtRTEI, true);
   emxInit_real_T(&g_y, 2, &od_emlrtRTEI, true);
   emxInit_real_T(&b_b, 1, &y_emlrtRTEI, true);
   emxInit_int32_T(&cols, 2, &cb_emlrtRTEI, true);
   emxInit_real_T(&a, 1, &eb_emlrtRTEI, true);
-  emxInit_real_T(&ytemp, 1, &s_emlrtRTEI, true);
+  emxInit_real_T(&ytemp, 1, &q_emlrtRTEI, true);
   emxInit_real_T(&h_y, 1, &pd_emlrtRTEI, true);
   emxInit_real_T(&c_b, 1, &ab_emlrtRTEI, true);
   emxInit_real_T(&b_a, 1, &fb_emlrtRTEI, true);
@@ -9074,7 +7589,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxInit_int32_T(&iv17, 1, &ed_emlrtRTEI, true);
   emxInit_int32_T(&m_rows, 2, &ob_emlrtRTEI, true);
   emxInit_real_T(&l_convOut, 1, &jb_emlrtRTEI, true);
-  emxInit_real_T(&n_b, 1, &g_emlrtRTEI, true);
+  emxInit_real_T(&n_b, 1, &f_emlrtRTEI, true);
+  emxInit_real_T(&b_xx, 2, &r_emlrtRTEI, true);
   emxInit_real_T(&m_convOut, 2, &jb_emlrtRTEI, true);
   emxInit_real_T(&n_convOut, 2, &jb_emlrtRTEI, true);
   emxInit_real_T(&o_convOut, 2, &jb_emlrtRTEI, true);
@@ -9085,8 +7601,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxInit_real_T(&t_convOut, 2, &jb_emlrtRTEI, true);
   emxInit_real_T(&u_convOut, 1, &cd_emlrtRTEI, true);
   if ((coef->size[1] == 0) || ((x->size[0] == 0) || (x->size[1] == 0))) {
-    x->size[0] = 0;
-    x->size[1] = 0;
+    xx->size[0] = 0;
+    xx->size[1] = 0;
   } else {
     real_T nfact;
     int32_T c;
@@ -9099,57 +7615,59 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
     int32_T outridx;
     int32_T thism;
     int32_T vlen;
-    int32_T xCol_dim0;
+    int32_T xx_dim0;
     boolean_T issos;
     boolean_T validLaunchParams;
     if (x->size[0] == 1) {
-      iv0 = xCol->size[0] * xCol->size[1];
-      xCol->size[0] = x->size[1];
-      xCol->size[1] = x->size[0];
-      emxEnsureCapacity_real_T(xCol, iv0, &c_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
-      d_x = x->size[0] - 1;
-      iv0 = x->size[1] - 1;
-      xCol_dim0 = xCol->size[0];
-      outridx = x->size[0];
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 + 1L)
-        * (d_x + 1L)), &grid, &block, 1024U, 65535U);
+      xx_dim0 = xx->size[0];
+      iv0 = xx->size[1];
+      gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+      xx_dirtyOnCpu = false;
+      ec_filtfilt_kernel2<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(xx_dim0, iv0,
+        gpu_i);
+      xx->size[0] = x->size[1];
+      xx->size[1] = 1;
+      cudaMemcpy(&i, gpu_i, 4UL, cudaMemcpyDeviceToHost);
+      emxEnsureCapacity_real_T(xx, i, &b_emlrtRTEI);
+      gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
+      d_x = x->size[1] - 1;
+      iv0 = x->size[0];
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(d_x + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_x, x);
-        x_dirtyOnCpu = false;
-        ec_filtfilt_kernel2<<<grid, block>>>(gpu_x, iv0, d_x, xCol_dim0, outridx,
-          gpu_xCol);
-        xCol_dirtyOnGpu = true;
+        ec_filtfilt_kernel3<<<grid, block>>>(gpu_x, d_x, iv0, gpu_xx);
+        xx_dirtyOnGpu = true;
       }
     } else {
-      iv0 = xCol->size[0] * xCol->size[1];
-      xCol->size[0] = x->size[0];
-      xCol->size[1] = x->size[1];
-      emxEnsureCapacity_real_T(xCol, iv0, &b_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
+      i = xx->size[0] * xx->size[1];
+      xx->size[0] = x->size[0];
+      xx->size[1] = x->size[1];
+      emxEnsureCapacity_real_T(xx, i, &emlrtRTEI);
       d_x = x->size[0] * x->size[1] - 1;
       validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(d_x + 1L),
         &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_x, x);
-        x_dirtyOnCpu = false;
-        ec_filtfilt_kernel1<<<grid, block>>>(gpu_x, d_x, gpu_xCol);
-        xCol_dirtyOnGpu = true;
+        gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+        ec_filtfilt_kernel1<<<grid, block>>>(gpu_x, d_x, gpu_xx);
+        xx_dirtyOnCpu = false;
+        xx_dirtyOnGpu = true;
       }
     }
 
-    iv0 = b->size[0] * b->size[1];
+    i = b->size[0] * b->size[1];
     b->size[0] = 1;
     b->size[1] = coef->size[1];
-    emxEnsureCapacity_real_T(b, iv0, &d_emlrtRTEI);
+    emxEnsureCapacity_real_T(b, i, &c_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(b, &gpu_b);
-    outridx = coef->size[1] - 1;
-    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx + 1L),
+    iv0 = coef->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
       &grid, &block, 1024U, 65535U);
     if (validLaunchParams) {
       gpuEmxMemcpyCpuToGpu_real_T(&gpu_coef, coef);
       coef_dirtyOnCpu = false;
-      ec_filtfilt_kernel3<<<grid, block>>>(gpu_coef, outridx, gpu_b);
+      ec_filtfilt_kernel4<<<grid, block>>>(gpu_coef, iv0, gpu_b);
     }
 
     if (coef->size[1] == 6) {
@@ -9166,9 +7684,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
       issos = false;
     }
 
-    iv0 = zi->size[0];
+    i = zi->size[0];
     zi->size[0] = 2;
-    emxEnsureCapacity_real_T(zi, iv0, &e_emlrtRTEI);
+    emxEnsureCapacity_real_T(zi, i, &d_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(zi, &gpu_zi);
     if (issos) {
       boolean_T exitg1;
@@ -9176,34 +7694,34 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_coef, coef);
       }
 
-      ec_filtfilt_kernel54<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_coef,
+      ec_filtfilt_kernel55<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_coef,
         gpu_b);
       if (b->size[1] == 1) {
-        iv0 = n_b->size[0];
+        i = n_b->size[0];
         n_b->size[0] = 1;
-        emxEnsureCapacity_real_T(n_b, iv0, &g_emlrtRTEI);
+        emxEnsureCapacity_real_T(n_b, i, &f_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(n_b, &b_gpu_b);
         gpuEmxMemcpyGpuToCpu_real_T(b, &gpu_b);
         n_b->data[0] = b->data[0];
-        iv0 = b1->size[0] * b1->size[1];
+        i = b1->size[0] * b1->size[1];
         b1->size[0] = 1;
         b1->size[1] = 1;
-        emxEnsureCapacity_real_T(b1, iv0, &j_emlrtRTEI);
+        emxEnsureCapacity_real_T(b1, i, &i_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b1, &gpu_b1);
         gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_b, n_b);
-        ec_filtfilt_kernel56<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(b_gpu_b,
+        ec_filtfilt_kernel57<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(b_gpu_b,
           gpu_b1);
       } else {
-        iv0 = b1->size[0] * b1->size[1];
+        i = b1->size[0] * b1->size[1];
         b1->size[0] = 1;
         b1->size[1] = b->size[1];
-        emxEnsureCapacity_real_T(b1, iv0, &i_emlrtRTEI);
+        emxEnsureCapacity_real_T(b1, i, &h_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b1, &gpu_b1);
-        outridx = b->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        iv0 = b->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel55<<<grid, block>>>(gpu_b, outridx, gpu_b1);
+          ec_filtfilt_kernel56<<<grid, block>>>(gpu_b, iv0, gpu_b1);
         }
       }
 
@@ -9212,20 +7730,20 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         dv1[iv0] = static_cast<uint32_T>(b1->size[iv0]);
       }
 
-      iv0 = b_y->size[0] * b_y->size[1];
+      i = b_y->size[0] * b_y->size[1];
       b_y->size[0] = static_cast<int32_T>(dv1[0]);
       b_y->size[1] = static_cast<int32_T>(dv1[1]);
-      emxEnsureCapacity_real_T(b_y, iv0, &l_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_y, i, &k_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(b_y, &gpu_y);
       validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nc + 1L),
         &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel57<<<grid, block>>>(gpu_b1, nc, gpu_y);
+        ec_filtfilt_kernel58<<<grid, block>>>(gpu_b1, nc, gpu_y);
       }
 
-      iv0 = maxCoefNum->size[0];
+      i = maxCoefNum->size[0];
       maxCoefNum->size[0] = b_y->size[0];
-      emxEnsureCapacity_real_T(maxCoefNum, iv0, &o_emlrtRTEI);
+      emxEnsureCapacity_real_T(maxCoefNum, i, &n_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(maxCoefNum, &gpu_maxCoefNum);
       vlen = b_y->size[1];
       ns = b_y->size[0];
@@ -9233,36 +7751,36 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
       validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns - 1) +
         1L), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel58<<<grid, block>>>(vlen, gpu_y, nc, ns,
+        ec_filtfilt_kernel59<<<grid, block>>>(vlen, gpu_y, nc, ns,
           gpu_maxCoefNum);
         maxCoefNum_dirtyOnGpu = true;
       }
 
-      iv0 = c_x->size[0];
+      i = c_x->size[0];
       c_x->size[0] = maxCoefNum->size[0];
-      emxEnsureCapacity_boolean_T(c_x, iv0, &q_emlrtRTEI);
+      emxEnsureCapacity_boolean_T(c_x, i, &p_emlrtRTEI);
       gpuEmxEnsureCapacity_boolean_T(c_x, &b_gpu_x);
-      outridx = maxCoefNum->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      iv0 = maxCoefNum->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel59<<<grid, block>>>(gpu_maxCoefNum, outridx, b_gpu_x);
-        b_x_dirtyOnGpu = true;
+        ec_filtfilt_kernel60<<<grid, block>>>(gpu_maxCoefNum, iv0, b_gpu_x);
+        x_dirtyOnGpu = true;
       }
 
-      xCol_dim0 = 1;
+      xx_dim0 = 1;
       exitg1 = false;
-      while ((!exitg1) && (xCol_dim0 <= c_x->size[0])) {
-        if (b_x_dirtyOnGpu) {
+      while ((!exitg1) && (xx_dim0 <= c_x->size[0])) {
+        if (x_dirtyOnGpu) {
           gpuEmxMemcpyGpuToCpu_boolean_T(c_x, &b_gpu_x);
         }
 
-        b_x_dirtyOnGpu = false;
-        if (!c_x->data[xCol_dim0 - 1]) {
+        x_dirtyOnGpu = false;
+        if (!c_x->data[xx_dim0 - 1]) {
           issos = false;
           exitg1 = true;
         } else {
-          xCol_dim0++;
+          xx_dim0++;
         }
       }
 
@@ -9272,46 +7790,47 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         val = maxCoefNum->data[0];
-        iv0 = b1->size[1];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 - 1)
+        i = b1->size[1];
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i - 1)
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel60<<<grid, block>>>(val, iv0, gpu_b1);
+          cudaMemcpy(gpu_i, &i, 4UL, cudaMemcpyHostToDevice);
+          ec_filtfilt_kernel61<<<grid, block>>>(val, gpu_i, gpu_b1);
         }
+      }
+
+      i = b_x->size[0];
+      b_x->size[0] = b1->size[1];
+      emxEnsureCapacity_boolean_T(b_x, i, &s_emlrtRTEI);
+      gpuEmxEnsureCapacity_boolean_T(b_x, &c_gpu_x);
+      iv0 = b1->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_filtfilt_kernel62<<<grid, block>>>(gpu_b1, iv0, c_gpu_x);
+        b_x_dirtyOnGpu = true;
       }
 
       iv0 = b_x->size[0];
-      b_x->size[0] = b1->size[1];
-      emxEnsureCapacity_boolean_T(b_x, iv0, &t_emlrtRTEI);
-      gpuEmxEnsureCapacity_boolean_T(b_x, &c_gpu_x);
-      outridx = b1->size[1] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
-      if (validLaunchParams) {
-        ec_filtfilt_kernel61<<<grid, block>>>(gpu_b1, outridx, c_gpu_x);
-        c_x_dirtyOnGpu = true;
-      }
-
-      outridx = b_x->size[0];
       idx = 0;
-      iv0 = ii->size[0];
+      i = ii->size[0];
       ii->size[0] = 1;
-      emxEnsureCapacity_int32_T(ii, iv0, &x_emlrtRTEI);
+      emxEnsureCapacity_int32_T(ii, i, &x_emlrtRTEI);
       gpuEmxEnsureCapacity_int32_T(ii, &gpu_ii);
       exitg1 = false;
-      while ((!exitg1) && (outridx > 0)) {
-        if (c_x_dirtyOnGpu) {
+      while ((!exitg1) && (iv0 > 0)) {
+        if (b_x_dirtyOnGpu) {
           gpuEmxMemcpyGpuToCpu_boolean_T(b_x, &c_gpu_x);
         }
 
-        c_x_dirtyOnGpu = false;
-        if (b_x->data[outridx - 1]) {
+        b_x_dirtyOnGpu = false;
+        if (b_x->data[iv0 - 1]) {
           idx = 1;
-          ii->data[0] = outridx;
+          ii->data[0] = iv0;
           ii_dirtyOnCpu = true;
           exitg1 = true;
         } else {
-          outridx--;
+          iv0--;
         }
       }
 
@@ -9319,26 +7838,26 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         ii->size[0] = 0;
       }
 
-      iv0 = nZeroLastDen->size[0];
+      i = nZeroLastDen->size[0];
       nZeroLastDen->size[0] = ii->size[0];
-      emxEnsureCapacity_uint32_T(nZeroLastDen, iv0, &db_emlrtRTEI);
+      emxEnsureCapacity_uint32_T(nZeroLastDen, i, &db_emlrtRTEI);
       gpuEmxEnsureCapacity_uint32_T(nZeroLastDen, &gpu_nZeroLastDen);
-      outridx = ii->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      iv0 = ii->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
         if (ii_dirtyOnCpu) {
           gpuEmxMemcpyCpuToGpu_int32_T(&gpu_ii, ii);
         }
 
-        ec_filtfilt_kernel62<<<grid, block>>>(gpu_ii, outridx, gpu_nZeroLastDen);
+        ec_filtfilt_kernel63<<<grid, block>>>(gpu_ii, iv0, gpu_nZeroLastDen);
         nZeroLastDen_dirtyOnGpu = true;
       }
 
       if (nZeroLastDen->size[0] == 0) {
-        iv0 = nZeroLastDen->size[0];
+        i = nZeroLastDen->size[0];
         nZeroLastDen->size[0] = 1;
-        emxEnsureCapacity_uint32_T(nZeroLastDen, iv0, &hb_emlrtRTEI);
+        emxEnsureCapacity_uint32_T(nZeroLastDen, i, &hb_emlrtRTEI);
         gpuEmxEnsureCapacity_uint32_T(nZeroLastDen, &gpu_nZeroLastDen);
         if (nZeroLastDen_dirtyOnGpu) {
           gpuEmxMemcpyGpuToCpu_uint32_T(nZeroLastDen, &gpu_nZeroLastDen);
@@ -9348,20 +7867,20 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         nZeroLastDen_dirtyOnGpu = false;
       }
 
-      ec_filtfilt_kernel63<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_b,
-        *gpu_a0);
-      iv0 = a2->size[0];
-      a2->size[0] = 3;
-      emxEnsureCapacity_real_T(a2, iv0, &kb_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(a2, &gpu_a2);
-      iv0 = b2->size[0];
-      b2->size[0] = 3;
-      emxEnsureCapacity_real_T(b2, iv0, &lb_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(b2, &gpu_b2);
       ec_filtfilt_kernel64<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_b,
+        *gpu_a0);
+      i = a2->size[0];
+      a2->size[0] = 3;
+      emxEnsureCapacity_real_T(a2, i, &kb_emlrtRTEI);
+      gpuEmxEnsureCapacity_real_T(a2, &gpu_a2);
+      i = b2->size[0];
+      b2->size[0] = 3;
+      emxEnsureCapacity_real_T(b2, i, &lb_emlrtRTEI);
+      gpuEmxEnsureCapacity_real_T(b2, &gpu_b2);
+      ec_filtfilt_kernel65<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_b,
         *gpu_a0, gpu_b2, gpu_a2);
       maxCoefNum_dirtyOnGpu = false;
-      b_x_dirtyOnGpu = true;
+      x_dirtyOnGpu = true;
       if (nZeroLastDen_dirtyOnGpu) {
         gpuEmxMemcpyGpuToCpu_uint32_T(nZeroLastDen, &gpu_nZeroLastDen);
       }
@@ -9370,11 +7889,11 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         (nZeroLastDen->data[0])) - 1.0));
       gpuEmxMemcpyGpuToCpu_real_T(b2, &gpu_b2);
       val = b2->data[0];
-      ec_filtfilt_kernel65<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2, val,
+      ec_filtfilt_kernel66<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2, val,
         gpu_b2, *gpu_rhs);
-      ec_filtfilt_kernel66<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_I);
       ec_filtfilt_kernel67<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_I);
-      ec_filtfilt_kernel68<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
+      ec_filtfilt_kernel68<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_I);
+      ec_filtfilt_kernel69<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
         *gpu_I, *gpu_A);
       cudaMemcpy(A, *gpu_A, 32UL, cudaMemcpyDeviceToHost);
       if (std::abs(A[1]) > std::abs(A[0])) {
@@ -9385,67 +7904,67 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         nc = 1;
       }
 
-      ec_filtfilt_kernel69<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_A, A[nc]
+      ec_filtfilt_kernel70<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_A, A[nc]
         / A[ns], ns, *gpu_rhs, nc, *gpu_Y);
-      ec_filtfilt_kernel70<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_A,
+      ec_filtfilt_kernel71<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_A,
         *gpu_rhs, ns, *gpu_Y);
-      ec_filtfilt_kernel71<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_Y,
+      ec_filtfilt_kernel72<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_Y,
         gpu_zi);
     } else {
-      iv0 = b2->size[0];
+      i = b2->size[0];
       b2->size[0] = coef->size[1];
-      emxEnsureCapacity_real_T(b2, iv0, &f_emlrtRTEI);
+      emxEnsureCapacity_real_T(b2, i, &e_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(b2, &gpu_b2);
-      outridx = coef->size[1] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      iv0 = coef->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
         if (coef_dirtyOnCpu) {
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_coef, coef);
         }
 
         coef_dirtyOnCpu = false;
-        ec_filtfilt_kernel4<<<grid, block>>>(gpu_coef, outridx, gpu_b2);
+        ec_filtfilt_kernel5<<<grid, block>>>(gpu_coef, iv0, gpu_b2);
         b2_dirtyOnGpu = true;
       }
 
-      iv0 = a2->size[0];
+      i = a2->size[0];
       a2->size[0] = 1;
-      emxEnsureCapacity_real_T(a2, iv0, &h_emlrtRTEI);
+      emxEnsureCapacity_real_T(a2, i, &g_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(a2, &gpu_a2);
       a2->data[0] = 1.0;
-      b_x_dirtyOnGpu = false;
+      x_dirtyOnGpu = false;
       maxCoefNum_dirtyOnGpu = true;
       nfact = std::fmax(1.0, 3.0 * (static_cast<real_T>(coef->size[1]) - 1.0));
       if (coef->size[1] > 1) {
-        iv0 = a2->size[0];
+        i = a2->size[0];
         a2->size[0] = coef->size[1];
-        emxEnsureCapacity_real_T(a2, iv0, &k_emlrtRTEI);
+        emxEnsureCapacity_real_T(a2, i, &j_emlrtRTEI);
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_a2, a2);
-        ec_filtfilt_kernel5<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2);
+        ec_filtfilt_kernel6<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2);
         maxCoefNum_dirtyOnGpu = false;
-        b_x_dirtyOnGpu = true;
+        x_dirtyOnGpu = true;
         loop_ub = coef->size[1] - 2;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel6<<<grid, block>>>(loop_ub, gpu_a2);
+          ec_filtfilt_kernel7<<<grid, block>>>(loop_ub, gpu_a2);
         }
 
         if (coef->size[1] - 1 < 2) {
           y->size[0] = 1;
           y->size[1] = 0;
         } else {
-          iv0 = y->size[0] * y->size[1];
+          i = y->size[0] * y->size[1];
           y->size[0] = 1;
           y->size[1] = coef->size[1] - 2;
-          emxEnsureCapacity_int32_T(y, iv0, &m_emlrtRTEI);
+          emxEnsureCapacity_int32_T(y, i, &l_emlrtRTEI);
           gpuEmxEnsureCapacity_int32_T(y, &b_gpu_y);
-          outridx = coef->size[1] - 3;
-          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-            (outridx + 1L), &grid, &block, 1024U, 65535U);
+          iv0 = coef->size[1] - 3;
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 +
+            1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel7<<<grid, block>>>(outridx, b_gpu_y);
+            ec_filtfilt_kernel8<<<grid, block>>>(iv0, b_gpu_y);
           }
         }
 
@@ -9453,33 +7972,33 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           c_y->size[0] = 1;
           c_y->size[1] = 0;
         } else {
-          iv0 = c_y->size[0] * c_y->size[1];
+          i = c_y->size[0] * c_y->size[1];
           c_y->size[0] = 1;
           c_y->size[1] = coef->size[1] - 2;
-          emxEnsureCapacity_int32_T(c_y, iv0, &m_emlrtRTEI);
+          emxEnsureCapacity_int32_T(c_y, i, &l_emlrtRTEI);
           gpuEmxEnsureCapacity_int32_T(c_y, &c_gpu_y);
-          outridx = coef->size[1] - 3;
-          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-            (outridx + 1L), &grid, &block, 1024U, 65535U);
+          iv0 = coef->size[1] - 3;
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 +
+            1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel8<<<grid, block>>>(outridx, c_gpu_y);
+            ec_filtfilt_kernel9<<<grid, block>>>(iv0, c_gpu_y);
           }
         }
 
-        iv0 = rows->size[0] * rows->size[1];
+        i = rows->size[0] * rows->size[1];
         rows->size[0] = 1;
         rows->size[1] = ((coef->size[1] + y->size[1]) + c_y->size[1]) - 1;
-        emxEnsureCapacity_int32_T(rows, iv0, &p_emlrtRTEI);
+        emxEnsureCapacity_int32_T(rows, i, &o_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(rows, &gpu_rows);
         loop_ub = coef->size[1] - 2;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel9<<<grid, block>>>(loop_ub, gpu_rows);
+          ec_filtfilt_kernel10<<<grid, block>>>(loop_ub, gpu_rows);
         }
 
         loop_ub = y->size[1] - 1;
-        outridx = coef->size[1];
+        iv0 = coef->size[1];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
@@ -9488,13 +8007,12 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           coef_dirtyOnCpu = false;
-          ec_filtfilt_kernel10<<<grid, block>>>(b_gpu_y, loop_ub, outridx,
-            gpu_rows);
+          ec_filtfilt_kernel11<<<grid, block>>>(b_gpu_y, loop_ub, iv0, gpu_rows);
         }
 
         loop_ub = c_y->size[1] - 1;
-        outridx = coef->size[1];
-        iv0 = y->size[1];
+        iv0 = coef->size[1];
+        i = y->size[1];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
@@ -9502,7 +8020,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_coef, coef);
           }
 
-          ec_filtfilt_kernel11<<<grid, block>>>(c_gpu_y, loop_ub, outridx, iv0,
+          ec_filtfilt_kernel12<<<grid, block>>>(c_gpu_y, loop_ub, iv0, i,
             gpu_rows);
         }
 
@@ -9512,58 +8030,58 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           e_y->size[0] = 1;
           e_y->size[1] = 0;
         } else {
-          iv0 = d_y->size[0] * d_y->size[1];
+          i = d_y->size[0] * d_y->size[1];
           d_y->size[0] = 1;
           d_y->size[1] = coef->size[1] - 2;
-          emxEnsureCapacity_int32_T(d_y, iv0, &m_emlrtRTEI);
+          emxEnsureCapacity_int32_T(d_y, i, &l_emlrtRTEI);
           gpuEmxEnsureCapacity_int32_T(d_y, &g_gpu_y);
-          outridx = coef->size[1] - 3;
-          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-            (outridx + 1L), &grid, &block, 1024U, 65535U);
+          iv0 = coef->size[1] - 3;
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 +
+            1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel12<<<grid, block>>>(outridx, g_gpu_y);
+            ec_filtfilt_kernel13<<<grid, block>>>(iv0, g_gpu_y);
           }
 
-          iv0 = e_y->size[0] * e_y->size[1];
+          i = e_y->size[0] * e_y->size[1];
           e_y->size[0] = 1;
           e_y->size[1] = coef->size[1] - 2;
-          emxEnsureCapacity_int32_T(e_y, iv0, &m_emlrtRTEI);
+          emxEnsureCapacity_int32_T(e_y, i, &l_emlrtRTEI);
           gpuEmxEnsureCapacity_int32_T(e_y, &h_gpu_y);
-          outridx = coef->size[1] - 3;
-          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-            (outridx + 1L), &grid, &block, 1024U, 65535U);
+          iv0 = coef->size[1] - 3;
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 +
+            1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel13<<<grid, block>>>(outridx, h_gpu_y);
+            ec_filtfilt_kernel14<<<grid, block>>>(iv0, h_gpu_y);
           }
         }
 
         b_iv[1] = coef->size[1] - 1;
-        iv0 = cols->size[0] * cols->size[1];
+        i = cols->size[0] * cols->size[1];
         cols->size[0] = 1;
         cols->size[1] = ((coef->size[1] + d_y->size[1]) + e_y->size[1]) - 1;
-        emxEnsureCapacity_int32_T(cols, iv0, &cb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(cols, i, &cb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(cols, &gpu_cols);
         loop_ub = coef->size[1] - 2;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel14<<<grid, block>>>(loop_ub, gpu_cols);
+          ec_filtfilt_kernel15<<<grid, block>>>(loop_ub, gpu_cols);
         }
 
         loop_ub = d_y->size[1] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel15<<<grid, block>>>(g_gpu_y, b_iv[1], loop_ub,
+          ec_filtfilt_kernel16<<<grid, block>>>(g_gpu_y, b_iv[1], loop_ub,
             gpu_cols);
         }
 
         loop_ub = e_y->size[1] - 1;
-        iv0 = d_y->size[1];
+        i = d_y->size[1];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel16<<<grid, block>>>(h_gpu_y, b_iv[1], loop_ub, iv0,
+          ec_filtfilt_kernel17<<<grid, block>>>(h_gpu_y, b_iv[1], loop_ub, i,
             gpu_cols);
         }
 
@@ -9577,30 +8095,30 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
 
         b_iv[1] = coef->size[1] - 2;
         nc = coef->size[1] - 2;
-        iv0 = vals->size[0] * vals->size[1];
+        i = vals->size[0] * vals->size[1];
         vals->size[0] = 1;
         vals->size[1] = (((ns - d_x) + coef->size[1]) + coef->size[1]) - 2;
-        emxEnsureCapacity_int8_T(vals, iv0, &nb_emlrtRTEI);
+        emxEnsureCapacity_int8_T(vals, i, &nb_emlrtRTEI);
         gpuEmxEnsureCapacity_int8_T(vals, &gpu_vals);
-        ec_filtfilt_kernel17<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
+        ec_filtfilt_kernel18<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
           gpu_vals);
         loop_ub = ns - d_x;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel18<<<grid, block>>>(gpu_a2, d_x, loop_ub, gpu_vals);
+          ec_filtfilt_kernel19<<<grid, block>>>(gpu_a2, d_x, loop_ub, gpu_vals);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((b_iv[1]
           - 1) + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel19<<<grid, block>>>(d_x, ns, b_iv[1] - 1, gpu_vals);
+          ec_filtfilt_kernel20<<<grid, block>>>(d_x, ns, b_iv[1] - 1, gpu_vals);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((nc - 1)
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel20<<<grid, block>>>(b_iv[1], d_x, ns, nc - 1,
+          ec_filtfilt_kernel21<<<grid, block>>>(b_iv[1], d_x, ns, nc - 1,
             gpu_vals);
         }
 
@@ -9609,51 +8127,51 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         val = b2->data[0];
-        iv0 = rhs->size[0];
+        i = rhs->size[0];
         rhs->size[0] = coef->size[1] - 1;
-        emxEnsureCapacity_real_T(rhs, iv0, &rb_emlrtRTEI);
+        emxEnsureCapacity_real_T(rhs, i, &rb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(rhs, &b_gpu_rhs);
-        outridx = coef->size[1] - 2;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        iv0 = coef->size[1] - 2;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel21<<<grid, block>>>(gpu_a2, val, gpu_b2, outridx,
+          ec_filtfilt_kernel22<<<grid, block>>>(gpu_a2, val, gpu_b2, iv0,
             b_gpu_rhs);
         }
 
         nc = cols->size[1] - 1;
         ns = rows->size[1] - 1;
-        iv0 = ridxInt->size[0];
+        i = ridxInt->size[0];
         ridxInt->size[0] = rows->size[1];
-        emxEnsureCapacity_int32_T(ridxInt, iv0, &tb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(ridxInt, i, &tb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(ridxInt, &gpu_ridxInt);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel22<<<grid, block>>>(gpu_rows, ns, gpu_ridxInt);
+          ec_filtfilt_kernel23<<<grid, block>>>(gpu_rows, ns, gpu_ridxInt);
           ridxInt_dirtyOnGpu = true;
         }
 
         ns = cols->size[1] - 1;
-        iv0 = cidxInt->size[0];
+        i = cidxInt->size[0];
         cidxInt->size[0] = cols->size[1];
-        emxEnsureCapacity_int32_T(cidxInt, iv0, &tb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(cidxInt, i, &tb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(cidxInt, &gpu_cidxInt);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel23<<<grid, block>>>(gpu_cols, ns, gpu_cidxInt);
+          ec_filtfilt_kernel24<<<grid, block>>>(gpu_cols, ns, gpu_cidxInt);
           cidxInt_dirtyOnGpu = true;
         }
 
-        iv0 = sortedIndices->size[0];
+        i = sortedIndices->size[0];
         sortedIndices->size[0] = cols->size[1];
-        emxEnsureCapacity_int32_T(sortedIndices, iv0, &ub_emlrtRTEI);
+        emxEnsureCapacity_int32_T(sortedIndices, i, &ub_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(sortedIndices, &gpu_sortedIndices);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nc + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel24<<<grid, block>>>(nc, gpu_sortedIndices);
+          ec_filtfilt_kernel25<<<grid, block>>>(nc, gpu_sortedIndices);
           gpuEmxMemcpyGpuToCpu_int32_T(sortedIndices, &gpu_sortedIndices);
         }
 
@@ -9669,50 +8187,50 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         ridxInt_dirtyOnGpu = false;
         coder::internal::introsort(sortedIndices, cidxInt->size[0], cidxInt,
           ridxInt);
-        c_x_dirtyOnGpu = true;
+        b_x_dirtyOnGpu = true;
         ns = cidxInt->size[0] - 1;
-        iv0 = t->size[0];
+        i = t->size[0];
         t->size[0] = cidxInt->size[0];
-        emxEnsureCapacity_int32_T(t, iv0, &vb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(t, i, &vb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(t, &gpu_t);
-        outridx = cidxInt->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        iv0 = cidxInt->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel25<<<grid, block>>>(gpu_cidxInt, outridx, gpu_t);
+          ec_filtfilt_kernel26<<<grid, block>>>(gpu_cidxInt, iv0, gpu_t);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&gpu_sortedIndices, sortedIndices);
-          c_x_dirtyOnGpu = false;
-          ec_filtfilt_kernel26<<<grid, block>>>(gpu_t, gpu_sortedIndices, ns,
+          b_x_dirtyOnGpu = false;
+          ec_filtfilt_kernel27<<<grid, block>>>(gpu_t, gpu_sortedIndices, ns,
             gpu_cidxInt);
           cidxInt_dirtyOnGpu = true;
         }
 
         ns = ridxInt->size[0] - 1;
-        iv0 = b_t->size[0];
+        i = b_t->size[0];
         b_t->size[0] = ridxInt->size[0];
-        emxEnsureCapacity_int32_T(b_t, iv0, &vb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(b_t, i, &vb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(b_t, &b_gpu_t);
-        outridx = ridxInt->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        iv0 = ridxInt->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel27<<<grid, block>>>(gpu_ridxInt, outridx, b_gpu_t);
+          ec_filtfilt_kernel28<<<grid, block>>>(gpu_ridxInt, iv0, b_gpu_t);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          if (c_x_dirtyOnGpu) {
+          if (b_x_dirtyOnGpu) {
             gpuEmxMemcpyCpuToGpu_int32_T(&gpu_sortedIndices, sortedIndices);
           }
 
-          c_x_dirtyOnGpu = false;
-          ec_filtfilt_kernel28<<<grid, block>>>(b_gpu_t, gpu_sortedIndices, ns,
+          b_x_dirtyOnGpu = false;
+          ec_filtfilt_kernel29<<<grid, block>>>(b_gpu_t, gpu_sortedIndices, ns,
             gpu_ridxInt);
           ridxInt_dirtyOnGpu = true;
         }
@@ -9734,23 +8252,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         d_x = cidxInt->data[cidxInt->size[0] - 1] - 1;
-        iv0 = y_d->size[0];
+        i = y_d->size[0];
         y_d->size[0] = cols->size[1];
-        emxEnsureCapacity_real_T(y_d, iv0, &bc_emlrtRTEI);
+        emxEnsureCapacity_real_T(y_d, i, &bc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(y_d, &gpu_y_d);
-        iv0 = y_colidx->size[0];
+        i = y_colidx->size[0];
         y_colidx->size[0] = cidxInt->data[cidxInt->size[0] - 1] + 1;
-        emxEnsureCapacity_int32_T(y_colidx, iv0, &cc_emlrtRTEI);
+        emxEnsureCapacity_int32_T(y_colidx, i, &cc_emlrtRTEI);
         y_colidx->data[0] = 1;
-        iv0 = y_rowidx->size[0];
+        i = y_rowidx->size[0];
         y_rowidx->size[0] = cols->size[1];
-        emxEnsureCapacity_int32_T(y_rowidx, iv0, &bc_emlrtRTEI);
+        emxEnsureCapacity_int32_T(y_rowidx, i, &bc_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(y_rowidx, &gpu_y_rowidx);
-        outridx = cols->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = cols->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel29<<<grid, block>>>(outridx, gpu_y_rowidx, gpu_y_d);
+          ec_filtfilt_kernel30<<<grid, block>>>(i, gpu_y_rowidx, gpu_y_d);
           y_d_dirtyOnGpu = true;
           y_rowidx_dirtyOnGpu = true;
         }
@@ -9773,11 +8291,11 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nc + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          if (c_x_dirtyOnGpu) {
+          if (b_x_dirtyOnGpu) {
             gpuEmxMemcpyCpuToGpu_int32_T(&gpu_sortedIndices, sortedIndices);
           }
 
-          ec_filtfilt_kernel30<<<grid, block>>>(gpu_vals, gpu_sortedIndices, nc,
+          ec_filtfilt_kernel31<<<grid, block>>>(gpu_vals, gpu_sortedIndices, nc,
             gpu_y_d);
           y_d_dirtyOnGpu = true;
         }
@@ -9830,22 +8348,22 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               ns = 1;
             }
 
-            iv0 = c_y_d->size[0];
+            i = c_y_d->size[0];
             c_y_d->size[0] = ns;
-            emxEnsureCapacity_real_T(c_y_d, iv0, &hc_emlrtRTEI);
+            emxEnsureCapacity_real_T(c_y_d, i, &hc_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(c_y_d, &c_gpu_y_d);
-            iv0 = c_y_colidx->size[0];
+            i = c_y_colidx->size[0];
             c_y_colidx->size[0] = thism + 1;
-            emxEnsureCapacity_int32_T(c_y_colidx, iv0, &cc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(c_y_colidx, i, &cc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(c_y_colidx, &b_gpu_y_colidx);
-            iv0 = c_y_rowidx->size[0];
+            i = c_y_rowidx->size[0];
             c_y_rowidx->size[0] = ns;
-            emxEnsureCapacity_int32_T(c_y_rowidx, iv0, &hc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(c_y_rowidx, i, &hc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(c_y_rowidx, &c_gpu_y_rowidx);
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel39<<<grid, block>>>(ns, c_gpu_y_rowidx,
+              ec_filtfilt_kernel40<<<grid, block>>>(ns, c_gpu_y_rowidx,
                 c_gpu_y_d);
               c_y_d_dirtyOnGpu = true;
               c_y_rowidx_dirtyOnGpu = true;
@@ -9854,34 +8372,34 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
               ((thism - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel40<<<grid, block>>>(thism, b_gpu_y_colidx);
+              ec_filtfilt_kernel41<<<grid, block>>>(thism, b_gpu_y_colidx);
             }
 
             nc = c_y_colidx->size[0] - 2;
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nc +
               1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel41<<<grid, block>>>(nc, b_gpu_y_colidx);
+              ec_filtfilt_kernel42<<<grid, block>>>(nc, b_gpu_y_colidx);
             }
 
-            outridx = c_y_colidx->size[0];
-            ec_filtfilt_kernel42<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
-              (outridx, b_gpu_y_colidx);
-            c_x_dirtyOnGpu = true;
-            ns = c_y_colidx->size[0];
             iv0 = c_y_colidx->size[0];
+            ec_filtfilt_kernel43<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(iv0,
+              b_gpu_y_colidx);
+            b_x_dirtyOnGpu = true;
+            ns = c_y_colidx->size[0];
+            i = c_y_colidx->size[0];
             c_y_colidx->size[0] = ns;
-            emxEnsureCapacity_int32_T(c_y_colidx, iv0, &hc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(c_y_colidx, i, &hc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(c_y_colidx, &b_gpu_y_colidx);
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel43<<<grid, block>>>(ns, b_gpu_y_colidx);
+              ec_filtfilt_kernel44<<<grid, block>>>(ns, b_gpu_y_colidx);
             }
 
             nc = y_colidx->data[y_colidx->size[0] - 1];
-            for (xCol_dim0 = 0; xCol_dim0 <= nc - 2; xCol_dim0++) {
-              if (c_x_dirtyOnGpu) {
+            for (xx_dim0 = 0; xx_dim0 <= nc - 2; xx_dim0++) {
+              if (b_x_dirtyOnGpu) {
                 gpuEmxMemcpyGpuToCpu_int32_T(c_y_colidx, &b_gpu_y_colidx);
               }
 
@@ -9889,28 +8407,28 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
                 gpuEmxMemcpyGpuToCpu_int32_T(y_rowidx, &gpu_y_rowidx);
               }
 
-              c_y_colidx->data[y_rowidx->data[xCol_dim0]]++;
+              c_y_colidx->data[y_rowidx->data[xx_dim0]]++;
               y_rowidx_dirtyOnGpu = false;
-              c_x_dirtyOnGpu = false;
+              b_x_dirtyOnGpu = false;
             }
 
-            if (c_x_dirtyOnGpu) {
+            if (b_x_dirtyOnGpu) {
               gpuEmxMemcpyGpuToCpu_int32_T(c_y_colidx, &b_gpu_y_colidx);
             }
 
             c_y_colidx->data[0] = 1;
-            for (xCol_dim0 = 0; xCol_dim0 < thism; xCol_dim0++) {
-              c_y_colidx->data[xCol_dim0 + 1] += c_y_colidx->data[xCol_dim0];
+            for (xx_dim0 = 0; xx_dim0 < thism; xx_dim0++) {
+              c_y_colidx->data[xx_dim0 + 1] += c_y_colidx->data[xx_dim0];
             }
 
-            iv0 = b_counts->size[0];
+            i = b_counts->size[0];
             b_counts->size[0] = thism;
-            emxEnsureCapacity_int32_T(b_counts, iv0, &pc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(b_counts, i, &pc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(b_counts, &b_gpu_counts);
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
               ((thism - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel44<<<grid, block>>>(thism, b_gpu_counts);
+              ec_filtfilt_kernel45<<<grid, block>>>(thism, b_gpu_counts);
               b_counts_dirtyOnGpu = true;
             }
 
@@ -9995,22 +8513,22 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
                 ns = 1;
               }
 
-              iv0 = d_y_d->size[0];
+              i = d_y_d->size[0];
               d_y_d->size[0] = ns;
-              emxEnsureCapacity_real_T(d_y_d, iv0, &hc_emlrtRTEI);
+              emxEnsureCapacity_real_T(d_y_d, i, &hc_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(d_y_d, &d_gpu_y_d);
-              iv0 = d_y_colidx->size[0];
+              i = d_y_colidx->size[0];
               d_y_colidx->size[0] = thism + 1;
-              emxEnsureCapacity_int32_T(d_y_colidx, iv0, &cc_emlrtRTEI);
+              emxEnsureCapacity_int32_T(d_y_colidx, i, &cc_emlrtRTEI);
               gpuEmxEnsureCapacity_int32_T(d_y_colidx, &c_gpu_y_colidx);
-              iv0 = d_y_rowidx->size[0];
+              i = d_y_rowidx->size[0];
               d_y_rowidx->size[0] = ns;
-              emxEnsureCapacity_int32_T(d_y_rowidx, iv0, &hc_emlrtRTEI);
+              emxEnsureCapacity_int32_T(d_y_rowidx, i, &hc_emlrtRTEI);
               gpuEmxEnsureCapacity_int32_T(d_y_rowidx, &d_gpu_y_rowidx);
               validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                 ((ns - 1) + 1L), &grid, &block, 1024U, 65535U);
               if (validLaunchParams) {
-                ec_filtfilt_kernel46<<<grid, block>>>(ns, d_gpu_y_rowidx,
+                ec_filtfilt_kernel47<<<grid, block>>>(ns, d_gpu_y_rowidx,
                   d_gpu_y_d);
                 d_y_d_dirtyOnGpu = true;
                 d_y_rowidx_dirtyOnGpu = true;
@@ -10019,34 +8537,34 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                 ((thism - 1) + 1L), &grid, &block, 1024U, 65535U);
               if (validLaunchParams) {
-                ec_filtfilt_kernel47<<<grid, block>>>(thism, c_gpu_y_colidx);
+                ec_filtfilt_kernel48<<<grid, block>>>(thism, c_gpu_y_colidx);
               }
 
               nc = d_y_colidx->size[0] - 2;
               validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nc
                 + 1L), &grid, &block, 1024U, 65535U);
               if (validLaunchParams) {
-                ec_filtfilt_kernel48<<<grid, block>>>(nc, c_gpu_y_colidx);
+                ec_filtfilt_kernel49<<<grid, block>>>(nc, c_gpu_y_colidx);
               }
 
-              outridx = d_y_colidx->size[0];
-              ec_filtfilt_kernel49<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
-                (outridx, c_gpu_y_colidx);
-              c_x_dirtyOnGpu = true;
-              ns = d_y_colidx->size[0];
               iv0 = d_y_colidx->size[0];
+              ec_filtfilt_kernel50<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(iv0,
+                c_gpu_y_colidx);
+              b_x_dirtyOnGpu = true;
+              ns = d_y_colidx->size[0];
+              i = d_y_colidx->size[0];
               d_y_colidx->size[0] = ns;
-              emxEnsureCapacity_int32_T(d_y_colidx, iv0, &hc_emlrtRTEI);
+              emxEnsureCapacity_int32_T(d_y_colidx, i, &hc_emlrtRTEI);
               gpuEmxEnsureCapacity_int32_T(d_y_colidx, &c_gpu_y_colidx);
               validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                 ((ns - 1) + 1L), &grid, &block, 1024U, 65535U);
               if (validLaunchParams) {
-                ec_filtfilt_kernel50<<<grid, block>>>(ns, c_gpu_y_colidx);
+                ec_filtfilt_kernel51<<<grid, block>>>(ns, c_gpu_y_colidx);
               }
 
               nc = y_colidx->data[y_colidx->size[0] - 1];
-              for (xCol_dim0 = 0; xCol_dim0 <= nc - 2; xCol_dim0++) {
-                if (c_x_dirtyOnGpu) {
+              for (xx_dim0 = 0; xx_dim0 <= nc - 2; xx_dim0++) {
+                if (b_x_dirtyOnGpu) {
                   gpuEmxMemcpyGpuToCpu_int32_T(d_y_colidx, &c_gpu_y_colidx);
                 }
 
@@ -10054,28 +8572,28 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
                   gpuEmxMemcpyGpuToCpu_int32_T(y_rowidx, &gpu_y_rowidx);
                 }
 
-                d_y_colidx->data[y_rowidx->data[xCol_dim0]]++;
+                d_y_colidx->data[y_rowidx->data[xx_dim0]]++;
                 y_rowidx_dirtyOnGpu = false;
-                c_x_dirtyOnGpu = false;
+                b_x_dirtyOnGpu = false;
               }
 
-              if (c_x_dirtyOnGpu) {
+              if (b_x_dirtyOnGpu) {
                 gpuEmxMemcpyGpuToCpu_int32_T(d_y_colidx, &c_gpu_y_colidx);
               }
 
               d_y_colidx->data[0] = 1;
-              for (xCol_dim0 = 0; xCol_dim0 < thism; xCol_dim0++) {
-                d_y_colidx->data[xCol_dim0 + 1] += d_y_colidx->data[xCol_dim0];
+              for (xx_dim0 = 0; xx_dim0 < thism; xx_dim0++) {
+                d_y_colidx->data[xx_dim0 + 1] += d_y_colidx->data[xx_dim0];
               }
 
-              iv0 = c_counts->size[0];
+              i = c_counts->size[0];
               c_counts->size[0] = thism;
-              emxEnsureCapacity_int32_T(c_counts, iv0, &pc_emlrtRTEI);
+              emxEnsureCapacity_int32_T(c_counts, i, &pc_emlrtRTEI);
               gpuEmxEnsureCapacity_int32_T(c_counts, &c_gpu_counts);
               validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                 ((thism - 1) + 1L), &grid, &block, 1024U, 65535U);
               if (validLaunchParams) {
-                ec_filtfilt_kernel51<<<grid, block>>>(thism, c_gpu_counts);
+                ec_filtfilt_kernel52<<<grid, block>>>(thism, c_gpu_counts);
                 c_counts_dirtyOnGpu = true;
               }
 
@@ -10146,19 +8664,19 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             c_N = cs_di_qr(c_cxA, c_S);
             cs_di_spfree(c_cxA);
             qr_rank_di(c_N, &val);
-            iv0 = zi->size[0];
+            i = zi->size[0];
             zi->size[0] = cidxInt->data[cidxInt->size[0] - 1];
-            emxEnsureCapacity_real_T(zi, iv0, &kc_emlrtRTEI);
+            emxEnsureCapacity_real_T(zi, i, &kc_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(zi, &gpu_zi);
             if (rhs->size[0] < cidxInt->data[cidxInt->size[0] - 1]) {
-              iv0 = b_outBuff->size[0];
+              i = b_outBuff->size[0];
               b_outBuff->size[0] = cidxInt->data[cidxInt->size[0] - 1];
-              emxEnsureCapacity_real_T(b_outBuff, iv0, &mc_emlrtRTEI);
+              emxEnsureCapacity_real_T(b_outBuff, i, &mc_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(b_outBuff, &b_gpu_outBuff);
             } else {
-              iv0 = b_outBuff->size[0];
+              i = b_outBuff->size[0];
               b_outBuff->size[0] = rhs->size[0];
-              emxEnsureCapacity_real_T(b_outBuff, iv0, &lc_emlrtRTEI);
+              emxEnsureCapacity_real_T(b_outBuff, i, &lc_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(b_outBuff, &b_gpu_outBuff);
             }
 
@@ -10166,32 +8684,33 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((nc
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel52<<<grid, block>>>(b_gpu_rhs, nc, b_gpu_outBuff);
+              ec_filtfilt_kernel53<<<grid, block>>>(b_gpu_rhs, nc, b_gpu_outBuff);
               gpuEmxMemcpyGpuToCpu_real_T(b_outBuff, &b_gpu_outBuff);
             }
 
             solve_from_qr_di(c_N, c_S, (double *)&b_outBuff->data[0], rhs->size
                              [0], cidxInt->data[cidxInt->size[0] - 1]);
-            iv0 = cidxInt->data[cidxInt->size[0] - 1] - 1;
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0
-              + 1L), &grid, &block, 1024U, 65535U);
+            i = cidxInt->data[cidxInt->size[0] - 1] - 1;
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i +
+              1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
               gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_outBuff, b_outBuff);
-              ec_filtfilt_kernel53<<<grid, block>>>(b_gpu_outBuff, iv0, gpu_zi);
+              cudaMemcpy(gpu_i, &i, 4UL, cudaMemcpyHostToDevice);
+              ec_filtfilt_kernel54<<<grid, block>>>(b_gpu_outBuff, gpu_i, gpu_zi);
             }
 
             cs_di_sfree(c_S);
             cs_di_nfree(c_N);
           } else {
-            iv0 = zi->size[0];
+            i = zi->size[0];
             zi->size[0] = rhs->size[0];
-            emxEnsureCapacity_real_T(zi, iv0, &jc_emlrtRTEI);
+            emxEnsureCapacity_real_T(zi, i, &jc_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(zi, &gpu_zi);
-            outridx = rhs->size[0] - 1;
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              (outridx + 1L), &grid, &block, 1024U, 65535U);
+            iv0 = rhs->size[0] - 1;
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0
+              + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel45<<<grid, block>>>(b_gpu_rhs, outridx, gpu_zi);
+              ec_filtfilt_kernel46<<<grid, block>>>(b_gpu_rhs, iv0, gpu_zi);
               gpuEmxMemcpyGpuToCpu_real_T(zi, &gpu_zi);
             }
 
@@ -10210,22 +8729,22 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               ns = 1;
             }
 
-            iv0 = b_y_d->size[0];
+            i = b_y_d->size[0];
             b_y_d->size[0] = ns;
-            emxEnsureCapacity_real_T(b_y_d, iv0, &hc_emlrtRTEI);
+            emxEnsureCapacity_real_T(b_y_d, i, &hc_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(b_y_d, &b_gpu_y_d);
-            iv0 = b_y_colidx->size[0];
+            i = b_y_colidx->size[0];
             b_y_colidx->size[0] = thism + 1;
-            emxEnsureCapacity_int32_T(b_y_colidx, iv0, &cc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(b_y_colidx, i, &cc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(b_y_colidx, &gpu_y_colidx);
-            iv0 = b_y_rowidx->size[0];
+            i = b_y_rowidx->size[0];
             b_y_rowidx->size[0] = ns;
-            emxEnsureCapacity_int32_T(b_y_rowidx, iv0, &hc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(b_y_rowidx, i, &hc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(b_y_rowidx, &b_gpu_y_rowidx);
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel31<<<grid, block>>>(ns, b_gpu_y_rowidx,
+              ec_filtfilt_kernel32<<<grid, block>>>(ns, b_gpu_y_rowidx,
                 b_gpu_y_d);
               b_y_d_dirtyOnGpu = true;
               b_y_rowidx_dirtyOnGpu = true;
@@ -10234,34 +8753,34 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
               ((thism - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel32<<<grid, block>>>(thism, gpu_y_colidx);
+              ec_filtfilt_kernel33<<<grid, block>>>(thism, gpu_y_colidx);
             }
 
             nc = b_y_colidx->size[0] - 2;
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nc +
               1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel33<<<grid, block>>>(nc, gpu_y_colidx);
+              ec_filtfilt_kernel34<<<grid, block>>>(nc, gpu_y_colidx);
             }
 
-            outridx = b_y_colidx->size[0];
-            ec_filtfilt_kernel34<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
-              (outridx, gpu_y_colidx);
-            c_x_dirtyOnGpu = true;
-            ns = b_y_colidx->size[0];
             iv0 = b_y_colidx->size[0];
+            ec_filtfilt_kernel35<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(iv0,
+              gpu_y_colidx);
+            b_x_dirtyOnGpu = true;
+            ns = b_y_colidx->size[0];
+            i = b_y_colidx->size[0];
             b_y_colidx->size[0] = ns;
-            emxEnsureCapacity_int32_T(b_y_colidx, iv0, &hc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(b_y_colidx, i, &hc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(b_y_colidx, &gpu_y_colidx);
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel35<<<grid, block>>>(ns, gpu_y_colidx);
+              ec_filtfilt_kernel36<<<grid, block>>>(ns, gpu_y_colidx);
             }
 
             nc = y_colidx->data[y_colidx->size[0] - 1];
-            for (xCol_dim0 = 0; xCol_dim0 <= nc - 2; xCol_dim0++) {
-              if (c_x_dirtyOnGpu) {
+            for (xx_dim0 = 0; xx_dim0 <= nc - 2; xx_dim0++) {
+              if (b_x_dirtyOnGpu) {
                 gpuEmxMemcpyGpuToCpu_int32_T(b_y_colidx, &gpu_y_colidx);
               }
 
@@ -10269,28 +8788,28 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
                 gpuEmxMemcpyGpuToCpu_int32_T(y_rowidx, &gpu_y_rowidx);
               }
 
-              b_y_colidx->data[y_rowidx->data[xCol_dim0]]++;
+              b_y_colidx->data[y_rowidx->data[xx_dim0]]++;
               y_rowidx_dirtyOnGpu = false;
-              c_x_dirtyOnGpu = false;
+              b_x_dirtyOnGpu = false;
             }
 
-            if (c_x_dirtyOnGpu) {
+            if (b_x_dirtyOnGpu) {
               gpuEmxMemcpyGpuToCpu_int32_T(b_y_colidx, &gpu_y_colidx);
             }
 
             b_y_colidx->data[0] = 1;
-            for (xCol_dim0 = 0; xCol_dim0 < thism; xCol_dim0++) {
-              b_y_colidx->data[xCol_dim0 + 1] += b_y_colidx->data[xCol_dim0];
+            for (xx_dim0 = 0; xx_dim0 < thism; xx_dim0++) {
+              b_y_colidx->data[xx_dim0 + 1] += b_y_colidx->data[xx_dim0];
             }
 
-            iv0 = counts->size[0];
+            i = counts->size[0];
             counts->size[0] = thism;
-            emxEnsureCapacity_int32_T(counts, iv0, &pc_emlrtRTEI);
+            emxEnsureCapacity_int32_T(counts, i, &pc_emlrtRTEI);
             gpuEmxEnsureCapacity_int32_T(counts, &gpu_counts);
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
               ((thism - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel36<<<grid, block>>>(thism, gpu_counts);
+              ec_filtfilt_kernel37<<<grid, block>>>(thism, gpu_counts);
               counts_dirtyOnGpu = true;
             }
 
@@ -10379,19 +8898,19 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             coder::internal::warning(ns, str);
           }
 
-          iv0 = zi->size[0];
+          i = zi->size[0];
           zi->size[0] = cidxInt->data[cidxInt->size[0] - 1];
-          emxEnsureCapacity_real_T(zi, iv0, &kc_emlrtRTEI);
+          emxEnsureCapacity_real_T(zi, i, &kc_emlrtRTEI);
           gpuEmxEnsureCapacity_real_T(zi, &gpu_zi);
           if (rhs->size[0] < cidxInt->data[cidxInt->size[0] - 1]) {
-            iv0 = outBuff->size[0];
+            i = outBuff->size[0];
             outBuff->size[0] = cidxInt->data[cidxInt->size[0] - 1];
-            emxEnsureCapacity_real_T(outBuff, iv0, &mc_emlrtRTEI);
+            emxEnsureCapacity_real_T(outBuff, i, &mc_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(outBuff, &gpu_outBuff);
           } else {
-            iv0 = outBuff->size[0];
+            i = outBuff->size[0];
             outBuff->size[0] = rhs->size[0];
-            emxEnsureCapacity_real_T(outBuff, iv0, &lc_emlrtRTEI);
+            emxEnsureCapacity_real_T(outBuff, i, &lc_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(outBuff, &gpu_outBuff);
           }
 
@@ -10399,18 +8918,19 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((nc -
             1) + 1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel37<<<grid, block>>>(b_gpu_rhs, nc, gpu_outBuff);
+            ec_filtfilt_kernel38<<<grid, block>>>(b_gpu_rhs, nc, gpu_outBuff);
             gpuEmxMemcpyGpuToCpu_real_T(outBuff, &gpu_outBuff);
           }
 
           solve_from_qr_di(N, S, (double *)&outBuff->data[0], rhs->size[0],
                            cidxInt->data[cidxInt->size[0] - 1]);
-          iv0 = cidxInt->data[cidxInt->size[0] - 1] - 1;
-          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 +
-            1L), &grid, &block, 1024U, 65535U);
+          i = cidxInt->data[cidxInt->size[0] - 1] - 1;
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+            &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_outBuff, outBuff);
-            ec_filtfilt_kernel38<<<grid, block>>>(gpu_outBuff, iv0, gpu_zi);
+            cudaMemcpy(gpu_i, &i, 4UL, cudaMemcpyHostToDevice);
+            ec_filtfilt_kernel39<<<grid, block>>>(gpu_outBuff, gpu_i, gpu_zi);
           }
 
           cs_di_sfree(S);
@@ -10421,14 +8941,15 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
       }
     }
 
-    if (xCol->size[1] == 1) {
-      if (xCol->size[0] < 10000) {
+    if (xx->size[1] == 1) {
+      if (xx->size[0] < 10000) {
         int32_T b_na;
         int32_T na;
         int32_T nb;
         uint32_T OH;
         uint32_T u;
         uint32_T window_idx_0;
+        i = static_cast<int32_T>(nfact + 1.0) - 1;
         c = static_cast<int32_T>(-((0.0 - nfact) - -1.0));
         na = a2->size[0] - 2;
         thism = b2->size[0] - 1;
@@ -10438,52 +8959,57 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_a2, a2);
         }
 
-        ec_filtfilt_kernel237<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
+        ec_filtfilt_kernel238<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
           gpu_a1, b_gpu_a1);
-        ec_filtfilt_kernel238<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_xCol,
-          gpu_d1);
-        if (xCol_dirtyOnGpu) {
-          gpuEmxMemcpyGpuToCpu_real_T(xCol, &gpu_xCol);
+        if (xx_dirtyOnCpu) {
+          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
         }
 
-        val = 2.0 * xCol->data[xCol->size[0] - 1];
-        outridx = xCol->size[0];
-        xCol_dim0 = ytemp->size[0];
-        ytemp->size[0] = (static_cast<int32_T>(nfact + 1.0) + xCol->size[0]) +
+        xx_dirtyOnCpu = false;
+        ec_filtfilt_kernel239<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_xx,
+          gpu_d1);
+        if (xx_dirtyOnGpu) {
+          gpuEmxMemcpyGpuToCpu_real_T(xx, &gpu_xx);
+        }
+
+        xx_dirtyOnGpu = false;
+        val = 2.0 * xx->data[xx->size[0] - 1];
+        outridx = xx->size[0];
+        xx_dim0 = ytemp->size[0];
+        ytemp->size[0] = (static_cast<int32_T>(nfact + 1.0) + xx->size[0]) +
           static_cast<int32_T>(-((0.0 - nfact) - -1.0));
-        emxEnsureCapacity_real_T(ytemp, xCol_dim0, &s_emlrtRTEI);
+        emxEnsureCapacity_real_T(ytemp, xx_dim0, &q_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(ytemp, &gpu_ytemp);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((
           static_cast<int32_T>(nfact + 1.0) - 2) + 1L), &grid, &block, 1024U,
           65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel239<<<grid, block>>>(gpu_xCol, static_cast<int32_T>
-            (nfact + 1.0) - 1, gpu_d1, static_cast<int32_T>(nfact + 1.0) - 2,
-            gpu_ytemp);
+          cudaMemcpy(gpu_i, &i, 4UL, cudaMemcpyHostToDevice);
+          ec_filtfilt_kernel240<<<grid, block>>>(gpu_xx, gpu_i, gpu_d1,
+            static_cast<int32_T>(nfact + 1.0) - 2, gpu_ytemp);
           ytemp_dirtyOnGpu = true;
         }
 
-        ns = xCol->size[0];
-        for (xCol_dim0 = 0; xCol_dim0 < ns; xCol_dim0++) {
+        ns = xx->size[0];
+        for (xx_dim0 = 0; xx_dim0 < ns; xx_dim0++) {
           if (ytemp_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(ytemp, &gpu_ytemp);
           }
 
-          ytemp->data[(xCol_dim0 + static_cast<int32_T>(nfact + 1.0)) - 1] =
-            xCol->data[xCol_dim0];
+          ytemp->data[(xx_dim0 + static_cast<int32_T>(nfact + 1.0)) - 1] =
+            xx->data[xx_dim0];
           ytemp_dirtyOnGpu = false;
           ytemp_dirtyOnCpu = true;
         }
 
-        for (xCol_dim0 = 0; xCol_dim0 <= c; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= c; xx_dim0++) {
           if (ytemp_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(ytemp, &gpu_ytemp);
           }
 
-          ytemp->data[((xCol_dim0 + static_cast<int32_T>(nfact + 1.0)) +
-                       xCol->size[0]) - 1] = val - xCol->data[(outridx -
-            xCol_dim0) - 2];
-          xCol_dirtyOnCpu = true;
+          ytemp->data[((xx_dim0 + static_cast<int32_T>(nfact + 1.0)) + xx->size
+                       [0]) - 1] = val - xx->data[(outridx - xx_dim0) - 2];
+          xx_dirtyOnCpu = true;
           ytemp_dirtyOnGpu = false;
           ytemp_dirtyOnCpu = true;
         }
@@ -10493,47 +9019,47 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         val = ytemp->data[0];
-        xCol_dim0 = h_y->size[0];
+        xx_dim0 = h_y->size[0];
         h_y->size[0] = zi->size[0];
-        emxEnsureCapacity_real_T(h_y, xCol_dim0, &w_emlrtRTEI);
+        emxEnsureCapacity_real_T(h_y, xx_dim0, &w_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(h_y, &f_gpu_y);
-        outridx = zi->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = zi->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (zi_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_zi, zi);
           }
 
           zi_dirtyOnCpu = false;
-          ec_filtfilt_kernel240<<<grid, block>>>(val, gpu_zi, outridx, f_gpu_y);
+          ec_filtfilt_kernel241<<<grid, block>>>(val, gpu_zi, i, f_gpu_y);
         }
 
-        xCol_dim0 = c_b->size[0];
+        xx_dim0 = c_b->size[0];
         c_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(c_b, xCol_dim0, &ab_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_b, xx_dim0, &ab_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_b, &d_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel241<<<grid, block>>>(gpu_b2, outridx, d_gpu_b);
+          ec_filtfilt_kernel242<<<grid, block>>>(gpu_b2, i, d_gpu_b);
           b_b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = b_a->size[0];
+        xx_dim0 = b_a->size[0];
         b_a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(b_a, xCol_dim0, &fb_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_a, xx_dim0, &fb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_a, &b_gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel242<<<grid, block>>>(gpu_a2, outridx, b_gpu_a);
+          ec_filtfilt_kernel243<<<grid, block>>>(gpu_a2, i, b_gpu_a);
           b_a_dirtyOnGpu = true;
         }
 
-        if (b_x_dirtyOnGpu) {
+        if (x_dirtyOnGpu) {
           gpuEmxMemcpyGpuToCpu_real_T(a2, &gpu_a2);
         }
 
@@ -10542,23 +9068,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(thism
             + 1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel243<<<grid, block>>>(b_gpu_a1, thism, d_gpu_b);
+            ec_filtfilt_kernel244<<<grid, block>>>(b_gpu_a1, thism, d_gpu_b);
             b_b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel244<<<grid, block>>>(b_gpu_a1, na, b_gpu_a);
+            ec_filtfilt_kernel245<<<grid, block>>>(b_gpu_a1, na, b_gpu_a);
           }
 
-          ec_filtfilt_kernel245<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(b_gpu_a);
+          ec_filtfilt_kernel246<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(b_gpu_a);
           b_a_dirtyOnGpu = true;
         }
 
         if (b_a->size[0] > c_b->size[0]) {
           ns = b_a->size[0] - c_b->size[0];
-          xCol_dim0 = c_b->size[0];
+          xx_dim0 = c_b->size[0];
           outridx = c_b->size[0];
           c_b->size[0] += ns;
           emxEnsureCapacity_real_T(c_b, outridx, &jb_emlrtRTEI);
@@ -10568,7 +9094,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(c_b, &d_gpu_b);
             }
 
-            std::memset(&c_b->data[xCol_dim0], 0, static_cast<uint32_T>(ns) *
+            std::memset(&c_b->data[xx_dim0], 0, static_cast<uint32_T>(ns) *
                         sizeof(real_T));
             b_b_dirtyOnCpu = true;
           }
@@ -10594,76 +9120,76 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + c_b->size[0];
         }
 
-        xCol_dim0 = b_expanded->size[0];
+        xx_dim0 = b_expanded->size[0];
         b_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(b_expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_expanded, &b_gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel246<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel247<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, b_gpu_expanded);
         }
 
         ns = ytemp->size[0];
-        xCol_dim0 = k_y->size[0] * k_y->size[1];
+        xx_dim0 = k_y->size[0] * k_y->size[1];
         k_y->size[0] = 1;
         k_y->size[1] = ytemp->size[0];
-        emxEnsureCapacity_int32_T(k_y, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(k_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(k_y, &k_gpu_y);
         k_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          k_y->data[xCol_dim0 + 1] = outridx;
+          k_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv1->size[0];
+        xx_dim0 = iv1->size[0];
         iv1->size[0] = k_y->size[1];
-        emxEnsureCapacity_int32_T(iv1, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv1, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv1, &gpu_iv1);
-        outridx = k_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = k_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&k_gpu_y, k_y);
-          ec_filtfilt_kernel247<<<grid, block>>>(nc, k_gpu_y, outridx, gpu_iv1);
+          ec_filtfilt_kernel248<<<grid, block>>>(nc, k_gpu_y, i, gpu_iv1);
         }
 
-        outridx = ytemp->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = ytemp->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (ytemp_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_ytemp, ytemp);
           }
 
           ytemp_dirtyOnCpu = false;
-          ec_filtfilt_kernel248<<<grid, block>>>(gpu_ytemp, gpu_iv1, outridx,
+          ec_filtfilt_kernel249<<<grid, block>>>(gpu_ytemp, gpu_iv1, i,
             b_gpu_expanded);
         }
 
-        xCol_dim0 = c_rows->size[0] * c_rows->size[1];
+        xx_dim0 = c_rows->size[0] * c_rows->size[1];
         c_rows->size[0] = 1;
         c_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(c_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(c_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(c_rows, &c_gpu_rows);
         c_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          c_rows->data[xCol_dim0 + 1] = outridx;
+          c_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = b_convOut->size[0];
+        xx_dim0 = b_convOut->size[0];
         b_convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(b_convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_convOut, &b_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))), 1U, 1U);
         r1 = dim3(static_cast<uint32_T>(d_x), 1U, 1U);
-        outridx = c_b->size[0];
+        i = c_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -10673,14 +9199,14 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&d_gpu_b, c_b);
           }
 
-          ec_filtfilt_kernel249<<<grid, block>>>(b_gpu_expanded, c_gpu_rows,
-            d_gpu_b, static_cast<int32_T>(u), outridx, b_gpu_convOut);
+          ec_filtfilt_kernel250<<<grid, block>>>(b_gpu_expanded, c_gpu_rows,
+            d_gpu_b, static_cast<int32_T>(u), i, b_gpu_convOut);
           b_convOut_dirtyOnGpu = true;
         }
 
         if (h_y->size[0] != 0) {
           if (h_y->size[0] == 1) {
-            ec_filtfilt_kernel251<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel252<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (f_gpu_y, b_gpu_convOut);
             b_convOut_dirtyOnGpu = true;
           } else {
@@ -10688,7 +9214,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns +
               1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel250<<<grid, block>>>(f_gpu_y, ns, b_gpu_convOut);
+              ec_filtfilt_kernel251<<<grid, block>>>(f_gpu_y, ns, b_gpu_convOut);
               b_convOut_dirtyOnGpu = true;
             }
           }
@@ -10715,25 +9241,25 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
         }
 
-        xCol_dim0 = dv3->size[0];
+        xx_dim0 = dv3->size[0];
         dv3->size[0] = ytemp->size[0];
-        emxEnsureCapacity_real_T(dv3, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(dv3, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(dv3, &gpu_dv3);
-        outridx = ytemp->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = ytemp->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (b_convOut_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_convOut, b_convOut);
           }
 
           b_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel252<<<grid, block>>>(b_gpu_convOut, outridx, gpu_dv3);
+          ec_filtfilt_kernel253<<<grid, block>>>(b_gpu_convOut, i, gpu_dv3);
           dv3_dirtyOnGpu = true;
         }
 
         zfSize[0] = static_cast<uint32_T>(ytemp->size[0]);
-        xCol_dim0 = ytemp->size[0] - 1;
+        xx_dim0 = ytemp->size[0] - 1;
         outridx = ytemp->size[0];
         ytemp->size[0] = static_cast<int32_T>(zfSize[0]);
         emxEnsureCapacity_real_T(ytemp, outridx, &xb_emlrtRTEI);
@@ -10741,8 +9267,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           gpuEmxEnsureCapacity_real_T(ytemp, &gpu_ytemp);
         }
 
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-          (xCol_dim0 + 1L), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(xx_dim0
+          + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (b_convOut_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_convOut, b_convOut);
@@ -10753,7 +9279,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_ytemp, ytemp);
           }
 
-          ec_filtfilt_kernel253<<<grid, block>>>(b_gpu_convOut, xCol_dim0,
+          ec_filtfilt_kernel254<<<grid, block>>>(b_gpu_convOut, xx_dim0,
             gpu_ytemp);
         }
 
@@ -10762,42 +9288,42 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         val = dv3->data[static_cast<int32_T>(zfSize[0]) - 1];
-        xCol_dim0 = p_y->size[0];
+        xx_dim0 = p_y->size[0];
         p_y->size[0] = zi->size[0];
-        emxEnsureCapacity_real_T(p_y, xCol_dim0, &w_emlrtRTEI);
+        emxEnsureCapacity_real_T(p_y, xx_dim0, &w_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(p_y, &n_gpu_y);
-        outridx = zi->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = zi->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (zi_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_zi, zi);
           }
 
-          ec_filtfilt_kernel254<<<grid, block>>>(val, gpu_zi, outridx, n_gpu_y);
+          ec_filtfilt_kernel255<<<grid, block>>>(val, gpu_zi, i, n_gpu_y);
         }
 
-        xCol_dim0 = g_b->size[0];
+        xx_dim0 = g_b->size[0];
         g_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(g_b, xCol_dim0, &ec_emlrtRTEI);
+        emxEnsureCapacity_real_T(g_b, xx_dim0, &ec_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(g_b, &h_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel255<<<grid, block>>>(gpu_b2, outridx, h_gpu_b);
+          ec_filtfilt_kernel256<<<grid, block>>>(gpu_b2, i, h_gpu_b);
           f_b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = f_a->size[0];
+        xx_dim0 = f_a->size[0];
         f_a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(f_a, xCol_dim0, &fc_emlrtRTEI);
+        emxEnsureCapacity_real_T(f_a, xx_dim0, &fc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(f_a, &f_gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel256<<<grid, block>>>(gpu_a2, outridx, f_gpu_a);
+          ec_filtfilt_kernel257<<<grid, block>>>(gpu_a2, i, f_gpu_a);
           d_a_dirtyOnGpu = true;
         }
 
@@ -10806,23 +9332,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nb +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel257<<<grid, block>>>(gpu_a1, nb, h_gpu_b);
+            ec_filtfilt_kernel258<<<grid, block>>>(gpu_a1, nb, h_gpu_b);
             f_b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(b_na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel258<<<grid, block>>>(gpu_a1, b_na, f_gpu_a);
+            ec_filtfilt_kernel259<<<grid, block>>>(gpu_a1, b_na, f_gpu_a);
           }
 
-          ec_filtfilt_kernel259<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(f_gpu_a);
+          ec_filtfilt_kernel260<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(f_gpu_a);
           d_a_dirtyOnGpu = true;
         }
 
         if (f_a->size[0] > g_b->size[0]) {
           ns = f_a->size[0] - g_b->size[0];
-          xCol_dim0 = g_b->size[0];
+          xx_dim0 = g_b->size[0];
           outridx = g_b->size[0];
           g_b->size[0] += ns;
           emxEnsureCapacity_real_T(g_b, outridx, &jb_emlrtRTEI);
@@ -10832,7 +9358,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(g_b, &h_gpu_b);
             }
 
-            std::memset(&g_b->data[xCol_dim0], 0, static_cast<uint32_T>(ns) *
+            std::memset(&g_b->data[xx_dim0], 0, static_cast<uint32_T>(ns) *
                         sizeof(real_T));
             f_b_dirtyOnCpu = true;
           }
@@ -10857,41 +9383,41 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + g_b->size[0];
         }
 
-        xCol_dim0 = e_expanded->size[0];
+        xx_dim0 = e_expanded->size[0];
         e_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(e_expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(e_expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(e_expanded, &f_gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel260<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel261<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, f_gpu_expanded);
         }
 
         ns = ytemp->size[0];
-        xCol_dim0 = r_y->size[0] * r_y->size[1];
+        xx_dim0 = r_y->size[0] * r_y->size[1];
         r_y->size[0] = 1;
         r_y->size[1] = static_cast<int32_T>(zfSize[0]);
-        emxEnsureCapacity_int32_T(r_y, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(r_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(r_y, &t_gpu_y);
         r_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          r_y->data[xCol_dim0 + 1] = outridx;
+          r_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv6->size[0];
+        xx_dim0 = iv6->size[0];
         iv6->size[0] = r_y->size[1];
-        emxEnsureCapacity_int32_T(iv6, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv6, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv6, &gpu_iv6);
-        outridx = r_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = r_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&t_gpu_y, r_y);
-          ec_filtfilt_kernel261<<<grid, block>>>(nc, t_gpu_y, outridx, gpu_iv6);
+          ec_filtfilt_kernel262<<<grid, block>>>(nc, t_gpu_y, i, gpu_iv6);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((
@@ -10902,31 +9428,31 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_convOut, b_convOut);
           }
 
-          ec_filtfilt_kernel262<<<grid, block>>>(b_gpu_convOut, static_cast<
+          ec_filtfilt_kernel263<<<grid, block>>>(b_gpu_convOut, static_cast<
             int32_T>(zfSize[0]) - 1, gpu_iv6, static_cast<int32_T>(zfSize[0]) -
             1, f_gpu_expanded);
         }
 
-        xCol_dim0 = f_rows->size[0] * f_rows->size[1];
+        xx_dim0 = f_rows->size[0] * f_rows->size[1];
         f_rows->size[0] = 1;
         f_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(f_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(f_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(f_rows, &g_gpu_rows);
         f_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          f_rows->data[xCol_dim0 + 1] = outridx;
+          f_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = e_convOut->size[0];
+        xx_dim0 = e_convOut->size[0];
         e_convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(e_convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(e_convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(e_convOut, &g_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))), 1U, 1U);
         r1 = dim3(static_cast<uint32_T>(d_x), 1U, 1U);
-        outridx = g_b->size[0];
+        i = g_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -10936,14 +9462,14 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&h_gpu_b, g_b);
           }
 
-          ec_filtfilt_kernel263<<<grid, block>>>(f_gpu_expanded, g_gpu_rows,
-            h_gpu_b, static_cast<int32_T>(u), outridx, g_gpu_convOut);
+          ec_filtfilt_kernel264<<<grid, block>>>(f_gpu_expanded, g_gpu_rows,
+            h_gpu_b, static_cast<int32_T>(u), i, g_gpu_convOut);
           f_convOut_dirtyOnGpu = true;
         }
 
         if (p_y->size[0] != 0) {
           if (p_y->size[0] == 1) {
-            ec_filtfilt_kernel265<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel266<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (n_gpu_y, g_gpu_convOut);
             f_convOut_dirtyOnGpu = true;
           } else {
@@ -10951,7 +9477,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns +
               1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel264<<<grid, block>>>(n_gpu_y, ns, g_gpu_convOut);
+              ec_filtfilt_kernel265<<<grid, block>>>(n_gpu_y, ns, g_gpu_convOut);
               f_convOut_dirtyOnGpu = true;
             }
           }
@@ -10989,12 +9515,12 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           vlen = static_cast<int32_T>(nfact + 1.0);
         }
 
-        xCol_dim0 = xCol->size[0] * xCol->size[1];
-        xCol->size[0] = div_s32(vlen - ns, outridx) + 1;
-        xCol->size[1] = 1;
-        emxEnsureCapacity_real_T(xCol, xCol_dim0, &sc_emlrtRTEI);
-        if (!xCol_dirtyOnCpu) {
-          gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
+        xx_dim0 = xx->size[0] * xx->size[1];
+        xx->size[0] = div_s32(vlen - ns, outridx) + 1;
+        xx->size[1] = 1;
+        emxEnsureCapacity_real_T(xx, xx_dim0, &sc_emlrtRTEI);
+        if (!xx_dirtyOnCpu) {
+          gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((vlen -
@@ -11004,13 +9530,14 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&g_gpu_convOut, e_convOut);
           }
 
-          if (xCol_dirtyOnCpu) {
-            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xCol, xCol);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
           }
 
-          ec_filtfilt_kernel266<<<grid, block>>>(g_gpu_convOut, outridx, ns,
-            vlen, gpu_xCol);
-          xCol_dirtyOnCpu = false;
+          ec_filtfilt_kernel267<<<grid, block>>>(g_gpu_convOut, outridx, ns,
+            vlen, gpu_xx);
+          xx_dirtyOnCpu = false;
+          xx_dirtyOnGpu = true;
         }
       } else {
         int32_T b_na;
@@ -11025,6 +9552,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         uint32_T OH;
         uint32_T u;
         uint32_T window_idx_0;
+        i = static_cast<int32_T>(nfact + 1.0) - 1;
         na = a2->size[0] - 2;
         thism = b2->size[0] - 1;
         b_na = a2->size[0] - 2;
@@ -11039,69 +9567,74 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_a2, a2);
         }
 
-        ec_filtfilt_kernel169<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
+        ec_filtfilt_kernel170<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
           c_gpu_a1, d_gpu_a1, e_gpu_a1, gpu_a1, b_gpu_a1);
-        if (xCol_dirtyOnGpu) {
-          gpuEmxMemcpyGpuToCpu_real_T(xCol, &gpu_xCol);
+        if (xx_dirtyOnGpu) {
+          gpuEmxMemcpyGpuToCpu_real_T(xx, &gpu_xx);
         }
 
-        val = 2.0 * xCol->data[0];
-        xCol_dim0 = xt->size[0];
+        val = 2.0 * xx->data[0];
+        xx_dim0 = xt->size[0];
         xt->size[0] = static_cast<int32_T>(nfact + 1.0) - 1;
-        emxEnsureCapacity_real_T(xt, xCol_dim0, &u_emlrtRTEI);
+        emxEnsureCapacity_real_T(xt, xx_dim0, &t_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(xt, &gpu_xt);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((
           static_cast<int32_T>(nfact + 1.0) - 2) + 1L), &grid, &block, 1024U,
           65535U);
         if (validLaunchParams) {
           cudaMemcpy(gpu_d1, &val, 8UL, cudaMemcpyHostToDevice);
-          ec_filtfilt_kernel170<<<grid, block>>>(gpu_d1, gpu_xCol, static_cast<
-            int32_T>(nfact + 1.0) - 1, gpu_xt);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          cudaMemcpy(gpu_i, &i, 4UL, cudaMemcpyHostToDevice);
+          ec_filtfilt_kernel171<<<grid, block>>>(gpu_d1, gpu_xx, gpu_i, gpu_xt);
           gpuEmxMemcpyGpuToCpu_real_T(xt, &gpu_xt);
         }
 
         val = xt->data[0];
-        xCol_dim0 = f_y->size[0];
+        xx_dim0 = f_y->size[0];
         f_y->size[0] = zi->size[0];
-        emxEnsureCapacity_real_T(f_y, xCol_dim0, &w_emlrtRTEI);
+        emxEnsureCapacity_real_T(f_y, xx_dim0, &w_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(f_y, &e_gpu_y);
-        outridx = zi->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = zi->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (zi_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_zi, zi);
           }
 
           zi_dirtyOnCpu = false;
-          ec_filtfilt_kernel171<<<grid, block>>>(val, gpu_zi, outridx, e_gpu_y);
+          ec_filtfilt_kernel172<<<grid, block>>>(val, gpu_zi, i, e_gpu_y);
         }
 
-        xCol_dim0 = b_b->size[0];
+        xx_dim0 = b_b->size[0];
         b_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(b_b, xCol_dim0, &y_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_b, xx_dim0, &y_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_b, &c_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel172<<<grid, block>>>(gpu_b2, outridx, c_gpu_b);
+          ec_filtfilt_kernel173<<<grid, block>>>(gpu_b2, i, c_gpu_b);
           b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = a->size[0];
+        xx_dim0 = a->size[0];
         a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(a, xCol_dim0, &eb_emlrtRTEI);
+        emxEnsureCapacity_real_T(a, xx_dim0, &eb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(a, &gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel173<<<grid, block>>>(gpu_a2, outridx, gpu_a);
+          ec_filtfilt_kernel174<<<grid, block>>>(gpu_a2, i, gpu_a);
           a_dirtyOnGpu = true;
         }
 
-        if (b_x_dirtyOnGpu) {
+        if (x_dirtyOnGpu) {
           gpuEmxMemcpyGpuToCpu_real_T(a2, &gpu_a2);
         }
 
@@ -11110,23 +9643,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(thism
             + 1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel174<<<grid, block>>>(b_gpu_a1, thism, c_gpu_b);
+            ec_filtfilt_kernel175<<<grid, block>>>(b_gpu_a1, thism, c_gpu_b);
             b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel175<<<grid, block>>>(b_gpu_a1, na, gpu_a);
+            ec_filtfilt_kernel176<<<grid, block>>>(b_gpu_a1, na, gpu_a);
           }
 
-          ec_filtfilt_kernel176<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a);
+          ec_filtfilt_kernel177<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a);
           a_dirtyOnGpu = true;
         }
 
         if (a->size[0] > b_b->size[0]) {
           loop_ub = a->size[0] - b_b->size[0];
-          xCol_dim0 = b_b->size[0];
+          xx_dim0 = b_b->size[0];
           outridx = b_b->size[0];
           b_b->size[0] += loop_ub;
           emxEnsureCapacity_real_T(b_b, outridx, &jb_emlrtRTEI);
@@ -11136,8 +9669,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(b_b, &c_gpu_b);
             }
 
-            std::memset(&b_b->data[xCol_dim0], 0, static_cast<uint32_T>(loop_ub)
-                        * sizeof(real_T));
+            std::memset(&b_b->data[xx_dim0], 0, static_cast<uint32_T>(loop_ub) *
+                        sizeof(real_T));
             b_dirtyOnCpu = true;
           }
         }
@@ -11163,71 +9696,71 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + b_b->size[0];
         }
 
-        xCol_dim0 = expanded->size[0];
+        xx_dim0 = expanded->size[0];
         expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(expanded, &gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel177<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel178<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, gpu_expanded);
         }
 
         ns = xt->size[0];
-        xCol_dim0 = j_y->size[0] * j_y->size[1];
+        xx_dim0 = j_y->size[0] * j_y->size[1];
         j_y->size[0] = 1;
         j_y->size[1] = xt->size[0];
-        emxEnsureCapacity_int32_T(j_y, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(j_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(j_y, &j_gpu_y);
         j_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          j_y->data[xCol_dim0 + 1] = outridx;
+          j_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv->size[0];
+        xx_dim0 = iv->size[0];
         iv->size[0] = j_y->size[1];
-        emxEnsureCapacity_int32_T(iv, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv, &gpu_iv);
-        outridx = j_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = j_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&j_gpu_y, j_y);
-          ec_filtfilt_kernel178<<<grid, block>>>(nc, j_gpu_y, outridx, gpu_iv);
+          ec_filtfilt_kernel179<<<grid, block>>>(nc, j_gpu_y, i, gpu_iv);
         }
 
         iv0 = xt->size[0] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel179<<<grid, block>>>(gpu_xt, gpu_iv, iv0,
+          ec_filtfilt_kernel180<<<grid, block>>>(gpu_xt, gpu_iv, iv0,
             gpu_expanded);
         }
 
-        xCol_dim0 = b_rows->size[0] * b_rows->size[1];
+        xx_dim0 = b_rows->size[0] * b_rows->size[1];
         b_rows->size[0] = 1;
         b_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(b_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(b_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(b_rows, &b_gpu_rows);
         b_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          b_rows->data[xCol_dim0 + 1] = outridx;
+          b_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = convOut->size[0];
+        xx_dim0 = convOut->size[0];
         convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(convOut, &gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))), 1U, 1U);
         r1 = dim3(static_cast<uint32_T>(d_x), 1U, 1U);
-        outridx = b_b->size[0];
+        i = b_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -11237,14 +9770,14 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&c_gpu_b, b_b);
           }
 
-          ec_filtfilt_kernel180<<<grid, block>>>(gpu_expanded, b_gpu_rows,
-            c_gpu_b, static_cast<int32_T>(u), outridx, gpu_convOut);
+          ec_filtfilt_kernel181<<<grid, block>>>(gpu_expanded, b_gpu_rows,
+            c_gpu_b, static_cast<int32_T>(u), i, gpu_convOut);
           convOut_dirtyOnGpu = true;
         }
 
         if (f_y->size[0] != 0) {
           if (f_y->size[0] == 1) {
-            ec_filtfilt_kernel182<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel183<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (e_gpu_y, gpu_convOut);
             convOut_dirtyOnGpu = true;
           } else {
@@ -11252,7 +9785,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns +
               1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel181<<<grid, block>>>(e_gpu_y, ns, gpu_convOut);
+              ec_filtfilt_kernel182<<<grid, block>>>(e_gpu_y, ns, gpu_convOut);
               convOut_dirtyOnGpu = true;
             }
           }
@@ -11287,9 +9820,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = convOut->size[0] - 1;
         }
 
-        xCol_dim0 = zfIIR->size[0];
+        xx_dim0 = zfIIR->size[0];
         zfIIR->size[0] = (outridx - ns) + 1;
-        emxEnsureCapacity_real_T(zfIIR, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(zfIIR, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(zfIIR, &gpu_zfIIR);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
           - ns) + 1L), &grid, &block, 1024U, 65535U);
@@ -11299,7 +9832,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel183<<<grid, block>>>(gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel184<<<grid, block>>>(gpu_convOut, ns, outridx,
             gpu_zfIIR);
         }
 
@@ -11313,31 +9846,31 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_convOut, convOut);
           }
 
-          ec_filtfilt_kernel184<<<grid, block>>>(gpu_convOut, gpu_a, ns, iv0,
+          ec_filtfilt_kernel185<<<grid, block>>>(gpu_convOut, gpu_a, ns, iv0,
             idx, gpu_zfIIR);
         }
 
-        xCol_dim0 = f_b->size[0];
+        xx_dim0 = f_b->size[0];
         f_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(f_b, xCol_dim0, &ac_emlrtRTEI);
+        emxEnsureCapacity_real_T(f_b, xx_dim0, &ac_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(f_b, &g_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel185<<<grid, block>>>(gpu_b2, outridx, g_gpu_b);
+          ec_filtfilt_kernel186<<<grid, block>>>(gpu_b2, i, g_gpu_b);
           e_b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = e_a->size[0];
+        xx_dim0 = e_a->size[0];
         e_a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(e_a, xCol_dim0, &dc_emlrtRTEI);
+        emxEnsureCapacity_real_T(e_a, xx_dim0, &dc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(e_a, &e_gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel186<<<grid, block>>>(gpu_a2, outridx, e_gpu_a);
+          ec_filtfilt_kernel187<<<grid, block>>>(gpu_a2, i, e_gpu_a);
           c_a_dirtyOnGpu = true;
         }
 
@@ -11346,23 +9879,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nb +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel187<<<grid, block>>>(gpu_a1, nb, g_gpu_b);
+            ec_filtfilt_kernel188<<<grid, block>>>(gpu_a1, nb, g_gpu_b);
             e_b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(b_na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel188<<<grid, block>>>(gpu_a1, b_na, e_gpu_a);
+            ec_filtfilt_kernel189<<<grid, block>>>(gpu_a1, b_na, e_gpu_a);
           }
 
-          ec_filtfilt_kernel189<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(e_gpu_a);
+          ec_filtfilt_kernel190<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(e_gpu_a);
           c_a_dirtyOnGpu = true;
         }
 
         if (e_a->size[0] > f_b->size[0]) {
           loop_ub = e_a->size[0] - f_b->size[0];
-          xCol_dim0 = f_b->size[0];
+          xx_dim0 = f_b->size[0];
           outridx = f_b->size[0];
           f_b->size[0] += loop_ub;
           emxEnsureCapacity_real_T(f_b, outridx, &jb_emlrtRTEI);
@@ -11372,15 +9905,15 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(f_b, &g_gpu_b);
             }
 
-            std::memset(&f_b->data[xCol_dim0], 0, static_cast<uint32_T>(loop_ub)
-                        * sizeof(real_T));
+            std::memset(&f_b->data[xx_dim0], 0, static_cast<uint32_T>(loop_ub) *
+                        sizeof(real_T));
             e_b_dirtyOnCpu = true;
           }
         }
 
         idx = f_b->size[0] - 1;
         window_idx_0 = static_cast<uint32_T>(f_b->size[0]);
-        OH = (static_cast<uint32_T>(xCol->size[0]) + static_cast<uint32_T>
+        OH = (static_cast<uint32_T>(xx->size[0]) + static_cast<uint32_T>
               (f_b->size[0])) - 1U;
         u = OH;
         if (OH > 2147483647U) {
@@ -11397,71 +9930,76 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + f_b->size[0];
         }
 
-        xCol_dim0 = f_expanded->size[0];
+        xx_dim0 = f_expanded->size[0];
         f_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(f_expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(f_expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(f_expanded, &e_gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel190<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel191<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, e_gpu_expanded);
         }
 
-        ns = xCol->size[0];
-        xCol_dim0 = t_y->size[0] * t_y->size[1];
+        ns = xx->size[0];
+        xx_dim0 = t_y->size[0] * t_y->size[1];
         t_y->size[0] = 1;
-        t_y->size[1] = xCol->size[0];
-        emxEnsureCapacity_int32_T(t_y, xCol_dim0, &pb_emlrtRTEI);
+        t_y->size[1] = xx->size[0];
+        emxEnsureCapacity_int32_T(t_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(t_y, &s_gpu_y);
         t_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          t_y->data[xCol_dim0 + 1] = outridx;
+          t_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv7->size[0];
+        xx_dim0 = iv7->size[0];
         iv7->size[0] = t_y->size[1];
-        emxEnsureCapacity_int32_T(iv7, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv7, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv7, &gpu_iv7);
-        outridx = t_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = t_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&s_gpu_y, t_y);
-          ec_filtfilt_kernel191<<<grid, block>>>(nc, s_gpu_y, outridx, gpu_iv7);
+          ec_filtfilt_kernel192<<<grid, block>>>(nc, s_gpu_y, i, gpu_iv7);
         }
 
-        loop_ub = xCol->size[0] - 1;
+        loop_ub = xx->size[0] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel192<<<grid, block>>>(gpu_xCol, gpu_iv7, loop_ub,
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel193<<<grid, block>>>(gpu_xx, gpu_iv7, loop_ub,
             e_gpu_expanded);
         }
 
-        xCol_dim0 = g_rows->size[0] * g_rows->size[1];
+        xx_dim0 = g_rows->size[0] * g_rows->size[1];
         g_rows->size[0] = 1;
         g_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(g_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(g_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(g_rows, &f_gpu_rows);
         g_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          g_rows->data[xCol_dim0 + 1] = outridx;
+          g_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = f_convOut->size[0];
+        xx_dim0 = f_convOut->size[0];
         f_convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(f_convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(f_convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(f_convOut, &f_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) +
                     31.0) / 32.0)), 1U, 1U);
         r1 = dim3(32U, 1U, 1U);
-        outridx = f_b->size[0];
+        i = f_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -11471,28 +10009,28 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&g_gpu_b, f_b);
           }
 
-          ec_filtfilt_kernel193<<<grid, block>>>(e_gpu_expanded, f_gpu_rows,
-            g_gpu_b, static_cast<int32_T>(u), outridx, f_gpu_convOut);
+          ec_filtfilt_kernel194<<<grid, block>>>(e_gpu_expanded, f_gpu_rows,
+            g_gpu_b, static_cast<int32_T>(u), i, f_gpu_convOut);
           e_convOut_dirtyOnGpu = true;
         }
 
         if (na != 0) {
           if (na == 1) {
-            ec_filtfilt_kernel195<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel196<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (gpu_zfIIR, f_gpu_convOut);
             e_convOut_dirtyOnGpu = true;
           } else {
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((na
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel194<<<grid, block>>>(gpu_zfIIR, na - 1,
+              ec_filtfilt_kernel195<<<grid, block>>>(gpu_zfIIR, na - 1,
                 f_gpu_convOut);
               e_convOut_dirtyOnGpu = true;
             }
           }
         }
 
-        ns = xCol->size[0] + e_a->size[0];
+        ns = xx->size[0] + e_a->size[0];
         for (d_x = 0; d_x <= ns - 2; d_x++) {
           outridx = static_cast<int32_T>(std::fmin(static_cast<real_T>(d_x) +
             1.0, static_cast<real_T>(e_a->size[0])));
@@ -11513,18 +10051,18 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
         }
 
-        if (static_cast<uint32_T>(xCol->size[0]) + 1U > static_cast<uint32_T>
+        if (static_cast<uint32_T>(xx->size[0]) + 1U > static_cast<uint32_T>
             (f_convOut->size[0])) {
           ns = 1;
           outridx = 0;
         } else {
-          ns = xCol->size[0] + 1;
+          ns = xx->size[0] + 1;
           outridx = f_convOut->size[0];
         }
 
-        xCol_dim0 = d_zfIIR->size[0];
+        xx_dim0 = d_zfIIR->size[0];
         d_zfIIR->size[0] = (outridx - ns) + 1;
-        emxEnsureCapacity_real_T(d_zfIIR, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(d_zfIIR, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(d_zfIIR, &c_gpu_zfIIR);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
           - ns) + 1L), &grid, &block, 1024U, 65535U);
@@ -11534,13 +10072,13 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           e_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel196<<<grid, block>>>(f_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel197<<<grid, block>>>(f_gpu_convOut, ns, outridx,
             c_gpu_zfIIR);
         }
 
         ns = e_a->size[0] - 3;
         iv0 = e_a->size[0];
-        xCol_dim0 = xCol->size[0];
+        xx_dim0 = xx->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
@@ -11549,46 +10087,57 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           e_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel197<<<grid, block>>>(f_gpu_convOut, e_gpu_a, ns, iv0,
-            xCol_dim0, c_gpu_zfIIR);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel198<<<grid, block>>>(f_gpu_convOut, e_gpu_a, ns, iv0,
+            xx_dim0, c_gpu_zfIIR);
         }
 
-        outridx = xCol->size[0] - 1;
-        val = 2.0 * xCol->data[xCol->size[0] - 1];
-        xCol_dim0 = xt->size[0];
+        outridx = xx->size[0] - 1;
+        xx_dirtyOnGpu = false;
+        val = 2.0 * xx->data[xx->size[0] - 1];
+        xx_dim0 = xt->size[0];
         xt->size[0] = static_cast<int32_T>(-((0.0 - nfact) - -1.0)) + 1;
-        emxEnsureCapacity_real_T(xt, xCol_dim0, &rc_emlrtRTEI);
+        emxEnsureCapacity_real_T(xt, xx_dim0, &rc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(xt, &gpu_xt);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(
           static_cast<int32_T>(-((0.0 - nfact) - -1.0)) + 1L), &grid, &block,
           1024U, 65535U);
         if (validLaunchParams) {
           cudaMemcpy(gpu_d1, &val, 8UL, cudaMemcpyHostToDevice);
-          ec_filtfilt_kernel198<<<grid, block>>>(gpu_d1, gpu_xCol, outridx, 0.0
-            - nfact, gpu_xt);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel199<<<grid, block>>>(gpu_d1, gpu_xx, outridx, 0.0 -
+            nfact, gpu_xt);
         }
 
-        xCol_dim0 = i_b->size[0];
+        xx_dim0 = i_b->size[0];
         i_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(i_b, xCol_dim0, &tc_emlrtRTEI);
+        emxEnsureCapacity_real_T(i_b, xx_dim0, &tc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(i_b, &l_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel199<<<grid, block>>>(gpu_b2, outridx, l_gpu_b);
+          ec_filtfilt_kernel200<<<grid, block>>>(gpu_b2, i, l_gpu_b);
           j_b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = h_a->size[0];
+        xx_dim0 = h_a->size[0];
         h_a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(h_a, xCol_dim0, &uc_emlrtRTEI);
+        emxEnsureCapacity_real_T(h_a, xx_dim0, &uc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(h_a, &j_gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel200<<<grid, block>>>(gpu_a2, outridx, j_gpu_a);
+          ec_filtfilt_kernel201<<<grid, block>>>(gpu_a2, i, j_gpu_a);
           e_a_dirtyOnGpu = true;
         }
 
@@ -11597,23 +10146,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(b_nb +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel201<<<grid, block>>>(e_gpu_a1, b_nb, l_gpu_b);
+            ec_filtfilt_kernel202<<<grid, block>>>(e_gpu_a1, b_nb, l_gpu_b);
             j_b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(c_na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel202<<<grid, block>>>(e_gpu_a1, c_na, j_gpu_a);
+            ec_filtfilt_kernel203<<<grid, block>>>(e_gpu_a1, c_na, j_gpu_a);
           }
 
-          ec_filtfilt_kernel203<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(j_gpu_a);
+          ec_filtfilt_kernel204<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(j_gpu_a);
           e_a_dirtyOnGpu = true;
         }
 
         if (h_a->size[0] > i_b->size[0]) {
           loop_ub = h_a->size[0] - i_b->size[0];
-          xCol_dim0 = i_b->size[0];
+          xx_dim0 = i_b->size[0];
           outridx = i_b->size[0];
           i_b->size[0] += loop_ub;
           emxEnsureCapacity_real_T(i_b, outridx, &jb_emlrtRTEI);
@@ -11623,8 +10172,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(i_b, &l_gpu_b);
             }
 
-            std::memset(&i_b->data[xCol_dim0], 0, static_cast<uint32_T>(loop_ub)
-                        * sizeof(real_T));
+            std::memset(&i_b->data[xx_dim0], 0, static_cast<uint32_T>(loop_ub) *
+                        sizeof(real_T));
             j_b_dirtyOnCpu = true;
           }
         }
@@ -11649,71 +10198,71 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + i_b->size[0];
         }
 
-        xCol_dim0 = h_expanded->size[0];
+        xx_dim0 = h_expanded->size[0];
         h_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(h_expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(h_expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(h_expanded, &j_gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel204<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel205<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, j_gpu_expanded);
         }
 
         ns = xt->size[0];
-        xCol_dim0 = w_y->size[0] * w_y->size[1];
+        xx_dim0 = w_y->size[0] * w_y->size[1];
         w_y->size[0] = 1;
         w_y->size[1] = xt->size[0];
-        emxEnsureCapacity_int32_T(w_y, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(w_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(w_y, &bb_gpu_y);
         w_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          w_y->data[xCol_dim0 + 1] = outridx;
+          w_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv11->size[0];
+        xx_dim0 = iv11->size[0];
         iv11->size[0] = w_y->size[1];
-        emxEnsureCapacity_int32_T(iv11, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv11, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv11, &gpu_iv11);
-        outridx = w_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = w_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&bb_gpu_y, w_y);
-          ec_filtfilt_kernel205<<<grid, block>>>(nc, bb_gpu_y, outridx, gpu_iv11);
+          ec_filtfilt_kernel206<<<grid, block>>>(nc, bb_gpu_y, i, gpu_iv11);
         }
 
         iv0 = xt->size[0] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(iv0 + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel206<<<grid, block>>>(gpu_xt, gpu_iv11, iv0,
+          ec_filtfilt_kernel207<<<grid, block>>>(gpu_xt, gpu_iv11, iv0,
             j_gpu_expanded);
         }
 
-        xCol_dim0 = i_rows->size[0] * i_rows->size[1];
+        xx_dim0 = i_rows->size[0] * i_rows->size[1];
         i_rows->size[0] = 1;
         i_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(i_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(i_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(i_rows, &j_gpu_rows);
         i_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          i_rows->data[xCol_dim0 + 1] = outridx;
+          i_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = h_convOut->size[0];
+        xx_dim0 = h_convOut->size[0];
         h_convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(h_convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(h_convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(h_convOut, &o_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))), 1U, 1U);
         r1 = dim3(static_cast<uint32_T>(d_x), 1U, 1U);
-        outridx = i_b->size[0];
+        i = i_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -11723,21 +10272,21 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&l_gpu_b, i_b);
           }
 
-          ec_filtfilt_kernel207<<<grid, block>>>(j_gpu_expanded, j_gpu_rows,
-            l_gpu_b, static_cast<int32_T>(u), outridx, o_gpu_convOut);
+          ec_filtfilt_kernel208<<<grid, block>>>(j_gpu_expanded, j_gpu_rows,
+            l_gpu_b, static_cast<int32_T>(u), i, o_gpu_convOut);
           i_convOut_dirtyOnGpu = true;
         }
 
         if (idx != 0) {
           if (idx == 1) {
-            ec_filtfilt_kernel209<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel210<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (c_gpu_zfIIR, o_gpu_convOut);
             i_convOut_dirtyOnGpu = true;
           } else {
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((idx
               - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel208<<<grid, block>>>(c_gpu_zfIIR, idx - 1,
+              ec_filtfilt_kernel209<<<grid, block>>>(c_gpu_zfIIR, idx - 1,
                 o_gpu_convOut);
               i_convOut_dirtyOnGpu = true;
             }
@@ -11771,42 +10320,42 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         val = h_convOut->data[xt->size[0] - 1];
-        xCol_dim0 = bb_y->size[0];
+        xx_dim0 = bb_y->size[0];
         bb_y->size[0] = zi->size[0];
-        emxEnsureCapacity_real_T(bb_y, xCol_dim0, &w_emlrtRTEI);
+        emxEnsureCapacity_real_T(bb_y, xx_dim0, &w_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(bb_y, &cb_gpu_y);
-        outridx = zi->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = zi->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (zi_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&gpu_zi, zi);
           }
 
-          ec_filtfilt_kernel210<<<grid, block>>>(val, gpu_zi, outridx, cb_gpu_y);
+          ec_filtfilt_kernel211<<<grid, block>>>(val, gpu_zi, i, cb_gpu_y);
         }
 
-        xCol_dim0 = l_b->size[0];
+        xx_dim0 = l_b->size[0];
         l_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(l_b, xCol_dim0, &xc_emlrtRTEI);
+        emxEnsureCapacity_real_T(l_b, xx_dim0, &xc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(l_b, &m_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel211<<<grid, block>>>(gpu_b2, outridx, m_gpu_b);
+          ec_filtfilt_kernel212<<<grid, block>>>(gpu_b2, i, m_gpu_b);
           k_b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = k_a->size[0];
+        xx_dim0 = k_a->size[0];
         k_a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(k_a, xCol_dim0, &yc_emlrtRTEI);
+        emxEnsureCapacity_real_T(k_a, xx_dim0, &yc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(k_a, &k_gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel212<<<grid, block>>>(gpu_a2, outridx, k_gpu_a);
+          ec_filtfilt_kernel213<<<grid, block>>>(gpu_a2, i, k_gpu_a);
           f_a_dirtyOnGpu = true;
         }
 
@@ -11815,23 +10364,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(c_nb +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel213<<<grid, block>>>(d_gpu_a1, c_nb, m_gpu_b);
+            ec_filtfilt_kernel214<<<grid, block>>>(d_gpu_a1, c_nb, m_gpu_b);
             k_b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(d_na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel214<<<grid, block>>>(d_gpu_a1, d_na, k_gpu_a);
+            ec_filtfilt_kernel215<<<grid, block>>>(d_gpu_a1, d_na, k_gpu_a);
           }
 
-          ec_filtfilt_kernel215<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(k_gpu_a);
+          ec_filtfilt_kernel216<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(k_gpu_a);
           f_a_dirtyOnGpu = true;
         }
 
         if (k_a->size[0] > l_b->size[0]) {
           loop_ub = k_a->size[0] - l_b->size[0];
-          xCol_dim0 = l_b->size[0];
+          xx_dim0 = l_b->size[0];
           outridx = l_b->size[0];
           l_b->size[0] += loop_ub;
           emxEnsureCapacity_real_T(l_b, outridx, &jb_emlrtRTEI);
@@ -11841,8 +10390,8 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(l_b, &m_gpu_b);
             }
 
-            std::memset(&l_b->data[xCol_dim0], 0, static_cast<uint32_T>(loop_ub)
-                        * sizeof(real_T));
+            std::memset(&l_b->data[xx_dim0], 0, static_cast<uint32_T>(loop_ub) *
+                        sizeof(real_T));
             k_b_dirtyOnCpu = true;
           }
         }
@@ -11868,41 +10417,41 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + l_b->size[0];
         }
 
-        xCol_dim0 = k_expanded->size[0];
+        xx_dim0 = k_expanded->size[0];
         k_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(k_expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(k_expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(k_expanded, &k_gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel216<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel217<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, k_gpu_expanded);
         }
 
         ns = xt->size[0];
-        xCol_dim0 = db_y->size[0] * db_y->size[1];
+        xx_dim0 = db_y->size[0] * db_y->size[1];
         db_y->size[0] = 1;
         db_y->size[1] = static_cast<int32_T>(dv1[0]);
-        emxEnsureCapacity_int32_T(db_y, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(db_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(db_y, &db_gpu_y);
         db_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          db_y->data[xCol_dim0 + 1] = outridx;
+          db_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv16->size[0];
+        xx_dim0 = iv16->size[0];
         iv16->size[0] = db_y->size[1];
-        emxEnsureCapacity_int32_T(iv16, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv16, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv16, &gpu_iv16);
-        outridx = db_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = db_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&db_gpu_y, db_y);
-          ec_filtfilt_kernel217<<<grid, block>>>(nc, db_gpu_y, outridx, gpu_iv16);
+          ec_filtfilt_kernel218<<<grid, block>>>(nc, db_gpu_y, i, gpu_iv16);
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((
@@ -11912,31 +10461,31 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&o_gpu_convOut, h_convOut);
           }
 
-          ec_filtfilt_kernel218<<<grid, block>>>(o_gpu_convOut,
+          ec_filtfilt_kernel219<<<grid, block>>>(o_gpu_convOut,
             static_cast<int32_T>(dv1[0]) - 1, gpu_iv16, static_cast<int32_T>
             (dv1[0]) - 1, k_gpu_expanded);
         }
 
-        xCol_dim0 = l_rows->size[0] * l_rows->size[1];
+        xx_dim0 = l_rows->size[0] * l_rows->size[1];
         l_rows->size[0] = 1;
         l_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(l_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(l_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(l_rows, &l_gpu_rows);
         l_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          l_rows->data[xCol_dim0 + 1] = outridx;
+          l_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = k_convOut->size[0];
+        xx_dim0 = k_convOut->size[0];
         k_convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(k_convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(k_convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(k_convOut, &s_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))), 1U, 1U);
         r1 = dim3(static_cast<uint32_T>(d_x), 1U, 1U);
-        outridx = l_b->size[0];
+        i = l_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -11946,14 +10495,14 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&m_gpu_b, l_b);
           }
 
-          ec_filtfilt_kernel219<<<grid, block>>>(k_gpu_expanded, l_gpu_rows,
-            m_gpu_b, static_cast<int32_T>(u), outridx, s_gpu_convOut);
+          ec_filtfilt_kernel220<<<grid, block>>>(k_gpu_expanded, l_gpu_rows,
+            m_gpu_b, static_cast<int32_T>(u), i, s_gpu_convOut);
           k_convOut_dirtyOnGpu = true;
         }
 
         if (bb_y->size[0] != 0) {
           if (bb_y->size[0] == 1) {
-            ec_filtfilt_kernel221<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel222<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (cb_gpu_y, s_gpu_convOut);
             k_convOut_dirtyOnGpu = true;
           } else {
@@ -11961,7 +10510,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns +
               1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel220<<<grid, block>>>(cb_gpu_y, ns, s_gpu_convOut);
+              ec_filtfilt_kernel221<<<grid, block>>>(cb_gpu_y, ns, s_gpu_convOut);
               k_convOut_dirtyOnGpu = true;
             }
           }
@@ -11997,9 +10546,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = k_convOut->size[0] - 1;
         }
 
-        xCol_dim0 = f_zfIIR->size[0];
+        xx_dim0 = f_zfIIR->size[0];
         f_zfIIR->size[0] = (outridx - ns) + 1;
-        emxEnsureCapacity_real_T(f_zfIIR, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(f_zfIIR, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(f_zfIIR, &f_gpu_zfIIR);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
           - ns) + 1L), &grid, &block, 1024U, 65535U);
@@ -12009,7 +10558,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           k_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel222<<<grid, block>>>(s_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel223<<<grid, block>>>(s_gpu_convOut, ns, outridx,
             f_gpu_zfIIR);
         }
 
@@ -12023,32 +10572,32 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&s_gpu_convOut, k_convOut);
           }
 
-          ec_filtfilt_kernel223<<<grid, block>>>(s_gpu_convOut, k_gpu_a, ns, iv0,
+          ec_filtfilt_kernel224<<<grid, block>>>(s_gpu_convOut, k_gpu_a, ns, iv0,
             idx, f_gpu_zfIIR);
         }
 
-        ns = xCol->size[0];
-        xCol_dim0 = m_b->size[0];
+        ns = xx->size[0];
+        xx_dim0 = m_b->size[0];
         m_b->size[0] = b2->size[0];
-        emxEnsureCapacity_real_T(m_b, xCol_dim0, &ad_emlrtRTEI);
+        emxEnsureCapacity_real_T(m_b, xx_dim0, &ad_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(m_b, &n_gpu_b);
-        outridx = b2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = b2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel224<<<grid, block>>>(gpu_b2, outridx, n_gpu_b);
+          ec_filtfilt_kernel225<<<grid, block>>>(gpu_b2, i, n_gpu_b);
           l_b_dirtyOnGpu = true;
         }
 
-        xCol_dim0 = l_a->size[0];
+        xx_dim0 = l_a->size[0];
         l_a->size[0] = a2->size[0];
-        emxEnsureCapacity_real_T(l_a, xCol_dim0, &bd_emlrtRTEI);
+        emxEnsureCapacity_real_T(l_a, xx_dim0, &bd_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(l_a, &l_gpu_a);
-        outridx = a2->size[0] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = a2->size[0] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel225<<<grid, block>>>(gpu_a2, outridx, l_gpu_a);
+          ec_filtfilt_kernel226<<<grid, block>>>(gpu_a2, i, l_gpu_a);
           g_a_dirtyOnGpu = true;
         }
 
@@ -12057,23 +10606,23 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(d_nb +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel226<<<grid, block>>>(c_gpu_a1, d_nb, n_gpu_b);
+            ec_filtfilt_kernel227<<<grid, block>>>(c_gpu_a1, d_nb, n_gpu_b);
             l_b_dirtyOnGpu = true;
           }
 
           validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(e_na +
             1L), &grid, &block, 1024U, 65535U);
           if (validLaunchParams) {
-            ec_filtfilt_kernel227<<<grid, block>>>(c_gpu_a1, e_na, l_gpu_a);
+            ec_filtfilt_kernel228<<<grid, block>>>(c_gpu_a1, e_na, l_gpu_a);
           }
 
-          ec_filtfilt_kernel228<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(l_gpu_a);
+          ec_filtfilt_kernel229<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(l_gpu_a);
           g_a_dirtyOnGpu = true;
         }
 
         if (l_a->size[0] > m_b->size[0]) {
           loop_ub = l_a->size[0] - m_b->size[0];
-          xCol_dim0 = m_b->size[0];
+          xx_dim0 = m_b->size[0];
           outridx = m_b->size[0];
           m_b->size[0] += loop_ub;
           emxEnsureCapacity_real_T(m_b, outridx, &jb_emlrtRTEI);
@@ -12083,14 +10632,14 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
               gpuEmxMemcpyGpuToCpu_real_T(m_b, &n_gpu_b);
             }
 
-            std::memset(&m_b->data[xCol_dim0], 0, static_cast<uint32_T>(loop_ub)
-                        * sizeof(real_T));
+            std::memset(&m_b->data[xx_dim0], 0, static_cast<uint32_T>(loop_ub) *
+                        sizeof(real_T));
             l_b_dirtyOnCpu = true;
           }
         }
 
         window_idx_0 = static_cast<uint32_T>(m_b->size[0]);
-        OH = (static_cast<uint32_T>(xCol->size[0]) + static_cast<uint32_T>
+        OH = (static_cast<uint32_T>(xx->size[0]) + static_cast<uint32_T>
               (m_b->size[0])) - 1U;
         u = OH;
         if (OH > 2147483647U) {
@@ -12107,44 +10656,44 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + m_b->size[0];
         }
 
-        xCol_dim0 = l_expanded->size[0];
+        xx_dim0 = l_expanded->size[0];
         l_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(l_expanded, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(l_expanded, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(l_expanded, &l_gpu_expanded);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(((
           static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) - 2) +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel229<<<grid, block>>>(static_cast<int32_T>(u),
+          ec_filtfilt_kernel230<<<grid, block>>>(static_cast<int32_T>(u),
             window_idx_0, l_gpu_expanded);
         }
 
-        xCol_dim0 = eb_y->size[0] * eb_y->size[1];
+        xx_dim0 = eb_y->size[0] * eb_y->size[1];
         eb_y->size[0] = 1;
-        eb_y->size[1] = xCol->size[0];
-        emxEnsureCapacity_int32_T(eb_y, xCol_dim0, &pb_emlrtRTEI);
+        eb_y->size[1] = xx->size[0];
+        emxEnsureCapacity_int32_T(eb_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(eb_y, &eb_gpu_y);
         eb_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          eb_y->data[xCol_dim0 + 1] = outridx;
+          eb_y->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = iv17->size[0];
+        xx_dim0 = iv17->size[0];
         iv17->size[0] = eb_y->size[1];
-        emxEnsureCapacity_int32_T(iv17, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv17, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv17, &gpu_iv17);
-        outridx = eb_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = eb_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&eb_gpu_y, eb_y);
-          ec_filtfilt_kernel230<<<grid, block>>>(nc, eb_gpu_y, outridx, gpu_iv17);
+          ec_filtfilt_kernel231<<<grid, block>>>(nc, eb_gpu_y, i, gpu_iv17);
         }
 
-        loop_ub = xCol->size[0] - 1;
-        xCol_dim0 = xCol->size[0];
+        loop_ub = xx->size[0] - 1;
+        xx_dim0 = xx->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
@@ -12152,30 +10701,35 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&f_gpu_convOut, f_convOut);
           }
 
-          ec_filtfilt_kernel231<<<grid, block>>>(f_gpu_convOut, gpu_iv17,
-            loop_ub, xCol_dim0, l_gpu_expanded);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel232<<<grid, block>>>(f_gpu_convOut, gpu_iv17,
+            loop_ub, xx_dim0, l_gpu_expanded);
         }
 
-        xCol_dim0 = m_rows->size[0] * m_rows->size[1];
+        xx_dim0 = m_rows->size[0] * m_rows->size[1];
         m_rows->size[0] = 1;
         m_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(m_rows, xCol_dim0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(m_rows, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(m_rows, &m_gpu_rows);
         m_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          m_rows->data[xCol_dim0 + 1] = outridx;
+          m_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        xCol_dim0 = l_convOut->size[0];
+        xx_dim0 = l_convOut->size[0];
         l_convOut->size[0] = static_cast<int32_T>(u);
-        emxEnsureCapacity_real_T(l_convOut, xCol_dim0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(l_convOut, xx_dim0, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(l_convOut, &t_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) +
                     31.0) / 32.0)), 1U, 1U);
         r1 = dim3(32U, 1U, 1U);
-        outridx = m_b->size[0];
+        i = m_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>((
           static_cast<int32_T>(u) - 1) + 1L), &r, &r1, &grid, &block, 1024U,
           65535U);
@@ -12185,28 +10739,28 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&n_gpu_b, m_b);
           }
 
-          ec_filtfilt_kernel232<<<grid, block>>>(l_gpu_expanded, m_gpu_rows,
-            n_gpu_b, static_cast<int32_T>(u), outridx, t_gpu_convOut);
+          ec_filtfilt_kernel233<<<grid, block>>>(l_gpu_expanded, m_gpu_rows,
+            n_gpu_b, static_cast<int32_T>(u), i, t_gpu_convOut);
           l_convOut_dirtyOnGpu = true;
         }
 
         if (vlen != 0) {
           if (vlen == 1) {
-            ec_filtfilt_kernel234<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
+            ec_filtfilt_kernel235<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>
               (f_gpu_zfIIR, t_gpu_convOut);
             l_convOut_dirtyOnGpu = true;
           } else {
             validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
               ((vlen - 1) + 1L), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel233<<<grid, block>>>(f_gpu_zfIIR, vlen - 1,
+              ec_filtfilt_kernel234<<<grid, block>>>(f_gpu_zfIIR, vlen - 1,
                 t_gpu_convOut);
               l_convOut_dirtyOnGpu = true;
             }
           }
         }
 
-        ns = xCol->size[0] + l_a->size[0];
+        ns = xx->size[0] + l_a->size[0];
         for (d_x = 0; d_x <= ns - 2; d_x++) {
           outridx = static_cast<int32_T>(std::fmin(static_cast<real_T>(d_x) +
             1.0, static_cast<real_T>(l_a->size[0])));
@@ -12227,11 +10781,11 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
         }
 
-        outridx = xCol->size[0];
-        ns = xCol->size[0];
-        xCol_dim0 = u_convOut->size[0];
-        u_convOut->size[0] = xCol->size[0];
-        emxEnsureCapacity_real_T(u_convOut, xCol_dim0, &cd_emlrtRTEI);
+        outridx = xx->size[0];
+        ns = xx->size[0];
+        xx_dim0 = u_convOut->size[0];
+        u_convOut->size[0] = xx->size[0];
+        emxEnsureCapacity_real_T(u_convOut, xx_dim0, &cd_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(u_convOut, &u_gpu_convOut);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
           - 1) + 1L), &grid, &block, 1024U, 65535U);
@@ -12240,19 +10794,28 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&t_gpu_convOut, l_convOut);
           }
 
-          ec_filtfilt_kernel235<<<grid, block>>>(t_gpu_convOut, outridx,
+          ec_filtfilt_kernel236<<<grid, block>>>(t_gpu_convOut, outridx,
             u_gpu_convOut);
         }
 
-        xCol_dim0 = xCol->size[0] * xCol->size[1];
-        xCol->size[0] = ns;
-        xCol->size[1] = 1;
-        emxEnsureCapacity_real_T(xCol, xCol_dim0, &dd_emlrtRTEI);
-        gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
+        xx_dim0 = xx->size[0] * xx->size[1];
+        xx->size[0] = ns;
+        xx->size[1] = 1;
+        emxEnsureCapacity_real_T(xx, xx_dim0, &dd_emlrtRTEI);
+        if (!xx_dirtyOnCpu) {
+          gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
+        }
+
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns - 1)
           + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel236<<<grid, block>>>(u_gpu_convOut, ns, gpu_xCol);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          ec_filtfilt_kernel237<<<grid, block>>>(u_gpu_convOut, ns, gpu_xx);
+          xx_dirtyOnCpu = false;
+          xx_dirtyOnGpu = true;
         }
       }
     } else {
@@ -12270,15 +10833,18 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
       uint32_T u;
       uint32_T window_idx_0;
       for (iv0 = 0; iv0 < 2; iv0++) {
-        sz[iv0] = static_cast<uint32_T>(xCol->size[iv0]);
+        sz[iv0] = static_cast<uint32_T>(xx->size[iv0]);
       }
 
-      outridx = xCol->size[0];
-      iv0 = xCol->size[0] * xCol->size[1];
-      xCol->size[0] = static_cast<int32_T>(sz[0]);
-      xCol->size[1] = div_s32(outridx * xCol->size[1], static_cast<int32_T>(sz[0]));
-      emxEnsureCapacity_real_T(xCol, iv0, &n_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
+      outridx = xx->size[0];
+      i = xx->size[0] * xx->size[1];
+      xx->size[0] = static_cast<int32_T>(sz[0]);
+      xx->size[1] = div_s32(outridx * xx->size[1], static_cast<int32_T>(sz[0]));
+      emxEnsureCapacity_real_T(xx, i, &m_emlrtRTEI);
+      if (!xx_dirtyOnCpu) {
+        gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
+      }
+
       na = a2->size[0] - 2;
       thism = b2->size[0] - 1;
       b_na = a2->size[0] - 2;
@@ -12293,118 +10859,127 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_a2, a2);
       }
 
-      ec_filtfilt_kernel72<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
+      ec_filtfilt_kernel73<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_a2,
         c_gpu_a1, d_gpu_a1, e_gpu_a1, gpu_a1, b_gpu_a1);
-      iv0 = g_y->size[0] * g_y->size[1];
+      i = g_y->size[0] * g_y->size[1];
       g_y->size[0] = 1;
-      g_y->size[1] = xCol->size[1];
-      emxEnsureCapacity_real_T(g_y, iv0, &w_emlrtRTEI);
+      g_y->size[1] = xx->size[1];
+      emxEnsureCapacity_real_T(g_y, i, &w_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(g_y, &d_gpu_y);
-      loop_ub = xCol->size[1] - 1;
-      xCol_dim0 = xCol->size[0];
+      loop_ub = xx->size[1] - 1;
+      xx_dim0 = xx->size[0];
       validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub +
         1L), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel73<<<grid, block>>>(gpu_xCol, loop_ub, xCol_dim0,
-          d_gpu_y);
+        if (xx_dirtyOnCpu) {
+          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+        }
+
+        xx_dirtyOnCpu = false;
+        ec_filtfilt_kernel74<<<grid, block>>>(gpu_xx, loop_ub, xx_dim0, d_gpu_y);
       }
 
-      ns = xCol->size[1];
+      ns = xx->size[1];
       outridx = g_y->size[1];
       if (ns <= outridx) {
         outridx = ns;
       }
 
-      if (xCol->size[1] == 1) {
+      if (xx->size[1] == 1) {
         vlen = g_y->size[1];
       } else if (g_y->size[1] == 1) {
-        vlen = xCol->size[1];
-      } else if (g_y->size[1] == xCol->size[1]) {
+        vlen = xx->size[1];
+      } else if (g_y->size[1] == xx->size[1]) {
         vlen = g_y->size[1];
       } else {
         vlen = outridx;
       }
 
-      iv0 = b_xt->size[0] * b_xt->size[1];
+      i = b_xt->size[0] * b_xt->size[1];
       b_xt->size[0] = static_cast<int32_T>(nfact + 1.0) - 1;
-      ns = xCol->size[1];
+      ns = xx->size[1];
       outridx = g_y->size[1];
       if (ns <= outridx) {
         outridx = ns;
       }
 
-      if (xCol->size[1] == 1) {
+      if (xx->size[1] == 1) {
         b_xt->size[1] = g_y->size[1];
       } else if (g_y->size[1] == 1) {
-        b_xt->size[1] = xCol->size[1];
-      } else if (g_y->size[1] == xCol->size[1]) {
+        b_xt->size[1] = xx->size[1];
+      } else if (g_y->size[1] == xx->size[1]) {
         b_xt->size[1] = g_y->size[1];
       } else {
         b_xt->size[1] = outridx;
       }
 
-      emxEnsureCapacity_real_T(b_xt, iv0, &bb_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_xt, i, &bb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(b_xt, &b_gpu_xt);
       if (vlen != 0) {
         ns = (g_y->size[1] != 1);
-        outridx = (xCol->size[1] != 1);
+        outridx = (xx->size[1] != 1);
         iv0 = b_xt->size[0] - 1;
         idx = b_xt->size[0];
-        xCol_dim0 = xCol->size[0];
+        xx_dim0 = xx->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 +
           1L) * ((vlen - 1) + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel74<<<grid, block>>>(gpu_xCol, d_gpu_y, nfact,
-            outridx, ns, iv0, vlen, idx, xCol_dim0, b_gpu_xt);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel75<<<grid, block>>>(gpu_xx, d_gpu_y, nfact, outridx,
+            ns, iv0, vlen, idx, xx_dim0, b_gpu_xt);
         }
       }
 
-      iv0 = i_y->size[0] * i_y->size[1];
+      i = i_y->size[0] * i_y->size[1];
       i_y->size[0] = zi->size[0];
       i_y->size[1] = b_xt->size[1];
-      emxEnsureCapacity_real_T(i_y, iv0, &gb_emlrtRTEI);
+      emxEnsureCapacity_real_T(i_y, i, &gb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(i_y, &i_gpu_y);
       loop_ub = b_xt->size[1] - 1;
-      outridx = zi->size[0] - 1;
+      i = zi->size[0] - 1;
       iv0 = i_y->size[0];
       idx = b_xt->size[0];
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx +
-        1L) * (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L) *
+        (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
         if (zi_dirtyOnCpu) {
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_zi, zi);
         }
 
         zi_dirtyOnCpu = false;
-        ec_filtfilt_kernel75<<<grid, block>>>(b_gpu_xt, gpu_zi, outridx, loop_ub,
-          iv0, idx, i_gpu_y);
+        ec_filtfilt_kernel76<<<grid, block>>>(b_gpu_xt, gpu_zi, i, loop_ub, iv0,
+          idx, i_gpu_y);
         y_dirtyOnGpu = true;
       }
 
-      iv0 = d_b->size[0];
+      i = d_b->size[0];
       d_b->size[0] = b2->size[0];
-      emxEnsureCapacity_real_T(d_b, iv0, &ib_emlrtRTEI);
+      emxEnsureCapacity_real_T(d_b, i, &ib_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(d_b, &e_gpu_b);
-      outridx = b2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = b2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel76<<<grid, block>>>(gpu_b2, outridx, e_gpu_b);
+        ec_filtfilt_kernel77<<<grid, block>>>(gpu_b2, i, e_gpu_b);
         c_b_dirtyOnGpu = true;
       }
 
-      iv0 = c_a->size[0];
+      i = c_a->size[0];
       c_a->size[0] = a2->size[0];
-      emxEnsureCapacity_real_T(c_a, iv0, &mb_emlrtRTEI);
+      emxEnsureCapacity_real_T(c_a, i, &mb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(c_a, &c_gpu_a);
-      outridx = a2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = a2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel77<<<grid, block>>>(gpu_a2, outridx, c_gpu_a);
+        ec_filtfilt_kernel78<<<grid, block>>>(gpu_a2, i, c_gpu_a);
       }
 
-      if (b_x_dirtyOnGpu) {
+      if (x_dirtyOnGpu) {
         gpuEmxMemcpyGpuToCpu_real_T(a2, &gpu_a2);
       }
 
@@ -12413,33 +10988,33 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(thism +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel78<<<grid, block>>>(b_gpu_a1, thism, e_gpu_b);
+          ec_filtfilt_kernel79<<<grid, block>>>(b_gpu_a1, thism, e_gpu_b);
           c_b_dirtyOnGpu = true;
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(na + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel79<<<grid, block>>>(b_gpu_a1, na, c_gpu_a);
+          ec_filtfilt_kernel80<<<grid, block>>>(b_gpu_a1, na, c_gpu_a);
         }
 
-        ec_filtfilt_kernel80<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(c_gpu_a);
+        ec_filtfilt_kernel81<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(c_gpu_a);
       }
 
       if (c_a->size[0] > d_b->size[0]) {
         loop_ub = c_a->size[0] - d_b->size[0];
-        iv0 = d_b->size[0];
-        xCol_dim0 = d_b->size[0];
+        i = d_b->size[0];
+        xx_dim0 = d_b->size[0];
         d_b->size[0] += loop_ub;
-        emxEnsureCapacity_real_T(d_b, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(d_b, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(d_b, &e_gpu_b);
         if (loop_ub - 1 >= 0) {
           if (c_b_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(d_b, &e_gpu_b);
           }
 
-          std::memset(&d_b->data[iv0], 0, static_cast<uint32_T>(loop_ub) *
-                      sizeof(real_T));
+          std::memset(&d_b->data[i], 0, static_cast<uint32_T>(loop_ub) * sizeof
+                      (real_T));
           c_b_dirtyOnCpu = true;
         }
       }
@@ -12449,7 +11024,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         zfSize_dirtyOnCpu = true;
       }
 
-      outridx = d_b->size[0];
+      i = d_b->size[0];
       if (c_b_dirtyOnCpu) {
         gpuEmxMemcpyCpuToGpu_real_T(&e_gpu_b, d_b);
       }
@@ -12458,15 +11033,15 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         cudaMemcpy(*gpu_zfSize, zfSize, 8UL, cudaMemcpyHostToDevice);
       }
 
-      ec_filtfilt_kernel81<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(outridx,
+      ec_filtfilt_kernel82<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(i,
         *gpu_zfSize);
       zfSize_dirtyOnCpu = false;
       if (b_xt->size[1] == 0) {
-        iv0 = b_zfIIR->size[0] * b_zfIIR->size[1];
+        i = b_zfIIR->size[0] * b_zfIIR->size[1];
         b_zfIIR->size[0] = d_b->size[0] - 1;
         cudaMemcpy(zfSize, *gpu_zfSize, 8UL, cudaMemcpyDeviceToHost);
         b_zfIIR->size[1] = static_cast<int32_T>(zfSize[1]);
-        emxEnsureCapacity_real_T(b_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_zfIIR, &b_gpu_zfIIR);
       } else {
         window_idx_0 = static_cast<uint32_T>(d_b->size[0]);
@@ -12492,9 +11067,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + d_b->size[0];
         }
 
-        iv0 = c_expanded->size[0] * c_expanded->size[1];
+        i = c_expanded->size[0] * c_expanded->size[1];
         c_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(c_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_expanded, &c_gpu_expanded);
         if (b_xt->size[1] > 2147483646) {
           outridx = MAX_int32_T;
@@ -12502,95 +11077,95 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = b_xt->size[1] + 1;
         }
 
-        iv0 = c_expanded->size[0] * c_expanded->size[1];
+        i = c_expanded->size[0] * c_expanded->size[1];
         c_expanded->size[1] = outridx - 1;
-        emxEnsureCapacity_real_T(c_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_expanded, &c_gpu_expanded);
         idx = ((static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) -
                1) * b_xt->size[1] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(idx + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel82<<<grid, block>>>(idx, c_gpu_expanded);
+          ec_filtfilt_kernel83<<<grid, block>>>(idx, c_gpu_expanded);
         }
 
         ns = b_xt->size[0];
-        iv0 = l_y->size[0] * l_y->size[1];
+        i = l_y->size[0] * l_y->size[1];
         l_y->size[0] = 1;
         l_y->size[1] = b_xt->size[0];
-        emxEnsureCapacity_int32_T(l_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(l_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(l_y, &l_gpu_y);
         l_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          l_y->data[xCol_dim0 + 1] = outridx;
+          l_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv2->size[0];
+        i = iv2->size[0];
         iv2->size[0] = l_y->size[1];
-        emxEnsureCapacity_int32_T(iv2, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv2, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv2, &gpu_iv2);
-        outridx = l_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = l_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&l_gpu_y, l_y);
-          ec_filtfilt_kernel83<<<grid, block>>>(nc, l_gpu_y, outridx, gpu_iv2);
+          ec_filtfilt_kernel84<<<grid, block>>>(nc, l_gpu_y, i, gpu_iv2);
         }
 
         ns = b_xt->size[1];
-        iv0 = m_y->size[0] * m_y->size[1];
+        i = m_y->size[0] * m_y->size[1];
         m_y->size[0] = 1;
         m_y->size[1] = b_xt->size[1];
-        emxEnsureCapacity_int32_T(m_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(m_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(m_y, &o_gpu_y);
         m_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          m_y->data[xCol_dim0 + 1] = outridx;
+          m_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv3->size[0];
+        i = iv3->size[0];
         iv3->size[0] = m_y->size[1];
-        emxEnsureCapacity_int32_T(iv3, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv3, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv3, &gpu_iv3);
-        outridx = m_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = m_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&o_gpu_y, m_y);
-          ec_filtfilt_kernel84<<<grid, block>>>(o_gpu_y, outridx, gpu_iv3);
+          ec_filtfilt_kernel85<<<grid, block>>>(o_gpu_y, i, gpu_iv3);
         }
 
         iv0 = b_xt->size[1] - 1;
-        outridx = b_xt->size[0] - 1;
+        i = b_xt->size[0] - 1;
         na = c_expanded->size[0];
         idx = b_xt->size[0];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
-          + 1L) * (iv0 + 1L)), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L)
+          * (iv0 + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel85<<<grid, block>>>(b_gpu_xt, gpu_iv3, gpu_iv2,
-            outridx, iv0, na, idx, c_gpu_expanded);
+          ec_filtfilt_kernel86<<<grid, block>>>(b_gpu_xt, gpu_iv3, gpu_iv2, i,
+            iv0, na, idx, c_gpu_expanded);
         }
 
-        iv0 = d_rows->size[0] * d_rows->size[1];
+        i = d_rows->size[0] * d_rows->size[1];
         d_rows->size[0] = 1;
         d_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(d_rows, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(d_rows, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(d_rows, &d_gpu_rows);
         d_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          d_rows->data[xCol_dim0 + 1] = outridx;
+          d_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = c_convOut->size[0] * c_convOut->size[1];
+        i = c_convOut->size[0] * c_convOut->size[1];
         c_convOut->size[0] = static_cast<int32_T>(u);
         c_convOut->size[1] = b_xt->size[1];
-        emxEnsureCapacity_real_T(c_convOut, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_convOut, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_convOut, &c_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))),
@@ -12600,67 +11175,66 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         r1 = dim3(static_cast<uint32_T>(d_x), static_cast<uint32_T>(vlen), 1U);
         vlen = c_convOut->size[0];
         na = c_expanded->size[0];
-        outridx = d_b->size[0];
+        i = d_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>(((
           static_cast<int32_T>(u) - 1) + 1L) * (c + 1L)), &r, &r1, &grid, &block,
           1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&d_gpu_rows, d_rows);
-          ec_filtfilt_kernel86<<<grid, block>>>(c_gpu_expanded, d_gpu_rows,
-            e_gpu_b, static_cast<int32_T>(u), c, outridx, vlen, na,
-            c_gpu_convOut);
+          ec_filtfilt_kernel87<<<grid, block>>>(c_gpu_expanded, d_gpu_rows,
+            e_gpu_b, static_cast<int32_T>(u), c, i, vlen, na, c_gpu_convOut);
           c_convOut_dirtyOnGpu = true;
         }
 
         if ((i_y->size[0] != 0) && (i_y->size[1] != 0)) {
           if (i_y->size[0] == 1) {
             ns = c_convOut->size[1] - 1;
-            outridx = i_y->size[1] - 1;
+            i = i_y->size[1] - 1;
             vlen = c_convOut->size[0];
             iv0 = i_y->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel90<<<grid, block>>>(i_gpu_y, outridx, ns, vlen,
-                iv0, c_gpu_convOut);
+              ec_filtfilt_kernel91<<<grid, block>>>(i_gpu_y, i, ns, vlen, iv0,
+                c_gpu_convOut);
             }
           } else if (i_y->size[1] == 1) {
             ns = c_convOut->size[1] - 1;
-            outridx = i_y->size[0] - 1;
+            i = i_y->size[0] - 1;
             vlen = c_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel89<<<grid, block>>>(i_gpu_y, outridx, ns, vlen,
+              ec_filtfilt_kernel90<<<grid, block>>>(i_gpu_y, i, ns, vlen,
                 c_gpu_convOut);
             }
           } else if (c_convOut->size[1] == i_y->size[1]) {
-            iv0 = m_convOut->size[0] * m_convOut->size[1];
+            i = m_convOut->size[0] * m_convOut->size[1];
             m_convOut->size[0] = i_y->size[0];
             m_convOut->size[1] = c_convOut->size[1];
-            emxEnsureCapacity_real_T(m_convOut, iv0, &jb_emlrtRTEI);
+            emxEnsureCapacity_real_T(m_convOut, i, &jb_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(m_convOut, &d_gpu_convOut);
             thism = c_convOut->size[1] - 1;
-            outridx = i_y->size[0] - 1;
+            i = i_y->size[0] - 1;
             vlen = m_convOut->size[0];
             idx = c_convOut->size[0];
             iv0 = i_y->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel87<<<grid, block>>>(i_gpu_y, c_gpu_convOut,
-                outridx, thism, vlen, idx, iv0, d_gpu_convOut);
+              ec_filtfilt_kernel88<<<grid, block>>>(i_gpu_y, c_gpu_convOut, i,
+                thism, vlen, idx, iv0, d_gpu_convOut);
             }
 
             thism = m_convOut->size[1] - 1;
-            outridx = m_convOut->size[0] - 1;
+            i = m_convOut->size[0] - 1;
             vlen = c_convOut->size[0];
             idx = m_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel88<<<grid, block>>>(d_gpu_convOut, outridx,
-                thism, vlen, idx, c_gpu_convOut);
+              ec_filtfilt_kernel89<<<grid, block>>>(d_gpu_convOut, i, thism,
+                vlen, idx, c_gpu_convOut);
             }
           } else {
             if (c_convOut_dirtyOnGpu) {
@@ -12687,7 +11261,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&c_gpu_convOut, c_convOut);
           }
 
-          ec_filtfilt_kernel91<<<grid, block>>>(c_gpu_a, ns, idx, iv0, vlen,
+          ec_filtfilt_kernel92<<<grid, block>>>(c_gpu_a, ns, idx, iv0, vlen,
             c_gpu_convOut);
           c_convOut_dirtyOnCpu = false;
         }
@@ -12701,10 +11275,10 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = c_convOut->size[0] - 1;
         }
 
-        iv0 = b_zfIIR->size[0] * b_zfIIR->size[1];
+        i = b_zfIIR->size[0] * b_zfIIR->size[1];
         b_zfIIR->size[0] = (outridx - ns) + 1;
         b_zfIIR->size[1] = c_convOut->size[1];
-        emxEnsureCapacity_real_T(b_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_zfIIR, &b_gpu_zfIIR);
         thism = c_convOut->size[1] - 1;
         na = b_zfIIR->size[0];
@@ -12717,58 +11291,58 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           c_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel92<<<grid, block>>>(c_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel93<<<grid, block>>>(c_gpu_convOut, ns, outridx,
             thism, na, vlen, b_gpu_zfIIR);
           zfIIR_dirtyOnGpu = true;
         }
 
         ns = c_convOut->size[1] - 1;
-        outridx = c_a->size[0] - 3;
+        i = c_a->size[0] - 3;
         iv0 = c_a->size[0];
         na = b_zfIIR->size[0];
         idx = b_xt->size[0];
         vlen = c_convOut->size[0];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
-          + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L)
+          * (ns + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (c_convOut_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&c_gpu_convOut, c_convOut);
           }
 
-          ec_filtfilt_kernel93<<<grid, block>>>(c_gpu_convOut, c_gpu_a, outridx,
-            ns, iv0, na, idx, vlen, b_gpu_zfIIR);
+          ec_filtfilt_kernel94<<<grid, block>>>(c_gpu_convOut, c_gpu_a, i, ns,
+            iv0, na, idx, vlen, b_gpu_zfIIR);
           zfIIR_dirtyOnGpu = true;
         }
 
-        iv0 = b_zfIIR->size[0] * b_zfIIR->size[1];
+        i = b_zfIIR->size[0] * b_zfIIR->size[1];
         cudaMemcpy(zfSize, *gpu_zfSize, 8UL, cudaMemcpyDeviceToHost);
         b_zfIIR->size[0] = static_cast<int32_T>(zfSize[0]);
         b_zfIIR->size[1] = static_cast<int32_T>(zfSize[1]);
-        emxEnsureCapacity_real_T(b_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(b_zfIIR, &b_gpu_zfIIR);
       }
 
-      iv0 = e_b->size[0];
+      i = e_b->size[0];
       e_b->size[0] = b2->size[0];
-      emxEnsureCapacity_real_T(e_b, iv0, &qb_emlrtRTEI);
+      emxEnsureCapacity_real_T(e_b, i, &qb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(e_b, &f_gpu_b);
-      outridx = b2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = b2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel94<<<grid, block>>>(gpu_b2, outridx, f_gpu_b);
+        ec_filtfilt_kernel95<<<grid, block>>>(gpu_b2, i, f_gpu_b);
         d_b_dirtyOnGpu = true;
       }
 
-      iv0 = d_a->size[0];
+      i = d_a->size[0];
       d_a->size[0] = a2->size[0];
-      emxEnsureCapacity_real_T(d_a, iv0, &sb_emlrtRTEI);
+      emxEnsureCapacity_real_T(d_a, i, &sb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(d_a, &d_gpu_a);
-      outridx = a2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = a2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel95<<<grid, block>>>(gpu_a2, outridx, d_gpu_a);
+        ec_filtfilt_kernel96<<<grid, block>>>(gpu_a2, i, d_gpu_a);
       }
 
       if ((!std::isinf(a2->data[0])) && (!std::isnan(a2->data[0])) &&
@@ -12776,43 +11350,43 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nb + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel96<<<grid, block>>>(gpu_a1, nb, f_gpu_b);
+          ec_filtfilt_kernel97<<<grid, block>>>(gpu_a1, nb, f_gpu_b);
           d_b_dirtyOnGpu = true;
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(b_na +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel97<<<grid, block>>>(gpu_a1, b_na, d_gpu_a);
+          ec_filtfilt_kernel98<<<grid, block>>>(gpu_a1, b_na, d_gpu_a);
         }
 
-        ec_filtfilt_kernel98<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(d_gpu_a);
+        ec_filtfilt_kernel99<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(d_gpu_a);
       }
 
       if (d_a->size[0] > e_b->size[0]) {
         loop_ub = d_a->size[0] - e_b->size[0];
-        iv0 = e_b->size[0];
-        xCol_dim0 = e_b->size[0];
+        i = e_b->size[0];
+        xx_dim0 = e_b->size[0];
         e_b->size[0] += loop_ub;
-        emxEnsureCapacity_real_T(e_b, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(e_b, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(e_b, &f_gpu_b);
         if (loop_ub - 1 >= 0) {
           if (d_b_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(e_b, &f_gpu_b);
           }
 
-          std::memset(&e_b->data[iv0], 0, static_cast<uint32_T>(loop_ub) *
-                      sizeof(real_T));
+          std::memset(&e_b->data[i], 0, static_cast<uint32_T>(loop_ub) * sizeof
+                      (real_T));
           d_b_dirtyOnCpu = true;
         }
       }
 
       for (iv0 = 0; iv0 < 2; iv0++) {
-        zfSize[iv0] = static_cast<uint32_T>(xCol->size[iv0]);
+        zfSize[iv0] = static_cast<uint32_T>(xx->size[iv0]);
         zfSize_dirtyOnCpu = true;
       }
 
-      outridx = e_b->size[0];
+      i = e_b->size[0];
       if (d_b_dirtyOnCpu) {
         gpuEmxMemcpyCpuToGpu_real_T(&f_gpu_b, e_b);
       }
@@ -12821,29 +11395,29 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         cudaMemcpy(*gpu_zfSize, zfSize, 8UL, cudaMemcpyHostToDevice);
       }
 
-      ec_filtfilt_kernel99<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(outridx,
+      ec_filtfilt_kernel100<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(i,
         *gpu_zfSize);
-      if (xCol->size[1] == 0) {
+      if (xx->size[1] == 0) {
         for (iv0 = 0; iv0 < 2; iv0++) {
-          dv1[iv0] = static_cast<uint32_T>(xCol->size[iv0]);
+          dv1[iv0] = static_cast<uint32_T>(xx->size[iv0]);
         }
 
         yc2->size[0] = static_cast<int32_T>(dv1[0]);
         yc2->size[1] = 0;
-        iv0 = c_zfIIR->size[0] * c_zfIIR->size[1];
+        i = c_zfIIR->size[0] * c_zfIIR->size[1];
         cudaMemcpy(zfSize, *gpu_zfSize, 8UL, cudaMemcpyDeviceToHost);
         c_zfIIR->size[0] = static_cast<int32_T>(zfSize[0]);
         c_zfIIR->size[1] = static_cast<int32_T>(zfSize[1]);
-        emxEnsureCapacity_real_T(c_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_zfIIR, &d_gpu_zfIIR);
       } else {
         window_idx_0 = static_cast<uint32_T>(e_b->size[0]);
-        OH = (static_cast<uint32_T>(xCol->size[0]) + static_cast<uint32_T>
+        OH = (static_cast<uint32_T>(xx->size[0]) + static_cast<uint32_T>
               (e_b->size[0])) - 1U;
         d_x = static_cast<int32_T>(std::fmin(32.0, static_cast<real_T>(OH)));
         vlen = static_cast<int32_T>(std::fmin(32.0, (static_cast<real_T>
-          (xCol->size[1]) + 1.0) - 1.0));
-        c = xCol->size[1] - 1;
+          (xx->size[1]) + 1.0) - 1.0));
+        c = xx->size[1] - 1;
         u = OH;
         if (OH > 2147483647U) {
           u = 2147483647U;
@@ -12860,175 +11434,179 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + e_b->size[0];
         }
 
-        iv0 = d_expanded->size[0] * d_expanded->size[1];
+        i = d_expanded->size[0] * d_expanded->size[1];
         d_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(d_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(d_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(d_expanded, &d_gpu_expanded);
-        if (xCol->size[1] > 2147483646) {
+        if (xx->size[1] > 2147483646) {
           outridx = MAX_int32_T;
         } else {
-          outridx = xCol->size[1] + 1;
+          outridx = xx->size[1] + 1;
         }
 
-        iv0 = d_expanded->size[0] * d_expanded->size[1];
+        i = d_expanded->size[0] * d_expanded->size[1];
         d_expanded->size[1] = outridx - 1;
-        emxEnsureCapacity_real_T(d_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(d_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(d_expanded, &d_gpu_expanded);
         idx = ((static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) -
-               1) * xCol->size[1] - 1;
+               1) * xx->size[1] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(idx + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel100<<<grid, block>>>(idx, d_gpu_expanded);
+          ec_filtfilt_kernel101<<<grid, block>>>(idx, d_gpu_expanded);
         }
 
-        iv0 = xCol->size[0];
-        xCol_dim0 = o_y->size[0] * o_y->size[1];
+        i = xx->size[0];
+        xx_dim0 = o_y->size[0] * o_y->size[1];
         o_y->size[0] = 1;
-        o_y->size[1] = xCol->size[0];
-        emxEnsureCapacity_int32_T(o_y, xCol_dim0, &pb_emlrtRTEI);
+        o_y->size[1] = xx->size[0];
+        emxEnsureCapacity_int32_T(o_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(o_y, &p_gpu_y);
         o_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= iv0 - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= i - 2; xx_dim0++) {
           outridx++;
-          o_y->data[xCol_dim0 + 1] = outridx;
+          o_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv4->size[0];
+        i = iv4->size[0];
         iv4->size[0] = o_y->size[1];
-        emxEnsureCapacity_int32_T(iv4, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv4, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv4, &gpu_iv4);
-        outridx = o_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = o_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&p_gpu_y, o_y);
-          ec_filtfilt_kernel101<<<grid, block>>>(nc, p_gpu_y, outridx, gpu_iv4);
+          ec_filtfilt_kernel102<<<grid, block>>>(nc, p_gpu_y, i, gpu_iv4);
         }
 
-        iv0 = xCol->size[1];
-        xCol_dim0 = q_y->size[0] * q_y->size[1];
+        i = xx->size[1];
+        xx_dim0 = q_y->size[0] * q_y->size[1];
         q_y->size[0] = 1;
-        q_y->size[1] = xCol->size[1];
-        emxEnsureCapacity_int32_T(q_y, xCol_dim0, &pb_emlrtRTEI);
+        q_y->size[1] = xx->size[1];
+        emxEnsureCapacity_int32_T(q_y, xx_dim0, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(q_y, &q_gpu_y);
         q_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= iv0 - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= i - 2; xx_dim0++) {
           outridx++;
-          q_y->data[xCol_dim0 + 1] = outridx;
+          q_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv5->size[0];
+        i = iv5->size[0];
         iv5->size[0] = q_y->size[1];
-        emxEnsureCapacity_int32_T(iv5, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv5, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv5, &gpu_iv5);
-        outridx = q_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = q_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&q_gpu_y, q_y);
-          ec_filtfilt_kernel102<<<grid, block>>>(q_gpu_y, outridx, gpu_iv5);
+          ec_filtfilt_kernel103<<<grid, block>>>(q_gpu_y, i, gpu_iv5);
         }
 
-        loop_ub = xCol->size[1] - 1;
-        iv0 = xCol->size[0] - 1;
+        loop_ub = xx->size[1] - 1;
+        iv0 = xx->size[0] - 1;
         na = d_expanded->size[0];
-        xCol_dim0 = xCol->size[0];
+        xx_dim0 = xx->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 +
           1L) * (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel103<<<grid, block>>>(gpu_xCol, gpu_iv5, gpu_iv4, iv0,
-            loop_ub, na, xCol_dim0, d_gpu_expanded);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel104<<<grid, block>>>(gpu_xx, gpu_iv5, gpu_iv4, iv0,
+            loop_ub, na, xx_dim0, d_gpu_expanded);
         }
 
-        iv0 = e_rows->size[0] * e_rows->size[1];
+        i = e_rows->size[0] * e_rows->size[1];
         e_rows->size[0] = 1;
         e_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(e_rows, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(e_rows, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(e_rows, &e_gpu_rows);
         e_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          e_rows->data[xCol_dim0 + 1] = outridx;
+          e_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = d_convOut->size[0] * d_convOut->size[1];
+        i = d_convOut->size[0] * d_convOut->size[1];
         d_convOut->size[0] = static_cast<int32_T>(u);
-        d_convOut->size[1] = xCol->size[1];
-        emxEnsureCapacity_real_T(d_convOut, iv0, &ob_emlrtRTEI);
+        d_convOut->size[1] = xx->size[1];
+        emxEnsureCapacity_real_T(d_convOut, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(d_convOut, &e_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))),
                  static_cast<uint32_T>(std::floor((static_cast<real_T>(
-          static_cast<uint32_T>(xCol->size[1]) + static_cast<uint32_T>(vlen)) -
+          static_cast<uint32_T>(xx->size[1]) + static_cast<uint32_T>(vlen)) -
                     1.0) / static_cast<real_T>(vlen))), 1U);
         r1 = dim3(static_cast<uint32_T>(d_x), static_cast<uint32_T>(vlen), 1U);
         vlen = d_convOut->size[0];
         na = d_expanded->size[0];
-        outridx = e_b->size[0];
+        i = e_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>(((
           static_cast<int32_T>(u) - 1) + 1L) * (c + 1L)), &r, &r1, &grid, &block,
           1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&e_gpu_rows, e_rows);
-          ec_filtfilt_kernel104<<<grid, block>>>(d_gpu_expanded, e_gpu_rows,
-            f_gpu_b, static_cast<int32_T>(u), c, outridx, vlen, na,
-            e_gpu_convOut);
+          ec_filtfilt_kernel105<<<grid, block>>>(d_gpu_expanded, e_gpu_rows,
+            f_gpu_b, static_cast<int32_T>(u), c, i, vlen, na, e_gpu_convOut);
           d_convOut_dirtyOnGpu = true;
         }
 
         if ((b_zfIIR->size[0] != 0) && (b_zfIIR->size[1] != 0)) {
           if (b_zfIIR->size[0] == 1) {
             ns = d_convOut->size[1] - 1;
-            outridx = b_zfIIR->size[1] - 1;
+            i = b_zfIIR->size[1] - 1;
             vlen = d_convOut->size[0];
             na = b_zfIIR->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel108<<<grid, block>>>(b_gpu_zfIIR, outridx, ns,
-                vlen, na, e_gpu_convOut);
+              ec_filtfilt_kernel109<<<grid, block>>>(b_gpu_zfIIR, i, ns, vlen,
+                na, e_gpu_convOut);
             }
           } else if (b_zfIIR->size[1] == 1) {
             ns = d_convOut->size[1] - 1;
-            outridx = b_zfIIR->size[0] - 1;
+            i = b_zfIIR->size[0] - 1;
             vlen = d_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel107<<<grid, block>>>(b_gpu_zfIIR, outridx, ns,
-                vlen, e_gpu_convOut);
+              ec_filtfilt_kernel108<<<grid, block>>>(b_gpu_zfIIR, i, ns, vlen,
+                e_gpu_convOut);
             }
           } else if (d_convOut->size[1] == b_zfIIR->size[1]) {
-            iv0 = n_convOut->size[0] * n_convOut->size[1];
+            i = n_convOut->size[0] * n_convOut->size[1];
             n_convOut->size[0] = b_zfIIR->size[0];
             n_convOut->size[1] = d_convOut->size[1];
-            emxEnsureCapacity_real_T(n_convOut, iv0, &jb_emlrtRTEI);
+            emxEnsureCapacity_real_T(n_convOut, i, &jb_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(n_convOut, &h_gpu_convOut);
             thism = d_convOut->size[1] - 1;
-            outridx = b_zfIIR->size[0] - 1;
+            i = b_zfIIR->size[0] - 1;
             vlen = n_convOut->size[0];
             idx = d_convOut->size[0];
             na = b_zfIIR->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel105<<<grid, block>>>(b_gpu_zfIIR, e_gpu_convOut,
-                outridx, thism, vlen, idx, na, h_gpu_convOut);
+              ec_filtfilt_kernel106<<<grid, block>>>(b_gpu_zfIIR, e_gpu_convOut,
+                i, thism, vlen, idx, na, h_gpu_convOut);
             }
 
             thism = n_convOut->size[1] - 1;
-            outridx = n_convOut->size[0] - 1;
+            i = n_convOut->size[0] - 1;
             vlen = d_convOut->size[0];
             idx = n_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel106<<<grid, block>>>(h_gpu_convOut, outridx,
-                thism, vlen, idx, e_gpu_convOut);
+              ec_filtfilt_kernel107<<<grid, block>>>(h_gpu_convOut, i, thism,
+                vlen, idx, e_gpu_convOut);
             }
           } else {
             if (d_convOut_dirtyOnGpu) {
@@ -13045,34 +11623,39 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         }
 
         ns = d_convOut->size[1] - 1;
-        xCol_dim0 = xCol->size[0];
+        xx_dim0 = xx->size[0];
         iv0 = d_a->size[0];
         vlen = d_convOut->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(ns + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
           if (d_convOut_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&e_gpu_convOut, d_convOut);
           }
 
-          ec_filtfilt_kernel109<<<grid, block>>>(d_gpu_a, ns, xCol_dim0, iv0,
-            vlen, e_gpu_convOut);
+          ec_filtfilt_kernel110<<<grid, block>>>(d_gpu_a, ns, xx_dim0, iv0, vlen,
+            e_gpu_convOut);
           d_convOut_dirtyOnCpu = false;
         }
 
-        if (static_cast<uint32_T>(xCol->size[0]) + 1U > static_cast<uint32_T>
+        if (static_cast<uint32_T>(xx->size[0]) + 1U > static_cast<uint32_T>
             (d_convOut->size[0])) {
           ns = 1;
           outridx = 0;
         } else {
-          ns = xCol->size[0] + 1;
+          ns = xx->size[0] + 1;
           outridx = d_convOut->size[0];
         }
 
-        iv0 = c_zfIIR->size[0] * c_zfIIR->size[1];
+        i = c_zfIIR->size[0] * c_zfIIR->size[1];
         c_zfIIR->size[0] = (outridx - ns) + 1;
         c_zfIIR->size[1] = d_convOut->size[1];
-        emxEnsureCapacity_real_T(c_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_zfIIR, &d_gpu_zfIIR);
         thism = d_convOut->size[1] - 1;
         na = c_zfIIR->size[0];
@@ -13085,43 +11668,48 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           d_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel110<<<grid, block>>>(e_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel111<<<grid, block>>>(e_gpu_convOut, ns, outridx,
             thism, na, vlen, d_gpu_zfIIR);
           b_zfIIR_dirtyOnGpu = true;
         }
 
         ns = d_convOut->size[1] - 1;
-        outridx = d_a->size[0] - 3;
+        i = d_a->size[0] - 3;
         iv0 = d_a->size[0];
         na = c_zfIIR->size[0];
-        xCol_dim0 = xCol->size[0];
+        xx_dim0 = xx->size[0];
         vlen = d_convOut->size[0];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
-          + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L)
+          * (ns + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (d_convOut_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&e_gpu_convOut, d_convOut);
           }
 
           d_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel111<<<grid, block>>>(e_gpu_convOut, d_gpu_a, outridx,
-            ns, iv0, na, xCol_dim0, vlen, d_gpu_zfIIR);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel112<<<grid, block>>>(e_gpu_convOut, d_gpu_a, i, ns,
+            iv0, na, xx_dim0, vlen, d_gpu_zfIIR);
           b_zfIIR_dirtyOnGpu = true;
         }
 
-        iv0 = c_zfIIR->size[0] * c_zfIIR->size[1];
+        i = c_zfIIR->size[0] * c_zfIIR->size[1];
         cudaMemcpy(zfSize, *gpu_zfSize, 8UL, cudaMemcpyDeviceToHost);
         c_zfIIR->size[0] = static_cast<int32_T>(zfSize[0]);
         c_zfIIR->size[1] = static_cast<int32_T>(zfSize[1]);
-        emxEnsureCapacity_real_T(c_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(c_zfIIR, &d_gpu_zfIIR);
-        iv0 = o_convOut->size[0] * o_convOut->size[1];
-        o_convOut->size[0] = xCol->size[0];
+        i = o_convOut->size[0] * o_convOut->size[1];
+        o_convOut->size[0] = xx->size[0];
         o_convOut->size[1] = d_convOut->size[1];
-        emxEnsureCapacity_real_T(o_convOut, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(o_convOut, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(o_convOut, &i_gpu_convOut);
         thism = d_convOut->size[1] - 1;
-        loop_ub = xCol->size[0] - 1;
+        loop_ub = xx->size[0] - 1;
         vlen = o_convOut->size[0];
         idx = d_convOut->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((loop_ub
@@ -13131,111 +11719,121 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&e_gpu_convOut, d_convOut);
           }
 
-          ec_filtfilt_kernel112<<<grid, block>>>(e_gpu_convOut, loop_ub, thism,
+          ec_filtfilt_kernel113<<<grid, block>>>(e_gpu_convOut, loop_ub, thism,
             vlen, idx, i_gpu_convOut);
         }
 
-        ns = xCol->size[0];
-        outridx = xCol->size[1];
-        iv0 = yc2->size[0] * yc2->size[1];
-        yc2->size[0] = xCol->size[0];
-        yc2->size[1] = xCol->size[1];
-        emxEnsureCapacity_real_T(yc2, iv0, &jb_emlrtRTEI);
+        ns = xx->size[0];
+        outridx = xx->size[1];
+        i = yc2->size[0] * yc2->size[1];
+        yc2->size[0] = xx->size[0];
+        yc2->size[1] = xx->size[1];
+        emxEnsureCapacity_real_T(yc2, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(yc2, &gpu_yc2);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns *
           outridx - 1) + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel113<<<grid, block>>>(i_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel114<<<grid, block>>>(i_gpu_convOut, ns, outridx,
             gpu_yc2);
         }
       }
 
-      outridx = xCol->size[0] - 1;
-      iv0 = n_y->size[0] * n_y->size[1];
+      outridx = xx->size[0] - 1;
+      i = n_y->size[0] * n_y->size[1];
       n_y->size[0] = 1;
-      n_y->size[1] = xCol->size[1];
-      emxEnsureCapacity_real_T(n_y, iv0, &w_emlrtRTEI);
+      n_y->size[1] = xx->size[1];
+      emxEnsureCapacity_real_T(n_y, i, &w_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(n_y, &m_gpu_y);
-      loop_ub = xCol->size[1] - 1;
-      xCol_dim0 = xCol->size[0];
+      loop_ub = xx->size[1] - 1;
+      xx_dim0 = xx->size[0];
       validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub +
         1L), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel114<<<grid, block>>>(gpu_xCol, outridx, loop_ub,
-          xCol_dim0, m_gpu_y);
+        if (xx_dirtyOnCpu) {
+          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+        }
+
+        xx_dirtyOnCpu = false;
+        ec_filtfilt_kernel115<<<grid, block>>>(gpu_xx, outridx, loop_ub, xx_dim0,
+          m_gpu_y);
       }
 
-      ns = xCol->size[1];
+      ns = xx->size[1];
       outridx = n_y->size[1];
       if (ns <= outridx) {
         outridx = ns;
       }
 
-      if (xCol->size[1] == 1) {
+      if (xx->size[1] == 1) {
         vlen = n_y->size[1];
       } else if (n_y->size[1] == 1) {
-        vlen = xCol->size[1];
-      } else if (n_y->size[1] == xCol->size[1]) {
+        vlen = xx->size[1];
+      } else if (n_y->size[1] == xx->size[1]) {
         vlen = n_y->size[1];
       } else {
         vlen = outridx;
       }
 
-      iv0 = b_xt->size[0] * b_xt->size[1];
+      i = b_xt->size[0] * b_xt->size[1];
       b_xt->size[0] = static_cast<int32_T>(-((0.0 - nfact) - -1.0)) + 1;
-      ns = xCol->size[1];
+      ns = xx->size[1];
       outridx = n_y->size[1];
       if (ns <= outridx) {
         outridx = ns;
       }
 
-      if (xCol->size[1] == 1) {
+      if (xx->size[1] == 1) {
         b_xt->size[1] = n_y->size[1];
       } else if (n_y->size[1] == 1) {
-        b_xt->size[1] = xCol->size[1];
-      } else if (n_y->size[1] == xCol->size[1]) {
+        b_xt->size[1] = xx->size[1];
+      } else if (n_y->size[1] == xx->size[1]) {
         b_xt->size[1] = n_y->size[1];
       } else {
         b_xt->size[1] = outridx;
       }
 
-      emxEnsureCapacity_real_T(b_xt, iv0, &bb_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_xt, i, &bb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(b_xt, &b_gpu_xt);
       if (vlen != 0) {
         ns = (n_y->size[1] != 1);
-        outridx = (xCol->size[1] != 1);
+        outridx = (xx->size[1] != 1);
         iv0 = b_xt->size[0] - 1;
         idx = b_xt->size[0];
-        xCol_dim0 = xCol->size[0];
+        xx_dim0 = xx->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 +
           1L) * ((vlen - 1) + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel115<<<grid, block>>>(gpu_xCol, m_gpu_y, nfact,
-            outridx, ns, iv0, vlen, idx, xCol_dim0, b_gpu_xt);
+          if (xx_dirtyOnCpu) {
+            gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+          }
+
+          xx_dirtyOnCpu = false;
+          ec_filtfilt_kernel116<<<grid, block>>>(gpu_xx, m_gpu_y, nfact, outridx,
+            ns, iv0, vlen, idx, xx_dim0, b_gpu_xt);
         }
       }
 
-      iv0 = h_b->size[0];
+      i = h_b->size[0];
       h_b->size[0] = b2->size[0];
-      emxEnsureCapacity_real_T(h_b, iv0, &wb_emlrtRTEI);
+      emxEnsureCapacity_real_T(h_b, i, &wb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(h_b, &i_gpu_b);
-      outridx = b2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = b2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel116<<<grid, block>>>(gpu_b2, outridx, i_gpu_b);
+        ec_filtfilt_kernel117<<<grid, block>>>(gpu_b2, i, i_gpu_b);
         g_b_dirtyOnGpu = true;
       }
 
-      iv0 = g_a->size[0];
+      i = g_a->size[0];
       g_a->size[0] = a2->size[0];
-      emxEnsureCapacity_real_T(g_a, iv0, &yb_emlrtRTEI);
+      emxEnsureCapacity_real_T(g_a, i, &yb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(g_a, &g_gpu_a);
-      outridx = a2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = a2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel117<<<grid, block>>>(gpu_a2, outridx, g_gpu_a);
+        ec_filtfilt_kernel118<<<grid, block>>>(gpu_a2, i, g_gpu_a);
       }
 
       if ((!std::isinf(a2->data[0])) && (!std::isnan(a2->data[0])) &&
@@ -13243,33 +11841,33 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(b_nb +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel118<<<grid, block>>>(e_gpu_a1, b_nb, i_gpu_b);
+          ec_filtfilt_kernel119<<<grid, block>>>(e_gpu_a1, b_nb, i_gpu_b);
           g_b_dirtyOnGpu = true;
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(c_na +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel119<<<grid, block>>>(e_gpu_a1, c_na, g_gpu_a);
+          ec_filtfilt_kernel120<<<grid, block>>>(e_gpu_a1, c_na, g_gpu_a);
         }
 
-        ec_filtfilt_kernel120<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(g_gpu_a);
+        ec_filtfilt_kernel121<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(g_gpu_a);
       }
 
       if (g_a->size[0] > h_b->size[0]) {
         loop_ub = g_a->size[0] - h_b->size[0];
-        iv0 = h_b->size[0];
-        xCol_dim0 = h_b->size[0];
+        i = h_b->size[0];
+        xx_dim0 = h_b->size[0];
         h_b->size[0] += loop_ub;
-        emxEnsureCapacity_real_T(h_b, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(h_b, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(h_b, &i_gpu_b);
         if (loop_ub - 1 >= 0) {
           if (g_b_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(h_b, &i_gpu_b);
           }
 
-          std::memset(&h_b->data[iv0], 0, static_cast<uint32_T>(loop_ub) *
-                      sizeof(real_T));
+          std::memset(&h_b->data[i], 0, static_cast<uint32_T>(loop_ub) * sizeof
+                      (real_T));
           g_b_dirtyOnCpu = true;
         }
       }
@@ -13301,9 +11899,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + h_b->size[0];
         }
 
-        iv0 = g_expanded->size[0] * g_expanded->size[1];
+        i = g_expanded->size[0] * g_expanded->size[1];
         g_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(g_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(g_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(g_expanded, &g_gpu_expanded);
         if (b_xt->size[1] > 2147483646) {
           outridx = MAX_int32_T;
@@ -13311,95 +11909,95 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = b_xt->size[1] + 1;
         }
 
-        iv0 = g_expanded->size[0] * g_expanded->size[1];
+        i = g_expanded->size[0] * g_expanded->size[1];
         g_expanded->size[1] = outridx - 1;
-        emxEnsureCapacity_real_T(g_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(g_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(g_expanded, &g_gpu_expanded);
         idx = ((static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) -
                1) * b_xt->size[1] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(idx + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel121<<<grid, block>>>(idx, g_gpu_expanded);
+          ec_filtfilt_kernel122<<<grid, block>>>(idx, g_gpu_expanded);
         }
 
         ns = b_xt->size[0];
-        iv0 = u_y->size[0] * u_y->size[1];
+        i = u_y->size[0] * u_y->size[1];
         u_y->size[0] = 1;
         u_y->size[1] = b_xt->size[0];
-        emxEnsureCapacity_int32_T(u_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(u_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(u_y, &u_gpu_y);
         u_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          u_y->data[xCol_dim0 + 1] = outridx;
+          u_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv9->size[0];
+        i = iv9->size[0];
         iv9->size[0] = u_y->size[1];
-        emxEnsureCapacity_int32_T(iv9, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv9, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv9, &gpu_iv9);
-        outridx = u_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = u_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&u_gpu_y, u_y);
-          ec_filtfilt_kernel122<<<grid, block>>>(nc, u_gpu_y, outridx, gpu_iv9);
+          ec_filtfilt_kernel123<<<grid, block>>>(nc, u_gpu_y, i, gpu_iv9);
         }
 
         ns = b_xt->size[1];
-        iv0 = v_y->size[0] * v_y->size[1];
+        i = v_y->size[0] * v_y->size[1];
         v_y->size[0] = 1;
         v_y->size[1] = b_xt->size[1];
-        emxEnsureCapacity_int32_T(v_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(v_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(v_y, &v_gpu_y);
         v_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          v_y->data[xCol_dim0 + 1] = outridx;
+          v_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv10->size[0];
+        i = iv10->size[0];
         iv10->size[0] = v_y->size[1];
-        emxEnsureCapacity_int32_T(iv10, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv10, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv10, &gpu_iv10);
-        outridx = v_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = v_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&v_gpu_y, v_y);
-          ec_filtfilt_kernel123<<<grid, block>>>(v_gpu_y, outridx, gpu_iv10);
+          ec_filtfilt_kernel124<<<grid, block>>>(v_gpu_y, i, gpu_iv10);
         }
 
         iv0 = b_xt->size[1] - 1;
-        outridx = b_xt->size[0] - 1;
+        i = b_xt->size[0] - 1;
         na = g_expanded->size[0];
         idx = b_xt->size[0];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
-          + 1L) * (iv0 + 1L)), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L)
+          * (iv0 + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel124<<<grid, block>>>(b_gpu_xt, gpu_iv10, gpu_iv9,
-            outridx, iv0, na, idx, g_gpu_expanded);
+          ec_filtfilt_kernel125<<<grid, block>>>(b_gpu_xt, gpu_iv10, gpu_iv9, i,
+            iv0, na, idx, g_gpu_expanded);
         }
 
-        iv0 = h_rows->size[0] * h_rows->size[1];
+        i = h_rows->size[0] * h_rows->size[1];
         h_rows->size[0] = 1;
         h_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(h_rows, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(h_rows, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(h_rows, &h_gpu_rows);
         h_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          h_rows->data[xCol_dim0 + 1] = outridx;
+          h_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = g_convOut->size[0] * g_convOut->size[1];
+        i = g_convOut->size[0] * g_convOut->size[1];
         g_convOut->size[0] = static_cast<int32_T>(u);
         g_convOut->size[1] = b_xt->size[1];
-        emxEnsureCapacity_real_T(g_convOut, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(g_convOut, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(g_convOut, &j_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))),
@@ -13409,7 +12007,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         r1 = dim3(static_cast<uint32_T>(d_x), static_cast<uint32_T>(vlen), 1U);
         vlen = g_convOut->size[0];
         na = g_expanded->size[0];
-        outridx = h_b->size[0];
+        i = h_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>(((
           static_cast<int32_T>(u) - 1) + 1L) * (c + 1L)), &r, &r1, &grid, &block,
           1024U, 65535U);
@@ -13419,61 +12017,60 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&i_gpu_b, h_b);
           }
 
-          ec_filtfilt_kernel125<<<grid, block>>>(g_gpu_expanded, h_gpu_rows,
-            i_gpu_b, static_cast<int32_T>(u), c, outridx, vlen, na,
-            j_gpu_convOut);
+          ec_filtfilt_kernel126<<<grid, block>>>(g_gpu_expanded, h_gpu_rows,
+            i_gpu_b, static_cast<int32_T>(u), c, i, vlen, na, j_gpu_convOut);
           g_convOut_dirtyOnGpu = true;
         }
 
         if ((c_zfIIR->size[0] != 0) && (c_zfIIR->size[1] != 0)) {
           if (c_zfIIR->size[0] == 1) {
             ns = g_convOut->size[1] - 1;
-            outridx = c_zfIIR->size[1] - 1;
+            i = c_zfIIR->size[1] - 1;
             vlen = g_convOut->size[0];
             na = c_zfIIR->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel129<<<grid, block>>>(d_gpu_zfIIR, outridx, ns,
-                vlen, na, j_gpu_convOut);
+              ec_filtfilt_kernel130<<<grid, block>>>(d_gpu_zfIIR, i, ns, vlen,
+                na, j_gpu_convOut);
             }
           } else if (c_zfIIR->size[1] == 1) {
             ns = g_convOut->size[1] - 1;
-            outridx = c_zfIIR->size[0] - 1;
+            i = c_zfIIR->size[0] - 1;
             vlen = g_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel128<<<grid, block>>>(d_gpu_zfIIR, outridx, ns,
-                vlen, j_gpu_convOut);
+              ec_filtfilt_kernel129<<<grid, block>>>(d_gpu_zfIIR, i, ns, vlen,
+                j_gpu_convOut);
             }
           } else if (g_convOut->size[1] == c_zfIIR->size[1]) {
-            iv0 = q_convOut->size[0] * q_convOut->size[1];
+            i = q_convOut->size[0] * q_convOut->size[1];
             q_convOut->size[0] = c_zfIIR->size[0];
             q_convOut->size[1] = g_convOut->size[1];
-            emxEnsureCapacity_real_T(q_convOut, iv0, &jb_emlrtRTEI);
+            emxEnsureCapacity_real_T(q_convOut, i, &jb_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(q_convOut, &k_gpu_convOut);
             thism = g_convOut->size[1] - 1;
-            outridx = c_zfIIR->size[0] - 1;
+            i = c_zfIIR->size[0] - 1;
             vlen = q_convOut->size[0];
             idx = g_convOut->size[0];
             na = c_zfIIR->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel126<<<grid, block>>>(d_gpu_zfIIR, j_gpu_convOut,
-                outridx, thism, vlen, idx, na, k_gpu_convOut);
+              ec_filtfilt_kernel127<<<grid, block>>>(d_gpu_zfIIR, j_gpu_convOut,
+                i, thism, vlen, idx, na, k_gpu_convOut);
             }
 
             thism = q_convOut->size[1] - 1;
-            outridx = q_convOut->size[0] - 1;
+            i = q_convOut->size[0] - 1;
             vlen = g_convOut->size[0];
             idx = q_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel127<<<grid, block>>>(k_gpu_convOut, outridx,
-                thism, vlen, idx, j_gpu_convOut);
+              ec_filtfilt_kernel128<<<grid, block>>>(k_gpu_convOut, i, thism,
+                vlen, idx, j_gpu_convOut);
             }
           } else {
             if (g_convOut_dirtyOnGpu) {
@@ -13500,15 +12097,15 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&j_gpu_convOut, g_convOut);
           }
 
-          ec_filtfilt_kernel130<<<grid, block>>>(g_gpu_a, ns, idx, iv0, vlen,
+          ec_filtfilt_kernel131<<<grid, block>>>(g_gpu_a, ns, idx, iv0, vlen,
             j_gpu_convOut);
           g_convOut_dirtyOnCpu = false;
         }
 
-        iv0 = p_convOut->size[0] * p_convOut->size[1];
+        i = p_convOut->size[0] * p_convOut->size[1];
         p_convOut->size[0] = b_xt->size[0];
         p_convOut->size[1] = g_convOut->size[1];
-        emxEnsureCapacity_real_T(p_convOut, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(p_convOut, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(p_convOut, &l_gpu_convOut);
         thism = g_convOut->size[1] - 1;
         iv0 = b_xt->size[0] - 1;
@@ -13521,68 +12118,68 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&j_gpu_convOut, g_convOut);
           }
 
-          ec_filtfilt_kernel131<<<grid, block>>>(j_gpu_convOut, iv0, thism, vlen,
+          ec_filtfilt_kernel132<<<grid, block>>>(j_gpu_convOut, iv0, thism, vlen,
             idx, l_gpu_convOut);
         }
 
         ns = b_xt->size[0];
         outridx = b_xt->size[1];
-        iv0 = yc3->size[0] * yc3->size[1];
+        i = yc3->size[0] * yc3->size[1];
         yc3->size[0] = b_xt->size[0];
         yc3->size[1] = b_xt->size[1];
-        emxEnsureCapacity_real_T(yc3, iv0, &vc_emlrtRTEI);
+        emxEnsureCapacity_real_T(yc3, i, &vc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(yc3, &gpu_yc3);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns *
           outridx - 1) + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel132<<<grid, block>>>(l_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel133<<<grid, block>>>(l_gpu_convOut, ns, outridx,
             gpu_yc3);
         }
       }
 
       ns = yc3->size[0] - 1;
-      iv0 = s_y->size[0] * s_y->size[1];
+      i = s_y->size[0] * s_y->size[1];
       s_y->size[0] = zi->size[0];
       s_y->size[1] = yc3->size[1];
-      emxEnsureCapacity_real_T(s_y, iv0, &gb_emlrtRTEI);
+      emxEnsureCapacity_real_T(s_y, i, &gb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(s_y, &r_gpu_y);
       loop_ub = yc3->size[1] - 1;
-      outridx = zi->size[0] - 1;
+      i = zi->size[0] - 1;
       iv0 = s_y->size[0];
       idx = yc3->size[0];
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx +
-        1L) * (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L) *
+        (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
         if (zi_dirtyOnCpu) {
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_zi, zi);
         }
 
-        ec_filtfilt_kernel133<<<grid, block>>>(gpu_yc3, ns, gpu_zi, outridx,
-          loop_ub, iv0, idx, r_gpu_y);
+        ec_filtfilt_kernel134<<<grid, block>>>(gpu_yc3, ns, gpu_zi, i, loop_ub,
+          iv0, idx, r_gpu_y);
         b_y_dirtyOnGpu = true;
       }
 
-      iv0 = j_b->size[0];
+      i = j_b->size[0];
       j_b->size[0] = b2->size[0];
-      emxEnsureCapacity_real_T(j_b, iv0, &gc_emlrtRTEI);
+      emxEnsureCapacity_real_T(j_b, i, &gc_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(j_b, &j_gpu_b);
-      outridx = b2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = b2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel134<<<grid, block>>>(gpu_b2, outridx, j_gpu_b);
+        ec_filtfilt_kernel135<<<grid, block>>>(gpu_b2, i, j_gpu_b);
         h_b_dirtyOnGpu = true;
       }
 
-      iv0 = i_a->size[0];
+      i = i_a->size[0];
       i_a->size[0] = a2->size[0];
-      emxEnsureCapacity_real_T(i_a, iv0, &ic_emlrtRTEI);
+      emxEnsureCapacity_real_T(i_a, i, &ic_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(i_a, &h_gpu_a);
-      outridx = a2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = a2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel135<<<grid, block>>>(gpu_a2, outridx, h_gpu_a);
+        ec_filtfilt_kernel136<<<grid, block>>>(gpu_a2, i, h_gpu_a);
       }
 
       if ((!std::isinf(a2->data[0])) && (!std::isnan(a2->data[0])) &&
@@ -13590,33 +12187,33 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(c_nb +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel136<<<grid, block>>>(d_gpu_a1, c_nb, j_gpu_b);
+          ec_filtfilt_kernel137<<<grid, block>>>(d_gpu_a1, c_nb, j_gpu_b);
           h_b_dirtyOnGpu = true;
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(d_na +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel137<<<grid, block>>>(d_gpu_a1, d_na, h_gpu_a);
+          ec_filtfilt_kernel138<<<grid, block>>>(d_gpu_a1, d_na, h_gpu_a);
         }
 
-        ec_filtfilt_kernel138<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(h_gpu_a);
+        ec_filtfilt_kernel139<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(h_gpu_a);
       }
 
       if (i_a->size[0] > j_b->size[0]) {
         loop_ub = i_a->size[0] - j_b->size[0];
-        iv0 = j_b->size[0];
-        xCol_dim0 = j_b->size[0];
+        i = j_b->size[0];
+        xx_dim0 = j_b->size[0];
         j_b->size[0] += loop_ub;
-        emxEnsureCapacity_real_T(j_b, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(j_b, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(j_b, &j_gpu_b);
         if (loop_ub - 1 >= 0) {
           if (h_b_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(j_b, &j_gpu_b);
           }
 
-          std::memset(&j_b->data[iv0], 0, static_cast<uint32_T>(loop_ub) *
-                      sizeof(real_T));
+          std::memset(&j_b->data[i], 0, static_cast<uint32_T>(loop_ub) * sizeof
+                      (real_T));
           h_b_dirtyOnCpu = true;
         }
       }
@@ -13650,9 +12247,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + j_b->size[0];
         }
 
-        iv0 = i_expanded->size[0] * i_expanded->size[1];
+        i = i_expanded->size[0] * i_expanded->size[1];
         i_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(i_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(i_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(i_expanded, &h_gpu_expanded);
         if (yc3->size[1] > 2147483646) {
           outridx = MAX_int32_T;
@@ -13660,95 +12257,95 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = yc3->size[1] + 1;
         }
 
-        iv0 = i_expanded->size[0] * i_expanded->size[1];
+        i = i_expanded->size[0] * i_expanded->size[1];
         i_expanded->size[1] = outridx - 1;
-        emxEnsureCapacity_real_T(i_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(i_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(i_expanded, &h_gpu_expanded);
         idx = ((static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) -
                1) * yc3->size[1] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(idx + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel139<<<grid, block>>>(idx, h_gpu_expanded);
+          ec_filtfilt_kernel140<<<grid, block>>>(idx, h_gpu_expanded);
         }
 
         ns = yc3->size[0];
-        iv0 = x_y->size[0] * x_y->size[1];
+        i = x_y->size[0] * x_y->size[1];
         x_y->size[0] = 1;
         x_y->size[1] = yc3->size[0];
-        emxEnsureCapacity_int32_T(x_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(x_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(x_y, &w_gpu_y);
         x_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          x_y->data[xCol_dim0 + 1] = outridx;
+          x_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv12->size[0];
+        i = iv12->size[0];
         iv12->size[0] = x_y->size[1];
-        emxEnsureCapacity_int32_T(iv12, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv12, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv12, &gpu_iv12);
-        outridx = x_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = x_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&w_gpu_y, x_y);
-          ec_filtfilt_kernel140<<<grid, block>>>(nc, w_gpu_y, outridx, gpu_iv12);
+          ec_filtfilt_kernel141<<<grid, block>>>(nc, w_gpu_y, i, gpu_iv12);
         }
 
         ns = yc3->size[1];
-        iv0 = y_y->size[0] * y_y->size[1];
+        i = y_y->size[0] * y_y->size[1];
         y_y->size[0] = 1;
         y_y->size[1] = yc3->size[1];
-        emxEnsureCapacity_int32_T(y_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(y_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(y_y, &x_gpu_y);
         y_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          y_y->data[xCol_dim0 + 1] = outridx;
+          y_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv13->size[0];
+        i = iv13->size[0];
         iv13->size[0] = y_y->size[1];
-        emxEnsureCapacity_int32_T(iv13, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv13, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv13, &gpu_iv13);
-        outridx = y_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = y_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&x_gpu_y, y_y);
-          ec_filtfilt_kernel141<<<grid, block>>>(x_gpu_y, outridx, gpu_iv13);
+          ec_filtfilt_kernel142<<<grid, block>>>(x_gpu_y, i, gpu_iv13);
         }
 
-        outridx = yc3->size[1] - 1;
+        i = yc3->size[1] - 1;
         iv0 = yc3->size[0] - 1;
         na = i_expanded->size[0];
         idx = yc3->size[0];
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 +
-          1L) * (outridx + 1L)), &grid, &block, 1024U, 65535U);
+          1L) * (i + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel142<<<grid, block>>>(gpu_yc3, gpu_iv13, gpu_iv12,
-            iv0, outridx, na, idx, h_gpu_expanded);
+          ec_filtfilt_kernel143<<<grid, block>>>(gpu_yc3, gpu_iv13, gpu_iv12,
+            iv0, i, na, idx, h_gpu_expanded);
         }
 
-        iv0 = j_rows->size[0] * j_rows->size[1];
+        i = j_rows->size[0] * j_rows->size[1];
         j_rows->size[0] = 1;
         j_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(j_rows, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(j_rows, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(j_rows, &i_gpu_rows);
         j_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          j_rows->data[xCol_dim0 + 1] = outridx;
+          j_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = i_convOut->size[0] * i_convOut->size[1];
+        i = i_convOut->size[0] * i_convOut->size[1];
         i_convOut->size[0] = static_cast<int32_T>(u);
         i_convOut->size[1] = yc3->size[1];
-        emxEnsureCapacity_real_T(i_convOut, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(i_convOut, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(i_convOut, &m_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))),
@@ -13758,7 +12355,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         r1 = dim3(static_cast<uint32_T>(d_x), static_cast<uint32_T>(vlen), 1U);
         vlen = i_convOut->size[0];
         na = i_expanded->size[0];
-        outridx = j_b->size[0];
+        i = j_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>(((
           static_cast<int32_T>(u) - 1) + 1L) * (c + 1L)), &r, &r1, &grid, &block,
           1024U, 65535U);
@@ -13768,61 +12365,60 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&j_gpu_b, j_b);
           }
 
-          ec_filtfilt_kernel143<<<grid, block>>>(h_gpu_expanded, i_gpu_rows,
-            j_gpu_b, static_cast<int32_T>(u), c, outridx, vlen, na,
-            m_gpu_convOut);
+          ec_filtfilt_kernel144<<<grid, block>>>(h_gpu_expanded, i_gpu_rows,
+            j_gpu_b, static_cast<int32_T>(u), c, i, vlen, na, m_gpu_convOut);
           h_convOut_dirtyOnGpu = true;
         }
 
         if ((s_y->size[0] != 0) && (s_y->size[1] != 0)) {
           if (s_y->size[0] == 1) {
             ns = i_convOut->size[1] - 1;
-            outridx = s_y->size[1] - 1;
+            i = s_y->size[1] - 1;
             vlen = i_convOut->size[0];
             iv0 = s_y->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel147<<<grid, block>>>(r_gpu_y, outridx, ns, vlen,
-                iv0, m_gpu_convOut);
+              ec_filtfilt_kernel148<<<grid, block>>>(r_gpu_y, i, ns, vlen, iv0,
+                m_gpu_convOut);
             }
           } else if (s_y->size[1] == 1) {
             ns = i_convOut->size[1] - 1;
-            outridx = s_y->size[0] - 1;
+            i = s_y->size[0] - 1;
             vlen = i_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel146<<<grid, block>>>(r_gpu_y, outridx, ns, vlen,
+              ec_filtfilt_kernel147<<<grid, block>>>(r_gpu_y, i, ns, vlen,
                 m_gpu_convOut);
             }
           } else if (i_convOut->size[1] == s_y->size[1]) {
-            iv0 = r_convOut->size[0] * r_convOut->size[1];
+            i = r_convOut->size[0] * r_convOut->size[1];
             r_convOut->size[0] = s_y->size[0];
             r_convOut->size[1] = i_convOut->size[1];
-            emxEnsureCapacity_real_T(r_convOut, iv0, &jb_emlrtRTEI);
+            emxEnsureCapacity_real_T(r_convOut, i, &jb_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(r_convOut, &n_gpu_convOut);
             thism = i_convOut->size[1] - 1;
-            outridx = s_y->size[0] - 1;
+            i = s_y->size[0] - 1;
             vlen = r_convOut->size[0];
             idx = i_convOut->size[0];
             iv0 = s_y->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel144<<<grid, block>>>(r_gpu_y, m_gpu_convOut,
-                outridx, thism, vlen, idx, iv0, n_gpu_convOut);
+              ec_filtfilt_kernel145<<<grid, block>>>(r_gpu_y, m_gpu_convOut, i,
+                thism, vlen, idx, iv0, n_gpu_convOut);
             }
 
             thism = r_convOut->size[1] - 1;
-            outridx = r_convOut->size[0] - 1;
+            i = r_convOut->size[0] - 1;
             vlen = i_convOut->size[0];
             idx = r_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel145<<<grid, block>>>(n_gpu_convOut, outridx,
-                thism, vlen, idx, m_gpu_convOut);
+              ec_filtfilt_kernel146<<<grid, block>>>(n_gpu_convOut, i, thism,
+                vlen, idx, m_gpu_convOut);
             }
           } else {
             if (h_convOut_dirtyOnGpu) {
@@ -13849,7 +12445,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&m_gpu_convOut, i_convOut);
           }
 
-          ec_filtfilt_kernel148<<<grid, block>>>(h_gpu_a, ns, idx, iv0, vlen,
+          ec_filtfilt_kernel149<<<grid, block>>>(h_gpu_a, ns, idx, iv0, vlen,
             m_gpu_convOut);
           h_convOut_dirtyOnCpu = false;
         }
@@ -13863,10 +12459,10 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = i_convOut->size[0] - 1;
         }
 
-        iv0 = e_zfIIR->size[0] * e_zfIIR->size[1];
+        i = e_zfIIR->size[0] * e_zfIIR->size[1];
         e_zfIIR->size[0] = (outridx - ns) + 1;
         e_zfIIR->size[1] = i_convOut->size[1];
-        emxEnsureCapacity_real_T(e_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(e_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(e_zfIIR, &e_gpu_zfIIR);
         thism = i_convOut->size[1] - 1;
         na = e_zfIIR->size[0];
@@ -13879,57 +12475,57 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           }
 
           h_convOut_dirtyOnCpu = false;
-          ec_filtfilt_kernel149<<<grid, block>>>(m_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel150<<<grid, block>>>(m_gpu_convOut, ns, outridx,
             thism, na, vlen, e_gpu_zfIIR);
           c_zfIIR_dirtyOnGpu = true;
         }
 
         ns = i_convOut->size[1] - 1;
-        outridx = i_a->size[0] - 3;
+        i = i_a->size[0] - 3;
         iv0 = i_a->size[0];
         na = e_zfIIR->size[0];
         idx = yc3->size[0];
         vlen = i_convOut->size[0];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
-          + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L)
+          * (ns + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           if (h_convOut_dirtyOnCpu) {
             gpuEmxMemcpyCpuToGpu_real_T(&m_gpu_convOut, i_convOut);
           }
 
-          ec_filtfilt_kernel150<<<grid, block>>>(m_gpu_convOut, h_gpu_a, outridx,
-            ns, iv0, na, idx, vlen, e_gpu_zfIIR);
+          ec_filtfilt_kernel151<<<grid, block>>>(m_gpu_convOut, h_gpu_a, i, ns,
+            iv0, na, idx, vlen, e_gpu_zfIIR);
           c_zfIIR_dirtyOnGpu = true;
         }
 
-        iv0 = e_zfIIR->size[0] * e_zfIIR->size[1];
+        i = e_zfIIR->size[0] * e_zfIIR->size[1];
         e_zfIIR->size[0] = static_cast<int32_T>(zfSize[0]);
         e_zfIIR->size[1] = static_cast<int32_T>(zfSize[1]);
-        emxEnsureCapacity_real_T(e_zfIIR, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(e_zfIIR, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(e_zfIIR, &e_gpu_zfIIR);
       }
 
-      iv0 = k_b->size[0];
+      i = k_b->size[0];
       k_b->size[0] = b2->size[0];
-      emxEnsureCapacity_real_T(k_b, iv0, &nc_emlrtRTEI);
+      emxEnsureCapacity_real_T(k_b, i, &nc_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(k_b, &k_gpu_b);
-      outridx = b2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = b2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel151<<<grid, block>>>(gpu_b2, outridx, k_gpu_b);
+        ec_filtfilt_kernel152<<<grid, block>>>(gpu_b2, i, k_gpu_b);
         i_b_dirtyOnGpu = true;
       }
 
-      iv0 = j_a->size[0];
+      i = j_a->size[0];
       j_a->size[0] = a2->size[0];
-      emxEnsureCapacity_real_T(j_a, iv0, &oc_emlrtRTEI);
+      emxEnsureCapacity_real_T(j_a, i, &oc_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(j_a, &i_gpu_a);
-      outridx = a2->size[0] - 1;
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx +
-        1L), &grid, &block, 1024U, 65535U);
+      i = a2->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        ec_filtfilt_kernel152<<<grid, block>>>(gpu_a2, outridx, i_gpu_a);
+        ec_filtfilt_kernel153<<<grid, block>>>(gpu_a2, i, i_gpu_a);
       }
 
       if ((!std::isinf(a2->data[0])) && (!std::isnan(a2->data[0])) &&
@@ -13937,33 +12533,33 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(d_nb +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel153<<<grid, block>>>(c_gpu_a1, d_nb, k_gpu_b);
+          ec_filtfilt_kernel154<<<grid, block>>>(c_gpu_a1, d_nb, k_gpu_b);
           i_b_dirtyOnGpu = true;
         }
 
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(e_na +
           1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel154<<<grid, block>>>(c_gpu_a1, e_na, i_gpu_a);
+          ec_filtfilt_kernel155<<<grid, block>>>(c_gpu_a1, e_na, i_gpu_a);
         }
 
-        ec_filtfilt_kernel155<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(i_gpu_a);
+        ec_filtfilt_kernel156<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(i_gpu_a);
       }
 
       if (j_a->size[0] > k_b->size[0]) {
         loop_ub = j_a->size[0] - k_b->size[0];
-        iv0 = k_b->size[0];
-        xCol_dim0 = k_b->size[0];
+        i = k_b->size[0];
+        xx_dim0 = k_b->size[0];
         k_b->size[0] += loop_ub;
-        emxEnsureCapacity_real_T(k_b, xCol_dim0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(k_b, xx_dim0, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(k_b, &k_gpu_b);
         if (loop_ub - 1 >= 0) {
           if (i_b_dirtyOnGpu) {
             gpuEmxMemcpyGpuToCpu_real_T(k_b, &k_gpu_b);
           }
 
-          std::memset(&k_b->data[iv0], 0, static_cast<uint32_T>(loop_ub) *
-                      sizeof(real_T));
+          std::memset(&k_b->data[i], 0, static_cast<uint32_T>(loop_ub) * sizeof
+                      (real_T));
           i_b_dirtyOnCpu = true;
         }
       }
@@ -13995,9 +12591,9 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = static_cast<int32_T>(u) + k_b->size[0];
         }
 
-        iv0 = j_expanded->size[0] * j_expanded->size[1];
+        i = j_expanded->size[0] * j_expanded->size[1];
         j_expanded->size[0] = outridx - 1;
-        emxEnsureCapacity_real_T(j_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(j_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(j_expanded, &i_gpu_expanded);
         if (yc2->size[1] > 2147483646) {
           outridx = MAX_int32_T;
@@ -14005,95 +12601,95 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
           outridx = yc2->size[1] + 1;
         }
 
-        iv0 = j_expanded->size[0] * j_expanded->size[1];
+        i = j_expanded->size[0] * j_expanded->size[1];
         j_expanded->size[1] = outridx - 1;
-        emxEnsureCapacity_real_T(j_expanded, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(j_expanded, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(j_expanded, &i_gpu_expanded);
         idx = ((static_cast<int32_T>(u) + static_cast<int32_T>(window_idx_0)) -
                1) * yc2->size[1] - 1;
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(idx + 1L),
           &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel156<<<grid, block>>>(idx, i_gpu_expanded);
+          ec_filtfilt_kernel157<<<grid, block>>>(idx, i_gpu_expanded);
         }
 
         ns = yc2->size[0];
-        iv0 = ab_y->size[0] * ab_y->size[1];
+        i = ab_y->size[0] * ab_y->size[1];
         ab_y->size[0] = 1;
         ab_y->size[1] = yc2->size[0];
-        emxEnsureCapacity_int32_T(ab_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(ab_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(ab_y, &y_gpu_y);
         ab_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          ab_y->data[xCol_dim0 + 1] = outridx;
+          ab_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv14->size[0];
+        i = iv14->size[0];
         iv14->size[0] = ab_y->size[1];
-        emxEnsureCapacity_int32_T(iv14, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv14, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv14, &gpu_iv14);
-        outridx = ab_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = ab_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&y_gpu_y, ab_y);
-          ec_filtfilt_kernel157<<<grid, block>>>(nc, y_gpu_y, outridx, gpu_iv14);
+          ec_filtfilt_kernel158<<<grid, block>>>(nc, y_gpu_y, i, gpu_iv14);
         }
 
         ns = yc2->size[1];
-        iv0 = cb_y->size[0] * cb_y->size[1];
+        i = cb_y->size[0] * cb_y->size[1];
         cb_y->size[0] = 1;
         cb_y->size[1] = yc2->size[1];
-        emxEnsureCapacity_int32_T(cb_y, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(cb_y, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(cb_y, &ab_gpu_y);
         cb_y->data[0] = 1;
         outridx = 1;
-        for (xCol_dim0 = 0; xCol_dim0 <= ns - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= ns - 2; xx_dim0++) {
           outridx++;
-          cb_y->data[xCol_dim0 + 1] = outridx;
+          cb_y->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = iv15->size[0];
+        i = iv15->size[0];
         iv15->size[0] = cb_y->size[1];
-        emxEnsureCapacity_int32_T(iv15, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_int32_T(iv15, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(iv15, &gpu_iv15);
-        outridx = cb_y->size[1] - 1;
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(outridx
-          + 1L), &grid, &block, 1024U, 65535U);
+        i = cb_y->size[1] - 1;
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+          &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
           gpuEmxMemcpyCpuToGpu_int32_T(&ab_gpu_y, cb_y);
-          ec_filtfilt_kernel158<<<grid, block>>>(ab_gpu_y, outridx, gpu_iv15);
+          ec_filtfilt_kernel159<<<grid, block>>>(ab_gpu_y, i, gpu_iv15);
         }
 
         iv0 = yc2->size[1] - 1;
-        outridx = yc2->size[0] - 1;
+        i = yc2->size[0] - 1;
         na = j_expanded->size[0];
         idx = yc2->size[0];
-        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((outridx
-          + 1L) * (iv0 + 1L)), &grid, &block, 1024U, 65535U);
+        validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L)
+          * (iv0 + 1L)), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel159<<<grid, block>>>(gpu_yc2, gpu_iv15, gpu_iv14,
-            outridx, iv0, na, idx, i_gpu_expanded);
+          ec_filtfilt_kernel160<<<grid, block>>>(gpu_yc2, gpu_iv15, gpu_iv14, i,
+            iv0, na, idx, i_gpu_expanded);
         }
 
-        iv0 = k_rows->size[0] * k_rows->size[1];
+        i = k_rows->size[0] * k_rows->size[1];
         k_rows->size[0] = 1;
         k_rows->size[1] = static_cast<int32_T>(window_idx_0);
-        emxEnsureCapacity_int32_T(k_rows, iv0, &pb_emlrtRTEI);
+        emxEnsureCapacity_int32_T(k_rows, i, &pb_emlrtRTEI);
         gpuEmxEnsureCapacity_int32_T(k_rows, &k_gpu_rows);
         k_rows->data[0] = 0;
         outridx = 0;
-        for (xCol_dim0 = 0; xCol_dim0 <= thism - 2; xCol_dim0++) {
+        for (xx_dim0 = 0; xx_dim0 <= thism - 2; xx_dim0++) {
           outridx++;
-          k_rows->data[xCol_dim0 + 1] = outridx;
+          k_rows->data[xx_dim0 + 1] = outridx;
         }
 
-        iv0 = j_convOut->size[0] * j_convOut->size[1];
+        i = j_convOut->size[0] * j_convOut->size[1];
         j_convOut->size[0] = static_cast<int32_T>(u);
         j_convOut->size[1] = yc2->size[1];
-        emxEnsureCapacity_real_T(j_convOut, iv0, &ob_emlrtRTEI);
+        emxEnsureCapacity_real_T(j_convOut, i, &ob_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(j_convOut, &p_gpu_convOut);
         r = dim3(static_cast<uint32_T>(std::floor((static_cast<real_T>(OH) + (
           static_cast<real_T>(d_x) - 1.0)) / static_cast<real_T>(d_x))),
@@ -14103,7 +12699,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
         r1 = dim3(static_cast<uint32_T>(d_x), static_cast<uint32_T>(vlen), 1U);
         vlen = j_convOut->size[0];
         na = j_expanded->size[0];
-        outridx = k_b->size[0];
+        i = k_b->size[0];
         validLaunchParams = mwApplyLaunchParameters(static_cast<real_T>(((
           static_cast<int32_T>(u) - 1) + 1L) * (c + 1L)), &r, &r1, &grid, &block,
           1024U, 65535U);
@@ -14113,61 +12709,60 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&k_gpu_b, k_b);
           }
 
-          ec_filtfilt_kernel160<<<grid, block>>>(i_gpu_expanded, k_gpu_rows,
-            k_gpu_b, static_cast<int32_T>(u), c, outridx, vlen, na,
-            p_gpu_convOut);
+          ec_filtfilt_kernel161<<<grid, block>>>(i_gpu_expanded, k_gpu_rows,
+            k_gpu_b, static_cast<int32_T>(u), c, i, vlen, na, p_gpu_convOut);
           j_convOut_dirtyOnGpu = true;
         }
 
         if ((e_zfIIR->size[0] != 0) && (e_zfIIR->size[1] != 0)) {
           if (e_zfIIR->size[0] == 1) {
             ns = j_convOut->size[1] - 1;
-            outridx = e_zfIIR->size[1] - 1;
+            i = e_zfIIR->size[1] - 1;
             vlen = j_convOut->size[0];
             na = e_zfIIR->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel164<<<grid, block>>>(e_gpu_zfIIR, outridx, ns,
-                vlen, na, p_gpu_convOut);
+              ec_filtfilt_kernel165<<<grid, block>>>(e_gpu_zfIIR, i, ns, vlen,
+                na, p_gpu_convOut);
             }
           } else if (e_zfIIR->size[1] == 1) {
             ns = j_convOut->size[1] - 1;
-            outridx = e_zfIIR->size[0] - 1;
+            i = e_zfIIR->size[0] - 1;
             vlen = j_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (ns + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel163<<<grid, block>>>(e_gpu_zfIIR, outridx, ns,
-                vlen, p_gpu_convOut);
+              ec_filtfilt_kernel164<<<grid, block>>>(e_gpu_zfIIR, i, ns, vlen,
+                p_gpu_convOut);
             }
           } else if (j_convOut->size[1] == e_zfIIR->size[1]) {
-            iv0 = t_convOut->size[0] * t_convOut->size[1];
+            i = t_convOut->size[0] * t_convOut->size[1];
             t_convOut->size[0] = e_zfIIR->size[0];
             t_convOut->size[1] = j_convOut->size[1];
-            emxEnsureCapacity_real_T(t_convOut, iv0, &jb_emlrtRTEI);
+            emxEnsureCapacity_real_T(t_convOut, i, &jb_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(t_convOut, &q_gpu_convOut);
             thism = j_convOut->size[1] - 1;
-            outridx = e_zfIIR->size[0] - 1;
+            i = e_zfIIR->size[0] - 1;
             vlen = t_convOut->size[0];
             idx = j_convOut->size[0];
             na = e_zfIIR->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel161<<<grid, block>>>(e_gpu_zfIIR, p_gpu_convOut,
-                outridx, thism, vlen, idx, na, q_gpu_convOut);
+              ec_filtfilt_kernel162<<<grid, block>>>(e_gpu_zfIIR, p_gpu_convOut,
+                i, thism, vlen, idx, na, q_gpu_convOut);
             }
 
             thism = t_convOut->size[1] - 1;
-            outridx = t_convOut->size[0] - 1;
+            i = t_convOut->size[0] - 1;
             vlen = j_convOut->size[0];
             idx = t_convOut->size[0];
-            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
-              ((outridx + 1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i +
+              1L) * (thism + 1L)), &grid, &block, 1024U, 65535U);
             if (validLaunchParams) {
-              ec_filtfilt_kernel162<<<grid, block>>>(q_gpu_convOut, outridx,
-                thism, vlen, idx, p_gpu_convOut);
+              ec_filtfilt_kernel163<<<grid, block>>>(q_gpu_convOut, i, thism,
+                vlen, idx, p_gpu_convOut);
             }
           } else {
             if (j_convOut_dirtyOnGpu) {
@@ -14194,15 +12789,15 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&p_gpu_convOut, j_convOut);
           }
 
-          ec_filtfilt_kernel165<<<grid, block>>>(i_gpu_a, ns, idx, iv0, vlen,
+          ec_filtfilt_kernel166<<<grid, block>>>(i_gpu_a, ns, idx, iv0, vlen,
             p_gpu_convOut);
           j_convOut_dirtyOnCpu = false;
         }
 
-        iv0 = s_convOut->size[0] * s_convOut->size[1];
+        i = s_convOut->size[0] * s_convOut->size[1];
         s_convOut->size[0] = yc2->size[0];
         s_convOut->size[1] = j_convOut->size[1];
-        emxEnsureCapacity_real_T(s_convOut, iv0, &jb_emlrtRTEI);
+        emxEnsureCapacity_real_T(s_convOut, i, &jb_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(s_convOut, &r_gpu_convOut);
         thism = j_convOut->size[1] - 1;
         iv0 = yc2->size[0] - 1;
@@ -14215,103 +12810,99 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
             gpuEmxMemcpyCpuToGpu_real_T(&p_gpu_convOut, j_convOut);
           }
 
-          ec_filtfilt_kernel166<<<grid, block>>>(p_gpu_convOut, iv0, thism, vlen,
+          ec_filtfilt_kernel167<<<grid, block>>>(p_gpu_convOut, iv0, thism, vlen,
             idx, r_gpu_convOut);
         }
 
         ns = yc2->size[0];
         outridx = yc2->size[1];
-        iv0 = yc5->size[0] * yc5->size[1];
+        i = yc5->size[0] * yc5->size[1];
         yc5->size[0] = yc2->size[0];
         yc5->size[1] = yc2->size[1];
-        emxEnsureCapacity_real_T(yc5, iv0, &wc_emlrtRTEI);
+        emxEnsureCapacity_real_T(yc5, i, &wc_emlrtRTEI);
         gpuEmxEnsureCapacity_real_T(yc5, &gpu_yc5);
         validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((ns *
           outridx - 1) + 1L), &grid, &block, 1024U, 65535U);
         if (validLaunchParams) {
-          ec_filtfilt_kernel167<<<grid, block>>>(r_gpu_convOut, ns, outridx,
+          ec_filtfilt_kernel168<<<grid, block>>>(r_gpu_convOut, ns, outridx,
             gpu_yc5);
         }
       }
 
-      iv0 = xCol->size[0] * xCol->size[1];
-      xCol->size[0] = yc5->size[0];
-      xCol->size[1] = yc5->size[1];
-      emxEnsureCapacity_real_T(xCol, iv0, &qc_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
-      outridx = yc5->size[1] - 1;
-      iv0 = yc5->size[0] - 1;
-      xCol_dim0 = xCol->size[0];
-      idx = yc5->size[0];
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 + 1L)
-        * (outridx + 1L)), &grid, &block, 1024U, 65535U);
-      if (validLaunchParams) {
-        ec_filtfilt_kernel168<<<grid, block>>>(gpu_yc5, iv0, outridx, xCol_dim0,
-          idx, gpu_xCol);
+      i = xx->size[0] * xx->size[1];
+      xx->size[0] = yc5->size[0];
+      xx->size[1] = yc5->size[1];
+      emxEnsureCapacity_real_T(xx, i, &qc_emlrtRTEI);
+      if (!xx_dirtyOnCpu) {
+        gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
       }
 
-      iv0 = xCol->size[0] * xCol->size[1];
-      xCol->size[0] = static_cast<int32_T>(sz[0]);
-      xCol->size[1] = static_cast<int32_T>(sz[1]);
-      emxEnsureCapacity_real_T(xCol, iv0, &v_emlrtRTEI);
-      gpuEmxEnsureCapacity_real_T(xCol, &gpu_xCol);
+      i = yc5->size[1] - 1;
+      iv0 = yc5->size[0] - 1;
+      xx_dim0 = xx->size[0];
+      idx = yc5->size[0];
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 + 1L)
+        * (i + 1L)), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (xx_dirtyOnCpu) {
+          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
+        }
+
+        ec_filtfilt_kernel169<<<grid, block>>>(gpu_yc5, iv0, i, xx_dim0, idx,
+          gpu_xx);
+        xx_dirtyOnCpu = false;
+        xx_dirtyOnGpu = true;
+      }
+
+      i = xx->size[0] * xx->size[1];
+      xx->size[0] = static_cast<int32_T>(sz[0]);
+      xx->size[1] = static_cast<int32_T>(sz[1]);
+      emxEnsureCapacity_real_T(xx, i, &v_emlrtRTEI);
+      if (!xx_dirtyOnCpu) {
+        gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
+      }
     }
 
     if (x->size[0] == 1) {
-      iv0 = x->size[0] * x->size[1];
-      x->size[0] = xCol->size[1];
-      x->size[1] = xCol->size[0];
-      emxEnsureCapacity_real_T(x, iv0, &r_emlrtRTEI);
-      if (!x_dirtyOnCpu) {
-        gpuEmxEnsureCapacity_real_T(x, &gpu_x);
-      }
-
-      loop_ub = xCol->size[0] - 1;
-      iv0 = xCol->size[1] - 1;
-      outridx = x->size[0];
-      xCol_dim0 = xCol->size[0];
+      i = b_xx->size[0] * b_xx->size[1];
+      b_xx->size[0] = xx->size[1];
+      b_xx->size[1] = xx->size[0];
+      emxEnsureCapacity_real_T(b_xx, i, &r_emlrtRTEI);
+      gpuEmxEnsureCapacity_real_T(b_xx, &b_gpu_xx);
+      loop_ub = xx->size[0] - 1;
+      iv0 = xx->size[1] - 1;
+      xx_dim0 = b_xx->size[0];
+      i = xx->size[0];
       validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 + 1L)
         * (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        if (xCol_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xCol, xCol);
+        if (xx_dirtyOnCpu) {
+          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
         }
 
-        if (x_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_real_T(&gpu_x, x);
-        }
-
-        ec_filtfilt_kernel268<<<grid, block>>>(gpu_xCol, iv0, loop_ub, outridx,
-          xCol_dim0, gpu_x);
-        x_dirtyOnGpu = true;
-      }
-    } else {
-      iv0 = x->size[0] * x->size[1];
-      x->size[0] = xCol->size[0];
-      x->size[1] = xCol->size[1];
-      emxEnsureCapacity_real_T(x, iv0, &r_emlrtRTEI);
-      if (!x_dirtyOnCpu) {
-        gpuEmxEnsureCapacity_real_T(x, &gpu_x);
+        xx_dirtyOnCpu = false;
+        ec_filtfilt_kernel268<<<grid, block>>>(gpu_xx, iv0, loop_ub, xx_dim0, i,
+          b_gpu_xx);
       }
 
-      loop_ub = xCol->size[1] - 1;
-      iv0 = xCol->size[0] - 1;
-      outridx = x->size[0];
-      xCol_dim0 = xCol->size[0];
-      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((iv0 + 1L)
-        * (loop_ub + 1L)), &grid, &block, 1024U, 65535U);
+      i = xx->size[0] * xx->size[1];
+      xx->size[0] = b_xx->size[0];
+      xx->size[1] = b_xx->size[1];
+      emxEnsureCapacity_real_T(xx, i, &u_emlrtRTEI);
+      if (!xx_dirtyOnCpu) {
+        gpuEmxEnsureCapacity_real_T(xx, &gpu_xx);
+      }
+
+      loop_ub = b_xx->size[0] * b_xx->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(loop_ub +
+        1L), &grid, &block, 1024U, 65535U);
       if (validLaunchParams) {
-        if (xCol_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xCol, xCol);
+        if (xx_dirtyOnCpu) {
+          gpuEmxMemcpyCpuToGpu_real_T(&gpu_xx, xx);
         }
 
-        if (x_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_real_T(&gpu_x, x);
-        }
-
-        ec_filtfilt_kernel267<<<grid, block>>>(gpu_xCol, iv0, loop_ub, outridx,
-          xCol_dim0, gpu_x);
-        x_dirtyOnGpu = true;
+        ec_filtfilt_kernel269<<<grid, block>>>(b_gpu_xx, loop_ub, gpu_xx);
+        xx_dirtyOnGpu = true;
       }
     }
   }
@@ -14325,6 +12916,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxFree_real_T(&o_convOut);
   emxFree_real_T(&n_convOut);
   emxFree_real_T(&m_convOut);
+  emxFree_real_T(&b_xx);
   emxFree_real_T(&n_b);
   emxFree_real_T(&l_convOut);
   emxFree_int32_T(&m_rows);
@@ -14482,19 +13074,19 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   emxFree_real_T(&b2);
   emxFree_real_T(&zi);
   emxFree_real_T(&b);
-  emxFree_real_T(&xCol);
 
-  // coder.gpu.kernel();
-  // parfor ch = 1:nCh
-  //     x(:,ch) = filtfilt(coef,1,x(:,ch));
-  // end
+  //  coder.gpu.kernel();
+  //  for ch = 1:nCh
+  //     xx(:,ch) = filtfilt(coef,1,x(:,ch));
+  //  end
   emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
-  if (x_dirtyOnGpu) {
-    gpuEmxMemcpyGpuToCpu_real_T(x, &gpu_x);
+  if (xx_dirtyOnGpu) {
+    gpuEmxMemcpyGpuToCpu_real_T(xx, &gpu_xx);
   }
 
+  gpuEmxFree_real_T(&gpu_xx);
+  mwCudaFree(gpu_i);
   gpuEmxFree_real_T(&gpu_x);
-  gpuEmxFree_real_T(&gpu_xCol);
   gpuEmxFree_real_T(&gpu_coef);
   gpuEmxFree_real_T(&gpu_b);
   gpuEmxFree_real_T(&gpu_b2);
@@ -14627,6 +13219,7 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   gpuEmxFree_real_T(&h_gpu_expanded);
   gpuEmxFree_real_T(&gpu_yc5);
   gpuEmxFree_real_T(&l_gpu_b);
+  gpuEmxFree_real_T(&b_gpu_xx);
   gpuEmxFree_int32_T(&w_gpu_y);
   gpuEmxFree_int32_T(&gpu_iv12);
   gpuEmxFree_real_T(&j_gpu_a);
@@ -14673,74 +13266,6 @@ void ec_filtfilt(emxArray_real_T *x, const emxArray_real_T *coef)
   gpuEmxFree_int32_T(&m_gpu_rows);
   gpuEmxFree_real_T(&t_gpu_convOut);
   gpuEmxFree_real_T(&u_gpu_convOut);
-}
-
-void ec_filtfilt_api(const mxArray * const prhs[2], const mxArray *plhs[1])
-{
-  emxArray_real_T *coef;
-  emxArray_real_T *x;
-  const mxArray *prhs_copy_idx_0;
-  emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
-  prhs_copy_idx_0 = emlrtProtectR2012b(prhs[0], 0, true, -1);
-
-  // Marshall function inputs
-  emxInit_real_T(&x, 2, &emlrtRTEI, true);
-  x->canFreeData = false;
-  emlrt_marshallIn(emlrtAlias(prhs_copy_idx_0), "x", x);
-  emxInit_real_T(&coef, 2, &emlrtRTEI, true);
-  coef->canFreeData = false;
-  b_emlrt_marshallIn(emlrtAlias(prhs[1]), "coef", coef);
-
-  // Invoke the target function
-  ec_filtfilt(x, coef);
-  emxFree_real_T(&coef);
-
-  // Marshall function outputs
-  x->canFreeData = false;
-  emlrt_marshallOut(x, prhs_copy_idx_0);
-  emxFree_real_T(&x);
-  plhs[0] = prhs_copy_idx_0;
-  emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
-}
-
-void ec_filtfilt_atexit()
-{
-  mexFunctionCreateRootTLS();
-  emlrtEnterRtStackR2012b(emlrtRootTLSGlobal);
-  emlrtDestroyRootTLS(&emlrtRootTLSGlobal);
-  emlrtExitTimeCleanup(&emlrtContextGlobal);
-}
-
-void ec_filtfilt_initialize()
-{
-  mex_InitInfAndNan();
-  mexFunctionCreateRootTLS();
-  emlrtClearAllocCountR2012b(emlrtRootTLSGlobal, false, 0U, nullptr);
-  emlrtEnterRtStackR2012b(emlrtRootTLSGlobal);
-  emlrtLicenseCheckR2022a(emlrtRootTLSGlobal,
-    "EMLRT:runTime:MexFunctionNeedsLicense", "distrib_computing_toolbox", 2);
-  emlrtLicenseCheckR2022a(emlrtRootTLSGlobal,
-    "EMLRT:runTime:MexFunctionNeedsLicense", "signal_toolbox", 2);
-  if (emlrtFirstTimeR2012b(emlrtRootTLSGlobal)) {
-    ec_filtfilt_once();
-  }
-
-  emlrtInitGPU(emlrtRootTLSGlobal);
-  cudaGetLastError();
-}
-
-void ec_filtfilt_terminate()
-{
-  cudaError_t errCode;
-  errCode = cudaGetLastError();
-  if (errCode != cudaSuccess) {
-    emlrtThinCUDAError(static_cast<uint32_T>(errCode), (char_T *)
-                       cudaGetErrorString(errCode), (char_T *)cudaGetErrorName
-                       (errCode), (char_T *)"SafeBuild", emlrtRootTLSGlobal);
-  }
-
-  emlrtDestroyRootTLS(&emlrtRootTLSGlobal);
-  mwMemoryManagerTerminate();
 }
 
 // End of code generation (ec_filtfilt.cu)

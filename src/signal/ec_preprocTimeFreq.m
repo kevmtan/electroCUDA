@@ -1,14 +1,50 @@
 function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,o,n,x,arg)
-% Time-frequency decomposition using continuous wave transform (CWT)
-% CWT uses Morse wavelets (FUTURE: add more CWT options)
-% CWT is used with L1 normalization to mitigate 1/f power decay at higher freqs
+%% electroCUDA: time-frequency decomposition
+% This function performs time-frequency decomposition on channel or IC timecourses
+% (output of 'ec_preproc' or 'ec_preprocICA'). Decomposition is performed via
+% continuous wavelet transform (CWT) using Morse wavelets, which account
+% for unequal variance-covariance across frequencies (unlike other wavelets).
+% L1-norm is applied to mitigate the 1/frequency decay of neuronal field potentials.
 %
-% TO DO: compile CWT in CUDA
+% SEE WIKI FOR MORE INFO: github.com/kevmtan/electroCUDA/wiki
+%
+% INPUTS:
+%    sbj = subject name
+%    proj = project name
+%    o = struct of options & parameters (TO DO: describe all options)
+%    n = preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
+%    x = preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
+%    arg = Name-Value Arguments (see "Input validation" below)
+%
+% OUTPUTS:
+%   errors = cell array of any errors or warnings
+%   n = Struct of preprocessing info & results
+%   x = Preprocessed EEG data indexed as: x(timeframe,channel)
+%      NOTE: 'n' and 'x' are saved to disk by default
+%
+% ACKNOWLEDGEMENTS:
+%    * Stanford Parvizi Lab (Pedro Pinhiero-Chagas, Amy Daitch, Su Liu, et al.)
+%    * Laboratoire des Systèmes Perceptifs (NoiseTools: Alain de Cheveigné, et al.)
+%    * Full acknowledgements in Wiki (github.com/kevmtan/electroCUDA/wiki)
+%
+% LICENSE: General Public License (GNU GPLv3)  
+% DISCLAIMERS:
+%    Use and distribution of this software must comply with GNU GPLv3.
+%    This software may be subject to University of California intellectual
+%    property rights.
+%    Use this code at your own risk. Users assume full responsibility for
+%    any eventualities related to the content herein.
+%    This code is for research purposes only and NOT INTENDED FOR CLINICAL USE.
+%    
+%
+%                 Kevin Tan, 2022 (github.io/kevmtan)
+
+%% Input validation
 arguments
     sbj
     proj {mustBeText} = 'MMR'
-    o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
-    n struct = [] % preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
+    o struct = struct % options struct (see "Options struct validation" below)
+    n struct = [] % preloaded 'n' struct from ec_preproc (OPTIONAL)
     x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
     arg.dirs struct = [] % Directory paths struct
     arg.ica logical = false

@@ -1,51 +1,51 @@
 function [errors,n,x] = ec_preproc(sbj,proj,o,n,x,arg)
-%% Robust preprocessing for intracranial/scalp electrophysiology
-%  This function is part of electroCUDA (github.com/kevmtan/electroCUDA)
-%  Call this function using its wrapper:
-%                             ~/electroCUDA/1/pipeline/pre5_robustPreproc.m
+%% electroCUDA - initial robust preprocessing steps for intracranial EEG
+% See these functions for later-stage preprocessing steps:
+%     - ec_preprocICA (source separation & denoising via ICA)
+%     - ec_preprocTimeFreq (time-frequency decomposition via wavelets)
 %
-% MAIN INPUTS:
+% SEE WIKI FOR MORE INFO: github.com/kevmtan/electroCUDA/wiki
+%
+% INPUTS:
 %    sbj = subject name
 %    proj = project name
-%    o = struct of options & parameters (described below in "Options struct validation")
+%    o = struct of options & parameters (TO DO: describe all options)
 %    n = preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
 %    x = preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
-%
-% NAME-VALUE INPUTS:
-%    see below sections: "Main input validation" & "Options struct validation"
+%    arg = Name-Value Arguments (see "Input validation" below)
 %
 % OUTPUTS:
-%   x = Preprocessed EEG data indexed as: x(timeframe,channel)
+%   errors = cell array of any errors or warnings
 %   n = Struct of preprocessing info & results
-%
-% ALGORITHM SEQUENCE:
-%    power line denoise, detrend, detect bad channels, interpolate bad channels,
-%    detect spatiotemporal outliers (channel covariance), robust rereferencing,
-%    detect epileptic HFOs, detect noisy timepoints (within-channel)
-%
-% ALGORITHM OPTIONS: see below section "Options struct validation"
-%
-% HARDWARE ACCELERATION: threaded CPU parallelization (see MATLAB ThreadPool)
-%
-%
-%               Kevin Tan, 2022 (http://github.com/kevmtan/electroCUDA)
-%
+%   x = Preprocessed EEG data indexed as: x(timeframe,channel)
+%      NOTE: 'n' and 'x' are saved to disk by default
 %
 % ACKNOWLEDGEMENTS:
 %    * Stanford Parvizi Lab (Pedro Pinhiero-Chagas, Amy Daitch, Su Liu, et al.)
 %    * Laboratoire des Systèmes Perceptifs (NoiseTools: Alain de Cheveigné, et al.)
-% LICENSE: GNU General Public License
-% DISCLAIMER: Use this code at your own risk. Author assumes no responsibility
-%    for any adverse outcomes related this code or its use. Author makes no
-%    guarantees on the performance or accuracy of this code. This code is for
-%    research purposes only. NOT INTENDED FOR MEDICAL USE.
+%    * Full acknowledgements in Wiki (github.com/kevmtan/electroCUDA/wiki)
+%
+% LICENSE: General Public License (GNU GPLv3)  
+% DISCLAIMERS:
+%    Use and distribution of this software must comply with GNU GPLv3.
+%    This software may be subject to University of California intellectual
+%    property rights.
+%    Use this code at your own risk. Users assume full responsibility for
+%    any eventualities related to the content herein.
+%    This code is for research purposes only and NOT INTENDED FOR CLINICAL USE.
+%    
+%
+%                 Kevin Tan, 2022 (github.io/kevmtan)
 
+%% Input validation
 arguments
+    % Main inputs
     sbj % Subject name
     proj {mustBeText} = 'MMR' % Project name
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
     n struct = [] % preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
     x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
+    % Name-value inputs 
     arg.blocks {mustBeText} = BlockBySubj(sbj,proj) % Task blocks/runs to include
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
