@@ -11,7 +11,6 @@
 #pragma once
 
 // Include files
-#include "ec_filtfilt_types.h"
 #include "rtwtypes.h"
 #include "emlrt.h"
 #include "mex.h"
@@ -26,8 +25,23 @@
 #undef printf
 #endif
 
+// Type Declarations
+struct emxArray_real_T;
+
+// Variable Declarations
+extern emlrtCTX emlrtRootTLSGlobal;
+extern emlrtContext emlrtContextGlobal;
+
 // Function Declarations
 void ec_filtfilt(const emxArray_real_T *x, const emxArray_real_T *coef,
                  emxArray_real_T *xx);
+
+void ec_filtfilt_api(const mxArray *const prhs[2], const mxArray *plhs[1]);
+
+void ec_filtfilt_atexit();
+
+void ec_filtfilt_initialize();
+
+void ec_filtfilt_terminate();
 
 // End of code generation (ec_filtfilt.h)

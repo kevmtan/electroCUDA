@@ -10,10 +10,7 @@
 
 // Include files
 #include "_coder_ec_CWTsingle_mex.h"
-#include "_coder_ec_CWTsingle_api.h"
-#include "ec_CWTsingle_data.h"
-#include "ec_CWTsingle_initialize.h"
-#include "ec_CWTsingle_terminate.h"
+#include "ec_CWTsingle.h"
 #include "rt_nonfinite.h"
 #include <stdexcept>
 

@@ -10,10 +10,7 @@
 
 // Include files
 #include "_coder_ec_CWTdouble_mex.h"
-#include "_coder_ec_CWTdouble_api.h"
-#include "ec_CWTdouble_data.h"
-#include "ec_CWTdouble_initialize.h"
-#include "ec_CWTdouble_terminate.h"
+#include "ec_CWTdouble.h"
 #include "rt_nonfinite.h"
 #include <stdexcept>
 

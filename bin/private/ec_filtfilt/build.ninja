@@ -53,22 +53,12 @@ build $builddir/solve_from_qr.o : cxx $root/CXSparse/CXSparseSupport/solve_from_
 build $builddir/makeCXSparseMatrix.o : cxx $root/CXSparse/CXSparseSupport/makeCXSparseMatrix.cpp
 build $builddir/unpackCXStruct.o : cxx $root/CXSparse/CXSparseSupport/unpackCXStruct.cpp
 build $builddir/MWCUBLASUtils.o : cudac $root/MWCUBLASUtils.cpp
-build $builddir/ec_filtfilt_data.o : cudac $root/ec_filtfilt_data.cu
 build $builddir/rt_nonfinite.o : cudac $root/rt_nonfinite.cu
-build $builddir/ec_filtfilt_initialize.o : cudac $root/ec_filtfilt_initialize.cu
-build $builddir/ec_filtfilt_terminate.o : cudac $root/ec_filtfilt_terminate.cu
 build $builddir/ec_filtfilt.o : cudac $root/ec_filtfilt.cu
-build $builddir/warning.o : cudac $root/warning.cu
-build $builddir/_coder_ec_filtfilt_api.o : cudac $root/interface/_coder_ec_filtfilt_api.cu
 build $builddir/_coder_ec_filtfilt_mex.o : cudac $root/interface/_coder_ec_filtfilt_mex.cu
-build $builddir/insertionsort.o : cudac $root/insertionsort.cu
-build $builddir/introsort.o : cudac $root/introsort.cu
-build $builddir/heapsort.o : cudac $root/heapsort.cu
-build $builddir/gpufilterImpl.o : cudac $root/gpufilterImpl.cu
-build $builddir/ec_filtfilt_emxutil.o : cudac $root/ec_filtfilt_emxutil.cu
 build $builddir/_coder_ec_filtfilt_info.o : cxx $root/interface/_coder_ec_filtfilt_info.cpp
 build $builddir/MWMemoryManager.o : cudac $root/MWMemoryManager.cpp
 build $builddir/cpp_mexapi_version.o : cudac $root/cpp_mexapi_version.cpp
 
 # Link
-build $root/ec_filtfilt_mex.mexa64 : linkcuda $builddir/cs_ri_bundle.o $builddir/cs_ci_bundle.o $builddir/solve_from_lu.o $builddir/solve_from_qr.o $builddir/makeCXSparseMatrix.o $builddir/unpackCXStruct.o $builddir/MWCUBLASUtils.o $builddir/ec_filtfilt_data.o $builddir/rt_nonfinite.o $builddir/ec_filtfilt_initialize.o $builddir/ec_filtfilt_terminate.o $builddir/ec_filtfilt.o $builddir/warning.o $builddir/_coder_ec_filtfilt_api.o $builddir/_coder_ec_filtfilt_mex.o $builddir/insertionsort.o $builddir/introsort.o $builddir/heapsort.o $builddir/gpufilterImpl.o $builddir/ec_filtfilt_emxutil.o $builddir/_coder_ec_filtfilt_info.o $builddir/MWMemoryManager.o $builddir/cpp_mexapi_version.o 
+build $root/ec_filtfilt_mex.mexa64 : linkcuda $builddir/cs_ri_bundle.o $builddir/cs_ci_bundle.o $builddir/solve_from_lu.o $builddir/solve_from_qr.o $builddir/makeCXSparseMatrix.o $builddir/unpackCXStruct.o $builddir/MWCUBLASUtils.o $builddir/rt_nonfinite.o $builddir/ec_filtfilt.o $builddir/_coder_ec_filtfilt_mex.o $builddir/_coder_ec_filtfilt_info.o $builddir/MWMemoryManager.o $builddir/cpp_mexapi_version.o 

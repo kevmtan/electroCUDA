@@ -11,7 +11,6 @@
 #pragma once
 
 // Include files
-#include "ec_CWTdouble_types.h"
 #include "rtwtypes.h"
 #include "emlrt.h"
 #include "mex.h"
@@ -26,9 +25,25 @@
 #undef printf
 #endif
 
+// Type Declarations
+struct emxArray_real_T;
+
+// Variable Declarations
+extern emlrtCTX emlrtRootTLSGlobal;
+extern emlrtContext emlrtContextGlobal;
+
 // Function Declarations
 void ec_CWTdouble(const emxArray_real_T *x, real_T fs, real_T freqLims[2],
                   boolean_T doAvg, real_T freqsPerOctave, emxArray_real_T *wt,
                   emxArray_real_T *freqs, emxArray_real_T *coi);
+
+void ec_CWTdouble_api(const mxArray *const prhs[5], int32_T nlhs,
+                      const mxArray *plhs[3]);
+
+void ec_CWTdouble_atexit();
+
+void ec_CWTdouble_initialize();
+
+void ec_CWTdouble_terminate();
 
 // End of code generation (ec_CWTdouble.h)

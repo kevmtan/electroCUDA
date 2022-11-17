@@ -10,25 +10,102 @@
 
 // Include files
 #include "ec_filtfilt.h"
-#include "ec_filtfilt_data.h"
-#include "ec_filtfilt_emxutil.h"
+#include "_coder_ec_filtfilt_mex.h"
 #include "ec_filtfilt_types.h"
-#include "gpufilterImpl.h"
-#include "introsort.h"
 #include "rt_nonfinite.h"
-#include "warning.h"
 #include "MWCUBLASUtils.hpp"
 #include "MWCudaDimUtility.hpp"
 #include "MWCudaMemoryFunctions.hpp"
 #include "MWLaunchParametersUtilities.hpp"
+#include "MWMemoryManager.hpp"
 #include "cs.h"
 #include "makeCXSparseMatrix.h"
 #include "solve_from_lu.h"
 #include "solve_from_qr.h"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
+// Type Definitions
+struct struct_T
+{
+  int32_T xstart;
+  int32_T xend;
+  int32_T depth;
+};
+
+struct emxArray_int32_T
+{
+  int32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_uint32_T
+{
+  uint32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_boolean_T
+{
+  boolean_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_int8_T
+{
+  int8_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_struct_T
+{
+  struct_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
 // Variable Definitions
+emlrtCTX emlrtRootTLSGlobal{ nullptr };
+
+emlrtContext emlrtContextGlobal{ true, // bFirstTime
+  false,                               // bInitialized
+  131627U,                             // fVersionInfo
+  nullptr,                             // fErrorFunction
+  "ec_filtfilt",                       // fFunctionName
+  nullptr,                             // fRTCallStack
+  false,                               // bDebugMode
+
+  { 3615363707U, 2875872051U, 2733369800U, 3255517249U },// fSigWrd
+  nullptr                              // fSigMem
+};
+
+static emlrtMCInfo emlrtMCI{ 14,       // lineNo
+  25,                                  // colNo
+  "warning",                           // fName
+  "/usr/local/MATLAB/R2022b/toolbox/shared/coder/coder/lib/+coder/+internal/warning.m"// pName
+};
+
+static emlrtMCInfo b_emlrtMCI{ 14,     // lineNo
+  9,                                   // colNo
+  "warning",                           // fName
+  "/usr/local/MATLAB/R2022b/toolbox/shared/coder/coder/lib/+coder/+internal/warning.m"// pName
+};
+
 static emlrtMCInfo c_emlrtMCI{ 53,     // lineNo
   19,                                  // colNo
   "flt2str",                           // fName
@@ -237,6 +314,12 @@ static emlrtRTEInfo ib_emlrtRTEI{ 401, // lineNo
   25,                                  // colNo
   "filtfilt",                          // fName
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
+};
+
+static emlrtRTEInfo jb_emlrtRTEI{ 1,   // lineNo
+  1,                                   // colNo
+  "gpufilterImpl",                     // fName
+  "/usr/local/MATLAB/R2022b/toolbox/eml/lib/matlab/datafun/private/gpufilterImpl.p"// pName
 };
 
 static emlrtRTEInfo kb_emlrtRTEI{ 211, // lineNo
@@ -653,11 +736,54 @@ static emlrtRTEInfo de_emlrtRTEI{ 356, // lineNo
   "/usr/local/MATLAB/R2022b/toolbox/signal/signal/filtfilt.m"// pName
 };
 
+static emlrtRTEInfo ee_emlrtRTEI{ 1,   // lineNo
+  1,                                   // colNo
+  "_coder_ec_filtfilt_api",            // fName
+  ""                                   // pName
+};
+
+static emlrtRTEInfo fe_emlrtRTEI{ 41,  // lineNo
+  1,                                   // colNo
+  "introsort",                         // fName
+  "/usr/local/MATLAB/R2022b/toolbox/shared/coder/coder/lib/+coder/+internal/introsort.m"// pName
+};
+
 // Function Declarations
 static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   *msgId, char_T ret[14]);
+static void b_emlrt_marshallIn(const mxArray *coef, const char_T *identifier,
+  emxArray_real_T *y);
+static void b_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
+  *parentId, emxArray_real_T *y);
+static const mxArray *b_feval(const mxArray *m1, const mxArray *m2, emlrtMCInfo *
+  location);
 static const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
   emlrtMCInfo *location);
+static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2);
+static void c_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
+  *msgId, emxArray_real_T *ret);
+namespace coder
+{
+  namespace internal
+  {
+    static void b_heapsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
+      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
+      *cmp_workspace_b);
+    static void b_warning();
+    static void c_warning();
+    static void insertionsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
+      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
+      *cmp_workspace_b);
+    static void introsort(emxArray_int32_T *x, int32_T xend, const
+                          emxArray_int32_T *cmp_workspace_a, const
+                          emxArray_int32_T *cmp_workspace_b);
+    static void warning(int32_T varargin_1, const char_T varargin_2[14]);
+    static void warning();
+  }
+}
+
+static void d_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
+  *msgId, emxArray_real_T *ret);
 static int32_T div_s32(int32_T numerator, int32_T denominator);
 static
 #ifdef __CUDACC__
@@ -1265,10 +1391,49 @@ static __global__ void ec_filtfilt_kernel97(const real_T *a1, int32_T nb,
 static __global__ void ec_filtfilt_kernel98(const real_T *a1, int32_T na,
   emxArray_real_T a);
 static __global__ void ec_filtfilt_kernel99(emxArray_real_T a);
-static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
-  *parentId, char_T y[14]);
+static void ec_filtfilt_once();
+static void emlrt_marshallIn(const mxArray *x, const char_T *identifier,
+  emxArray_real_T *y);
 static void emlrt_marshallIn(const mxArray *a__output_of_sprintf_, const char_T *
   identifier, char_T y[14]);
+static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
+  *parentId, char_T y[14]);
+static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
+  *parentId, emxArray_real_T *y);
+static const mxArray *emlrt_marshallOut(const emxArray_real_T *u);
+static void emxEnsureCapacity_boolean_T(emxArray_boolean_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation);
+static void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation);
+static void emxEnsureCapacity_int8_T(emxArray_int8_T *emxArray, int32_T oldNumel,
+  const emlrtRTEInfo *srcLocation);
+static void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel,
+  const emlrtRTEInfo *srcLocation);
+static void emxEnsureCapacity_struct_T(emxArray_struct_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation);
+static void emxEnsureCapacity_uint32_T(emxArray_uint32_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation);
+static void emxFree_boolean_T(emxArray_boolean_T **pEmxArray);
+static void emxFree_int32_T(emxArray_int32_T **pEmxArray);
+static void emxFree_int8_T(emxArray_int8_T **pEmxArray);
+static void emxFree_real_T(emxArray_real_T **pEmxArray);
+static void emxFree_struct_T(emxArray_struct_T **pEmxArray);
+static void emxFree_uint32_T(emxArray_uint32_T **pEmxArray);
+static void emxInit_boolean_T(emxArray_boolean_T **pEmxArray, int32_T
+  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void emxInit_int8_T(emxArray_int8_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void emxInit_real_T(emxArray_real_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void emxInit_struct_T(emxArray_struct_T **pEmxArray, int32_T
+  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void emxInit_uint32_T(emxArray_uint32_T **pEmxArray, int32_T
+  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void feval(const mxArray *m, const mxArray *m1, emlrtMCInfo *location);
+static const mxArray *feval(const mxArray *m1, const mxArray *m2, const mxArray *
+  m3, const mxArray *m4, emlrtMCInfo *location);
 static void gpuEmxEnsureCapacity_boolean_T(const emxArray_boolean_T *cpu,
   emxArray_boolean_T *gpu);
 static void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
@@ -1314,6 +1479,35 @@ static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   emlrtDestroyArray(&src);
 }
 
+static void b_emlrt_marshallIn(const mxArray *coef, const char_T *identifier,
+  emxArray_real_T *y)
+{
+  emlrtMsgIdentifier thisId;
+  thisId.fIdentifier = const_cast<const char_T *>(identifier);
+  thisId.fParent = nullptr;
+  thisId.bParentIsCell = false;
+  b_emlrt_marshallIn(emlrtAlias(coef), &thisId, y);
+  emlrtDestroyArray(&coef);
+}
+
+static void b_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
+  *parentId, emxArray_real_T *y)
+{
+  d_emlrt_marshallIn(emlrtAlias(u), parentId, y);
+  emlrtDestroyArray(&u);
+}
+
+static const mxArray *b_feval(const mxArray *m1, const mxArray *m2, emlrtMCInfo *
+  location)
+{
+  const mxArray *pArrays[2];
+  const mxArray *m;
+  pArrays[0] = m1;
+  pArrays[1] = m2;
+  return emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 2, &pArrays[0],
+    "feval", true, location);
+}
+
 static const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
   emlrtMCInfo *location)
 {
@@ -1323,6 +1517,676 @@ static const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
   pArrays[1] = m2;
   return emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 2, &pArrays[0],
     "sprintf", true, location);
+}
+
+static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2)
+{
+  emxArray_real_T *b_in1;
+  int32_T aux_0_1;
+  int32_T aux_1_1;
+  int32_T b;
+  int32_T i;
+  int32_T stride_0_1;
+  int32_T stride_1_1;
+  emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
+  emxInit_real_T(&b_in1, 2, &jb_emlrtRTEI, true);
+  i = b_in1->size[0] * b_in1->size[1];
+  b_in1->size[0] = in2->size[0];
+  if (in2->size[1] == 1) {
+    b_in1->size[1] = in1->size[1];
+  } else {
+    b_in1->size[1] = in2->size[1];
+  }
+
+  emxEnsureCapacity_real_T(b_in1, i, &jb_emlrtRTEI);
+  stride_0_1 = (in1->size[1] != 1);
+  stride_1_1 = (in2->size[1] != 1);
+  aux_0_1 = 0;
+  aux_1_1 = 0;
+  if (in2->size[1] == 1) {
+    b = in1->size[1];
+  } else {
+    b = in2->size[1];
+  }
+
+  for (i = 0; i < b; i++) {
+    for (int32_T i1{0}; i1 < in2->size[0]; i1++) {
+      b_in1->data[i1 + b_in1->size[0] * i] = in1->data[i1 + in1->size[0] *
+        aux_0_1] + in2->data[i1 + in2->size[0] * aux_1_1];
+    }
+
+    aux_1_1 += stride_1_1;
+    aux_0_1 += stride_0_1;
+  }
+
+  for (i = 0; i < b_in1->size[1]; i++) {
+    for (int32_T i1{0}; i1 < b_in1->size[0]; i1++) {
+      in1->data[i1 + in1->size[0] * i] = b_in1->data[i1 + b_in1->size[0] * i];
+    }
+  }
+
+  emxFree_real_T(&b_in1);
+  emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
+}
+
+static void c_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
+  *msgId, emxArray_real_T *ret)
+{
+  static const int32_T dims[2]{ -1, -1 };
+
+  int32_T iv[2];
+  int32_T i;
+  const boolean_T bv[2]{ true, true };
+
+  emlrtCheckVsBuiltInR2012b(emlrtRootTLSGlobal, msgId, src, "double", false, 2U,
+    (const void *)&dims[0], &bv[0], &iv[0]);
+  ret->allocatedSize = iv[0] * iv[1];
+  i = ret->size[0] * ret->size[1];
+  ret->size[0] = iv[0];
+  ret->size[1] = iv[1];
+  emxEnsureCapacity_real_T(ret, i, static_cast<emlrtRTEInfo *>(nullptr));
+  ret->data = static_cast<real_T *>(emlrtMxGetData(src));
+  ret->canFreeData = false;
+  emlrtDestroyArray(&src);
+}
+
+namespace coder
+{
+  namespace internal
+  {
+    static void b_heapsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
+      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
+      *cmp_workspace_b)
+    {
+      int32_T cmpIdx;
+      int32_T extremum;
+      int32_T extremumIdx;
+      int32_T leftIdx;
+      int32_T n;
+      int32_T xcmp;
+      boolean_T changed;
+      boolean_T exitg1;
+      boolean_T varargout_1;
+      n = xend - xstart;
+      for (int32_T idx{0}; idx <= n; idx++) {
+        leftIdx = (n - idx) - 1;
+        changed = true;
+        extremumIdx = leftIdx + xstart;
+        leftIdx = (((leftIdx + 2) << 1) + xstart) - 2;
+        exitg1 = false;
+        while ((!exitg1) && (leftIdx + 1 < xend)) {
+          changed = false;
+          extremum = x->data[extremumIdx];
+          cmpIdx = leftIdx;
+          xcmp = x->data[leftIdx];
+          if (cmp_workspace_a->data[x->data[leftIdx] - 1] <
+              cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[x->data[leftIdx] - 1] ==
+                     cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
+            varargout_1 = (cmp_workspace_b->data[x->data[leftIdx] - 1] <
+                           cmp_workspace_b->data[x->data[leftIdx + 1] - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            cmpIdx = leftIdx + 1;
+            xcmp = x->data[leftIdx + 1];
+          }
+
+          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
+              cmp_workspace_a->data[xcmp - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
+                     cmp_workspace_a->data[xcmp - 1]) {
+            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
+                           cmp_workspace_b->data[xcmp - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            x->data[extremumIdx] = xcmp;
+            x->data[cmpIdx] = extremum;
+            extremumIdx = cmpIdx;
+            leftIdx = ((((cmpIdx - xstart) + 2) << 1) + xstart) - 2;
+            changed = true;
+          } else {
+            exitg1 = true;
+          }
+        }
+
+        if (changed && (leftIdx + 1 <= xend)) {
+          extremum = x->data[extremumIdx];
+          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
+              cmp_workspace_a->data[x->data[leftIdx] - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
+                     cmp_workspace_a->data[x->data[leftIdx] - 1]) {
+            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
+                           cmp_workspace_b->data[x->data[leftIdx] - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            x->data[extremumIdx] = x->data[leftIdx];
+            x->data[leftIdx] = extremum;
+          }
+        }
+      }
+
+      for (int32_T idx{0}; idx < n; idx++) {
+        leftIdx = x->data[(xend - idx) - 1];
+        x->data[(xend - idx) - 1] = x->data[xstart - 1];
+        x->data[xstart - 1] = leftIdx;
+        changed = true;
+        extremumIdx = xstart - 1;
+        leftIdx = xstart;
+        exitg1 = false;
+        while ((!exitg1) && (leftIdx + 1 < (xend - idx) - 1)) {
+          changed = false;
+          extremum = x->data[extremumIdx];
+          cmpIdx = leftIdx;
+          xcmp = x->data[leftIdx];
+          if (cmp_workspace_a->data[x->data[leftIdx] - 1] <
+              cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[x->data[leftIdx] - 1] ==
+                     cmp_workspace_a->data[x->data[leftIdx + 1] - 1]) {
+            varargout_1 = (cmp_workspace_b->data[x->data[leftIdx] - 1] <
+                           cmp_workspace_b->data[x->data[leftIdx + 1] - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            cmpIdx = leftIdx + 1;
+            xcmp = x->data[leftIdx + 1];
+          }
+
+          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
+              cmp_workspace_a->data[xcmp - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
+                     cmp_workspace_a->data[xcmp - 1]) {
+            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
+                           cmp_workspace_b->data[xcmp - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            x->data[extremumIdx] = xcmp;
+            x->data[cmpIdx] = extremum;
+            extremumIdx = cmpIdx;
+            leftIdx = ((((cmpIdx - xstart) + 2) << 1) + xstart) - 2;
+            changed = true;
+          } else {
+            exitg1 = true;
+          }
+        }
+
+        if (changed && (leftIdx + 1 <= (xend - idx) - 1)) {
+          extremum = x->data[extremumIdx];
+          if (cmp_workspace_a->data[x->data[extremumIdx] - 1] <
+              cmp_workspace_a->data[x->data[leftIdx] - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[x->data[extremumIdx] - 1] ==
+                     cmp_workspace_a->data[x->data[leftIdx] - 1]) {
+            varargout_1 = (cmp_workspace_b->data[x->data[extremumIdx] - 1] <
+                           cmp_workspace_b->data[x->data[leftIdx] - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            x->data[extremumIdx] = x->data[leftIdx];
+            x->data[leftIdx] = extremum;
+          }
+        }
+      }
+    }
+
+    static void b_warning()
+    {
+      static const int32_T iv[2]{ 1, 7 };
+
+      static const int32_T iv1[2]{ 1, 7 };
+
+      static const int32_T iv2[2]{ 1, 22 };
+
+      static const int32_T iv3[2]{ 1, 3 };
+
+      static const int32_T iv4[2]{ 1, 3 };
+
+      static const char_T msgID[22]{ 's', 'i', 'g', 'n', 'a', 'l', ':', 'f', 'i',
+        'l', 't', 'f', 'i', 'l', 't', ':', 'P', 'a', 'r', 's', 'e', 'B' };
+
+      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
+
+      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
+
+      static const char_T varargin_1[3]{ 'a', '0', '1' };
+
+      static const char_T varargin_2[3]{ 'S', 'O', 'S' };
+
+      const mxArray *b_y;
+      const mxArray *c_y;
+      const mxArray *d_y;
+      const mxArray *e_y;
+      const mxArray *m;
+      const mxArray *y;
+      y = nullptr;
+      m = emlrtCreateCharArray(2, &iv[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
+      emlrtAssign(&y, m);
+      b_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv1[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
+      emlrtAssign(&b_y, m);
+      c_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv2[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 22, m, &msgID[0]);
+      emlrtAssign(&c_y, m);
+      d_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv3[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 3, m, &varargin_1[0]);
+      emlrtAssign(&d_y, m);
+      e_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv4[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 3, m, &varargin_2[0]);
+      emlrtAssign(&e_y, m);
+      feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
+    }
+
+    static void c_warning()
+    {
+      static const int32_T iv[2]{ 1, 7 };
+
+      static const int32_T iv1[2]{ 1, 7 };
+
+      static const int32_T iv2[2]{ 1, 21 };
+
+      static const char_T msgID[21]{ 'M', 'A', 'T', 'L', 'A', 'B', ':', 's', 'i',
+        'n', 'g', 'u', 'l', 'a', 'r', 'M', 'a', 't', 'r', 'i', 'x' };
+
+      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
+
+      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
+
+      const mxArray *b_y;
+      const mxArray *c_y;
+      const mxArray *m;
+      const mxArray *y;
+      y = nullptr;
+      m = emlrtCreateCharArray(2, &iv[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
+      emlrtAssign(&y, m);
+      b_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv1[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
+      emlrtAssign(&b_y, m);
+      c_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv2[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 21, m, &msgID[0]);
+      emlrtAssign(&c_y, m);
+      feval(y, b_feval(b_y, c_y, &emlrtMCI), &b_emlrtMCI);
+    }
+
+    static void insertionsort(emxArray_int32_T *x, int32_T xstart, int32_T xend,
+      const emxArray_int32_T *cmp_workspace_a, const emxArray_int32_T
+      *cmp_workspace_b)
+    {
+      int32_T i;
+      i = xstart + 1;
+      for (int32_T k{0}; k <= xend - i; k++) {
+        int32_T idx;
+        int32_T xc;
+        boolean_T exitg1;
+        idx = xstart + k;
+        xc = x->data[idx] - 1;
+        exitg1 = false;
+        while ((!exitg1) && (idx >= xstart)) {
+          boolean_T varargout_1;
+          if (cmp_workspace_a->data[xc] < cmp_workspace_a->data[x->data[idx - 1]
+              - 1]) {
+            varargout_1 = true;
+          } else if (cmp_workspace_a->data[xc] == cmp_workspace_a->data[x->
+                     data[idx - 1] - 1]) {
+            varargout_1 = (cmp_workspace_b->data[xc] < cmp_workspace_b->data
+                           [x->data[idx - 1] - 1]);
+          } else {
+            varargout_1 = false;
+          }
+
+          if (varargout_1) {
+            x->data[idx] = x->data[idx - 1];
+            idx--;
+          } else {
+            exitg1 = true;
+          }
+        }
+
+        x->data[idx] = xc + 1;
+      }
+    }
+
+    static void introsort(emxArray_int32_T *x, int32_T xend, const
+                          emxArray_int32_T *cmp_workspace_a, const
+                          emxArray_int32_T *cmp_workspace_b)
+    {
+      emxArray_struct_T *st_d;
+      struct_T frame;
+      emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
+      emxInit_struct_T(&st_d, 1, &fe_emlrtRTEI, true);
+      if (xend > 1) {
+        if (xend <= 32) {
+          insertionsort(x, 1, xend, cmp_workspace_a, cmp_workspace_b);
+        } else {
+          int32_T MAXDEPTH;
+          int32_T pivot;
+          int32_T pmax;
+          int32_T pmin;
+          int32_T pow2p;
+          boolean_T exitg1;
+          pmax = 31;
+          pmin = 0;
+          exitg1 = false;
+          while ((!exitg1) && (pmax - pmin > 1)) {
+            pivot = (pmin + pmax) >> 1;
+            pow2p = 1 << pivot;
+            if (pow2p == xend) {
+              pmax = pivot;
+              exitg1 = true;
+            } else if (pow2p > xend) {
+              pmax = pivot;
+            } else {
+              pmin = pivot;
+            }
+          }
+
+          MAXDEPTH = (pmax - 1) << 1;
+          frame.xstart = 1;
+          frame.xend = xend;
+          frame.depth = 0;
+          pmax = MAXDEPTH << 1;
+          pmin = st_d->size[0];
+          st_d->size[0] = pmax;
+          emxEnsureCapacity_struct_T(st_d, pmin, &fe_emlrtRTEI);
+          for (pmin = 0; pmin < pmax; pmin++) {
+            st_d->data[pmin] = frame;
+          }
+
+          st_d->data[0] = frame;
+          pow2p = 1;
+          while (pow2p > 0) {
+            frame = st_d->data[pow2p - 1];
+            pmax = st_d->data[pow2p - 1].xstart - 1;
+            xend = st_d->data[pow2p - 1].xend;
+            pow2p--;
+            if ((frame.xend - frame.xstart) + 1 <= 32) {
+              insertionsort(x, frame.xstart, frame.xend, cmp_workspace_a,
+                            cmp_workspace_b);
+            } else if (frame.depth == MAXDEPTH) {
+              b_heapsort(x, frame.xstart, frame.xend, cmp_workspace_a,
+                         cmp_workspace_b);
+            } else {
+              int32_T t;
+              boolean_T varargout_1;
+              pmin = (frame.xstart + (frame.xend - frame.xstart) / 2) - 1;
+              if (cmp_workspace_a->data[x->data[pmin] - 1] <
+                  cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
+                varargout_1 = true;
+              } else if (cmp_workspace_a->data[x->data[pmin] - 1] ==
+                         cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
+                varargout_1 = (cmp_workspace_b->data[x->data[pmin] - 1] <
+                               cmp_workspace_b->data[x->data[pmax] - 1]);
+              } else {
+                varargout_1 = false;
+              }
+
+              if (varargout_1) {
+                t = x->data[frame.xstart - 1];
+                x->data[frame.xstart - 1] = x->data[pmin];
+                x->data[pmin] = t;
+              }
+
+              if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] <
+                  cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
+                varargout_1 = true;
+              } else if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] ==
+                         cmp_workspace_a->data[x->data[frame.xstart - 1] - 1]) {
+                varargout_1 = (cmp_workspace_b->data[x->data[xend - 1] - 1] <
+                               cmp_workspace_b->data[x->data[pmax] - 1]);
+              } else {
+                varargout_1 = false;
+              }
+
+              if (varargout_1) {
+                t = x->data[frame.xstart - 1];
+                x->data[frame.xstart - 1] = x->data[frame.xend - 1];
+                x->data[frame.xend - 1] = t;
+              }
+
+              if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] <
+                  cmp_workspace_a->data[x->data[pmin] - 1]) {
+                varargout_1 = true;
+              } else if (cmp_workspace_a->data[x->data[frame.xend - 1] - 1] ==
+                         cmp_workspace_a->data[x->data[pmin] - 1]) {
+                varargout_1 = (cmp_workspace_b->data[x->data[xend - 1] - 1] <
+                               cmp_workspace_b->data[x->data[pmin] - 1]);
+              } else {
+                varargout_1 = false;
+              }
+
+              if (varargout_1) {
+                t = x->data[pmin];
+                x->data[pmin] = x->data[frame.xend - 1];
+                x->data[frame.xend - 1] = t;
+              }
+
+              pivot = x->data[pmin] - 1;
+              x->data[pmin] = x->data[frame.xend - 2];
+              x->data[frame.xend - 2] = pivot + 1;
+              pmax = frame.xstart - 1;
+              pmin = frame.xend - 2;
+              int32_T exitg2;
+              do {
+                int32_T exitg3;
+                exitg2 = 0;
+                pmax++;
+                do {
+                  exitg3 = 0;
+                  if (cmp_workspace_a->data[x->data[pmax] - 1] <
+                      cmp_workspace_a->data[pivot]) {
+                    varargout_1 = true;
+                  } else if (cmp_workspace_a->data[x->data[pmax] - 1] ==
+                             cmp_workspace_a->data[pivot]) {
+                    varargout_1 = (cmp_workspace_b->data[x->data[pmax] - 1] <
+                                   cmp_workspace_b->data[pivot]);
+                  } else {
+                    varargout_1 = false;
+                  }
+
+                  if (varargout_1) {
+                    pmax++;
+                  } else {
+                    exitg3 = 1;
+                  }
+                } while (exitg3 == 0);
+
+                pmin--;
+                do {
+                  exitg3 = 0;
+                  if (cmp_workspace_a->data[pivot] < cmp_workspace_a->data
+                      [x->data[pmin] - 1]) {
+                    varargout_1 = true;
+                  } else if (cmp_workspace_a->data[pivot] ==
+                             cmp_workspace_a->data[x->data[pmin] - 1]) {
+                    varargout_1 = (cmp_workspace_b->data[pivot] <
+                                   cmp_workspace_b->data[x->data[pmin] - 1]);
+                  } else {
+                    varargout_1 = false;
+                  }
+
+                  if (varargout_1) {
+                    pmin--;
+                  } else {
+                    exitg3 = 1;
+                  }
+                } while (exitg3 == 0);
+
+                if (pmax + 1 >= pmin + 1) {
+                  exitg2 = 1;
+                } else {
+                  t = x->data[pmax];
+                  x->data[pmax] = x->data[pmin];
+                  x->data[pmin] = t;
+                }
+              } while (exitg2 == 0);
+
+              x->data[frame.xend - 2] = x->data[pmax];
+              x->data[pmax] = pivot + 1;
+              if (pmax + 2 < frame.xend) {
+                st_d->data[pow2p].xstart = pmax + 2;
+                st_d->data[pow2p].xend = frame.xend;
+                st_d->data[pow2p].depth = frame.depth + 1;
+                pow2p++;
+              }
+
+              if (frame.xstart < pmax + 1) {
+                st_d->data[pow2p].xstart = frame.xstart;
+                st_d->data[pow2p].xend = pmax + 1;
+                st_d->data[pow2p].depth = frame.depth + 1;
+                pow2p++;
+              }
+            }
+          }
+        }
+      }
+
+      emxFree_struct_T(&st_d);
+      emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
+    }
+
+    static void warning(int32_T varargin_1, const char_T varargin_2[14])
+    {
+      static const int32_T iv[2]{ 1, 7 };
+
+      static const int32_T iv1[2]{ 1, 7 };
+
+      static const int32_T iv2[2]{ 1, 32 };
+
+      static const int32_T iv3[2]{ 1, 14 };
+
+      static const char_T msgID[32]{ 'C', 'o', 'd', 'e', 'r', ':', 'M', 'A', 'T',
+        'L', 'A', 'B', ':', 'r', 'a', 'n', 'k', 'D', 'e', 'f', 'i', 'c', 'i',
+        'e', 'n', 't', 'M', 'a', 't', 'r', 'i', 'x' };
+
+      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
+
+      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
+
+      const mxArray *b_y;
+      const mxArray *c_y;
+      const mxArray *d_y;
+      const mxArray *e_y;
+      const mxArray *m;
+      const mxArray *y;
+      y = nullptr;
+      m = emlrtCreateCharArray(2, &iv[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
+      emlrtAssign(&y, m);
+      b_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv1[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
+      emlrtAssign(&b_y, m);
+      c_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv2[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 32, m, &msgID[0]);
+      emlrtAssign(&c_y, m);
+      d_y = nullptr;
+      m = emlrtCreateNumericMatrix(1, 1, mxINT32_CLASS, mxREAL);
+      *static_cast<int32_T *>(emlrtMxGetData(m)) = varargin_1;
+      emlrtAssign(&d_y, m);
+      e_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv3[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 14, m, &varargin_2[0]);
+      emlrtAssign(&e_y, m);
+      feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
+    }
+
+    static void warning()
+    {
+      static const int32_T iv[2]{ 1, 7 };
+
+      static const int32_T iv1[2]{ 1, 7 };
+
+      static const int32_T iv2[2]{ 1, 24 };
+
+      static const int32_T iv3[2]{ 1, 3 };
+
+      static const char_T msgID[24]{ 's', 'i', 'g', 'n', 'a', 'l', ':', 'f', 'i',
+        'l', 't', 'f', 'i', 'l', 't', ':', 'P', 'a', 'r', 's', 'e', 'S', 'O',
+        'S' };
+
+      static const char_T b_u[7]{ 'm', 'e', 's', 's', 'a', 'g', 'e' };
+
+      static const char_T u[7]{ 'w', 'a', 'r', 'n', 'i', 'n', 'g' };
+
+      static const char_T varargin_1[3]{ 'S', 'O', 'S' };
+
+      const mxArray *b_y;
+      const mxArray *c_y;
+      const mxArray *d_y;
+      const mxArray *e_y;
+      const mxArray *m;
+      const mxArray *y;
+      y = nullptr;
+      m = emlrtCreateCharArray(2, &iv[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &u[0]);
+      emlrtAssign(&y, m);
+      b_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv1[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 7, m, &b_u[0]);
+      emlrtAssign(&b_y, m);
+      c_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv2[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 24, m, &msgID[0]);
+      emlrtAssign(&c_y, m);
+      d_y = nullptr;
+      m = emlrtCreateCharArray(2, &iv3[0]);
+      emlrtInitCharArrayR2013a(emlrtRootTLSGlobal, 3, m, &varargin_1[0]);
+      emlrtAssign(&d_y, m);
+      e_y = nullptr;
+      m = emlrtCreateString1R2022a(emlrtRootTLSGlobal, 'G');
+      emlrtAssign(&e_y, m);
+      feval(y, feval(b_y, c_y, d_y, e_y, &emlrtMCI), &b_emlrtMCI);
+    }
+  }
+}
+
+static void d_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
+  *msgId, emxArray_real_T *ret)
+{
+  static const int32_T dims[2]{ 1, -1 };
+
+  int32_T iv[2];
+  int32_T i;
+  const boolean_T bv[2]{ false, true };
+
+  emlrtCheckVsBuiltInR2012b(emlrtRootTLSGlobal, msgId, src, "double", false, 2U,
+    (const void *)&dims[0], &bv[0], &iv[0]);
+  ret->allocatedSize = iv[0] * iv[1];
+  i = ret->size[0] * ret->size[1];
+  ret->size[0] = iv[0];
+  ret->size[1] = iv[1];
+  emxEnsureCapacity_real_T(ret, i, static_cast<emlrtRTEInfo *>(nullptr));
+  ret->data = static_cast<real_T *>(emlrtMxGetData(src));
+  ret->canFreeData = false;
+  emlrtDestroyArray(&src);
 }
 
 static int32_T div_s32(int32_T numerator, int32_T denominator)
@@ -6252,6 +7116,11 @@ static __global__ __launch_bounds__(32, 1) void ec_filtfilt_kernel99
   }
 }
 
+static void ec_filtfilt_once()
+{
+  mwMemoryManagerInit(256U, 1U, 8U, 2048U);
+}
+
 static void emlrt_marshallIn(const mxArray *a__output_of_sprintf_, const char_T *
   identifier, char_T y[14])
 {
@@ -6268,6 +7137,636 @@ static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
 {
   b_emlrt_marshallIn(emlrtAlias(u), parentId, y);
   emlrtDestroyArray(&u);
+}
+
+static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
+  *parentId, emxArray_real_T *y)
+{
+  c_emlrt_marshallIn(emlrtAlias(u), parentId, y);
+  emlrtDestroyArray(&u);
+}
+
+static void emlrt_marshallIn(const mxArray *x, const char_T *identifier,
+  emxArray_real_T *y)
+{
+  emlrtMsgIdentifier thisId;
+  thisId.fIdentifier = const_cast<const char_T *>(identifier);
+  thisId.fParent = nullptr;
+  thisId.bParentIsCell = false;
+  emlrt_marshallIn(emlrtAlias(x), &thisId, y);
+  emlrtDestroyArray(&x);
+}
+
+static const mxArray *emlrt_marshallOut(const emxArray_real_T *u)
+{
+  static const int32_T iv[2]{ 0, 0 };
+
+  const mxArray *m;
+  const mxArray *y;
+  y = nullptr;
+  m = emlrtCreateNumericArray(2, (const void *)&iv[0], mxDOUBLE_CLASS, mxREAL);
+  emlrtMxSetData((mxArray *)m, &u->data[0]);
+  emlrtSetDimensions((mxArray *)m, &u->size[0], 2);
+  emlrtAssign(&y, m);
+  return y;
+}
+
+static void emxEnsureCapacity_boolean_T(emxArray_boolean_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(boolean_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<boolean_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<boolean_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(int32_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<int32_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<int32_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxEnsureCapacity_int8_T(emxArray_int8_T *emxArray, int32_T oldNumel,
+  const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(int8_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<int8_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<int8_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel,
+  const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(real_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<real_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<real_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxEnsureCapacity_struct_T(emxArray_struct_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(struct_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<struct_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<struct_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxEnsureCapacity_uint32_T(emxArray_uint32_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(uint32_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<uint32_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<uint32_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxFree_boolean_T(emxArray_boolean_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_boolean_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<boolean_T *>(nullptr)) && (*pEmxArray)
+        ->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_boolean_T *>(nullptr);
+  }
+}
+
+static void emxFree_int32_T(emxArray_int32_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_int32_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<int32_T *>(nullptr)) && (*pEmxArray
+        )->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_int32_T *>(nullptr);
+  }
+}
+
+static void emxFree_int8_T(emxArray_int8_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_int8_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<int8_T *>(nullptr)) && (*pEmxArray)
+        ->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_int8_T *>(nullptr);
+  }
+}
+
+static void emxFree_real_T(emxArray_real_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_real_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<real_T *>(nullptr)) && (*pEmxArray)
+        ->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_real_T *>(nullptr);
+  }
+}
+
+static void emxFree_struct_T(emxArray_struct_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_struct_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<struct_T *>(nullptr)) && (*pEmxArray
+        )->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_struct_T *>(nullptr);
+  }
+}
+
+static void emxFree_uint32_T(emxArray_uint32_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_uint32_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<uint32_T *>(nullptr)) && (*pEmxArray
+        )->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_uint32_T *>(nullptr);
+  }
+}
+
+static void emxInit_boolean_T(emxArray_boolean_T **pEmxArray, int32_T
+  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_boolean_T *emxArray;
+  *pEmxArray = static_cast<emxArray_boolean_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_boolean_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_boolean_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<boolean_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_int32_T *emxArray;
+  *pEmxArray = static_cast<emxArray_int32_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_int32_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_int32_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<int32_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static void emxInit_int8_T(emxArray_int8_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_int8_T *emxArray;
+  *pEmxArray = static_cast<emxArray_int8_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_int8_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_int8_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<int8_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static void emxInit_real_T(emxArray_real_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_real_T *emxArray;
+  *pEmxArray = static_cast<emxArray_real_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_real_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_real_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<real_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static void emxInit_struct_T(emxArray_struct_T **pEmxArray, int32_T
+  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_struct_T *emxArray;
+  *pEmxArray = static_cast<emxArray_struct_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_struct_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_struct_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<struct_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static void emxInit_uint32_T(emxArray_uint32_T **pEmxArray, int32_T
+  numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_uint32_T *emxArray;
+  *pEmxArray = static_cast<emxArray_uint32_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_uint32_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_uint32_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<uint32_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static const mxArray *feval(const mxArray *m1, const mxArray *m2, const mxArray *
+  m3, const mxArray *m4, emlrtMCInfo *location)
+{
+  const mxArray *pArrays[4];
+  const mxArray *m;
+  pArrays[0] = m1;
+  pArrays[1] = m2;
+  pArrays[2] = m3;
+  pArrays[3] = m4;
+  return emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 4, &pArrays[0],
+    "feval", true, location);
+}
+
+static void feval(const mxArray *m, const mxArray *m1, emlrtMCInfo *location)
+{
+  const mxArray *pArrays[2];
+  pArrays[0] = m;
+  pArrays[1] = m1;
+  emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 0, nullptr, 2, &pArrays[0], "feval",
+                        true, location);
 }
 
 static void gpuEmxEnsureCapacity_boolean_T(const emxArray_boolean_T *cpu,
@@ -13266,6 +14765,74 @@ void ec_filtfilt(const emxArray_real_T *x, const emxArray_real_T *coef,
   gpuEmxFree_int32_T(&m_gpu_rows);
   gpuEmxFree_real_T(&t_gpu_convOut);
   gpuEmxFree_real_T(&u_gpu_convOut);
+}
+
+void ec_filtfilt_api(const mxArray * const prhs[2], const mxArray *plhs[1])
+{
+  emxArray_real_T *coef;
+  emxArray_real_T *x;
+  emxArray_real_T *xx;
+  emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
+
+  // Marshall function inputs
+  emxInit_real_T(&x, 2, &ee_emlrtRTEI, true);
+  x->canFreeData = false;
+  emlrt_marshallIn(emlrtAlias(prhs[0]), "x", x);
+  emxInit_real_T(&coef, 2, &ee_emlrtRTEI, true);
+  coef->canFreeData = false;
+  b_emlrt_marshallIn(emlrtAlias(prhs[1]), "coef", coef);
+
+  // Invoke the target function
+  emxInit_real_T(&xx, 2, &ee_emlrtRTEI, true);
+  ec_filtfilt(x, coef, xx);
+  emxFree_real_T(&coef);
+  emxFree_real_T(&x);
+
+  // Marshall function outputs
+  xx->canFreeData = false;
+  plhs[0] = emlrt_marshallOut(xx);
+  emxFree_real_T(&xx);
+  emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
+}
+
+void ec_filtfilt_atexit()
+{
+  mexFunctionCreateRootTLS();
+  emlrtEnterRtStackR2012b(emlrtRootTLSGlobal);
+  emlrtDestroyRootTLS(&emlrtRootTLSGlobal);
+  emlrtExitTimeCleanup(&emlrtContextGlobal);
+}
+
+void ec_filtfilt_initialize()
+{
+  mex_InitInfAndNan();
+  mexFunctionCreateRootTLS();
+  emlrtClearAllocCountR2012b(emlrtRootTLSGlobal, false, 0U, nullptr);
+  emlrtEnterRtStackR2012b(emlrtRootTLSGlobal);
+  emlrtLicenseCheckR2022a(emlrtRootTLSGlobal,
+    "EMLRT:runTime:MexFunctionNeedsLicense", "distrib_computing_toolbox", 2);
+  emlrtLicenseCheckR2022a(emlrtRootTLSGlobal,
+    "EMLRT:runTime:MexFunctionNeedsLicense", "signal_toolbox", 2);
+  if (emlrtFirstTimeR2012b(emlrtRootTLSGlobal)) {
+    ec_filtfilt_once();
+  }
+
+  emlrtInitGPU(emlrtRootTLSGlobal);
+  cudaGetLastError();
+}
+
+void ec_filtfilt_terminate()
+{
+  cudaError_t errCode;
+  errCode = cudaGetLastError();
+  if (errCode != cudaSuccess) {
+    emlrtThinCUDAError(static_cast<uint32_T>(errCode), (char_T *)
+                       cudaGetErrorString(errCode), (char_T *)cudaGetErrorName
+                       (errCode), (char_T *)"SafeBuild", emlrtRootTLSGlobal);
+  }
+
+  emlrtDestroyRootTLS(&emlrtRootTLSGlobal);
+  mwMemoryManagerTerminate();
 }
 
 // End of code generation (ec_filtfilt.cu)

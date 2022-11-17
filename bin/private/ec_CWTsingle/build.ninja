@@ -47,19 +47,12 @@ rule linkcuda
 
 # Build
 build $builddir/MWCUFFTPlanManager.o : cudac $root/MWCUFFTPlanManager.cpp
-build $builddir/ec_CWTsingle_data.o : cudac $root/ec_CWTsingle_data.cu
 build $builddir/rt_nonfinite.o : cudac $root/rt_nonfinite.cu
-build $builddir/ec_CWTsingle_initialize.o : cudac $root/ec_CWTsingle_initialize.cu
-build $builddir/ec_CWTsingle_terminate.o : cudac $root/ec_CWTsingle_terminate.cu
 build $builddir/ec_CWTsingle.o : cudac $root/ec_CWTsingle.cu
-build $builddir/cwt.o : cudac $root/cwt.cu
-build $builddir/_coder_ec_CWTsingle_api.o : cudac $root/interface/_coder_ec_CWTsingle_api.cu
 build $builddir/_coder_ec_CWTsingle_mex.o : cudac $root/interface/_coder_ec_CWTsingle_mex.cu
-build $builddir/ec_CWTsingle_emxutil.o : cudac $root/ec_CWTsingle_emxutil.cu
-build $builddir/ec_CWTsingle_mexutil.o : cudac $root/ec_CWTsingle_mexutil.cu
 build $builddir/_coder_ec_CWTsingle_info.o : cxx $root/interface/_coder_ec_CWTsingle_info.cpp
 build $builddir/MWMemoryManager.o : cudac $root/MWMemoryManager.cpp
 build $builddir/cpp_mexapi_version.o : cudac $root/cpp_mexapi_version.cpp
 
 # Link
-build $root/ec_CWTsingle_mex.mexa64 : linkcuda $builddir/MWCUFFTPlanManager.o $builddir/ec_CWTsingle_data.o $builddir/rt_nonfinite.o $builddir/ec_CWTsingle_initialize.o $builddir/ec_CWTsingle_terminate.o $builddir/ec_CWTsingle.o $builddir/cwt.o $builddir/_coder_ec_CWTsingle_api.o $builddir/_coder_ec_CWTsingle_mex.o $builddir/ec_CWTsingle_emxutil.o $builddir/ec_CWTsingle_mexutil.o $builddir/_coder_ec_CWTsingle_info.o $builddir/MWMemoryManager.o $builddir/cpp_mexapi_version.o 
+build $root/ec_CWTsingle_mex.mexa64 : linkcuda $builddir/MWCUFFTPlanManager.o $builddir/rt_nonfinite.o $builddir/ec_CWTsingle.o $builddir/_coder_ec_CWTsingle_mex.o $builddir/_coder_ec_CWTsingle_info.o $builddir/MWMemoryManager.o $builddir/cpp_mexapi_version.o 

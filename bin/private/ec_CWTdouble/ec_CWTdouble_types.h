@@ -29,20 +29,4 @@ struct emxArray_real_T {
   boolean_T canFreeData;
 };
 
-struct emxArray_creal_T {
-  creal_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_char_T {
-  char_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
 // End of code generation (ec_CWTdouble_types.h)

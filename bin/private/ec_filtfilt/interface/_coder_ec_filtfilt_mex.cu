@@ -10,10 +10,7 @@
 
 // Include files
 #include "_coder_ec_filtfilt_mex.h"
-#include "_coder_ec_filtfilt_api.h"
-#include "ec_filtfilt_data.h"
-#include "ec_filtfilt_initialize.h"
-#include "ec_filtfilt_terminate.h"
+#include "ec_filtfilt.h"
 #include "rt_nonfinite.h"
 #include <stdexcept>
 

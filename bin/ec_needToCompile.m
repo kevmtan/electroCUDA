@@ -4,8 +4,8 @@ cd(dirs.code+"bin");
 addpath(genpath('src_mex'));
 
 %% Setup GPU with GUI (first compile)
-% sudo update-alternatives --config gcc
-gpucoderSetup
+% sudo update-alternatives --set gcc /usr/bin/gcc-10
+%gpucoderSetup
 
 %% Compile ec_filtfilt: zero-phase filtering
 clear all; close all; %#ok<*CLALL> 
@@ -22,7 +22,7 @@ cfg = coder.gpuConfig( "mex" );
 cfg.DeepLearningConfig = coder.DeepLearningConfigBase.empty();
 cfg.TargetLang = "C++";
 cfg.DynamicMemoryAllocation = "AllVariableSizeArrays";
-%cfg.FilePartitionMethod = "SingleFile";
+cfg.FilePartitionMethod = "SingleFile";
 cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits";
 cfg.HighlightLoopControlIssues = true;
 cfg.GenerateReport = true;
@@ -60,7 +60,7 @@ cfg = coder.gpuConfig("mex");
 cfg.DeepLearningConfig = coder.DeepLearningConfigBase.empty();
 cfg.TargetLang = "C++";
 cfg.DynamicMemoryAllocation = "AllVariableSizeArrays";
-%cfg.FilePartitionMethod = "SingleFile";
+cfg.FilePartitionMethod = "SingleFile";
 cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits";
 cfg.HighlightLoopControlIssues = true;
 cfg.GenerateReport = true;
@@ -100,7 +100,7 @@ cfg = coder.gpuConfig("mex");
 cfg.DeepLearningConfig = coder.DeepLearningConfigBase.empty();
 cfg.TargetLang = "C++";
 cfg.DynamicMemoryAllocation = "AllVariableSizeArrays";
-%cfg.FilePartitionMethod = "SingleFile";
+cfg.FilePartitionMethod = "SingleFile";
 cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits";
 cfg.HighlightLoopControlIssues = true;
 cfg.GenerateReport = true;
