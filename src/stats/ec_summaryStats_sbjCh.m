@@ -1,7 +1,7 @@
 function ec_summaryStats_sbjCh(sbj,proj,o,dirs,a)
 arguments
-    sbj {ischar,isstring}
-    proj {ischar,isstring} = "MMR"
+    sbj {istext,isnumeric}
+    proj {istext} = "MMR"
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
     dirs struct = []
     a.type string = "spec"

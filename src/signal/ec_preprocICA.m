@@ -51,7 +51,7 @@ arguments
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
     n struct = [] % preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
     x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
-    arg.blocks {mustBeText} = BlockBySubj(sbj,proj) % Task blocks/runs to include
+    arg.blocks {istext,isnumeric} = BlockBySubj(sbj,proj) % Task blocks/runs to include
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
     arg.test logical = false
@@ -302,7 +302,10 @@ sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
 ch_bad = chNfo.bad;
 fn=string(fieldnames(n)); fn=fn(contains(fn,"detrendW")); fn=fn(end);
-idxICA = full(~n.(fn));
+idxICA = full(n.(fn));
+idxICA = sum(idxICA,2);
+[~,~,thr] = isoutlier(idxICA,"mean",1,"ThresholdFactor",3);
+idxICA = idxICA>thr;
 cd(o.dirOut); try system("rm cudaica_"+sfx+"*"); catch;end % Remove old cudaica files
 
 % Starting weights
@@ -312,7 +315,7 @@ if isfield(arg,"nIn")
 end
 
 %% Infomax ICA compiled in CUDA
-ica = ec_cudaica(x(idxICA,chICA),dirs.cudaica,ic_wtsIn,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
+ica = ec_cudaica(x(~idxICA,chICA),dirs.cudaica,ic_wtsIn,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
     lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
 nICs = height(ica.wts);
 disp("Finished CUDAICA: "+sbj); toc(tt);
@@ -344,6 +347,7 @@ n.chICA = chICA;
 n.nICs = nICs;
 n.icNfo = icNfo;
 n.icW = ica.w;
+n.badFramesICA = sparse(idxICA);
 %n.icPCA = pcaArg;
 end
 

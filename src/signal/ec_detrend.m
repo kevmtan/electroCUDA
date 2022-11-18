@@ -32,21 +32,17 @@ if iscell(x)
         [y{iTrial},w{iTrial},r{iTrial}] = ec_detrend(x{iTrial},order,w,basis,thresh,niter,wsize);
     end
     return
+else
+    x = squeeze(x);
+    dims = size(x);
+end
+if isany(w)
+    w = squeeze(w);
+else
+    w = true(dims);
 end
 
-dims = size(x);
-% w = w;
-% if ~isempty(w)
-%     w = w(:);
-%     if numel(w)<dims(1)
-%         % assume that w contains indices, set them to 1
-%         idx=w;
-%         w = zeros(dims(1),1);
-%         w(idx) = 1;
-%     end
-% end
-
-if isempty(wsize) || ~any(wsize)
+if ~isany(wsize)
     % standard detrending (trend fit to entire data)
     [y,w,r] = ec_detrendHelper(x,order,w,basis,thresh,niter);
 else
@@ -64,7 +60,7 @@ else
         w = w(:,:);
         dims = size(x);
     end
-    if isempty(w); w = ones(size(x)); end
+    if isempty(w); w = true(size(x)); end
     if size(w,2)==1; w = repmat(w,1,dims(2)); end
 
     % 1) divide into windows, 2) detrend each, 3) stitch together, 4) estimate w
@@ -268,7 +264,7 @@ function [z,b] = regw_lfn(y,x,w)
 %
 % NoiseTools
 
-thr_PCA = 0.0000001; % discard dimensions of x with eigenvalue lower than this
+thr_PCA = 1e-7; % discard dimensions of x with eigenvalue lower than this
 
 if nargin<3; w = []; end
 if nargin<2; error('!'); end

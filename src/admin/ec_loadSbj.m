@@ -1,11 +1,14 @@
-function [n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx,fs,onlyVar)
+function [n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx,fs,onlyVar,o)
 % Input validation
 arguments
-    dirs struct
+    dirs {isstruct,ischar,isstring} = []
     sfx {isStringScalar,ischar} = ""
     fs {isnumeric} = []
     onlyVar {isstring,ischar,ismember(onlyVar,["x" "n" ""])} = ""
+    o.sbj {isstring,ischar,isnumeric} = []
+    o.proj {isstring,ischar} = []
 end
+if ~isstruct(dirs); dirs = ec_getDirs(dirs,o.sbj,o.proj); end
 sbjID = dirs.sbjID;
 proj = dirs.proj;
 if isnumeric(sbjID); sbjID = "s"+sbjID; end

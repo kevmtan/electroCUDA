@@ -46,7 +46,7 @@ arguments
     n struct = [] % preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
     x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
     % Name-value inputs 
-    arg.blocks {mustBeText} = BlockBySubj(sbj,proj) % Task blocks/runs to include
+    arg.blocks {istext,isnumeric} = BlockBySubj(sbj,proj) % Task blocks/runs to include
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
     arg.redo logical = false % Redo of previously-preprocessed subject

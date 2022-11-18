@@ -1,4 +1,4 @@
-function [A,c,LL,Lt,gm,alpha,mu,beta,rho] = amica_KT(x,M,m,maxiter,update_rho,mindll,iterwin,do_newton,remove_mean,As,cs)
+function [A,c,LL,Lt,gm,alpha,mu,beta,rho] = ec_amica(x,M,m,o)
 % function [A,c,LL,gm,alpha,mu,beta,rho] = amica_ex(x,[M,m,maxiter,update_rho,mindll,iterwin,do_newton,As,cs])
 %
 % Performs AMICA algorithm for adaptive mixutre ICA on input data x (of dimension n x N), using M models,
@@ -38,78 +38,33 @@ function [A,c,LL,Lt,gm,alpha,mu,beta,rho] = amica_KT(x,M,m,maxiter,update_rho,mi
 %
 %
 % Author: Jason Palmer (jason@sccn.ucsd.edu), Swartz Center for Computational Neuroscience, 2008.
+% Modified: Kevin Tan - implement in GPU/CUDA (kevmtan.github.io)
 %
 % Publication: J. A. Palmer, S. Makeig, K. Kreutz-Delgado, and B. D. Rao, Newton Method for the ICA Mixture Model,
 %              in Proceedings of the 33rd IEEE International Conference on Acoustics and Signal Processing (ICASSP 2008),
 %              Las Vegas, NV, pp. 1805-1808, 2008.
-%
 
-[n,N] = size(x);
-if nargin < 4
-    maxiter = 100;
+%% Input validation
+arguments
+    x {mustBeFloat}
+    M (1,1){isnumeric} = 1
+    m (1,1){isnumeric} = 3
+    o.maxiter (1,1){isnumeric} = 500
+    o.update_rho (1,1){isnumeric} = 1
+    o.mindll (1,1){isfloat} = 1e-8
+    o.iterwin (1,1){isnumeric} = 50
+    o.do_newton (1,1) logical = true
+    o.remove_mean (1,1) logical = true
+    o.lrate (1,1){isfloat} = 0.1
+    o.showLL (1,1) logical = true % display the log likelihood at each iteration
+    %o.As {isnumeric} = []
+    %o.cs {isnumeric} = []
 end
-if nargin < 3
-    m = 3;
-end
-if nargin < 2
-    M = 1;
-end
-if nargin < 1
-    help amica;
-    return;
-end
-if nargin < 8
-    do_newton = 1;
-end
-if nargin < 9
-    remove_mean = 1;
-end
-if nargin >= 10
-    %plothist = 1;
-    nbins = 50;
-end
-if nargin < 6 || mindll == -1
-    mindll = 1e-8;
-end
-if nargin < 7 || iterwin == -1
-    iterwin = 1;
-end
-if nargin >= 10 && nargin < 11
-    cs = zeros(n,M);
-end
-
-lrate0 = 0.1;
-lratemax = 1.0;
-lnatrate = 0.1;
-lnatratemax = 0.1;
-newt_start_iter = 25;
-lratefact = 0.5;
-
-maxdec = 3;
-numdec = 0;
-maxdec2 = 20;
-numdec2 = 0;
-
-lrate = lrate0;
-
-if M > 1
-    dispinterval = 10;
-else
-    dispinterval = 1;
-end
-showLL = 1; % display the log likelihood at each iteration
-if nargin >= 10
-    plotfig = 1; % we are given the solution bases and centers
-else
-    plotfig = 0;  % can also set this to 1 to plot anyway (without the solution)
-end
-
-Mx = max(max(abs(x)));
-
+update_rho = o.update_rho;
 rholrate = 0.1;
 rhomin = 1.0;
 rhomax = 2;
-if nargin < 5
+if isempty(update_rho)
     update_rho = 1;
     rho0 = 1.5;
 else
@@ -129,62 +84,85 @@ else
     end
 end
 
+lrate = o.lrate; %lrate0 = 0.1;
+lratemax = 1.0;
+lnatrate = 0.1;
+lnatratemax = 0.1;
+newt_start_iter = 25;
+lratefact = 0.5;
 
-% Demean
-mn = zeros(n,1);
-if remove_mean
-    for i = 1:n
-        mn(i,1) = mean(x(i,:));
-        x(i,:) = x(i,:) - mn(i,1);
-    end
-end
-if nargin >= 10 && max(size(cs)) > 1
-    for h = 1:M
-        cs(:,h) = cs(:,h) - mn;
-    end
-end
+maxdec = 3;
+numdec = 0;
+maxdec2 = 20;
+numdec2 = 0;
+
+[nChs,nFrames] = size(x);
+
+% Plotting vars
+% if nargin >= 10
+%     plothist = 1;
+%     nbins = 50;
+% end
+% if M > 1
+%     dispinterval = 10;
+% else
+%     dispinterval = 1;
+% end
+% if nargin >= 10
+%     plotfig = 1; % we are given the solution bases and centers
+% else
+%     plotfig = 0;  % can also set this to 1 to plot anyway (without the solution)
+% end
+% Mx = max(max(abs(x)));
+% if isempty(o.cs)
+%     cs = zeros(n,M);
+% else
+%     cs = o.cs;
+% end
+
+%% Initialize AMICA
+tic;
 
 % Initialize parameters
-A = zeros(m,n,M);
-c = nan(n,M);
+A = zeros(nChs,nChs,M);
+c = nan(nChs,M);
 for h = 1:M
-    A(:,:,h) = eye(n) + 0.1*randn(n,n);
-    for i = 1:n
-        A(:,i,h) = A(:,i,h) / norm(A(:,i,h));
+    A(:,:,h) = eye(nChs) + 0.1*randn(nChs,nChs);
+    for ch = 1:nChs
+        A(:,ch,h) = A(:,ch,h) / norm(A(:,ch,h));
     end
-    c(:,h) = zeros(n,1);
+    c(:,h) = zeros(nChs,1);
 end
 gm = (1/M) * ones(M,1);
-alpha = (1/m) * ones(m,n,M);
+alpha = (1/m) * ones(m,nChs,M);
 if m > 1
-    mu = 0.1 * randn(m,n,M);
+    mu = 0.1 * randn(m,nChs,M);
 else
-    mu = zeros(m,n,M);
+    mu = zeros(m,nChs,M);
 end
-beta = ones(m,n,M) + 0.1 * randn(m,n,M);
-rho = rho0 * ones(m,n,M);
+beta = ones(m,nChs,M) + 0.1 * randn(m,nChs,M);
+rho = rho0 * ones(m,nChs,M);
 %rho(1,:,:) = rho0_sub * ones(1,n,M);
 %rho(2:m,:,:) = rho0_sup * ones(m-1,n,M);
 %rho = 2*rand(size(mu)) + 1;
 
-
 % Intialize variables
-b = zeros(n,N,M);
-B = zeros(n,N);
+b = zeros(nChs,nFrames,M);
+B = zeros(nChs,nFrames);
 
-y = zeros(n,N,m,M);
-fp = zeros(m,N);
-zfp = zeros(m,N);
-Q = zeros(m,N);
+y = zeros(nChs,nFrames,m,M);
+%fp = zeros(m,nFrames);
+%zfp = zeros(m,nFrames);
+Q = zeros(m,nFrames);
 
-Lt = zeros(M,N);
-v = ones(M,N);
+Lt = zeros(M,nFrames);
+v = ones(M,nFrames);
 vsum = zeros(M,1);
-z = ones(n,N,m,M)/N;
+z = ones(nChs,nFrames,m,M)/nFrames;
 
 ldet = zeros(M,1);
-LL = zeros(maxiter);
-dLL = zeros(maxiter);
+LL = zeros(o.maxiter);
+dLL = zeros(o.maxiter);
 
 % g = zeros(n,N);
 % r = zeros(n,N,m,M);
@@ -192,64 +170,90 @@ dLL = zeros(maxiter);
 % kappa = zeros(n,1);
 % sigma2 = zeros(n,1);
 
-% Iteratively optimize parameters using EM
-for ii = 1:maxiter
+%% Demean
+mn = zeros(nChs,1);
+if o.remove_mean
+    for ch = 1:nChs
+        mn(ch,1) = mean(x(ch,:));
+        x(ch,:) = x(ch,:) - mn(ch,1);
+    end
+end
+disp("Demeaned"); toc;
+% if max(size(cs)) > 1
+%     for h = 1:M
+%         cs(:,h) = cs(:,h) - mn;
+%     end
+% end
+
+%% Iteratively optimize parameters using EM
+for ii = 1:o.maxiter
     % get y, Q, Lt, u (u is named z since z overwrites it later)
     for h = 1:M
-        ldet(h) = -log(abs(det(A(:,:,h))));
-        Lt(h,:) = log(gm(h)) + ldet(h);
+        A_h = A(:,:,h);
+        c_h = c(:,h);
+        ldet(h) = -log(abs(det(A_h)));
+        Lt_h = log(gm(h)) + ldet(h); %Lt(h,:) = log(gm(h)) + ldet(h);
 
         if M == 1
             b = pinv(A) * x;
         end
-        for i = 1:n
+        b_h = b(:,:,h);
+        for ch = 1:nChs
             if M > 1
-                Wh = pinv(A(:,:,h));
-                b(i,:,h) = Wh(i,:) * x - Wh(i,:)*c(:,h);
+                Wh = pinv(A_h);
+                b_ch = Wh(ch,:) * x - Wh(ch,:)*c_h; %b(ch,:,h) = Wh(ch,:) * x - Wh(ch,:)*c_h;
+            else
+                b_ch = b_h(ch,:);
             end
-            for j = 1:m
-                y(i,:,j,h) = sqrt(beta(j,i,h)) * ( b(i,:,h) - mu(j,i,h) );
-                Q(j,:) = log(alpha(j,i,h)) + 0.5*log(beta(j,i,h)) + logpfun(y(i,:,j,h),rho(j,i,h));
+
+            parfor j = 1:m
+                y(ch,:,j,h) = sqrt(beta(j,ch,h)) * (b_ch - mu(j,ch,h) );
+                Q(j,:) = log(alpha(j,ch,h)) + 0.5*log(beta(j,ch,h)) + logpfun(y(ch,:,j,h),rho(j,ch,h));
             end
             if m > 1
                 Qmax = ones(m,1)*max(Q,[],1);
-                Lt(h,:) = Lt(h,:) + Qmax(1,:) + log(sum(exp(Q - Qmax),1));
+                Lt_h = Lt_h + Qmax(1,:) + log(sum(exp(Q - Qmax),1));
                 for j = 1:m
                     Qj = ones(m,1)*Q(j,:);
-                    z(i,:,j,h) = 1 ./ sum(exp(Q-Qj),1);   % this is really u, but we use z to save space
+                    z(ch,:,j,h) = 1 ./ sum(exp(Q-Qj),1);   % this is really u, but we use z to save space
                 end
             else
-                Lt(h,:) = Lt(h,:) + Q(1,:);
+                Lt_h = Lt_h + Q(1,:);
             end
+            b_h(ch,:) = b_ch;
         end
+        Lt(h,:) = Lt_h;
+        A(:,:,h) = A_h;
+        c(:,h) = c_h;
+        b(:,:,h) = b_h;
     end
+    disp("got y, Q, Lt, u: "+ii+" "+toc);
     if M > 1
         Ltmax = ones(M,1) * max(Lt,[],1);
         P = sum(exp(Lt-Ltmax),1);
-        LL(ii) = sum(Ltmax(1,:) + log(P)) / (n*N);
+        LL(ii) = sum(Ltmax(1,:) + log(P)) / (nChs*nFrames);
     else
-        LL(ii) = sum(Lt) / (n*N);
+        LL(ii) = sum(Lt) / (nChs*nFrames);
     end
-        
+
     if ii > 1
         dLL(ii) = LL(ii) - LL(ii-1);
     end
-    
-    if showLL
-        disp(['iter '  int2str(ii) ' lrate = ' num2str(lrate) ' LL = ' num2str(LL(ii))]);
+
+    if o.showLL
+        disp("iter="+ii+"  lrate="+lrate+" LL="+LL(ii)+" "+toc);
     end
-    
-    if ii > iterwin + 1
-        sdll = sum(dLL(ii-iterwin:ii))/iterwin;
-        if (sdll > 0) && (sdll < mindll)
-            break
+
+    if ii > o.iterwin + 1
+        sdll = sum(dLL(ii-o.iterwin:ii))/o.iterwin;
+        if (sdll > 0) && (sdll < o.mindll)
+            break;
         end
         if sdll < 0
-            disp('Likelihood decreasing!');
             lrate = lrate * lratefact;
             numdec = numdec + 1;
             if numdec > maxdec
-                disp(['Reducing lrate, lrate = ' num2str(lrate)]);
+                disp("Likelihood decreasing! Reducing lrate="+lrate+" "+toc);
                 lratemax = lratemax * lratefact;
                 lnatratemax = lnatratemax * lratefact;
                 rholrate = rholrate * lratefact;
@@ -258,16 +262,18 @@ for ii = 1:maxiter
                     break;
                 end
                 numdec = 0;
+            else
+                disp("Likelihood decreasing! Same lrate="+lrate+" "+toc);
             end
         else
-            if ii > newt_start_iter && do_newton
+            if ii > newt_start_iter && o.do_newton
                 lrate = min(lratemax,lrate + min(0.1,lrate));
             else
                 lrate = min(lnatratemax,lrate + min(0.1,lrate));
             end
+            disp("Likelihood NOT decreasing! lrate="+lrate+" "+toc);
         end
     end
-     
 
     % get v, z, gm, and alpha
     for h = 1:M
@@ -275,222 +281,158 @@ for ii = 1:maxiter
             Lh = ones(M,1)*Lt(h,:);
             v(h,:) = 1 ./ sum(exp(Lt-Lh),1);
             vsum(h) = sum(v(h,:));
-            gm(h) = vsum(h) / N;
-        
+            gm(h) = vsum(h) / nFrames;
+
             if gm(h) == 0
-                continue
+                continue;
             end
         end
-        
-        g = zeros(n,N);
-        kappa = zeros(n,1);
-        lambda = zeros(n,1);
+        g = zeros(nChs,nFrames);
+        kappa = zeros(nChs,1);
+        lambda = zeros(nChs,1);
         %eta = zeros(n,1);
         %sigma2 = zeros(n,1);
-        
-        for i = 1:n
+
+        parfor ch = 1:nChs
+            z_ch = z(ch,:,:,:);
             for j = 1:m
                 if M > 1
                     if m > 1
-                        z(i,:,j,h) = v(h,:) .* z(i,:,j,h);
-                        sumz = sum(z(i,:,j,h));
-                        alpha(j,i,h) = sumz / vsum(h);
+                        z_ch(1,:,j,h) = v(h,:) .* z_ch(1,:,j,h); %#ok<PFBNS>
+                        sumz = sum(z_ch(1,:,j,h));
+                        alpha(j,ch,h) = sumz / vsum(h); %#ok<PFBNS>
                     else
-                        z(i,:,j,h) = v(h,:);
-                        sumz = sum(z(i,:,j,h));
+                        z_ch(1,:,j,h) = v(h,:);
+                        sumz = sum(z_ch(1,:,j,h));
                     end
                 else
                     if m > 1
-                        sumz = sum(z(i,:,j,h));
-                        alpha(j,i,h) = sumz / N;
+                        sumz = sum(z_ch(1,:,j,h));
+                        alpha(j,ch,h) = sumz / nFrames;
                     else
-                        sumz = N;
+                        sumz = nFrames;
                     end
                 end
 
                 if sumz > 0
                     if M > 1 || m > 1
-                        z(i,:,j,h) = z(i,:,j,h) / sumz;
+                        z_ch(1,:,j,h) = z_ch(1,:,j,h) / sumz;
                     end
                 else
                     continue;
                 end
-                fp(j,:) = ffun(y(i,:,j,h),rho(j,i,h));
-                zfp(j,:) = z(i,:,j,h) .* fp(j,:);
-                
-                g(i,:) = g(i,:) + alpha(j,i,h) * sqrt(beta(j,i,h)) * zfp(j,:);
-                
-                kp = beta(j,i,h) * sum(zfp(j,:).*fp(j,:));
-                kappa(i) = kappa(i) + alpha(j,i,h) * kp;
-                
-                lambda(i) = lambda(i) + alpha(j,i,h) * (sum(z(i,:,j,h).*(fp(j,:).*y(i,:,j,h)-1).^2) + mu(j,i,h)^2 * kp);
+                fp_j = ffun(y(ch,:,j,h),rho(j,ch,h));
+                zfp_j = z_ch(1,:,j,h) .* fp_j;
 
-                if rho(j,i,h) <= 2
+                g(ch,:) = g(ch,:) + alpha(j,ch,h) * sqrt(beta(j,ch,h)) * zfp_j;
+
+                kp = beta(j,ch,h) * sum(zfp_j.*fp_j);
+                kappa(ch) = kappa(ch) + alpha(j,ch,h) * kp;
+
+                lambda(ch) = lambda(ch) + alpha(j,ch,h) * (sum(z_ch(1,:,j,h).*(fp_j.*y(ch,:,j,h)-1).^2) + mu(j,ch,h)^2 * kp);
+
+                if rho(j,ch,h) <= 2
                     if m > 1 || M > 1
-                        dm = sum(zfp(j,:)./y(i,:,j,h));
+                        dm = sum(zfp_j./y(ch,:,j,h));
                         if dm > 0
-                            mu(j,i,h) = mu(j,i,h) + (1/sqrt(beta(j,i,h))) * sum(zfp(j,:)) / dm;
+                            mu(j,ch,h) = mu(j,ch,h) + (1/sqrt(beta(j,ch,h))) * sum(zfp_j) / dm;
                         end
                     end
-                    db = sum(zfp(j,:).*y(i,:,j,h));
+                    db = sum(zfp_j.*y(ch,:,j,h));
                     if db > 0
-                        beta(j,i,h) = beta(j,i,h) / db;
+                        beta(j,ch,h) = beta(j,ch,h) / db;
                     end
                 else
                     if m > 1 || M > 1
                         if kp > 0
-                            mu(j,i,h) = mu(j,i,h) + sqrt(beta(j,i,h)) * sum(zfp(j,:)) / kp;
+                            mu(j,ch,h) = mu(j,ch,h) + sqrt(beta(j,ch,h)) * sum(zfp_j) / kp;
                         end
                     end
-                    db = ( rho(j,i,h) * sum(z(i,:,j,h).*abs(y(i,:,j,h)).^rho(j,i,h)) )^(-2 / rho(j,i,h));
-                    beta(j,i,h) = beta(j,i,h) * db;
+                    db = ( rho(j,ch,h) * sum(z_ch(1,:,j,h).*abs(y(ch,:,j,h)).^rho(j,ch,h)) )^(-2 / rho(j,ch,h));
+                    beta(j,ch,h) = beta(j,ch,h) * db;
                 end
-                
+
                 if update_rho
-                    ytmp = abs(y(i,:,j,h)).^rho(j,i,h);
-                    dr = sum(z(i,:,j,h).*log(ytmp).*ytmp);
-                    if rho(j,i,h) > 2
-                        dr2 = psi(1+1/rho(j,i,h)) / rho(j,i,h) - dr;
+                    ytmp = abs(y(ch,:,j,h)).^rho(j,ch,h);
+                    dr = sum(z_ch(1,:,j,h).*log(ytmp).*ytmp);
+                    if rho(j,ch,h) > 2
+                        dr2 = psi(1+1/rho(j,ch,h)) / rho(j,ch,h) - dr;
                         if ~isnan(dr2)
-                            rho(j,i,h) = rho(j,i,h) + 0.5 * dr2;
+                            rho(j,ch,h) = rho(j,ch,h) + 0.5 * dr2;
                         end
                     else
-                        dr2 = 1 - rho(j,i,h) * dr / psi(1+1/rho(j,i,h));
+                        dr2 = 1 - rho(j,ch,h) * dr / psi(1+1/rho(j,ch,h));
                         if ~isnan(dr2)
-                            rho(j,i,h) = rho(j,i,h) + rholrate * dr2;
+                            rho(j,ch,h) = rho(j,ch,h) + rholrate * dr2;
                         end
                     end
-                    rho(j,i,h) = min(rhomax,rho(j,i,h));
-                    rho(j,i,h) = max(rhomin,rho(j,i,h));    
-                end                
+                    rho(j,ch,h) = min(rhomax,rho(j,ch,h));
+                    rho(j,ch,h) = max(rhomin,rho(j,ch,h));
+                end
             end
+            z(ch,:,:,:) = z_ch;
         end
-        
+
         if M > 1
             sigma2 = b(:,:,h).^2 * v(h,:)'/vsum(h);
         else
-            sigma2 = sum(b.^2,2) / N;
+            sigma2 = sum(b.^2,2) / nFrames;
         end
 
-        dA = eye(n) - g * b(:,:,h)';
+        dA = eye(nChs) - g * b(:,:,h)';
 
-        bflag = 0;
-        for i = 1:n
-            for k = 1:n            
-                if i == k
-                    B(i,i) = dA(i,i) / (-0*dA(i,i) + lambda(i));
+        bflag = zeros(nChs,1);
+        parfor ch = 1:nChs
+            B_ch = B(ch,:);
+            for k = 1:nChs
+                if ch == k
+                    B_ch(1,ch) = dA(ch,ch) / (-0*dA(ch,ch) + lambda(ch));
                 else
-                    denom = kappa(i)*kappa(k)*sigma2(i)*sigma2(k) - 1;
+                    denom = kappa(ch)*kappa(k)*sigma2(ch)*sigma2(k) - 1;
                     if denom > 0
-                        B(i,k) = (-kappa(k) * sigma2(i) * dA(i,k) + dA(k,i)) / denom;
+                        B_ch(1,k) = (-kappa(k) * sigma2(ch) * dA(ch,k) + dA(k,ch)) / denom;
                     else
-                        bflag = 1;
+                        bflag(ch) = 1;
                     end
                 end
             end
+            B(ch,:) = B_ch;
         end
-        if bflag == 0 && do_newton == 1 && ii > newt_start_iter
+        if all(~bflag) && o.do_newton && ii > newt_start_iter
             A(:,:,h) = A(:,:,h) + lrate * A(:,:,h) * B;
         else
             A(:,:,h) = A(:,:,h) - lnatrate * A(:,:,h) * dA;
         end
     end
-            
+    disp("got v, z, gm, alpha: "+ii); toc;
+
     % reparameterize
     for h = 1:M
         if gm(h) == 0
             continue
         end
-        for i = 1:n
-            tau = norm(A(:,i,h));
-            A(:,i,h) = A(:,i,h) / tau;
-            mu(:,i,h) = mu(:,i,h) * tau;
-            beta(:,i,h) = beta(:,i,h) / tau^2;
+        A_h = A(:,:,h);
+        c_h = c(:,h);
+        parfor ch = 1:nChs
+            tau = norm(A_h(:,ch));
+            A_h(:,ch) = A_h(:,ch) / tau;
+            mu(:,ch,h) = mu(:,ch,h) * tau;
+            beta(:,ch,h) = beta(:,ch,h) / tau^2;
         end
 
         if M > 1
             % make posterior mean zero
             cnew = x * v(h,:)'/(sum(v(h,:)));
-            for i = 1:n
-                Wh = pinv(A(:,:,h));
-                mu(:,i,h) = mu(:,i,h) - Wh(i,:)*(cnew-c(:,h));
+            parfor ch = 1:nChs
+                Wh = pinv(A_h);
+                mu(:,ch,h) = mu(:,ch,h) - Wh(ch,:)*(cnew-c_h);
             end
-            c(:,h) = cnew;
+            c_h = cnew;
         end
+        A(:,:,h) = A_h;
+        c(:,h) = c_h;
     end
-    
-    % Plot
-    if plotfig && mod(ii,dispinterval) == 0
-        if M < 2
-            figure(1), clf;
-            subplot(2,2,1); set(gca,'fontsize',14); hold on; axis(Mx*[-1 1 -1 1]);
-            xlabel('\itx_{\rm1}'); ylabel('\itx_{\rm2}');
-            plot(x(1,:),x(2,:),'g.');
-            
-            for h = 1:M
-                for i = 1:n
-                    if nargin >= 10
-                        plot([cs(1,h) cs(1,h)+As(1,i,h)],[cs(2,h) cs(2,h)+As(2,i,h)],'r','LineWidth',2);
-                    end
-                    %cc(1) = c(1,h) + A(1,i,h)*sum(alpha(:,1,h).*mu(:,1,h));
-                    %cc(2) = c(2,h) + A(2,i,h)*sum(alpha(:,2,h).*mu(:,2,h));
-                    %plot([cc(1) cc(1)+A(1,i,h)],[cc(2) cc(2)+A(2,i,h)],'b','LineWidth',2);
-                    plot([c(1,h) c(1,h)+A(1,i,h)],[c(2,h) c(2,h)+A(2,i,h)],'b','LineWidth',2);
-                end
-            end
-            %pause(0.5);
-
-            [mval,mind] = max(Lt,[],1); %#ok<ASGLU> 
-            for h = 1:1
-                inds = mind == h;
-                
-                for i = 1:2
-                    [hst,bn] = hist(b(i,inds,h),nbins); %#ok<HIST> 
-                    
-                    dbn = abs(bn(2)-bn(1));
-                    hst = hst / (sum(hst)*dbn);
-                    
-                    ph = zeros(1,length(bn));
-                    
-                    subplot(2,2,1+i); set(gca,'fontsize',14); hold on;
-                    xlabel(['\its_{\rm' int2str(i) '}']); ylabel('norm. histogram');
-                    
-                    bmax = max(abs(bn(1)),abs(bn(end)));
-                    axis([-bmax-2*dbn bmax+2*dbn 0 max(hst)+0.1]); hold on;
-                    for j = 1:m
-                        dh = alpha(j,i,h) * sqrt(beta(j,i,h)) * exp(-abs(sqrt(beta(j,i,h))*(bn-mu(j,i,h))).^rho(j,i,h)) / (2*gamma(1+1/rho(j,i,h)));
-                        plot(bn,dh,'g');
-                        ph = ph + dh;
-                    end
-                    plot(bn,hst,'r');
-                    plot(bn,ph);
-                    axis([-Mx Mx 0 max(max(ph,1))])
-                end
-            end
-            subplot(2,2,4); set(gca,'fontsize',14); plot(LL); xlim([1 maxiter]);
-            xlabel('iteration'); ylabel('Log Likelihood');
-        else
-            figure(1), clf;
-            subplot(1,2,1); set(gca,'fontsize',14); hold on; axis(Mx*[-1 1 -1 1]);
-            xlabel('\itx_{\rm1}'); ylabel('\itx_{\rm2}');
-            plot(x(1,:),x(2,:),'g.');
-            
-            for h = 1:M
-                for i = 1:n
-                    if nargin >= 10
-                        plot([cs(1,h) cs(1,h)+As(1,i,h)],[cs(2,h) cs(2,h)+As(2,i,h)],'r','LineWidth',2);
-                    end
-                    %cc(1) = c(1,h) + A(1,i,h)*sum(alpha(:,1,h).*mu(:,1,h));
-                    %cc(2) = c(2,h) + A(2,i,h)*sum(alpha(:,2,h).*mu(:,2,h));
-                    %plot([cc(1) cc(1)+A(1,i,h)],[cc(2) cc(2)+A(2,i,h)],'b','LineWidth',2);
-                    plot([c(1,h) c(1,h)+A(1,i,h)],[c(2,h) c(2,h)+A(2,i,h)],'b','LineWidth',2);
-                end
-            end
-            subplot(1,2,2); set(gca,'fontsize',14); plot(LL); xlim([1 maxiter]);
-            xlabel('iteration'); ylabel('Log Likelihood');
-            
-        end
-    end
+    disp("reparametrized: "+ii); toc;
 end
 
 for h = 1:M
@@ -500,11 +442,87 @@ for h = 1:M
 end
 disp('Done!');
 
-function f = pfun(x,rho) %#ok<DEFNU> 
-f = (1 / (2*GAMMA(1+1/rho))) * exp( - abs(x).^rho );
 
 function f = logpfun(x,rho)
 f = -abs(x).^rho - log(2) - gammaln(1+1/rho);
 
 function f = ffun(x,rho)
 f = rho * sign(x).*abs(x).^(rho-1);
+
+%% Depreciated
+% function f = pfun(x,rho) %#ok<DEFNU>
+% f = (1 / (2*GAMMA(1+1/rho))) * exp( - abs(x).^rho );
+%
+%
+%     if plotfig && mod(ii,dispinterval) == 0
+%         if M < 2
+%             figure(1), clf;
+%             subplot(2,2,1); set(gca,'fontsize',14); hold on; axis(Mx*[-1 1 -1 1]);
+%             xlabel('\itx_{\rm1}'); ylabel('\itx_{\rm2}');
+%             plot(x(1,:),x(2,:),'g.');
+%
+%             for h = 1:M
+%                 for i = 1:n
+%                     if nargin >= 10
+%                         plot([cs(1,h) cs(1,h)+As(1,i,h)],[cs(2,h) cs(2,h)+As(2,i,h)],'r','LineWidth',2);
+%                     end
+%                     %cc(1) = c(1,h) + A(1,i,h)*sum(alpha(:,1,h).*mu(:,1,h));
+%                     %cc(2) = c(2,h) + A(2,i,h)*sum(alpha(:,2,h).*mu(:,2,h));
+%                     %plot([cc(1) cc(1)+A(1,i,h)],[cc(2) cc(2)+A(2,i,h)],'b','LineWidth',2);
+%                     plot([c(1,h) c(1,h)+A(1,i,h)],[c(2,h) c(2,h)+A(2,i,h)],'b','LineWidth',2);
+%                 end
+%             end
+%             %pause(0.5);
+%
+%             [mval,mind] = max(Lt,[],1); %#ok<ASGLU>
+%             for h = 1:1
+%                 inds = mind == h;
+%
+%                 for i = 1:2
+%                     [hst,bn] = hist(b(i,inds,h),nbins); %#ok<HIST>
+%
+%                     dbn = abs(bn(2)-bn(1));
+%                     hst = hst / (sum(hst)*dbn);
+%
+%                     ph = zeros(1,length(bn));
+%
+%                     subplot(2,2,1+i); set(gca,'fontsize',14); hold on;
+%                     xlabel(['\its_{\rm' int2str(i) '}']); ylabel('norm. histogram');
+%
+%                     bmax = max(abs(bn(1)),abs(bn(end)));
+%                     axis([-bmax-2*dbn bmax+2*dbn 0 max(hst)+0.1]); hold on;
+%                     for j = 1:m
+%                         dh = alpha(j,i,h) * sqrt(beta(j,i,h)) * exp(-abs(sqrt(beta(j,i,h))*(bn-mu(j,i,h))).^rho(j,i,h)) / (2*gamma(1+1/rho(j,i,h)));
+%                         plot(bn,dh,'g');
+%                         ph = ph + dh;
+%                     end
+%                     plot(bn,hst,'r');
+%                     plot(bn,ph);
+%                     axis([-Mx Mx 0 max(max(ph,1))])
+%                 end
+%             end
+%             subplot(2,2,4); set(gca,'fontsize',14); plot(LL); xlim([1 o.maxiter]);
+%             xlabel('iteration'); ylabel('Log Likelihood');
+%         else
+%             figure(1), clf;
+%             subplot(1,2,1); set(gca,'fontsize',14); hold on; axis(Mx*[-1 1 -1 1]);
+%             xlabel('\itx_{\rm1}'); ylabel('\itx_{\rm2}');
+%             plot(x(1,:),x(2,:),'g.');
+%
+%             for h = 1:M
+%                 for i = 1:n
+%                     if nargin >= 10
+%                         plot([cs(1,h) cs(1,h)+As(1,i,h)],[cs(2,h) cs(2,h)+As(2,i,h)],'r','LineWidth',2);
+%                     end
+%                     %cc(1) = c(1,h) + A(1,i,h)*sum(alpha(:,1,h).*mu(:,1,h));
+%                     %cc(2) = c(2,h) + A(2,i,h)*sum(alpha(:,2,h).*mu(:,2,h));
+%                     %plot([cc(1) cc(1)+A(1,i,h)],[cc(2) cc(2)+A(2,i,h)],'b','LineWidth',2);
+%                     plot([c(1,h) c(1,h)+A(1,i,h)],[c(2,h) c(2,h)+A(2,i,h)],'b','LineWidth',2);
+%                 end
+%             end
+%             subplot(1,2,2); set(gca,'fontsize',14); plot(LL); xlim([1 o.maxiter]);
+%             xlabel('iteration'); ylabel('Log Likelihood');
+%
+%         end
+%     end
+% end
