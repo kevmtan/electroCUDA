@@ -88,7 +88,7 @@ for r = 1:nRuns
             % Loop across specified polynomial orders
             for ii = 1:numel(dPoly)
                 [xr(:,ch,:),dr(:,ch,:)] = ec_detrend(xr(:,ch,:),...
-                    dPoly(ii),dr(:,ch,:),'polynomials',dThr(ii),dItr(ii),dWin(ii)*fs); %#ok<PFBNS>
+                    dPoly(ii),dThr(ii),dItr(ii),dWin(ii)*fs,dr(:,ch,:)); %#ok<PFBNS>
                 olPctCh(ii) = nnz(~dr(:,ch,:));
             end
             olPct(:,ch) = olPctCh;
