@@ -1,8 +1,8 @@
-function [errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,o,n,arg)
+function [errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,task,o,n,arg)
 % Check inputs
 arguments
     sbj
-    proj {mustBeText} = 'MMR'
+    task {mustBeText} = 'MMR'
     o struct = struct
     n struct = []
     arg.dsTarg {isnumeric} = [] % Downsampling target freq
@@ -14,13 +14,13 @@ arguments
     arg.redoTr logical = false
     arg.redoPsy logical = false
     arg.dirs struct = []
-    arg.blocks {mustBeText} = BlockBySubj(sbj,proj)
+    arg.blocks {mustBeText} = BlockBySubj(sbj,task)
 end
 dirs=arg.dirs; blocks=arg.blocks; dsTarg=arg.dsTarg;
-if ~isstruct(dirs)||isempty(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
-if isempty(blocks); blocks = BlockBySubj(sbj,proj); end
-if ~isfield(o,'dirOut'); o.dirOut=dirs.robustSbj; end % Output directory
-if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+proj; end % Filename ending string
+if ~isstruct(dirs)||isempty(dirs); dirs=ec_getDirs(dirs,sbj,task); end
+if isempty(blocks); blocks=BlockBySubj(sbj,task); end
+if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
+if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending string
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
 errors={};
 % arg.save=0; arg.redoCh=0; arg.redoTr=0; arg.redoPsy=1;
@@ -44,7 +44,7 @@ if isempty(n) || arg.redo || arg.redoN
         n = struct; 
         n.sbj = sbj;
         n.sbjID = uint16(str2double(extractBetween(sbj,"_","_")));
-        n.proj = proj;
+        n.task = task;
         n.suffix = o.suffix;
         n.fnStr = o.fnStr;
         n.ICA = arg.ica;
@@ -96,7 +96,7 @@ end
 fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr;
 if ~isfile(fn) || dsTarg>0 || arg.redoTr || arg.redoPsy || arg.redo
     [trialNfo,runIdx,runIdxOg,runTimes,runTimesOg,errorsEvent] =...
-        ec_getEventIdx(sbj,proj,blocks,dirs,dsTarg=dsTarg);
+        ec_getEventIdx(sbj,task,blocks,dirs,dsTarg=dsTarg);
     if nnz(~cellfun(@isempty,errorsEvent)); errors{end+1,1} = errorsEvent; end
 
     n.nFrames = runIdx(end,2);

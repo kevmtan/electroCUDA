@@ -56,7 +56,7 @@ else
     sbjChs=n.icNfo.sbjIC;
 end
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
-if ~isfield(o,'dirOut'); o.dirOut=dirs.robustSbj; end % Output directory
+if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+proj+".mat"; end % Filename ending string
 if doGPU
     if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice, 0, []); end

@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preprocICA(sbj,proj,o,n,x,arg)
+function [errors,n,x] = ec_preprocICA(sbj,task,o,n,x,arg)
 %% electroCUDA - Independent Components Analysis (ICA)
 % This function performs ICA on preprocesssed data from 'ec_preproc'
 % Additional denoising, detrending & high-pass filtering (HPF) can be temporarily
@@ -15,7 +15,7 @@ function [errors,n,x] = ec_preprocICA(sbj,proj,o,n,x,arg)
 %
 % INPUTS:
 %    sbj = subject name
-%    proj = project name
+%    task = task name
 %    o = struct of options & parameters (TO DO: describe all options)
 %    n = preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
 %    x = preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
@@ -47,11 +47,11 @@ function [errors,n,x] = ec_preprocICA(sbj,proj,o,n,x,arg)
 %% Input validation
 arguments
     sbj % Subject name
-    proj {mustBeText} = 'MMR' % Project name
+    task {mustBeText} = 'MMR' % task name
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
     n struct = [] % preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
     x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
-    arg.blocks {istext,isnumeric} = BlockBySubj(sbj,proj) % Task blocks/runs to include
+    arg.blocks {istext,isnumeric} = BlockBySubj(sbj,task) % Task blocks/runs to include
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
     arg.test logical = false
@@ -60,27 +60,27 @@ arguments
     arg.raw logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
-if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
-if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,proj); end
-try parpool('threads'); catch;end
 % x=[]; n=[]; o=oICA; arg.raw=false; arg.nIn=[]; arg.save=0; arg.test=1; arg.redoN=1;
 
 %% Initialize & load data
+if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
+if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,task); end
+try parpool('threads'); catch;end
 tt = tic;
 
 % Load metadata
-[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,redoN=arg.redoN,dirs=dirs,save=arg.save);
-ch_bad = chNfo.bad; % extract nested table of bad channels
+[errors,o,n,chNfo,~,~] = ec_initialize(sbj,task,o,n,dirs=dirs,save=arg.save,...
+    redoN=arg.redoN); % Load metadata
 cd(o.dirOut); % set working directory to subject dir
 
 % Load EEG data
-xOg = [];
 if isempty(x) && arg.raw
-    [x,errors,chNan] = load_iEEG_LBCN(sbj,proj,blocks,dirs,errors); toc(tt);
-    ch_bad.nan(chNan) = true;
+    [x,errors,chNan] = load_iEEG_LBCN(sbj,task,blocks,dirs,errors); toc(tt);
+    chNfo.bad.nan(chNan) = true;
 elseif isempty(x)
     x = ec_loadSbj(dirs,o.sfx_src,"x");
-else
+end
+if ~isempty(x)
     xOg = x; % Save input data for later
 end
 
@@ -90,40 +90,39 @@ if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
 
 %% Classify bad chans & frames
 sfxB = "";
-if o.doBadCh
-    [chNfo,ch_bad] = classifyBadChs_lfn(x,o,chNfo,ch_bad,sfx); % Bad chan classifier
-    chGood = ~ch_bad.("bad"+sfx);
-    sfxB = sfx;
-elseif contains(o.suffix,"i") && any(ch_bad.Properties.VariableNames=="bad_i")
-    chGood = ~ch_bad.rr_i;            disp("Bad chans: ch_bad.bad_i "+sbj);
-elseif any(ch_bad.Properties.VariableNames=="rr")
-    chGood = ~ch_bad.rr;              disp("Bad chans: ch_bad.rr "+sbj);
-elseif any(ch_bad.Properties.VariableNames=="bad")
-    chGood = ~ch_bad.bad;             disp("Bad chans: ch_bad.bad "+sbj);
-else
-    chGood = true(nChs,1);
+% if o.doBadCh
+%     [chNfo] = classifyBadChs_lfn(x,o,chNfo,sfx); % Bad chan classifier
+%     chGood = ~chNfo.bad.("bad"+sfx);
+%     sfxB = sfx;
+% elseif contains(o.suffix,"i") && any(chNfo.bad.Properties.VariableNames=="bad_i")
+%     chGood = ~chNfo.bad.rr_i;            disp("Bad chans: ch_bad.bad_i "+sbj);
+% elseif any(chNfo.bad.Properties.VariableNames=="rr")
+%     chGood = ~chNfo.bad.rr;              disp("Bad chans: ch_bad.rr "+sbj);
+% elseif any(chNfo.bad.Properties.VariableNames=="bad")
+%     chGood = ~chNfo.bad.bad;             disp("Bad chans: ch_bad.bad "+sbj);
+% else
+%     chGood = true(nChs,1);
+% end
+% toc(tt);
+
+%% Robust detrending (temporary, aggressive for better ICA decomposition)
+if nnz(o.detrendOrder)
+    [n,x] = ec_detrend(n,x,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
+        win=o.detrendWin,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,tic=tt);
+    if arg.test; x_detr=x; end %#ok<*NASGU> 
 end
-toc(tt);
 
-%% Robust detrending for better ICA decomposition (aggressive)
-[x,n] = ec_detrendHPF(x,o.hiPassICA,o.detrendOrder_ICA,n,tt,win=o.detrendWin_ICA,...
-    itr=o.detrendItr_ICA,thr=o.detrendThr_ICA,missing=o.missingInterp,...
-    sfx=o.sfx_src, sfxOg=o.sfx_src);
-
-%% Robust rereference
-if o.doRereference
-    [x,chGood] = ec_rereference(x,chGood',o.rrThr,o.rrItr,ch_bad.ref);
-    chGood = chGood';
-    ch_bad.("rr"+sfx) = ~chGood;
-    disp("Finished robust referencing"); toc(tt);
+%% High-pass filtering (temporary, aggressive for better ICA decomposition)
+if nnz(o.hiPassICA) % HPF within-run to avoid edge artifacts
+    [n,x] = ec_HPF(n,x,tt,hpf=o.hiPassICA,missing=o.missingInterp,gpu=o.hiPassGPU,sfx=sfx);
+    if arg.test; x_hpf=x; end 
 end
 
 %% Prepare for ICA
-[o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,n,o,arg,ch_bad,chNfo,sfxB,sfx1,errors,tt);
-chNfo.bad = ch_bad;
+[o,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,chNfo,sfxB,sfx1,errors,tt);
 
 %% Run ICA decomposition on GPU
-[n,icNfo] = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt);
+n = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt);
 
 % Initial save of 'n'
 if arg.save
@@ -131,32 +130,28 @@ if arg.save
     save(fn,"n"); disp("SAVED: "+fn);
 end
 
+%% Reconstruct IC activity timecourses
+[x,n] = reconstructICs_lfn(xOg,o,n,tt);
+
+%% Get correlations between ICs & EEG chans (name ICs after closest chan)
+n = get_icChCorrs(x,xOg,n,tt);
+if ~arg.test; clear xOg; end
+
 %% Classify bad ICs
 if o.doBadIC
-    icNfo = classifyBadICs_lfn(icNfo,n,o,tt); % Classifier doesn't like robust rereferenced data
+    n = classifyBadICs_lfn(n,o,tt); % Classifier doesn't like robust rereferenced data
 end
-
-%% Reconstruct IC activity timecourses
-[x,xOg,n] = reconstructICs_lfn(xOg,o,n,chGood,chICA,sfx,tt);
-
-%% Get correlations between ICs & EEG chans
-[n,icNfo] = get_icChCorrs(x,xOg,n,icNfo,tt);
-if ~arg.test; clear xOg; end
 
 %% Identify bad frames per IC
 if o.doBadFrames
-    [ic_bad,x_bad] = ec_findBadFrames(x,[],icNfo(:,["ic" "name"]),mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    ic_bad.Properties.VariableNames = "bad_"+ic_bad.Properties.VariableNames;
-    icNfo(:,ic_bad.Properties.VariableNames) = ic_bad;
-    n.badFrames = x_bad;
-    disp("Identified bad frames per IC: "+sbj);
+    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,...
+        [],sfx1,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+    disp("Identified bad frames per IC: "+sbj); toc(tt);
 end
 
 %% Finalize & save
 sfx = o.suffix;
-icNfo = movevars(icNfo,["MNI" "dist" "sbjIC"],"After",width(icNfo));
-if o.doBadIC; icNfo = movevars(icNfo,"dist","Before","sbjIC"); end
-n.icNfo = icNfo;
+n.icNfo = movevars(n.icNfo,["MNI" "dist" "sbjIC"],"After",width(n.icNfo));
 n.suffix = o.suffix;
 n.("o"+sfx) = o;
 
@@ -167,7 +162,7 @@ if arg.save
     save(fn,"chNfo","-v7"); disp("SAVED: "+fn)
     % Save n struct
     fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
-    save(fn,"n","-v7.3"); disp("SAVED: "+fn);
+    save(fn,"n","-v7"); disp("SAVED: "+fn);
     % Save IC timecourses
     fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
     savefast(fn,'x'); disp("SAVED: "+fn);
@@ -205,10 +200,10 @@ end
 
 
 %% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [o,ch_bad,chNfo,chICA,errors] = prepICA_lfn(x,n,o,arg,ch_bad,chNfo,sfxB,sfx1,errors,tt)
+function [o,chNfo,chICA,errors] = prepICA_lfn(x,o,arg,chNfo,sfxB,sfx1,errors,tt)
 if ~exist('tt','var'); tt = tic; end
-fn=string(fieldnames(n)); fn=fn(contains(fn,"detrendW")); fn=fn(end);
-xCh = x(~n.(fn),:);
+xCh = x;
+ch_bad = chNfo.bad;
 
 % Find channels to use for ICA
 if isfield(arg,"nIn") && isstruct(arg.nIn) && isfield(arg.nIn,"chICA")
@@ -221,9 +216,9 @@ else
     id = find(contains(ch_bad.Properties.VariableNames,"asr"),1,"last");
     chICA = find(~(ch_bad{:,id} | ch_bad.nan) & any(chNfo.pialRAS(:,1),2)); 
     id = find(contains(ch_bad.Properties.VariableNames,"rr"),1,"last");
-    chBadr = full([ch_bad{:,id},ch_bad.sus,ch_bad.("xcorr"+sfxB),ch_bad.("dev"+sfxB),...
-        ch_bad.("grad"+sfxB),ch_bad.("hurstL"+sfxB),ch_bad.("hurstH"+sfxB),ch_bad.("flat"+sfxB),...
-        ch_bad.("cov"+sfxB),ch_bad.("sns"+sfxB),ch_bad.sus]);
+    chBadr = full([ch_bad{:,id},ch_bad.sus,ch_bad.ref,ch_bad.("ai"+sfxB),ch_bad.("mad"+sfxB),...
+        ch_bad.("diff"+sfxB),ch_bad.("flat"+sfxB),ch_bad.("sns"+sfxB)*2,ch_bad.("cov"+sfxB),...
+        ch_bad.("dev"+sfxB)*2,ch_bad.("grad"+sfxB),ch_bad.("hurstL"+sfxB),ch_bad.("hurstH"+sfxB)]);
     chBadr = sum(chBadr,2);
     chBad = find(chBadr>=1);
     chICAbad = intersect(chICA,chBad);
@@ -236,7 +231,7 @@ else
     chRankOg=chRank; doGPU=0;
     disp("ICA_chans="+numel(chICA)+" | rank="+chRank);
 
-    %% If rank-deficient, try channel exclusions
+    % If rank-deficient, try channel exclusions
     if chRank<numel(chICA) && o.ica_pca<=0 && numel(chICAbad)>0
         % Setup leave-one-out
         chs=chNfo.ch; chRm=cell(numel(chICAbad),1); chEigs=nan(numel(chs),1);
@@ -270,7 +265,7 @@ else
         end
     end
 
-    %% Do PCA if still rank-deficient (using all redeemable chans)
+    % Do PCA if still rank-deficient (using all redeemable chans)
     if chRank<numel(chICA) && o.ica_pca>=0
         chICA = chICAog;
         chRank = gather(ec_rank(xCh(:,chICA),tol=tol));
@@ -280,6 +275,8 @@ else
     else
         o.ica_pca = 0;
     end
+
+    chNfo.bad = ch_bad;
     disp("ICA_chans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca);
 end
 
@@ -288,25 +285,22 @@ chNfo.("ica"+sfx1)(:) = false;
 chNfo.("ica"+sfx1)(chICA) = true; % indicate ICA channels
 ch_bad.("ica"+sfx1) = chNfo.("ica"+sfx1);
 disp("Finished ICA prep: "+chNfo.sbj(1)); toc(tt);
-
-% Clear VRAM
-clear xCh;
-if doGPU; try reset(gpuDevice(1)); catch;end;end
 end
 
 
+
 %% Run CUDAICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [n,icNfo] = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt)
+function n = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,chICA,tt)
 sbj = n.sbj;
 sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
 ch_bad = chNfo.bad;
-fn=string(fieldnames(n)); fn=fn(contains(fn,"detrendW")); fn=fn(end);
-idxICA = full(n.(fn));
+idxICA = full(n.xBad.detrend);
 idxICA = sum(idxICA,2);
-[~,~,thr] = isoutlier(idxICA,"mean",1,"ThresholdFactor",3);
+[~,~,thr] = isoutlier(idxICA,"median",1,"ThresholdFactor",6);
 idxICA = idxICA>thr;
 cd(o.dirOut); try system("rm cudaica_"+sfx+"*"); catch;end % Remove old cudaica files
+try reset(gpuDevice()); catch;end
 
 % Starting weights
 ic_wtsIn = '';
@@ -315,8 +309,8 @@ if isfield(arg,"nIn")
 end
 
 %% Infomax ICA compiled in CUDA
-ica = ec_cudaica(x(~idxICA,chICA),dirs.cudaica,ic_wtsIn,pca=o.ica_pca,dir=o.dirOut,sfx=sfx,...
-    lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
+ica = ec_cudaica(x(~idxICA,chICA),dirs.cudaica,ic_wtsIn,verbose="off",...
+    pca=o.ica_pca,dir=o.dirOut,sfx=sfx,lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
 nICs = height(ica.wts);
 disp("Finished CUDAICA: "+sbj); toc(tt);
 
@@ -334,11 +328,12 @@ end
 
 % Initialize icNfo table
 icNfo = table;
-icNfo.ic = uint16(1:nICs)';
-icNfo.name(:) = uint16(0);
+icNfo.order = uint16(1:nICs)';
+icNfo.ic(:) = uint16(0);
 icNfo.chCorr(:) = uint16(0);
 icNfo.chWt(:) = uint16(0);
 icNfo.MNI = MNI;
+icNfo.sbjIC(:) = "";
 
 %% Copy to 'n' struct
 n.ICA = true;
@@ -346,6 +341,7 @@ n.ica = ica;
 n.chICA = chICA;
 n.nICs = nICs;
 n.icNfo = icNfo;
+n.icBad = [];
 n.icW = ica.w;
 n.badFramesICA = sparse(idxICA);
 %n.icPCA = pcaArg;
@@ -354,26 +350,14 @@ end
 
 
 %% Reconstruct IC activity %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [x,xOg,n] = reconstructICs_lfn(xOg,o,n,chGood,chICA,sfx,tt)
+function [x,n] = reconstructICs_lfn(xOg,o,n,tt)
 if isempty(xOg)
    xOg = ec_loadSbj(n.dirs,o.sfx_src,"x");
 end
 
-% Rereference
-if o.doRereference
-    xOg = ec_rereference(xOg,chGood',o.rrThr,o.rrItr);
-    disp("Finished robust referencing (final): "+n.sbj); toc(tt);
-end
-
 % Reconstruct IC timecourses
-x = (n.icW * xOg(:,chICA)')';
+x = (n.icW * xOg(:,n.chICA)')';
 disp("Reconstructed IC timecourses: "+n.sbj); toc(tt);
-
-% Hi-pass & detrend
-if any(o.hiPass) || any(o.detrendOrder)
-    [x,n] = ec_detrendHPF(x,o.hiPass,o.detrendOrder,o.detrendWin,n,tt,...
-        itr=o.detrendItr,thr=o.detrendThr,sfx=sfx);
-end
 
 % Get IC covariance
 n.icCov = cov(x,'partialrows');
@@ -384,39 +368,43 @@ end
 
 
 %% Classify bad ICs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function icNfo = classifyBadICs_lfn(icNfo,n,o,tt)
+function n = classifyBadICs_lfn(n,o,tt)
+icBad = n.icNfo(:,["order" "ic" "sbjIC"]);
 
 % Load raw EEG data (classifier doesn't work with robust referenced data)
-xa = load_iEEG_LBCN(n.sbj,n.proj,n.blocks,n.dirs);
+xa = load_iEEG_LBCN(n.sbj,n.task,n.blocks,n.dirs);
 
 % Reconstruct IC timecourses
 xa = (n.icW * xa(:,n.chICA)')';
 
 % Run classifier
-[chClass,icNfo.dist] = ec_classifyBadChs(xa,icNfo.MNI);
-icNfo.bad_ai = chClass.bad;
+[chClass,n.icNfo.dist] = ec_classifyBadChs(xa,n.icNfo.MNI);
+icBad.ai = chClass.bad;
 
 % Hurst exponent
 chHrst = abs(chClass.hurs - 0.5);
 [~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(~chClass.bad),...
     "median","ThresholdFactor",o.thrHurst);
-icNfo.bad_hurstL = chHrst < chHrst_lo;
-icNfo.bad_hurstH = chHrst > chHrst_hi;
+icBad.hurstL = chHrst < chHrst_lo;
+icBad.hurstH = chHrst > chHrst_hi;
 
 % Copy
 chClass.Properties.VariableNames(2:end) =...
-    "bad_"+string(chClass.Properties.VariableNames(2:end))+"P";
-icNfo(:,chClass.Properties.VariableNames(2:end)) = chClass(:,2:end);
-disp("Bad ICs classifier: "); disp(find(icNfo.bad_ai)'); toc(tt);
+    string(chClass.Properties.VariableNames(2:end))+"P";
+icBad(:,chClass.Properties.VariableNames(2:end)) = chClass(:,2:end);
+n.icBad = icBad;
+
+disp("Bad ICs classifier: "); disp(find(icBad.ai)'); toc(tt);
 end
 
 
 
 %% Get correlations between ICs & EEG chans %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [n,icNfo] = get_icChCorrs(x,xOg,n,icNfo,tt)
+function n = get_icChCorrs(x,xOg,n,tt)
 chICA = n.chICA;
 nChs = numel(chICA);
 nICs = width(x);
+icNfo = n.icNfo;
 
 %% Weights
 winv = abs(n.ica.winv');
@@ -469,10 +457,10 @@ while ~isempty(chRep)
 end
 
 %% Copy
-icNfo.name = uint16(icName);
-icNfo.sbjIC = "s"+n.sbjID+"_ic"+icNfo.name;
+icNfo.ic = uint16(icName);
+icNfo.sbjIC = "s"+n.sbjID+"_ic"+icNfo.ic;
 icNfo.Properties.RowNames = icNfo.sbjIC;
-icNfo = movevars(icNfo,["chWt" "chCorr"],"After","name");
+icNfo = movevars(icNfo,["chWt" "chCorr"],"After","ic");
 n.icNfo = icNfo;
 n.icCh_corr = cor; % Correlations between ICs & EEG channels
 n.icCh_corrOrder = cor_order; % Chans ordered from highest-to-lowest correlation

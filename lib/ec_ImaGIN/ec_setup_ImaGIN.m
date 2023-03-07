@@ -1,4 +1,4 @@
-saveDir = "/home/kt/Documents/MATLAB/";
+saveDir = "/home/kt/matlab";
 
 % Load the training features
 trainBase = load('ImaGIN_trainBaseFeatures_ec.mat');
@@ -10,4 +10,3 @@ trainBase = load('ImaGIN_trainBaseFeatures_ec.mat');
 %% Save results
 
 save(saveDir+"ec_trainedClassifier_ImaGIN.mat",'mdl','-v7');
-

@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,o,n,x,arg)
+function [errors,n,x] = ec_preprocTimeFreq(sbj,task,o,n,x,arg)
 %% electroCUDA: time-frequency decomposition
 % This function performs time-frequency decomposition on channel or IC timecourses
 % (output of 'ec_preproc' or 'ec_preprocICA'). Decomposition is performed via
@@ -10,7 +10,7 @@ function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,o,n,x,arg)
 %
 % INPUTS:
 %    sbj = subject name
-%    proj = project name
+%    task = task name
 %    o = struct of options & parameters (TO DO: describe all options)
 %    n = preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
 %    x = preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
@@ -42,7 +42,7 @@ function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,o,n,x,arg)
 %% Input validation
 arguments
     sbj {istext,isnumeric}
-    proj {mustBeText} = 'MMR'
+    task {mustBeText} = 'MMR'
     o struct = struct % options struct (see "Options struct validation" below)
     n struct = [] % preloaded 'n' struct from ec_preproc (OPTIONAL)
     x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
@@ -58,7 +58,7 @@ dirs=arg.dirs;
 % o=oSpec; o=oHFB;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
-if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,proj); end
+if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
 if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
 if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
 if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
@@ -67,30 +67,33 @@ if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz
 if ~isfield(o,'single');      o.single=[]; end         % Run & save as single (single much faster on GPU)
 if ~isfield(o,'singleOut');   o.singleOut=[]; end      % Run as double (accuracy) & save as single (small filesize)
 if ~isfield(o,'doGPU');       o.doGPU=false; end       % Run on GPU, see MATLAB gpuArray requirements (default=false)
+if ~isfield(o,'GPUmex');      o.GPUmex=false; end
 if ~isfield(o,'norm');        o.norm=true; end         % Convert absolute values (log-normal) to normal distribution
 % Make workspace vars
-doGPU=o.doGPU; fMean=o.fMean; dsTarg=o.dsTarg; singleOut=o.singleOut; doNorm=o.norm;
+fMean=logical(o.fMean); dsTarg=o.dsTarg; singleOut=logical(o.singleOut); doNorm=logical(o.norm);
+doGPU=logical(o.doGPU); GPUmex=logical(o.GPUmex);
 
 %% Setup & initialize
 tic;
 % Load metadata
-[errors,o,n,chNfo] = ec_initialize(sbj,proj,o,n,ica=arg.ica,dirs=dirs,save=0,redoN=arg.redoN);
+[errors,o,n,chNfo] = ec_initialize(sbj,task,o,n,ica=arg.ica,dirs=dirs,save=0,redoN=arg.redoN);
 sbjID = n.sbjID;
 nRuns = n.nRuns;
 runIdx = n.runIdx;
 blocks = string(n.blocks);
 fsOg = floor(n.fs_orig);
-n.proj = proj;
+n.task = task;
 n.suffix = o.suffix;
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
-if ~isfield(o,'dirOut'); o.dirOut=dirs.robustSbj; end % Output directory
-if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+proj+".mat"; end % Filename ending string
+if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
+if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
 
 % Load EEG data
 if isempty(x)
     if arg.ica && o.sfx_src==""; o.sfx_src="i"; end
     x = ec_loadSbj(dirs,o.sfx_src,"x");
 end
+
 % Find best values for missing inputs
 if isa(x,'single') && ~isempty(o.single) && ~o.single; x=double(x);
     if isempty(singleOut); singleOut=true; end;end % convert single to double
@@ -107,10 +110,10 @@ else
 end
 
 % Reset GPU & get free VRAM
-if doGPU
+if doGPU && ~GPUmex
     if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); delete(gcp('nocreate')); end
     try reset(gpuDevice()); catch;end; memMax=gpuDevice(); memMax=memMax.AvailableMemory;
-else
+elseif ~doGPU
     try parpool('threads'); catch;end
 end
 
@@ -118,60 +121,52 @@ end
 xa = cell(nRuns,1);
 cwtHz = xa;
 for r = 1:nRuns % CWT within-run (avoid edge artifacts at run transitions)
-    rFin = 0;
-    while ~rFin; if arg.test; tic; end
-        % Get block iEEG data
-        idx = runIdx(r,1):runIdx(r,2);
-        rLength = length(idx);
-        run = blocks(r);
-        xr = x(idx,:);
-        if o.single; xr = single(xr); end
-        xr = num2cell(xr,1);
+    if arg.test; tic; end
+    % Get block iEEG data
+    idx = runIdx(r,1):runIdx(r,2);
+    rLength = length(idx);
+    run = blocks(r);
+    xr = x(idx,:);
+    if o.single; xr = single(xr); end
+    xr = num2cell(xr,1);
 
-        % Generate wavelet filters
-        fb = cwtfilterbank(SignalLength=rLength,VoicesPerOctave=o.fVoices,...
-            SamplingFrequency=fsOg,FrequencyLimits=o.fLims);
-        cwtHz{r} = fb.centerFrequencies';
+    % Generate wavelet filters
+    fb = cwtfilterbank(SignalLength=rLength,VoicesPerOctave=o.fVoices,...
+        SamplingFrequency=fsOg,FrequencyLimits=o.fLims);
+    cwtHz{r} = fb.centerFrequencies';
 
-        %% Do CWT
-        if ~doGPU
-            % CPU parfor loop (slower, no GPU required)
-            disp("Starting wavelet transform (CPU): "+sbj+" "+run+" time="+toc);
-            parfor ch = 1:nChs
-                xr{ch} = cwt_lfn(fb,xr{ch},fMean,doNorm,1,1,singleIn,false);
-            end
-            rFin=1; disp("Wavelet transformed (CPU): "+sbj+" "+run+" time="+toc);
-        else
-            % Use GPU (faster, requires nVidia CUDA GPU), find numChans that fit in VRAM
-            memIn=xr{1}; memIn=whos('memIn'); memIn=memIn.bytes; nFrqs=numel(cwtHz{r}); %#ok<NASGU>
-            if fMean; memIn=.25*memIn*nFrqs; else; memIn=2*memIn*nFrqs; end
-            if ~singleIn && ds2>ds1; memIn=memIn*(ds1/ds2*2); end
-            if ~singleIn && singleOut; memIn=memIn*.6; end % numChans that fit in VRAM       
-            memChs=floor(memMax/memIn); memItr=ceil(nChs/memChs); memChs=ceil(nChs/memItr);
-
-            % Move vars to GPU
-            fMean=arrayfun(@(f) f==1,gpuArray(fMean)); doNorm=gpuArray(doNorm==1);
-            singleIn(singleIn==1); singleOut(singleOut==1); ds1=gpuArray(ds1); ds2=gpuArray(ds2);
-
-            % gpuArray iterations with numChans that fit in VRAM
-            disp("Starting wavelet transform (GPU): "+sbj+" "+run+" memChs="+memChs+"/"+nChs+" time="+toc);
-            try chFin=false(nChs,1);
-                for v = 1:memItr
-                    idx=find(~chFin,memChs);
-                    xr(idx) = cellfun(@gpuArray,xr(idx),UniformOutput=false);
-                    xr(idx) = arrayfun(@(xx) cwt_lfn(fb,xx{:},fMean,doNorm,...
-                        ds1,ds2,singleIn,singleOut),xr(idx),UniformOutput=false);
-                    xr(idx) = cellfun(@gather,xr(idx),UniformOutput=false);
-                    chFin(idx) = true;
-                    disp("Wavelet transformed (GPU): "+sbj+" "+run+" "+idx(end)+"/"+nChs+" time="+toc);
-                end
-                rFin=1; xr=cellfun(@gather,xr,UniformOutput=false);
-            catch ME; errors{end+1}=ME; rFin=0; if arg.test; error(getReport(ME)); else %#ok<AGROW>
-                doGPU=false; try parpool('threads'); catch;end;end; getReport(ME)
-            end
-            ds1=gather(ds1); ds2=gather(ds2); singleIn=gather(singleIn); singleOut=gather(singleOut);
-            doNorm=gather(doNorm); fMean=gather(fMean);
+    %% Do CWT
+    if ~doGPU
+        % CPU parfor loop (slower, no GPU required)
+        parfor ch = 1:nChs
+            xr{ch} = cwt_lfn(fb,xr{ch},fMean,doNorm,1,1,singleIn,false);
         end
+        disp("Wavelet transformed (CPU): "+sbj+" "+run+" time="+toc);
+    else
+        % CWT using GPUarray (fasteer, requires nVidia CUDA GPU)
+        memIn=xr{1}; memIn=whos('memIn'); memIn=memIn.bytes; nFrqs=numel(cwtHz{r}); %#ok<NASGU>
+        if fMean; memIn=.25*memIn*nFrqs; else; memIn=2*memIn*nFrqs; end
+        if ~singleIn && ds2>ds1; memIn=memIn*(ds1/ds2*2); end
+        if ~singleIn && singleOut; memIn=memIn*.6; end % numChans that fit in VRAM
+        memChs=floor(memMax/memIn); memItr=ceil(nChs/memChs); memChs=ceil(nChs/memItr);
+        fMean=arrayfun(@(f) f==1,gpuArray(fMean)); doNorm=gpuArray(doNorm);
+        singleIn = gpuArray(singleIn); singleOut=gpuArray(singleOut);
+        ds1=gpuArray(ds1); ds2=gpuArray(ds2); chFin=false(nChs,1);
+
+        % gpuArray iterations with numChans that fit in VRAM
+        disp("Starting wavelet transform (GPUarray): "+sbj+" "+run+" memChs="+memChs+"/"+nChs+" time="+toc);
+        for v = 1:memItr
+            idx=find(~chFin,memChs);
+            xr(idx) = cellfun(@gpuArray,xr(idx),UniformOutput=false);
+            xr(idx) = arrayfun(@(xx) cwt_lfn(fb,xx{:},fMean,doNorm,...
+                ds1,ds2,singleIn,singleOut),xr(idx),UniformOutput=false);
+            xr(idx) = cellfun(@gather,xr(idx),UniformOutput=false);
+            chFin(idx) = true;
+            disp("Wavelet transformed (GPU): "+sbj+" "+run+" "+idx(end)+"/"+nChs+" time="+toc);
+        end
+        xr=cellfun(@gather,xr,UniformOutput=false);
+        ds1=gather(ds1); ds2=gather(ds2); singleIn=gather(singleIn); singleOut=gather(singleOut);
+        doNorm=gather(doNorm); fMean=gather(fMean);
     end
 
     %% Normalize & downsample if not yet applied
@@ -207,42 +202,41 @@ n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
 
 % Resample n indices
-[err,o,n] = ec_initialize(sbj,proj,o,n,dirs=dirs,save=arg.save,ica=arg.ica,...
+[err,o,n] = ec_initialize(sbj,task,o,n,dirs=dirs,save=arg.save,ica=arg.ica,...
     dsTarg=o.dsTarg);
 if isany(err); errors{end+1}=err; end
 
-%% Detrend/high-pass
-if isany(o.detrendOrder2) || isany(o.hiPass)
-    fn=string(fieldnames(n)); idx=contains(fn,"detrendW");
-    if ~fMean && any(idx); n=rmfield(n,fn(idx)); end
-    [x,n] = ec_detrendHPF(x,n,hpf=o.hiPass,poly=o.detrendOrder2,win=o.detrendWin2,...
-        thr=o.detrendThr2,itr=o.detrendItr2,missing=o.missingInterp,sfx=o.suffix,gpu=o.hiPassGPU);
+%% Robust detrending
+if nnz(o.detrendOrder)
+    [n,x] = ec_detrend(n,x,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,win=o.detrendWin,...
+        missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,sfx=sfx);
+end
+
+%% High-pass filtering
+if nnz(o.hiPass) 
+    [n,x] = ec_HPF(n,x,tt,hpf=o.hiPass,missing=o.missingInterp,gpu=o.hiPassGPU,sfx=sfx);
 end
 
 %% Identify bad frames per chan
 if o.doBadFrames && ~arg.ica
     % Retain HFO
-    if any(n.badFrames.Properties.VariableNames=="hfo")
-        x_bad = n.badFrames(:,["ch" "hfo"]);
+    if any(n.xBad.Properties.VariableNames=="hfo")
+        x_bad = n.xBad(:,"hfo");
         if ds2>1
             hfo = resample(double(full(x_bad.hfo)),ds1,ds2,'Dimension',2);
             x_bad.hfo = sparse(hfo>=0.5);
         end
     else
-        x_bad = n.badFrames(:,"ch");
+        x_bad = table;
     end
 
     % Identify
     [chNfo.bad,x_bad] = ec_findBadFrames(x,chNfo.bad,x_bad,sfx,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    n.badFrames = x_bad;
+    n.xBad = x_bad;
     disp("Identified bad frames per chan: "+sbj+" time="+toc);
 elseif o.doBadFrames
-    [ic_bad,x_bad] = ec_findBadFrames(x,[],n.icNfo(:,["ic" "name"]),...
-        mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    ic_bad.Properties.VariableNames = "bad_"+ic_bad.Properties.VariableNames+sfx;
-    n.icNfo(:,ic_bad.Properties.VariableNames) = ic_bad;
-    n.badFrames = x_bad;
+    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,sfx,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     disp("Identified bad frames per IC: "+sbj+" time="+toc);
 end
 
@@ -277,7 +271,7 @@ if arg.save
 
     % Save n struct
     fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
-    save(fn,"n","-v7.3"); disp("SAVED: "+fn);
+    save(fn,"n","-v7"); disp("SAVED: "+fn);
 
     % Save processed iEEG data
     fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
@@ -289,16 +283,17 @@ end
 %% Continuous Wavelet Transform - local function
 function xx = cwt_lfn(fb,xx,fMean,doNorm,ds1,ds2,singleIn,singleOut)
 % Do CWT
-if fMean
+if ~fMean
+    % Real-valued power (magnitude absolute value squared)
+    xx = abs(fb.wt(xx)).^2'; % wt(frames,freqs)
+else
     % Normalized average density (weighted integral normed by variance)
     xx = fb.scaleSpectrum(xx,SpectrumType="density")'; % wt(frames,1)
-else % Real-valued power (magnitude absolute value squared)
-    xx = abs(fb.wt(xx)).^2'; % wt(frames,freqs)
 end
 
 % Downsample
 if ds2>ds1 && ~singleIn
-   xx = resample(xx,ds1,ds2); % doesn't work in parfor loop
+    xx = resample(xx,ds1,ds2); % doesn't work in parfor loop
 end
 
 % Absolute values (log-norm) to normal distribution

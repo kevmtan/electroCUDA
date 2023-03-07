@@ -16,7 +16,6 @@ pos(isnan(pos)) = 0;
 if isempty(mdl)
     load('ec_trainedClassifier_ImaGIN.mat','mdl');
 end
-try parpool('threads'); catch;end
 
 %% Classify bad channels
 [chF,chDist] = computeFeatures_lfn(x,pos,nChs,nn,logScale); % compute features

@@ -134,7 +134,12 @@ ica.cfg = sc;
 writematrix(sc,fnSc,'Delimiter',' ',"FileType","text");
 
 %% Write data
-prec='float';
+prec = 'float';
+% if isa(x,'double')
+%     prec = 'float64';
+% else
+%     prec = 'float';
+% end
 
 % EEG data
 x = x';

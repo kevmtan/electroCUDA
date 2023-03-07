@@ -18,7 +18,7 @@ arguments
     vals {isnumeric} % Vector of numeric values
     cMapName {ischar,isstring} = "RdBu" % Name of colormap
     cLim {isnumeric} = [] % Raw/z-score value limits to clip: [lowerLimit,upperLimit]
-    a.center (1,1) {isnumeric,ischar,isstring} = nan % Center raw/zscored values at this number
+    a.center {isnumeric,istext} = [] % Center raw/zscored values at this number
     a.zscore {isnumeric,islogical} = false % do z-transform (true|false), zscore limits [lowerZ,upperZ]
 end
 
@@ -50,7 +50,7 @@ if any(a.zscore)
         vals(vals<cLim(1)) = cLim(1);
         vals(vals>cLim(2)) = cLim(2);
     end 
-elseif any(a.center) % Center colorbar
+elseif ~isempty(a.center) % Center colorbar
     vals = normalize(vals,"center",a.center);
     cLim = [min(vals) max(vals)];
     cLim = [-max(abs(cLim(1)),abs(cLim(2))) max(abs(cLim(1)),abs(cLim(2)))];

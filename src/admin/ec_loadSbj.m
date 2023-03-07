@@ -1,65 +1,60 @@
-function [n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx,fs,onlyVar,o)
+function [n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx,onlyVar,fs)
 % Input validation
 arguments
-    dirs {isstruct,ischar,isstring} = []
-    sfx {isStringScalar,ischar} = ""
-    fs {isnumeric} = []
-    onlyVar {isstring,ischar,ismember(onlyVar,["x" "n" ""])} = ""
-    o.sbj {isstring,ischar,isnumeric} = []
-    o.proj {isstring,ischar} = []
+    dirs struct
+    sfx string = ""   
+    onlyVar {mustBeMember(onlyVar,["n" "x" "psy" "trialNfo" "chNfo" "all"])} = "all"
+    fs double = []
 end
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,o.sbj,o.proj); end
 sbjID = dirs.sbjID;
-proj = dirs.proj;
+task = dirs.task;
 if isnumeric(sbjID); sbjID = "s"+sbjID; end
 if ~startsWith(sbjID,"s"); sbjID = "s"+sbjID; end
-if isstring(fs)||ischar(fs); onlyVar=fs; fs=[]; end
 
 %% Load
 
 % Metadata "n" struct
-if onlyVar=="" || onlyVar=="n" || (onlyVar~="" && nargout>=2) ||...
-        isempty(fs) && (nargout>=3 || ismember(onlyVar,["psy" "trialNfo"]))
-    fpath = dirs.robustSbj+"n"+sfx+"_"+sbjID+"_"+proj;
-    load(fpath,"n"); disp("LOADED: "+fpath);
-
-    % Check sampling rate
-    if isempty(fs); fs=n.fs; disp("CHECKING SAMPLING RATE"); end
+fpath = dirs.procSbj+"n"+sfx+"_"+sbjID+"_"+task;
+if onlyVar=="all" || onlyVar=="n" || isempty(fs) && ismember(onlyVar,["psy" "trialNfo"])
+    load(fpath,"n"); disp("LOADED: "+fpath); % Load
+    if onlyVar=="n" && nargout<=1; return; end
+    if isempty(fs); fs=n.fs; disp("CHECKING SAMPLING RATE"); end % Check sampling rate
 end
-if fs==1000; fs=""; else; fs=string(fs); end
+if fs==1000; fs=""; else; fs=string(fs); end % Default sampling rate not appended in filename
 
 % EEG data for sfx
-fpath = dirs.robustSbj+"x"+sfx+"_"+sbjID+"_"+proj;
-if nargout>=2
+if nargout>=2 || onlyVar=="x"
+    fpath = dirs.procSbj+"x"+sfx+"_"+sbjID+"_"+task;
     load(fpath,"x"); disp("LOADED: "+fpath);
-elseif onlyVar=="x" && nargout<=1
-    n = load(fpath,"x"); disp("LOADED: "+fpath);
-    n = n.x;
+    if onlyVar=="x" && nargout<=1
+        n = x; return
+    end
 end
 
 % Behavioral task data aligned to EEG recordings
-fpath = dirs.robustSbj+"psy"+fs+"_"+sbjID+"_"+proj;
-if nargout >=3  
+if nargout>=3 || onlyVar=="psy"
+    fpath = dirs.procSbj+"psy"+fs+"_"+sbjID+"_"+task;
     load(fpath,"psy");  disp("LOADED: "+fpath);
-elseif onlyVar=="psy" && nargout<=1
-    n = load(fpath,"psy");  disp("LOADED: "+fpath);
-    n = n.psy;
+    if onlyVar=="psy" && nargout<=1
+        n = psy; return
+    end
 end
 
 % Trial information
-fpath = dirs.robustSbj+"trialNfo"+fs+"_"+sbjID+"_"+proj;
-if nargout >= 4
+if nargout>=4 || onlyVar=="trialNfo"
+    fpath = dirs.procSbj+"trialNfo"+fs+"_"+sbjID+"_"+task;
     load(fpath,"trialNfo"); disp("LOADED: "+fpath);
-elseif onlyVar=="trialNfo" && nargout<=1
-    n = load(fpath,"trialNfo");  disp("LOADED: "+fpath);
-    n = n.trialNfo;
+    if onlyVar=="trialNfo" && nargout<=1
+        n = trialNfo; return
+    end
 end
 
 % Channel information
-fpath = dirs.robustSbj+"chNfo_"+sbjID+"_"+proj;
-if nargout >= 5
+if nargout>=5 || onlyVar=="chNfo"
+    fpath = dirs.procSbj+"chNfo_"+sbjID+"_"+task;
     load(fpath,"chNfo"); disp("LOADED: "+fpath);
-elseif onlyVar=="chNfo" && nargout<=1
-    n = load(fpath,"chNfo");  disp("LOADED: "+fpath);
-    n = n.chNfo;
+    if onlyVar=="chNfo" && nargout<=1
+        n = chNfo; return
+    end
 end

@@ -169,7 +169,7 @@ function statusPP = preprocChs_lfn(pathFn,statusPP,proj,o,doPsy,doLFP,doSpec,doH
 for s = 1:height(statusPP) % Subject loop
     sbj=statusPP.sbj{s}; sbjID=statusPP.sbjID(s);
     dirs = ec_getDirs(pathFn,sbj,proj,sbjID);
-    o.dirOut = dirs.robustSbj;
+    o.dirOut = dirs.procSbj;
     o.fnStr = "s"+sbjID+"_"+proj;
     o.suffix = "";
 
@@ -275,7 +275,7 @@ function statusPP = preprocICA_lfn(pathFn,statusPP,proj,o,doICA,doICAspec,doICAh
 for s = 1:height(statusPP) % subject loop
     sbj=statusPP.sbj{s}; sbjID=statusPP.sbjID(s);
     dirs = ec_getDirs(pathFn,sbj,proj,sbjID);
-    o.dirOut = dirs.robustSbj;
+    o.dirOut = dirs.procSbj;
     o.fnStr = "s"+sbjID+"_"+proj+".mat";
     o.suffix = "";
 
@@ -391,7 +391,7 @@ for s = 1:height(statusPP) % Subject loop
     sbj=statusPP.sbj{s}; sbjID=statusPP.sbjID(s);
     dirs = ec_getDirs(pathFn,sbj,proj,sbjID);
     %ni = ec_loadSbj(dirs,"i","n");
-    o.dirOut = dirs.robustSbj;
+    o.dirOut = dirs.procSbj;
     o.fnStr = "s"+sbjID+"_"+proj;
     o.suffix = "hi";
 

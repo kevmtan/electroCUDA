@@ -1,16 +1,13 @@
-function dirs = ec_getDirs(usrStr,sbj,proj,sbjID)
+function dirs = ec_getDirs(proj,sbj,task,sbjID)
+% You must edit 'ec_paths' to match the directorieson your system
+%% Input validation
 arguments
-    usrStr {isstruct,ischar,isstring} = []
+    proj {isstruct,ischar,isstring} = 'lbcn'
     sbj {isstring,ischar,isnumeric} = []
-    proj {ischar,isstring} = "MMR";
+    task {ischar,isstring} = "MMR";
     sbjID {isnumeric} = []
 end
 
-if isempty(usrStr)
-    usrStr = 'Kevin_DMN';
-elseif isstruct(usrStr)
-    dirs = usrStr;
-end
 if isempty(sbjID) && ~isempty(sbj)
     if isnumeric(sbj)
         sbjID = sbj;
@@ -19,25 +16,32 @@ if isempty(sbjID) && ~isempty(sbj)
     end
 end
 
-%% Initialize directories
-[dirFreesufer,dirMain,dirCode,path_cudaica] = AddPaths(usrStr);
+%% Organize dirs
 
-dirs.code = string(dirCode);
-dirs.comp = string(dirMain); 
-dirs.data = dirs.comp; 
-dirs.orig = dirs.data+"orig"+filesep;
-dirs.psych = dirs.orig;
-dirs.robust = dirs.data+"robust"+filesep;
-dirs.anal = dirMain+"anal"+filesep;
-dirs.freesurfer = string(dirFreesufer);
-dirs.fsaverage = dirs.freesurfer+sbj+filesep+"fsaverage";
-dirs.cudaica = path_cudaica;
+% Project-specific
+if isstruct(proj)
+    dirs = proj;
+else
+    [dirFreesufer,dirMain,dirCode,path_cudaica] = ec_paths(proj);
+    dirs.proj = proj;
+    dirs.code = string(dirCode);
+    dirs.data = string(dirMain);
+    dirs.orig = dirs.data+"orig"+filesep;
+    dirs.psych = dirs.orig;
+    dirs.proc = dirs.data+"proc"+filesep;
+    dirs.anal = dirMain+"anal"+filesep;
+    dirs.freesurfer = string(dirFreesufer);
+    dirs.fsaverage = dirs.freesurfer+"fsaverage"+filesep;
+    dirs.cudaica = path_cudaica;
+end
+
+% Subject-specific
 if ~isempty(sbj)
     dirs.sbj = sbj;
     dirs.sbjID = sbjID;
-    dirs.proj = proj;
+    dirs.task = task;
     dirs.psychSbj = dirs.psych+sbj+filesep;
     dirs.origSbj = dirs.orig+sbj+filesep;
-    dirs.robustSbj = dirs.robust+"s"+sbjID+filesep+proj+filesep;
+    dirs.procSbj = dirs.proc+"s"+sbjID+filesep+task+filesep;
     dirs.fsSbj = dirs.freesurfer+sbj+filesep;
 end

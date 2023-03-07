@@ -1,5 +1,75 @@
-function EEG = ec_ASR(EEG,cutoff,windowlen,stepsize,maxdims,ref_maxbadchannels,...
-    ref_tolerances,ref_wndlen,usegpu,useriemannian,maxmem,filtAmps)
+function [EEG,n] = ec_ASR(o,n,x,psy,trialNfo,chNfo)
+arguments
+    o struct
+    n struct
+    x {mustBeFloat}
+    psy table
+    trialNfo table
+    chNfo table
+end
+optFields = ["chIgnore",...
+    "doGPU","maxMem","refBurst","refTols","refMaxBadChs","refWinSz",...
+    "winSz","winOverlap","stepSz","blockSz","filtHz","filtMag","dimsPCA",...
+    "refMaxDropout","refMinClean","truncQuant","stepSizes","shapeRange"];
+for ii = 1:length(optFields)
+    if ~isfield(o,optFields(ii))
+        o.(optFields(ii)) = [];
+    end
+end
+
+%% Convert to EEGLAB format
+EEG = ec_exportEEGLAB(n,x,psy,trialNfo,chNfo);
+clear x psy trialNfo chNfo
+EEGog = EEG;
+
+% Remove excluded channels
+chIgnore = o.chIgnore;
+if isany(chIgnore)
+    EEG = eeg_checkset(pop_select(EEG,'nochannel',cellstr(EEG.chNfo.sbjCh(chIgnore))));
+    disp("Removing these chans for ASR: "); disp(EEG.chNfo.sbjCh(chIgnore)');
+end
+
+%% Run ASR
+[EEG,state] = asrMain_lfn(EEG,o.doGPU,o.maxMem,o.refBurst,o.refTols,o.refMaxBadChs,...
+    o.refWinSz,o.winSz,o.winOverlap,o.stepSz,o.blockSz,o.filtHz,o.filtMag,o.dimsPCA,...
+    o.refMaxDropout,o.refMinClean,o.truncQuant,o.stepSizes,o.shapeRange);
+
+% Fix mismatched frames
+if width(EEG.data)~=width(EEGog.data)
+    warning("ASR - mismatched number of frames: EEG.data & EEGog.data")
+    if width(EEG.data)>EEGog.pnts; disp("ASR - matching end frames of EEG & EEGog")
+        EEG.data = EEG.data(:,1:EEGog.pnts); end
+end
+
+% Copy cleaned channels to data matrix
+if isany(chIgnore)
+    [~,ia,ib] = intersect({EEGog.chanlocs.labels},{EEG.chanlocs.labels},'stable');
+    EEGog.data(ia,:) = EEG.data(ib,:);
+    EEG = EEGog.data;
+else
+    EEG = EEG.data;
+end
+EEG = EEG';
+
+% Save ASR parameters as single
+fNames = string(fieldnames(state));
+for ii = 1:length(fNames)
+    if isfloat(state.(fNames(ii))); state.(fNames(ii)) = single(state.(fNames(ii))); end
+end
+n.asr = state;
+
+
+
+
+%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+%% Main %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [EEG,state] = asrMain_lfn(EEG,doGPU,maxMem,refBurst,refTols,refMaxBadChs,...
+    refWinSz,winSz,winOverlap,stepSz,blockSz,filtHz,filtMag,dimsPCA,refMaxDropout,...
+    refMinClean,truncQuant,stepSizes,shapeRange)
 % Run the ASR method on some high-pass filtered recording.
 % Signal = clean_asr(Signal,StandardDevCutoff,WindowLength,BlockSize,MaxDimensions,ReferenceMaxBadChannels,RefTolerances,ReferenceWindowLength,UseGPU,UseRiemannian,MaxMem)
 %
@@ -92,6 +162,37 @@ function EEG = ec_ASR(EEG,cutoff,windowlen,stepsize,maxdims,ref_maxbadchannels,.
 %            Note that for this to work you need to a) have the Parallel Computing toolbox and b) remove
 %            the dummy gather.m file from the path. Default: false
 %
+%   WindowOverlap : Window overlap fraction. The fraction of two successive windows that overlaps.
+%                   Higher overlap ensures that fewer artifact portions are going to be missed (but
+%                   is slower). (default: 0.66)
+%
+%   Blocksize : Block size for calculating the robust data covariance and thresholds, in samples;
+%               allows to reduce the memory and time requirements of the robust estimators by this
+%               factor (down to Channels x Channels x Samples x 16 / Blocksize bytes). Default: 10
+%
+%   MaxDropoutFraction : Maximum fraction that can have dropouts. This is the maximum fraction of
+%                        time windows that may have arbitrarily low amplitude (e.g., due to the
+%                        sensors being unplugged). (default: 0.1)
+%
+%   MinCleanFraction : Minimum fraction that needs to be clean. This is the minimum fraction of time
+%                      windows that need to contain essentially uncontaminated EEG. (default: 0.25)
+%
+%
+%   The following are expert-level parameters that you should not tune unless you fully understand
+%   how the method works.
+%
+%   TruncateQuantile : Truncated Gaussian quantile. Quantile range [upper,lower] of the truncated
+%                      Gaussian distribution that shall be fit to the EEG contents. (default: [0.022 0.6])
+%
+%   StepSizes : Grid search stepping. Step size of the grid search, in quantiles; separately for
+%               [lower,upper] edge of the truncated Gaussian. The lower edge has finer stepping
+%               because the clean data density is assumed to be lower there, so small changes in
+%               quantile amount to large changes in data space. (default: [0.01 0.01])
+%
+%   ShapeRange : Shape parameter range. Search range for the shape parameter of the generalized
+%                Gaussian distribution used to fit clean EEG. (default: 1.7:0.15:3.5)
+%
+%
 % Out:
 %   Signal : data set with local peaks removed
 %
@@ -110,89 +211,250 @@ function EEG = ec_ASR(EEG,cutoff,windowlen,stepsize,maxdims,ref_maxbadchannels,.
 %
 %                                Christian Kothe, Swartz Center for Computational Neuroscience, UCSD
 %                                2012-10-15
-if ~exist('cutoff','var') || isempty(cutoff); cutoff = 5; end
-if ~exist('windowlen','var') || isempty(windowlen); windowlen = max(0.5,1.5*EEG.nbchan/EEG.srate); end
-if ~exist('stepsize','var') || isempty(stepsize); stepsize = []; end
-if ~exist('maxdims','var') || isempty(maxdims); maxdims = 2/3; end
-if ~exist('ref_maxbadchannels','var') || isempty(ref_maxbadchannels); ref_maxbadchannels = 0.075; end
-if ~exist('ref_tolerances','var') || isempty(ref_tolerances); ref_tolerances = [-3.5 5.5]; end
-if ~exist('ref_wndlen','var') || isempty(ref_wndlen); ref_wndlen = 1; end
-if ~exist('usegpu','var') || isempty(usegpu); usegpu = false; end
-if ~exist('maxmem','var') || isempty(maxmem); maxmem = []; end
-if ~exist('useriemannian','var') || isempty(useriemannian); useriemannian = false; end
-maxdims = floor((ec_rank(EEG.data')*maxdims)/EEG.nbchan);
-EEG.data = double(EEG.data);
+%% Input validation
+if isempty(doGPU); doGPU = 0; end
+if isempty(refBurst); refBurst = 5; end
+if isempty(refMaxBadChs); refMaxBadChs = 0.075; end
+if isempty(refTols); refTols = [-3.5 5.5]; end
+if isempty(refWinSz); refWinSz = 1; end
+if isempty(winSz); winSz = 0.5; end
+winSz = max([winSz 0.5 1.5*EEG.nbchan/EEG.srate]);
+if isempty(winOverlap); winOverlap=2/3; end
+if isempty(stepSz); stepSz = floor(EEG.srate/3); end % floor(EEG.srate*winLength/2);
+if isempty(filtHz);  filtHz  = [0  2   3   13 16 40 80 EEG.srate/2]; end
+if isempty(filtMag); filtMag = [3 .75 .33 .33 1  1  3  3]; end
+if isempty(dimsPCA); dimsPCA = 2/3; end
+if isempty(refMaxDropout); refMaxDropout = 0.1; end
+if isempty(refMinClean); refMinClean = 0.25; end
+if isempty(truncQuant); truncQuant = [0.022 0.6]; end
+if isempty(stepSizes); stepSizes = [0.01 0.01]; end
+if isempty(shapeRange); shapeRange = 1.7:0.15:3.5; end
+if isempty(maxMem)
+    if doGPU
+        reset(gpuDevice()); maxMem=gpuDevice();
+        maxMem = maxMem.AvailableMemory/2^20;
+    else
+        maxMem = ec_ramAvail/2^20;
+    end
+end
+[C,S] = size(EEG.data);
+if ~isany(blockSz)
+    blockSz = ceil((C*C*S*8*3*2)/(maxMem*(2^20))); %blockSz = max(blockSz,ceil((C*C*S*8*3*2)/hlp_memfree));
+end
+dimsPCA = round(ec_rank(EEG.data')*dimsPCA);
+disp("ASR: maxMem="+maxMem+" | stepSz="+stepSz+" | blockSz="+blockSz+" | dimsPCA="+dimsPCA);
 
-%% first determine the reference (calibration) data
-if isnumeric(ref_maxbadchannels) && isnumeric(ref_tolerances) && isnumeric(ref_wndlen)
+
+%% Find clean data for reference calibration
+refDat = [];
+if isnumeric(refMaxBadChs) && isnumeric(refTols) && isnumeric(refWinSz)
     disp('Finding a clean section of the data...');
     try
-        ref_section = clean_windows(EEG,ref_maxbadchannels,ref_tolerances,ref_wndlen);
-    catch e
+        refDat = cleanWindows_lfn(EEG,refMaxBadChs,refTols,refWinSz,winOverlap,...
+            refMaxDropout,refMinClean,truncQuant,stepSizes,shapeRange);
+    catch ME
         disp('An error occurred while trying to identify a subset of clean calibration data from the recording.');
         disp('If this is because do not have EEGLAB loaded or no Statistics toolbox, you can generally');
         disp('skip this step by passing in ''off'' as the ReferenceMaxBadChannels parameter.');
-        disp('Error details: ');
-        hlp_handleerror(e,1);
-        disp('Falling back to using the entire data for calibration.')
-        ref_section = EEG;
+        disp('Error details: '); hlp_handleerror(ME,1); disp('Falling back to using the entire data for calibration.')
     end
-elseif strcmp(ref_maxbadchannels,'off') || strcmp(ref_tolerances,'off') || strcmp(ref_wndlen,'off')
-    disp('Using the entire data for calibration (reference parameters set to ''off'').')
-    ref_section = EEG;
-elseif ischar(ref_maxbadchannels) && isvarname(ref_maxbadchannels)
+elseif strcmp(refMaxBadChs,'off') || strcmp(refTols,'off') || strcmp(refWinSz,'off')
+elseif ischar(refMaxBadChs) && isvarname(refMaxBadChs)
     disp('Using a user-supplied data set in the workspace.');
-    ref_section = evalin('base',ref_maxbadchannels);
-elseif all(isfield(ref_maxbadchannels,{'data','srate','chanlocs'}))
+    refDat = evalin('base',refMaxBadChs);
+elseif all(isfield(refMaxBadChs,{'data','srate','chanlocs'}))
     disp('Using a user-supplied clean section of data.');
-    ref_section = ref_maxbadchannels;
-else
-    error('Unsupported value for argument ref_maxbadchannels.');
+    refDat = refMaxBadChs;
 end
 
-% calibrate on the reference data
+% Fallback using all data as reference data
+if isempty(refDat)
+    refDat = EEG;
+    disp('Using the entire data for calibration (reference parameters set to ''off'').');
+end
+
+%% Calibrate on the reference data
 disp('Estimating calibration statistics; this may take a while...');
-if exist('hlp_diskcache','file')
-    if useriemannian
-        state = hlp_diskcache('filterdesign',@asr_calibrate_r,ref_section.data,ref_section.srate,cutoff);
-    else
-        state = hlp_diskcache('filterdesign',@asr_calibrate,ref_section.data,ref_section.srate,cutoff);
-    end
-else
-    if useriemannian
-        state = asr_calibrate_r(ref_section.data,ref_section.srate,cutoff,...
-            [],[],[],[],[],[],[],maxmem);
-    else
-        state = ec_ASRcalibrate(ref_section.data,ref_section.srate,cutoff,...
-            [],[],[],[],[],[],[],maxmem,filtAmps);
-    end
-end
-clear ref_section;
+state = ec_ASRcalibrate(refDat.data,refDat.srate,refBurst,blockSz,filtHz,filtMag,winSz,...
+    winOverlap,refMaxDropout,refMinClean,maxMem,doGPU);
+clear refDat;
 
-if isempty(stepsize)
-    stepsize = floor(EEG.srate*windowlen/2); end
+% Extrapolate last few samples of the signal
+sig = 2*EEG.data(:,end) - EEG.data(:,(end-1):-1:end-round(winSz/2*EEG.srate));
+sigSz = width(sig);
+sig = [EEG.data sig];
+%sig = [EEG.data 2*EEG.data(:,end) - EEG.data(:,(end-1):-1:end-round(winSz/2*EEG.srate))];
+% bsxfun(@minus,2*EEG.data(:,end),EEG.data(:,(end-1):-1:end-round(winSz/2*EEG.srate)))
 
-% extrapolate last few samples of the signal
-sig = [EEG.data 2*EEG.data(:,end) - EEG.data(:,(end-1):-1:end-round(windowlen/2*EEG.srate))];
-%sig = [signal.data bsxfun(@minus,2*signal.data(:,end),signal.data(:,(end-1):-1:end-round(windowlen/2*signal.srate)))];
-
-%% process signal using ASR
-if useriemannian
-    [EEG.data,state] = ec_ASR_r(sig,EEG.srate,state,windowlen,windowlen/2,stepsize,maxdims,maxmem,usegpu);
-else
-    [EEG.data,state] = asr_lfn(sig,EEG.srate,state,windowlen,windowlen/2,stepsize,maxdims,maxmem,usegpu);
+%% Process signal with ASR
+[EEG.data,state] = asr_lfn(sig,EEG.srate,state,winSz,winSz/2,stepSz,dimsPCA,maxMem,doGPU);
+EEG.data(:,1:size(state.carry,2)) = []; % Shift signal content back (to compensate for processing delay)
+if EEG.pnts == width(EEG.data)-sigSz
+    EEG.data(:,EEG.pnts+1:end) = [];
 end
 
-% shift signal content back (to compensate for processing delay)
-EEG.data(:,1:size(state.carry,2)) = [];
-end
+
 
 
 %%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%% Main ASR processing 
-function [outdata,outstate] = asr_lfn(data,srate,state,windowlen,lookahead,stepsize,maxdims,maxmem,usegpu)
+
+%% Clean windows %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [EEG,sample_mask] = cleanWindows_lfn(EEG,refMaxBadChs,refTols,refWinSz,...
+    winOverlap,refMaxDropout,refMinClean,truncQuant,stepSizes,shapeRange)
+% Remove periods with abnormally high-power content from continuous data.
+% [Signal,Mask] = clean_windows(Signal,MaxBadChannels,PowerTolerances,WindowLength,WindowOverlap,MaxDropoutFraction,Min)
+%
+% This function cuts segments from the data which contain high-power artifacts. Specifically,
+% only windows are retained which have less than a certain fraction of "bad" channels, where a channel
+% is bad in a window if its power is above or below a given upper/lower threshold (in standard 
+% deviations from a robust estimate of the EEG power distribution in the channel).
+%
+% In:
+%   Signal         : Continuous data set, assumed to be appropriately high-passed (e.g. >1Hz or
+%                    0.5Hz - 2.0Hz transition band)
+%
+%   MaxBadChannels : The maximum number or fraction of bad channels that a retained window may still
+%                    contain (more than this and it is removed). Reasonable range is 0.05 (very clean
+%                    output) to 0.3 (very lax cleaning of only coarse artifacts). Default: 0.2.
+%
+%   PowerTolerances: The minimum and maximum standard deviations within which the RMS of a channel
+%                    must lie (relative to a robust estimate of the clean EEG RMS distribution in 
+%                    the channel) for it to be considered "not bad". Default: [-3.5 5].
+%
+%   The following are detail parameters that usually do not have to be tuned. If you can't get
+%   the function to do what you want, you might consider adapting these to your data.
+%
+%   WindowLength    : Window length that is used to check the data for artifact content. This is 
+%                     ideally as long as the expected time scale of the artifacts but not shorter 
+%                     than half a cycle of the high-pass filter that was used. Default: 1.
+%
+%   WindowOverlap : Window overlap fraction. The fraction of two successive windows that overlaps.
+%                   Higher overlap ensures that fewer artifact portions are going to be missed (but
+%                   is slower). (default: 0.66)
+% 
+%   MaxDropoutFraction : Maximum fraction that can have dropouts. This is the maximum fraction of
+%                        time windows that may have arbitrarily low amplitude (e.g., due to the
+%                        sensors being unplugged). (default: 0.1)
+%
+%   MinCleanFraction : Minimum fraction that needs to be clean. This is the minimum fraction of time
+%                      windows that need to contain essentially uncontaminated EEG. (default: 0.25)
+%
+%   
+%   The following are expert-level parameters that you should not tune unless you fully understand
+%   how the method works.
+%
+%   TruncateQuantile : Truncated Gaussian quantile. Quantile range [upper,lower] of the truncated
+%                      Gaussian distribution that shall be fit to the EEG contents. (default: [0.022 0.6])
+%
+%   StepSizes : Grid search stepping. Step size of the grid search, in quantiles; separately for
+%               [lower,upper] edge of the truncated Gaussian. The lower edge has finer stepping
+%               because the clean data density is assumed to be lower there, so small changes in
+%               quantile amount to large changes in data space. (default: [0.01 0.01])
+%
+%   ShapeRange : Shape parameter range. Search range for the shape parameter of the generalized
+%                Gaussian distribution used to fit clean EEG. (default: 1.7:0.15:3.5)
+%
+% Out:
+%   Signal : data set with bad time periods removed.
+%
+%   Mask   : mask of retained samples (logical array)
+%
+%                                Christian Kothe, Swartz Center for Computational Neuroscience, UCSD
+%                                2010-07-06
+
+% Input validation
+if isempty(refMaxBadChs); refMaxBadChs = 0.2; end
+if isempty(refTols); refTols = [-3.5 5]; end
+if isempty(refWinSz); refWinSz = 1; end
+if isempty(winOverlap); winOverlap = 0.66; end
+if isempty(refMaxDropout); refMaxDropout = 0.1; end
+if isempty(refMinClean); refMinClean = 0.25; end
+if isempty(truncQuant); truncQuant = [0.022 0.6]; end
+if isempty(stepSizes); stepSizes = [0.01 0.01]; end
+if isempty(shapeRange); shapeRange = 1.7:0.15:3.5; end
+if ~isempty(refMaxBadChs) && refMaxBadChs > 0 && refMaxBadChs < 1 %#ok<*NODEF>
+    refMaxBadChs = round(size(EEG.data,1)*refMaxBadChs); end
+
+% Initialize
+[C,S] = size(EEG.data);
+N = refWinSz*EEG.srate;
+wnd = 0:N-1;
+offsets = round(1:N*(1-winOverlap):S-N);
+
+% Time window rejection for each channel...
+fprintf('Determining time window rejection thresholds...');
+for c = C:-1:1
+    % Compute RMS amplitude for each window...
+    X = EEG.data(c,:).^2;
+    X = sqrt(sum(X(bsxfun(@plus,offsets,wnd')))/N);
+
+    % Robustly fit a distribution to the clean EEG part
+    [mu,sig] = fit_eeg_distribution(X,refMinClean,refMaxDropout,truncQuant,stepSizes,shapeRange);
+
+    % Calculate z scores relative to that
+    wz(c,:) = (X - mu)/sig;
+end
+wz = sort(wz); % Sort z scores into quantiles
+disp('done.');
+
+% Determine which windows to remove
+remove_mask = false(1,size(wz,2));
+if max(refTols)>0
+    remove_mask(wz(end-refMaxBadChs,:) > max(refTols)) = true; end
+if min(refTols)<0
+    remove_mask(wz(1+refMaxBadChs,:) < min(refTols)) = true; end
+removed_windows = find(remove_mask);
+
+% Find indices of samples to remove
+removed_samples = repmat(offsets(removed_windows)',1,length(wnd))+repmat(wnd,length(removed_windows),1);
+sample_mask = true(1,S); % mask them out
+sample_mask(removed_samples(:)) = false;
+fprintf('Keeping %.1f%% (%.0f seconds) of the data.\n',100*(mean(sample_mask)),nnz(sample_mask)/EEG.srate);
+
+% Determine intervals to retain
+retain_data_intervals = reshape(find(diff([false sample_mask false])),2,[])';
+retain_data_intervals(:,2) = retain_data_intervals(:,2)-1;
+
+% Apply selection
+try
+    EEG = pop_select(EEG,'point',retain_data_intervals);
+    EEG = eeg_checkset(EEG,'eventconsistency');
+catch e
+    if ~exist('pop_select','file')
+        disp('Apparently you do not have EEGLAB''s pop_select() on the path.');
+    else
+        disp('Could not select time windows using EEGLAB''s pop_select(); details: ');
+        hlp_handleerror(e,1);
+    end
+    warning('Falling back to a basic substitute and dropping signal meta-data.');
+    EEG.data = EEG.data(:,sample_mask);
+    EEG.pnts = size(EEG.data,2);
+    EEG.xmax = EEG.xmin + (EEG.pnts-1)/EEG.srate;    
+    [EEG.event,EEG.urevent,EEG.epoch,EEG.icaact,EEG.reject,EEG.stats,EEG.specdata,EEG.specicaact] = deal(EEG.event([]),EEG.urevent([]),[],[],[],[],[],[]);
+end
+% if isfield(signal.etc,'clean_sample_mask')
+%     signal.etc.clean_sample_mask(signal.etc.clean_sample_mask) = sample_mask;
+% else
+%     signal.etc.clean_sample_mask = sample_mask;
+% end
+if isfield(EEG.etc,'clean_sample_mask')
+    oneInds = find(EEG.etc.clean_sample_mask == 1);
+    if length(oneInds) == length(sample_mask)
+        EEG.etc.clean_sample_mask(oneInds) = sample_mask;
+    else
+        disp('Warning: EEG.etc.clean_sample is present. It is overwritten.');
+    end
+else
+    EEG.etc.clean_sample_mask = sample_mask;
+end
+
+
+
+
+%% Main ASR processing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [data,state] = asr_lfn(data,fs,state,winSz,lookahead,stepSz,dimsPCA,maxMem,doGPU)
 % Processing function for the Artifact Subspace Reconstruction (ASR) method.
 % [Data,State] = asr_process(Data,SamplingRate,State,WindowLength,LookAhead,StepSize,MaxDimensions,MaxMemory,UseGPU)
 %
@@ -247,174 +509,114 @@ function [outdata,outstate] = asr_lfn(data,srate,state,windowlen,lookahead,steps
 %
 %   State : final filter state (can be passed in for subsequent calls)
 %
-
+%
 % History
 % 03/20/2019 Makoto and Chiyuan. Supported 'availableRAM_GB'. GUI switched to GUIDE-made.
 % 08/31/2012 Christian. Created.
-%
 %                                Christian Kothe, Swartz Center for Computational Neuroscience, UCSD
 %                                2012-08-31
 
-% UC Copyright Notice
-% This software is Copyright (C) 2013 The Regents of the University of California. All Rights Reserved.
-%
-% Permission to copy, modify, and distribute this software and its documentation for educational,
-% research and non-profit purposes, without fee, and without a written agreement is hereby granted,
-% provided that the above copyright notice, this paragraph and the following three paragraphs appear
-% in all copies.
-%
-% Permission to make commercial use of this software may be obtained by contacting:
-% Technology Transfer Office
-% 9500 Gilman Drive, Mail Code 0910
-% University of California
-% La Jolla, CA 92093-0910
-% (858) 534-5815
-% invent@ucsd.edu
-%
-% This software program and documentation are copyrighted by The Regents of the University of
-% California. The software program and documentation are supplied "as is", without any accompanying
-% services from The Regents. The Regents does not warrant that the operation of the program will be
-% uninterrupted or error-free. The end-user understands that the program was developed for research
-% purposes and is advised not to rely exclusively on the program for any reason.
-%
-% IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
-% SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF
-% THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE
-% POSSIBILITY OF SUCH DAMAGE. THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
-% INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
-% PARTICULAR PURPOSE. THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE UNIVERSITY OF
-% CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
-% MODIFICATIONS.
+% Input validation
+if isempty(data); return; end
+if isempty(winSz); winSz = 0.5; end
+if isempty(lookahead); lookahead=winSz/2; end
+if isempty(stepSz); stepSz = 32; end
+if isempty(dimsPCA); dimsPCA = 0.66; end
+if isempty(doGPU); doGPU = false; end
+if dimsPCA<1; dimsPCA = round(ec_rank(data')*dimsPCA); end
 
-if nargin < 4 || isempty(windowlen)
-    windowlen = 0.5; end
-windowlen = max(windowlen,1.5*size(data,1)/srate);
-if nargin < 5 || isempty(lookahead)
-    lookahead = windowlen/2; end
-if nargin < 6 || isempty(stepsize)
-    stepsize = 32; end
-if nargin < 7 || isempty(maxdims)
-    maxdims = 0.66; end
-if nargin < 9 || isempty(usegpu)
-    usegpu = false; end
-if nargin < 8 || isempty(maxmem)
-    %     if usegpu
-    %         dev = gpuDevice(); maxmem = dev.FreeMemory/2^20;
-    %     else
-    %         maxmem = hlp_memfree/(2^21); % In MB? (if 2^20) Probably because in the subsequent moving average process, you'll need to secure double amount of data.
-    %     end
-end
-if usegpu
-    try reset(gpuDevice()); catch;end
-    dev = gpuDevice();
-    maxmem = dev.AvailableMemory;
-else
-    maxmem = memfree_lfn; % In MB? (if 2^20) Probably because in the subsequent moving average process, you'll need to secure double amount of data.
-end
-
-if maxdims < 1
-    maxdims = round(size(data,1)*maxdims); end
-if isempty(data)
-    outdata = data; outstate = state; return; end
-
+%% Prep
 [C,S] = size(data);
-N = round(windowlen*srate);
-P = round(lookahead*srate);
-[T,M,A,B] = deal(state.T,state.M,state.A,state.B); % T, threshold; M, mixing matrix from the calibration data (sqrt of covariance matrix), IIR filter, IIR filter
+N = round(winSz*fs);
+P = round(lookahead*fs);
+[T,M,A,B] = deal(state.T,state.M,state.A,state.B); % T, threshold; M, mixing matrix from the calibration data (sqrt of covariance matrix), IIR filter, IIR filter 
 
-% initialize prior filter state by extrapolating available data into the past (if necessary)
+% Initialize prior filter state by extrapolating available data into the past (if necessary)
 if isempty(state.carry)
     state.carry = repmat(2*data(:,1),1,P) - data(:,1+mod(((P+1):-1:2)-1,S)); end
-
 data = [state.carry data];
 data(~isfinite(data(:))) = 0;
 
-% split up the total sample range into k chunks that will fit in memory
-% if maxmem*1024*1024 - C*C*P*8*3 < 0
-%     disp('Memory too low, increasing it (rejection block size now depends on available memory so it might not be 100% reproducible)...');
-%     maxmem = memfree_lfn/(2^21);
-%     if maxmem*1024*1024 - C*C*P*8*3 < 0
-%     	error('Not enough memory');
-%     end
-% end
-%splits = ceil((C*C*S*8*8 + C*C*8*S/stepsize + C*S*8*2 + S*8*5) / (maxmem*1024*1024 - C*C*P*8*3)); % Mysterious. More memory available, less 'splits'
-x_sz = whos('data');
-x_sz = x_sz.bytes;
-splits = ceil(maxmem/x_sz*8);
-if splits > 1
-    fprintf('Now cleaning data in %i blocks',splits); end
-
-for i=1:splits
-    range = 1+floor((i-1)*S/splits) : min(S,floor(i*S/splits)); %
-    if ~isempty(range)
-        % get spectrally shaped data X for statistics computation (range shifted by lookahead)
-        [X,state.iir] = filter(B,A,double(data(:,range+P)),state.iir,2);
-        % move it to the GPU if applicable
-        if usegpu && length(range) > 1000
-            try X = gpuArray(X); catch,end; end
-        % compute running mean covariance (assuming a zero-mean signal)
-        [Xcov,state.cov] =...
-            moving_average(N,reshape(reshape(X,1,C,[]).*reshape(X,C,1,[]),C*C,[]),state.cov);
-        %[Xcov,state.cov] = moving_average(N,reshape(bsxfun(@times,reshape(X,1,C,[]),reshape(X,C,1,[])),C*C,[]),state.cov); % ch c ch x range.
-
-        % extract the subset of time points at which we intend to update
-        update_at = min(stepsize:stepsize:(size(Xcov,2)+stepsize-1),size(Xcov,2));
-        % if there is no previous R (from the end of the last chunk), we estimate it right at the first sample
-        if isempty(state.last_R)
-            update_at = [1 update_at];
-            state.last_R = eye(C);
-        end
-        Xcov = reshape(Xcov(:,update_at),C,C,[]);
-        if isgpuarray(Xcov)
-            Xcov = gather(Xcov); end
-        % do the reconstruction in intervals of length stepsize (or shorter if at the end of a chunk)
-        last_n = 0;
-        for j=1:length(update_at)
-            % do a PCA to find potential artifact components
-            [V,D] = eig(Xcov(:,:,j));
-            [D,order] = sort(reshape(diag(D),1,C)); V = V(:,order);
-            % determine which components to keep (variance below directional threshold or not admissible for rejection)
-            keep = D<sum((T*V).^2) | (1:C)<(C-maxdims);
-            trivial = all(keep);
-            % update the reconstruction matrix R (reconstruct artifact components using the mixing matrix)
-            if ~trivial
-                R = real(M*pinv(keep'.*V'*M)*V');
-            else
-                R = eye(C);
-            end
-            % apply the reconstruction to intermediate samples (using raised-cosine blending)
-            n = update_at(j);
-            if ~trivial || ~state.last_trivial
-                subrange = range((last_n+1):n);
-                blend = (1-cos(pi*(1:(n-last_n))/(n-last_n)))/2;
-                %data(:,subrange) = bsxfun(@times,blend,R*data(:,subrange)) + bsxfun(@times,1-blend,state.last_R*data(:,subrange));
-                data(:,subrange) = blend.*(R*data(:,subrange)) +...
-                    (1-blend).*(state.last_R*data(:,subrange));
-            end
-            [last_n,state.last_R,state.last_trivial] = deal(n,R,trivial);
-        end
+% Split up the total sample range into k chunks that will fit in memory
+if maxMem*1024*1024 - C*C*P*8*3 < 0
+    disp('Memory too low, increasing it (rejection block size now depends on available memory so it might not be 100% reproducible)...');
+    maxMem = maxMem/(2^21);
+    if maxMem*1024*1024 - C*C*P*8*3 < 0
+    	error('Not enough memory');
     end
-    if splits > 1
-        fprintf('.'); end
 end
-if splits > 1
-    fprintf('\n'); end
+splits = ceil((C*C*S*8*8 + C*C*8*S/stepSz + C*S*8*2 + S*8*5) / (maxMem*1024*1024 - C*C*P*8*3)); % Mysterious. More memory available, less 'splits'
 
-% carry the look-ahead portion of the data over to the state (for successive calls)
+%% Clean data across blocks
+fprintf('Now cleaning data in %i blocks',splits);
+for ii = 1:splits
+    range = 1+floor((ii-1)*S/splits):min(S,floor(ii*S/splits));
+    if isempty(range); continue; end
+
+    % Get spectrally shaped data X for statistics computation (range shifted by lookahead)
+    [X,state.iir] = filter(B,A,data(:,range+P),state.iir,2);
+
+    %%% GPU computations if applicable %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if doGPU && length(range)>1000; X = gpuArray(X); end
+
+    % Compute running mean covariance (assuming a zero-mean signal)
+    [Xcov,state.cov] = movingAvg_lfn(N,reshape(bsxfun(@times,reshape(X,1,C,[]),reshape(X,C,1,[])),C*C,[]),state.cov); % ch c ch x range.
+    
+    % Extract the subset of time points at which we intend to update
+    update_at = min(stepSz:stepSz:(size(Xcov,2)+stepSz-1),size(Xcov,2));
+    if isempty(state.last_R) % If there is no previous R (from the end of the last chunk), 
+        update_at = [1 update_at]; % we estimate it right at the first sample
+        state.last_R = eye(C);
+    end
+    Xcov = reshape(Xcov(:,update_at),C,C,[]);
+    if isgpuarray(Xcov); Xcov=gather(Xcov); end
+    %%% Back to CPU %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    % Do the reconstruction in intervals of length stepsize (or shorter if at the end of a chunk)
+    last_n = 0;
+    for j = 1:length(update_at)
+        % Do a PCA to find potential artifact components
+        [V,D] = eig(Xcov(:,:,j));
+        [D,order] = sort(reshape(diag(D),1,C)); V = V(:,order);
+
+        % Determine which components to keep (variance below directional threshold or not admissible for rejection)
+        keep = D<sum((T*V).^2) | (1:C)<(C-dimsPCA); trivial = all(keep);
+
+        % Update the reconstruction matrix R (reconstruct artifact components using the mixing matrix)
+        if ~trivial
+            R = real(M*pinv(bsxfun(@times,keep',V'*M))*V');
+        else
+            R = eye(C);
+        end
+
+        % Apply the reconstruction to intermediate samples (using raised-cosine blending)
+        n = update_at(j);
+        if ~trivial || ~state.last_trivial
+            subrange = range((last_n+1):n);
+            blend = (1-cos(pi*(1:(n-last_n))/(n-last_n)))/2;
+            data(:,subrange) = bsxfun(@times,blend,R*data(:,subrange)) + bsxfun(@times,1-blend,state.last_R*data(:,subrange));
+        end
+        [last_n,state.last_R,state.last_trivial] = deal(n,R,trivial);
+    end
+    fprintf('.');
+end
+fprintf('\n');
+
+% Carry the look-ahead portion of the data over to the state (for successive calls)
 state.carry = [state.carry data(:,(end-P+1):end)];
 state.carry = state.carry(:,(end-P+1):end);
 
-% finalize outputs
-outdata = data(:,1:(end-P));
-if isgpuarray(state.cov)
-    state.iir = gather(state.iir);
-    state.cov = gather(state.cov);
+% Finalize outputs (gather remaining GPU data)
+fNames = string(fieldnames(state));
+for ii = 1:length(fNames)
+    if isgpuarray(state.(fNames(ii))); state.(fNames(ii))=gather(state.(fNames(ii))); end
 end
-outstate = state;
-end
+if isgpuarray(data); data=gather(data); end
+
+
 
 %% Moving average subfuntion
-function [X,Zf] = moving_average(N,X,Zi)
+function [X,Zf] = movingAvg_lfn(N,X,Zi)
 % Run a moving-average filter along the second dimension of the data.
 % [X,Zf] = moving_average(N,X,Zi)
 %
@@ -426,33 +628,21 @@ function [X,Zf] = moving_average(N,X,Zi)
 % Out:
 %   X : the filtered data
 %   Zf : final filter conditions
-%
-%                           Christian Kothe, Swartz Center for Computational Neuroscience, UCSD
-%                           2012-01-10
 
+% Pre-pend initial state & get dimensions
 if nargin <= 2 || isempty(Zi)
     Zi = zeros(size(X,1),N); end
+Y = [Zi X];
+M = size(Y,2);
 
-% pre-pend initial state & get dimensions
-Y = [Zi X]; M = size(Y,2);
-% get alternating index vector (for additions & subtractions)
-I = [1:M-N; 1+N:M];
-% get sign vector (also alternating, and includes the scaling)
-S = [-ones(1,M-N); ones(1,M-N)]/N;
-% run moving average
-X = cumsum(Y(:,I(:)).*S(:)',2);
-%X = cumsum(bsxfun(@times,Y(:,I(:)),S(:)'),2);
-
-% read out result
-X = X(:,2:2:end);
-
+% Calculate
+I = [1:M-N; 1+N:M]; % get alternating index vector (for additions & subtractions)
+S = [-ones(1,M-N); ones(1,M-N)]/N; % get sign vector (also alternating, and includes the scaling)
+X = cumsum(bsxfun(@times,Y(:,I(:)),S(:)'),2); % run moving average
+X = X(:,2:2:end); % read out result
 if nargout > 1
-    Zf = [-(X(:,end)*N-Y(:,end-N+1)) Y(:,end-N+2:end)]; end
+    Zf = [-(X(:,end)*N-Y(:,end-N+1)) Y(:,end-N+2:end)];
 end
 
 
-%% Memory
-function result = memfree_lfn
-% Get the amount of free physical memory, in bytes
-result = javaMethod('getFreePhysicalMemorySize', javaMethod('getOperatingSystemMXBean','java.lang.management.ManagementFactory'));
-end
+

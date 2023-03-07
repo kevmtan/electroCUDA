@@ -1,4 +1,4 @@
-function [x,w,r] = ec_detrend(x,order,thresh,niter,wsize,w,basis)
+function [n,x] = ec_detrend(n,x,w,arg)
 %% Robust detrending - wrapper for CPU processing
 %
 % INPUTS:
@@ -13,47 +13,362 @@ function [x,w,r] = ec_detrend(x,order,thresh,niter,wsize,w,basis)
 % Modified by: Kevin Tan, 2022 (kevmtan.github.io)
 %    - Added GPU support
 %    - Replaced bsxfun with implicit expansion operators (much faster)
-%    - Miscellaneous compute & readability enhancements 
+%    - Miscellaneous compute & readability enhancements
 
 %% Input validation
 arguments
-    x {mustBeFloat}                % Raw data
-    order {isnumeric} = 10         % Polynomial order (default=10)
-    thresh {isnumeric} = 3         % Outlier threshold (default=3)
-    niter {isnumeric} = 3          % Number of iterations (default=3)
-    wsize {isnumeric} = []         % Overlapping window size (default=[])
-    w logical = []                 % Pre-calculated weights
-    basis {istext} = 'polynomials' % Basis function
+    n struct                        % Metadata
+    x {mustBeFloat}                 % Raw data: x(frames,chans)|x(frames,chans,freqs)
+    w logical = false(size(x))      % Input weights: w(frames,chans)|w(frames,chans,freqs)
+    arg.missing {istext} = "linear" % Interpolation method for missing
+    arg.order (1,:){isfloat} = 10   % Polynomial order (can be vector of polynomials)
+    arg.thr (1,:){isfloat} = 3      % Outlier threshold (same size as order)
+    arg.itr (1,:){isfloat} = 3      % Number of iterations (same size as order)
+    arg.win (1,:){isfloat} = 0      % Window width (secs, 0=all) (same size as order)
+    arg.basis {mustBeMember(arg.basis,{'polynomials','sinusoids'})}...
+        = "polynomials"        % Basis function
+    arg.gpu (1,1){isfloat} = 0 % GPU: 0=disable, 1=Matlab, 2=CUDA (must compile: ec_compileBins)
+    arg.single logical = []    % Run in single-precision (true/false)
+    arg.tic uint64 = tic       % Output from 'tic'
+    arg.pcaThr = 1e-7; 
+    %arg.sfx {istext} = ""
+    %arg.sfxOg {istext} = ''
 end
-x = squeeze(x);
-dimsOg = size(x);
-if isany(w); w = squeeze(w); else; w = true(dimsOg); end
 
-% Concatenate into 2D if data has 3 or more dims
-if numel(dimsOg)>=3
-    x = x(:,:); 
-    w = w(:,:);
-end
-
-% Column-major array layout has best performance (columns = frames or timepoints)
-if length(x)<width(x); x = x'; end
-if length(w)<width(w); w = w'; end
+%% Prep
+if issparse(w); w=full(w); end
+if isempty(w)||isscalar(w); w=false(size(x)); end
+if ~isequal(size(x),size(w)); error("ec_detrend: data must be same size as weights"); end
+if length(x)<width(x); x=x'; w=w'; warning("ec_detrend: converted to column-major arrays"); end
+if all(w,'all'); w=false(size(w)); warning("ec_detrend: all outliers, resetting..."); end
+if arg.gpu && isempty(arg.single); arg.single=true; end
+%if arg.gpu; try reset(gpuDevice()); catch;end;end
+if ~isfield(n,'xBad'); n.xBad=table; end
+runs = n.runs;
+nRuns = numel(runs);
+reps = nnz(arg.order);
+pcaThr = arg.pcaThr;
+%basis = string(arg.basis); %#ok<NASGU> 
 dims = size(x);
 nChs = dims(2);
-r = cell(nChs,1);
-
-% Expand pre-computed weights if only 1D
-if size(w,2)==1; w = repmat(w,1,dims(2)); end
-try parpool('threads'); catch;end
-
-%% Call computational functions - parfor loop across channels 
-parfor ch = 1:nChs
-    [x(:,ch),w(:,ch),r{ch}] = ec_detrendCompute(x(:,ch),order,thresh,niter,wsize,w(:,ch),basis);
+if length(dims) < 3
+    nFrq = 1;
+else
+    nFrq = dims(3);
 end
 
-% Revert to original dimensions if 3 or more dims
-if numel(dimsOg)>=3
-    x = reshape(x,dimsOg);
-    w = reshape(w,dimsOg);
+% Options per rep
+if numel(arg.thr)~=reps; thr=repmat(arg.thr,1,reps); else; thr=arg.thr; end
+if numel(arg.itr)~=reps; itr=repmat(arg.itr,1,reps); else; itr=arg.itr; end
+if numel(arg.win)~=reps; win=repmat(arg.win,1,reps); else; win=arg.win; end
+if any(win,"all"); win=floor(win.*n.fs); end
+ord = arg.order;
+
+% Convert to single if requested
+if arg.single
+    ord=single(ord); thr=single(thr); itr=single(itr); win=single(win); pcaThr=single(pcaThr);
+    x = single(x); 
+    w = single(~w); % convert outlier mask
+else
+    w = double(~w); % convert outlier mask
 end
+
+%% Interpolate missing
+rIdx = cell(nRuns,1);
+for ir = 1:nRuns
+    rIdx{ir} = n.runIdx(ir,1):n.runIdx(ir,2); % Run indices
+    if any(ismissing(x(rIdx{ir},:,:)),"all")
+        x(rIdx{ir},:,:) = fillmissing(x(rIdx{ir},:,:),arg.missing,1);
+        disp("Interpolated missing: "+runs(ir)+" time="+toc(tt));
+    end
+end
+
+%% Detrend
+if arg.gpu && length(dims)<=2 && ~any(win,"all") % TODO: 3d detrend
+    if arg.gpu==1     % Matlab gpuArray
+        rIdx = n.runIdxOg(:,2);
+        [x,w,olPct] = detrendGPU_lfn(x,w,rIdx,ord,thr,itr,win,pcaThr);
+    elseif arg.gpu==2 % CUDA binary
+        [x,w,olPct] = detrendCUDA_lfn(x,w,rIdx,ord,thr,itr,arg);
+    end
+else
+    % CPU parallel threadpool
+    olPct = nan(nChs,reps,"like",x);
+    try parpool('Threads'); catch;end
+    parfor ch = 1:nChs
+        for f = 1:nFrq
+            [x(:,ch,f),w(:,ch,f),olPct(ch,f)] =...
+                detrendCPU_lfn(x(:,ch,f),w(:,ch,f),rIdx,ord,thr,itr,win,pcaThr);
+        end
+    end
+end
+
+%% Final
+olPct = sum(olPct,1,"omitnan")/numel(w);
+for ii = 1:reps
+    disp("Robust detrended: order="+ord(ii)+" ol="+olPct(ii)); % Display percent outliers
+end
+toc(arg.tic);
+
+% Save
+n.xBad.detrend = sparse(logical(~w));
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%% Detrend with CPU %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [xCh,wCh,olPct] = detrendCPU_lfn(xCh,wCh,rIdx,ord,thr,itr,win,pcaThr)
+xCh=squeeze(xCh); wCh=squeeze(wCh);
+if ~nnz(wCh); wCh(:)=1; end
+nRuns = height(rIdx);
+reps = length(ord);
+olPct = nan(nRuns,reps);
+
+% Detrend within-run to avoid edge artifacts
+for ir = 1:nRuns
+    xr = xCh(rIdx{ir},:);
+    wr = wCh(rIdx{ir},:);
+    nFrames = height(xr);
+
+    % Loop across unique polynomials
+    for ii = 1:reps
+        iOrd=ord(ii); iThr=thr(ii); iItr=itr(ii); iWin=win(ii);
+        if ~iWin
+            % Standard detrending (trend fit to entire data)
+            regs = regsFromBasis_lfn(nFrames,iOrd);
+            [xr,wr] = detrend_lfn(xr,wr,regs,iThr,iItr,pcaThr);
+        else
+            % Overlapping window detrending
+            [xr,wr] = detrendWin_lfn(xr,wr,iOrd,iThr,iItr,iWin,pcaThr);
+        end
+        olPct(ir,ii) = nnz(~wr);
+    end
+
+    % Copy back run data
+    xCh(rIdx{ir},:) = xr;
+    wCh(rIdx{ir},:) = wr;
+end
+olPct = sum(olPct,1,"omitnan");
+
+
+
+
+%% Detrend with Matlab gpuArray %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,w,olPct] = detrendGPU_lfn(x,w,ri,ord,thr,itr,win,pcaThr)
+x = mat2cell(x,ri);
+w = mat2cell(w,ri);
+
+% Copy to GPU
+thr=gpuArray(thr); itr=gpuArray(itr); win=gpuArray(win); ord=gpuArray(ord);
+ri=gpuArray(ri); nRuns=gpuArray(numel(x)); reps=gpuArray(numel(ord)); pcaThr=gpuArray(pcaThr);
+olPct = gpuArray(nan(nRuns,reps));
+
+% Detrend within-run to avoid edge artifacts
+for ir = 1:nRuns
+    xr = num2cell(gpuArray(x{ir}),1);
+    wr = num2cell(gpuArray(w{ir}),1);
+
+    % Run detrend (loop across polynomial orders)
+    for ii = 1:reps
+        iOrd=ord(ii); iThr=thr(ii); iItr=itr(ii); iWin=win(ii);
+        if ~iWin % Detrend entire run
+            nFrames = ri(ir);
+            regs = regsFromBasis_lfn(nFrames,iOrd); % Weighted regression
+            [xr,wr] = arrayfun(@(x,w) detrend_lfn(x{:},w{:},regs,iThr,iItr,pcaThr),...
+                xr,wr,'UniformOutput',false); % Standard detrending (trend fit to entire data)
+        else % Detrend windows within run
+            [xr,wr] = arrayfun(@(x,w) detrendWin_lfn(x{:},w{:},iOrd,iThr,iItr,iWin,pcaThr),...
+                xr,wr,'UniformOutput',false);
+        end
+
+        olPct(ir,ii) = sum(arrayfun(@(w) nnz(~w{:}),wr));
+    end
+
+    % Copy back run data
+    x{ir} = gather(horzcat(xr{:}));
+    w{ir} = gather(horzcat(wr{:}));
+end
+x = vertcat(x{:});
+w = vertcat(w{:});
+olPct = gather(olPct);
+
+
+%% Detrend with GPU CUDA binary %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,w,olPct] = detrendCUDA_lfn(x,w,rIdx,ord,thr,itr,arg)
+nRuns = height(rIdx);
+reps = numel(ord);
+olPct = nan(nRuns,reps);
+
+% Detrend within-run to avoid edge artifacts
+for ir = 1:nRuns
+    xr = x(rIdx{ir},:);
+    wr = w(rIdx{ir},:);
+
+    % Run detrend (for each polynomial order)
+    if arg.single
+        [xr,wr,olPct(ir,:)] = ecc_detr_mex32(xr,wr,ord,thr,itr); % single-precision
+    else
+        [xr,wr,olPct(ir,:)] = ecc_detr_mex64(xr,wr,ord,thr,itr); % double-precision
+    end
+
+    % Copy back run data
+    x(rIdx{ir},:) = xr;
+    w(rIdx{ir},:) = wr;
+end
+
+
+
+%% Standard detrending (trend fit to entire data) %%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,w] = detrend_lfn(x,w,r,iThr,iItr,pcaThr)
+% The data are fit to the basis using weighted least squares. The weight is
+% updated by setting samples for which the residual is greater than 'thresh'
+% times its std to zero, and the fit is repeated at most 'niter'-1 times.
+%
+% The choice of order (and basis) determines what complexity of the trend
+% that can be removed.  It may be useful to first detrend with a low order
+% to avoid fitting outliers, and then increase the order.
+%
+% The tricky bit is to ensure that weighted means are removed before
+% calculating the regression (see nt_regw).
+
+% Detrend per polynomial order
+for ii = 1:iItr
+    % Weighted regression
+    z = regw_lfn(x,w,r,pcaThr); % Discard dimensions of r with eigenvalue lower than pcaThr
+
+    % Find outliers
+    d = (x-z).*w;
+    thrItr = iThr*std(d,"omitnan");
+    w(abs(d)>thrItr) = 0; % update weights
+end
+
+% Remove trends
+x = x-z;
+
+
+
+%% Detrend across overlapping time windows %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [y,w] = detrendWin_lfn(x,w,iOrd,iThr,iItr,iWin,pcaThr)
+dims = ones(1,1,'like',x) * size(x);
+y = zeros(dims,'like',x);
+
+% 1) divide into windows, 2) detrend each, 3) stitch together, 4) estimate w
+for iIter = 1:iItr
+    trend = zeros(dims,'like',x);
+    a = zeros(dims(1),1,'like',x);
+    offset = zeros(1,'like',x);
+    while true
+        start = offset+1;
+        stop = min(dims(1),offset+iWin);
+
+        % if not enough valid samples grow window:
+        counter = 5;
+        while any(sum(min(w(start:stop),2))) < iWin
+            if counter <= 0 ; break; end
+            start = max(1,start-iWin/2);
+            stop = min(dims(1),stop+iWin/2);
+            counter = counter-1;
+        end
+        if rem(stop-start+1,2)==1; stop = stop-1; end
+        wsize2 = stop-start+1;
+
+        % detrend this window
+        regs = regsFromBasis_lfn(length(start:stop),iOrd);
+        yy = detrend_lfn(x(start:stop,:),w(start:stop,:),regs,iThr,1,pcaThr);
+
+        % triangular weighting
+        if start==1
+            b = [ones(1,wsize2/2,'like',x)*wsize2/2, wsize2/2:-1:1]';
+        elseif stop==dims(1)
+            b = [1:wsize2/2, ones(1,wsize2/2,'like',x)*wsize2/2]';
+        else
+            b = [1:wsize2/2, wsize2/2:-1:1]';
+        end
+
+        % overlap-add to output
+        y(start:stop,:) = y(start:stop,:) + (yy.*b); %bsxfun(@times,yy,b);
+        trend(start:stop,:) = trend(start:stop,:) + (x(start:stop,:)-yy).*b; %bsxfun(@times,x(start:stop,:)-yy,b);
+        a(start:stop,1) = a(start:stop)+b;
+        offset = offset+iWin/2;
+        if offset > dims(1)-iWin/2; break; end
+    end
+
+    if stop<dims(1) % last sample can be missed
+        y(end,:) = y(end-1,:);
+        a(end,:) = a(end-1,:);
+    end
+    y = y.*(1./a); %bsxfun(@times,y,1./a);
+    y(isnan(y)) = 0;
+    trend = trend.*(1./a); %bsxfun(@times,trend,1./a);
+    trend(isnan(trend)) = 0;
+
+    % Find outliers
+    d = (x-trend).*w;
+    thrItr = iThr*std(d);
+    w(abs(d)>thrItr) = 0; % update weights
+end
+
+
+
+%% Get regressors from basis function (CPU) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function regs = regsFromBasis_lfn(nFrames,iOrd)
+regs = zeros(nFrames,iOrd,'like',iOrd);
+if isgpuarray(iOrd)
+    lin = gpuArray.linspace(-1,1,nFrames);
+else
+    lin = linspace(-1,1,nFrames);
+end
+for k = 1:iOrd
+    regs(:,k) = lin.^k;
+end
+% if basis=="polynomials"
+%     regs = zeros(nFrames,iOrd,'like',iOrd);
+%     lin = linspace(-1,1,nFrames);
+%     for k = iOrd
+%         regs(:,k) = lin.^k;
+%     end
+% elseif basis=="sinusoids"
+%     regs = zeros(nFrames,iOrd*2,'like',iOrd);
+%     lin = linspace(-1,1,nFrames);
+%     for k = 1:iOrd
+%         regs(:,2*k-1) = sin(2*pi*k*lin/2);
+%         regs(:,2*k) = cos(2*pi*k*lin/2);
+%     end
+% else
+%     error("ec_detrend: basis must be 'polynomials' or 'sinusoids'");
+% end
+
+
+
+
+%% Weighted Regression %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function z = regw_lfn(x,w,r,pcaThr)
+%  b: regression matrix (apply to r to approximate x)
+%  z: regression (r*b)
+
+% Save weighted mean
+mn = x - demean_lfn(x,w);
+
+% Fit weighted regression
+x = demean_lfn(x,w).* w;
+r = demean_lfn(r,w); % remove channel-specific-weighted mean from regressor
+rr = r.*w;
+[V,D] = eig(rr'*rr);
+D = diag(D); %V=real(V); D=real(diag(D));
+D = D/max(D);
+V = V(:,D>pcaThr); % discard weak dims
+rr = rr*V;
+b = ((x'*rr)/(rr'*rr))';
+z = r*(V*b) + mn;
+
+
+
+%% Demean %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,mn] = demean_lfn(x,w)
+
+mn = sum(x.*w,1) ./ (sum(w,1)+eps);
+x = x - mn;
 

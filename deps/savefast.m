@@ -32,12 +32,16 @@ if isempty(ext)
     filename = fullfile(filepath, [filebase '.mat']);
 end
 
-create_dummy = false;
+% Initial file
 if all(isnum)
     % Save a dummy variable, just to create the file
     dummy = 0;
     save(filename, '-v7.3', 'dummy');
-    create_dummy = true;
+
+    % Delete the dummy, just in case the user supplied a variable called dummy
+    fid = H5F.open(filename,'H5F_ACC_RDWR','H5P_DEFAULT');
+    H5L.delete(fid,'dummy','H5P_DEFAULT');
+    H5F.close(fid)
 else
     s = struct;
     for i = 1:numel(isnum)
@@ -46,14 +50,6 @@ else
         end
     end
     save(filename, '-v7.3', '-struct', 's');
-end
-
-% Delete the dummy, if necessary, just in case the user supplied a
-% variable called dummy
-if create_dummy
-    fid = H5F.open(filename,'H5F_ACC_RDWR','H5P_DEFAULT');
-    H5L.delete(fid,'dummy','H5P_DEFAULT');
-    H5F.close(fid);
 end
 
 % Save all numeric variables

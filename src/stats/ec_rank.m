@@ -14,7 +14,7 @@ if o.gpu && ~isgpuarray(x); x = gpuArray(x);end
 if o.gpu && ~isgpuarray(o.tol); o.tol = gpuArray(o.tol); end
 
 %% Better rank computation using covariance eigenvectors (Sven Hoffman)
-xEig = eig(cov(x,1,'partialrows'));
+xEig = eig(cov(x,1,"omitrows"));
 xRank = sum(xEig>o.tol);
 
 %% Matlab default rank computation 

@@ -90,5 +90,3 @@ else
         tw = sum(w(:));
     end       
 end
-end
-

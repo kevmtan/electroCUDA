@@ -1,4 +1,4 @@
-function [outdata,outstate, Y] = ec_ASR_r(data,srate,state,windowlen,lookahead,stepsize,maxdims,maxmem,usegpu)
+function [data,state, Y] = ec_ASR_r(data,srate,state,windowlen,lookahead,stepsize,maxdims,maxmem,usegpu)
 % Processing function for the Artifact Subspace Reconstruction (ASR) method.
 % [Data,State] = asr_process(Data,SamplingRate,State,WindowLength,LookAhead,StepSize,MaxDimensions,MaxMemory,UseGPU)
 %
@@ -115,8 +115,6 @@ end
 
 if maxdims < 1
     maxdims = round(size(data,1)*maxdims); end
-if isempty(data)
-    outdata = data; outstate = state; return; end
 
 [C,S] = size(data);
 %N = round(windowlen*srate);
@@ -225,9 +223,9 @@ state.carry = state.carry(:,(end-P+1):end);
 state.cov = Xcov;
 
 % finalize outputs
-outdata = data(:,1:(end-P));
-outstate = state;
-
+data = data(:,1:(end-P));
+% Shift signal content back (to compensate for processing delay)
+data(:,1:size(state.carry,2)) = [];
 
 %%
 function result = hlp_memfree

@@ -34,7 +34,7 @@
 %       imagesc(C);
 %       colorbar;
 %       colormap(cbrewer('YlOrRd', 256);
-%
+%f
 %   Example 2 (line plot):
 %       x = 0:0.01:2;
 %       sc = [0.5; 1; 2];

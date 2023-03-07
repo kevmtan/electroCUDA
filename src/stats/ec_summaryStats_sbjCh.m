@@ -23,6 +23,7 @@ if a.ICA && ~contains(a.sfx,"i"); a.sfx = a.sfx + "i"; end
 
 %% Calculate summary stats
 if a.stats
+    try parpool('Threads'); catch; end
     if a.type=="spec"
         spec_runStats(a,o,dirs);
     elseif a.type=="hfb-lfp"
@@ -34,6 +35,7 @@ end
 
 %% Make plots
 if ~a.stats && a.plot
+    try parpool('Processes'); catch; end
     if a.type=="spec"
         spec_runPlots(a,o,dirs);
     elseif a.type=="hfb-lfp"
@@ -56,7 +58,7 @@ tic;
 [ns,xs,psy,trialNfo,chNfo] = ec_loadSbj(dirs,a.sfx+"s"); toc;
 ns.suffix = a.sfx+"s";
 if a.ICA; ns.ICA=1; else; ns.ICA=0; end
-if a.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.badFrames; end %#ok<NASGU>
+if a.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 
 %% Initialize
 sbj = ns.sbj;
@@ -87,12 +89,12 @@ for i = 1:nBands
 end
 B.Properties.RowNames = B.name;
 
-% Get mean evoked magnitude per freq & cond
-ssFrq = nan(numel(conds),nChs,numel(ns.freqs));
+%% Get mean evoked magnitude per freq & cond
+fAvg = nan(numel(conds),nChs,numel(ns.freqs));
 for c = 1:numel(conds)
     idx = psy.stim & psy.cond==conds(c);
-    ssFrq(c,:,:) = squeeze(mean(xs(idx,:,:),1,'omitnan'));
-    %ssFrq(c,:,:) = normalize(ssFrq(c,:,:),3,'zscore','robust');
+    fAvg(c,:,:) = mean(xs(idx,:,:),1,'omitnan');
+    %fAvg(c,:,:) = normalize(fAvg(c,:,:),3,'zscore');
 end
 disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
@@ -160,18 +162,18 @@ end
 %% Initialize plotting
 if ~a.plot
     fn = o.dirOut+"plot_s"+sbjID+".mat";
-    savefast(fn,'xe','xhe','ssFrq','B','trialNfo');
+    savefast(fn,'xe','xhe','fAvg','B','trialNfo');
     disp("SAVED: "+fn);
 else
     try delete(gcp('nocreate')); catch; end
-    spec_runPlots(a,o,dirs,ss,xe,xhe,ssFrq,B,trialNfo);
+    spec_runPlots(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo);
     try delete(gcp('nocreate')); catch; end
 end
 end
 
 
 % Run spec plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function spec_runPlots(a,o,dirs,ss,xe,xhe,ssFrq,B,trialNfo)
+function spec_runPlots(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo)
 % Load
 ns = ec_loadSbj(dirs,a.sfx+"s","n");
 sbjID = ns.sbjID;
@@ -183,7 +185,7 @@ if nargin<=3
     load(fn,"ss"); disp("LOADED: "+fn);
 
     fn = o.dirOut+"plot_s"+sbjID+".mat";
-    load(fn,"xe","xhe","ssFrq","B","trialNfo"); disp("LOADED: "+fn);
+    load(fn,"xe","xhe","fAvg","B","trialNfo"); disp("LOADED: "+fn);
 end
 
 %% Prep
@@ -196,7 +198,7 @@ oP.freqs = ns.freqs;
 % oP.visible=1; oP.save=0; oP.doGPU=0;
 
 %% Parfor loop across channels/ICs
-try parpool('local2',24); catch; end
+try parpool('Processes'); catch; end
 parfor ch = 1:nChs
     % Load channel/IC info
     dCh = d;
@@ -205,7 +207,7 @@ parfor ch = 1:nChs
     % Load EEG stats/recordings
     xN = xNfo(ch,:);
     sc = ss(ch,:);
-    fCh = squeeze(ssFrq(:,ch,:));
+    fCh = squeeze(fAvg(:,ch,:));
     vars = string(sc.Properties.VariableNames);
     if any(vars=="ms"); sc.ms{1}.latency = sc.ms{1}.bin; end
     if any(vars=="RT"); sc.RT{1}.latency = sc.RT{1}.binRT; end
@@ -248,7 +250,7 @@ hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','tight');
 %% Legends
 nexttile;
 if a.ICA % Chan name
-    text(1,1,sbjCh+" ("+xN.ic+")",Interpreter='none',Units='normalized',FontSize=20,...
+    text(1,1,sbjCh+" ("+xN.order+")",Interpreter='none',Units='normalized',FontSize=20,...
         HorizontalAlignment='right',VerticalAlignment='top');
 else
     text(1,1,sbjCh,Interpreter='none',Units='normalized',FontSize=20,...
@@ -391,14 +393,13 @@ B.Properties.RowNames = B.name;
 B = B(["hfb" "lfp"],:);
 
 % % Get mean evoked magnitude per freq & cond
-% ssFrq = nan(numel(conds),nChs,numel(nh.freqs));
+% fAvg = nan(numel(conds),nChs,numel(nh.freqs));
 % for c = 1:numel(conds)
 %     idx = psy.stim & psy.cond==conds(c);
-%     ssFrq(c,:,:) = squeeze(mean(xh(idx,:,:),1,'omitnan'));
-%     %ssFrq(c,:,:) = normalize(ssFrq(c,:,:),3,'zscore','robust');
+%     fAvg(c,:,:) = squeeze(mean(xh(idx,:,:),1,'omitnan'));
+%     %fAvg(c,:,:) = normalize(fAvg(c,:,:),3,'zscore','robust');
 % end
 % disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
-try parpool('threads'); catch;end
 
 %% Analysis template
 anT = analysisTemplate_lfn(psy,trialNfo,nh,o); toc;
@@ -500,7 +501,7 @@ sbj = n.sbj;
 % oP.visible=1; oP.save=0; oP.doGPU=0;
 
 %% Parfor loop across channels/ICs
-try parpool('local2',24); catch; end
+try parpool('Processes'); catch; end
 parfor ch = 1:nChs
     % Load channel/IC info
     dCh = d;
@@ -550,7 +551,7 @@ hl = tiledlayout(h,4,6,'TileSpacing','compact','Padding','tight');
 %% Channel name
 nexttile;
 if a.ICA
-    text(.5,.5,sbjCh+" ("+xN.ic+")",Interpreter='none',FontSize=20,Units='normalized',...
+    text(.5,.5,sbjCh+" ("+xN.order+")",Interpreter='none',FontSize=20,Units='normalized',...
         HorizontalAlignment='center',VerticalAlignment='middle');
 else
     text(.5,.5,sbjCh,Interpreter='none',FontSize=20,Units='normalized',...
@@ -738,7 +739,7 @@ sbj = n.sbj;
 % oP.visible=1; oP.save=0; oP.doGPU=0;
 
 %% Parfor loop across channels/ICs
-try parpool('local2',24); catch; end
+try parpool('Processes'); catch; end
 parfor ch = 1:nChs
     % Load channel/IC info
     dCh = d;
@@ -786,7 +787,7 @@ hl = tiledlayout(h,3,5,'TileSpacing','compact','Padding','tight');
 %% Channel/IC name
 nexttile;
 if a.ICA
-    text(1,0.5,sbjCh+" ("+xN.ic+")",Interpreter='none',FontSize=20,Units='normalized',...
+    text(1,0.5,sbjCh+" ("+xN.order+")",Interpreter='none',FontSize=20,Units='normalized',...
         HorizontalAlignment='center',VerticalAlignment='middle');
 else
     text(1,0.5,sbjCh,Interpreter='none',FontSize=20,Units='normalized',...
@@ -981,12 +982,7 @@ missingInterp = o.missingInterp;
 thrOL = o.thrOL;
 thrOLbl = o.thrOLbl;
 conds = o.conds;
-detrendOrder = o.detrendOrder;
-detrendItr = o.detrendItr;
-detrendThr = o.detrendThr;
 runIdx=na.runIdxOg(:,2);
-d3 = length(size(xa))>2;
-try parpool('threads'); catch;end
 % runIdx = grpstats(psy,"run",["min" "max"],"DataVars","idx"); % Get run indices
 % runIdx = sortrows(runIdx,["min_idx" "max_idx"],"ascend");
 %nWorkers = gcp('nocreate').NumWorkers;
@@ -996,6 +992,9 @@ try parpool('threads'); catch;end
 %pre = anT.pre;
 %condT = anT.cond;
 %stim = anT.stim;
+% detrendOrder = o.detrendOrder;
+% detrendItr = o.detrendItr;
+% detrendThr = o.detrendThr;
 
 % Separate non-trial frames at start vs. end of each run
 psy.trialR = int32(psy.trialA);
@@ -1055,13 +1054,17 @@ if o.logSpec && contains(na.suffix,"s"|"d"|"t"|"a"|"b"|"g"|"h")
 end
 
 %% Detrend & HPF
-[ds1,ds2] = rat(fsTarg/fs); % downsampling factors
-if (isstring(o.hiPass) && o.hiPass~="") || nnz(o.hiPass) || nnz(o.detrendOrder)
-    [xa,na] = ec_detrendHPF(xa,o.hiPass,o.detrendOrder,o.detrendWin,na,missing="linear");
+if nnz(o.detrendOrder)
+    [na,xa] = ec_detrend(na,xa,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
+        win=o.detrendWin,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle);
+end
+if (isstring(o.hiPass) && o.hiPass~="") || nnz(o.hiPass)
+    [xa,na] = ec_HPF(na,xa,hpf=o.hiPass,gpu=o.hiPassGPU); % HPF
 end
 xa = mat2cell(xa,runIdx);
 
-%% Outliers, low-pass filter & downsampling (within-run)
+%% Detrend, HPF, LPF, outliers & downsampling (within-run)
+[ds1,ds2] = rat(fsTarg/fs); % downsampling factors
 for r = 1:nRuns
     xr = xa{r};
     parfor ch = 1:nChs
@@ -1076,10 +1079,12 @@ for r = 1:nRuns
                 bl = mean(xCh(idx,:),1,"omitnan");
                 idx = psy.cond(idr)==conds(c);
                 xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOL);
-                xCh(idx,:) = fillmissing(xCh(idx,:),missingInterp,1); % Linear interpolation
                 xCh(idx,:) = xCh(idx,:) - bl; % Center at avg condition baseline
             end
         end
+
+        % Fill missing
+        xCh = fillmissing(xCh,missingInterp,1); % Linear interpolation
 
         % Low-pass filter
         if loPassHz>0
@@ -1118,7 +1123,7 @@ end
 xa=vertcat(xa{:}); xa=xa(anT.iPsy,:,:); % Match xs & anT indices
 xa = mat2cell(xa,trIdx.GroupCount);
 anT = mat2cell(anT,trIdx.GroupCount);
-try detrendWts = full(~na.detrendWts); catch; detrendWts=true(size(xa,[1 2])); end
+% try detrendWts = full(~na.detrendWts); catch; detrendWts=true(size(xa,[1 2])); end
 % if numel(detrendOrder)>=2 && detrendOrder(2)>0
 %     detrendWts=detrendWts(anT.iPsy,:,:);
 %     detrendWts = mat2cell(detrendWts,trIdx.GroupCount);
@@ -1129,15 +1134,10 @@ try detrendWts = full(~na.detrendWts); catch; detrendWts=true(size(xa,[1 2])); e
 % Parfor across trials
 parfor t = 1:height(trIdx)
     xt = xa{t};
+    
     % Robust z-score (within-trial)
     xt = fillmissing(xt,missingInterp,1); % Interpolate missing
     xt = normalize(xt,1,"zscore","robust"); % Median Absolute Deviation
-
-    % Final detrend (within-trial)
-    if numel(detrendOrder)>=3 && detrendOrder(3)>0 && ~d3
-        [xt,detrendWts{t}] = ec_detrend(xt,detrendOrder(3),detrendWts{t},...
-            'polynomials',detrendThr(3),detrendItr(3)); %#ok<PFBNS>
-    end
 
     % Baseline correction (within-trial)
     bl = median(xt(anT{t}.pre,:,:),1,"omitnan"); % Trial baseline (median so outlier-resistant)
@@ -1145,13 +1145,6 @@ parfor t = 1:height(trIdx)
     xa{t} = xt;
 end
 disp("Robust z-scored (trialwise): "+sbj);
-if numel(detrendOrder)>=3 && detrendOrder(3)>0 && ~d3
-    detrendWts = logical(vertcat(detrendWts{:}));
-    olPct = nnz(~detrendWts)/numel(detrendWts);
-    detrendWts = sparse(~detrendWts);
-    na.detrendWts = detrendWts;
-    disp("Trialwise polynomial detrended^"+detrendOrder(3)+" ol="+olPct+" "+sbj);
-end
 
 % Interpolate baseline outliers & center at baseline mean (within-condition)
 xa=vertcat(xa{:}); anT=vertcat(anT{:});
@@ -1174,7 +1167,7 @@ sbjID = ns.sbjID;
 nChs = size(xs,2);
 B(cellfun(@isempty,B.freqs),:) = [];
 doICA = ns.ICA;
-if doICA; chNames = ns.icNfo.name; else; chNames=[1:nChs,1]; end
+if doICA; chNames = ns.icNfo.ic; else; chNames=[1:nChs,1]; end
 if isfield(o,'epoch'); epoch=round(o.epoch*1000); else; epoch=[]; end
 if isfield(o,'epochRT'); epochRT=round(o.epochRT*1000); else; epochRT=[]; end
 if isfield(o,'epochPct'); epochPct=round(o.epochPct*100); else; epochPct=[]; end
@@ -1436,10 +1429,10 @@ end
 function [dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN)
 if a.ICA
     % Color by ICA weights
-    dCh.wts = normalize(dCh.wts,"range",oP.climICA);
+    %dCh.wts = normalize(dCh.wts,"range",oP.climICA);
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
-    ch = xN.name;
+        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z,center=0);
+    ch = xN.ic;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
     dCh.col(dCh.order==-Inf,1:3) = 0;

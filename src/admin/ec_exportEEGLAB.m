@@ -1,6 +1,5 @@
-function [EEG,eeg_changes] = ec_exportEEGLAB(dirs,n,x,psy,trialNfo,chNfo)
+function [EEG,eegChanges] = ec_exportEEGLAB(n,x,psy,trialNfo,chNfo)
 arguments
-    dirs struct
     n struct = []
     x {mustBeFloat} = []
     psy table = []
@@ -18,11 +17,11 @@ EEG.sbjID = n.sbjID;
 EEG.session = n.runs;
 EEG.setname = char(n.fnStr);
 EEG.filename = char("EEG"+sfx+"_"+EEG.setname+".set");
-EEG.filepath = char(dirs.robustSbj);
+EEG.filepath = char(n.dirs.procSbj);
 EEG.pnts = height(x);
 EEG.nbchan = width(x);
 EEG.srate = n.fs;
-EEG.times = round(psy.time*1000);
+EEG.times = round(psy.time*1000)';
 EEG.trials = 1; % 1 for continuous
 EEG.history = {};
 EEG.comments = 'Converted from electroCUDA';
@@ -93,7 +92,7 @@ EEG.xmax = 0;
 %EEG.epochdescription = [];
 
 %% EEG & ICA data
-if n.ICA
+if n.ICA && isfield(n,"ica")
     EEG.data = [];
     EEG.icaweights = n.ica.wts;
     EEG.icasphere = n.ica.sph;
@@ -115,13 +114,15 @@ EEG.etc = struct;
 EEG.saved = 'no';
 
 %% Check dataset
-try
-    [EEG,eeg_changes] = eeg_checkset(EEG);
-    disp(eeg_changes);
-catch ME
-    getReport(ME)
-    warning("Error in eeg_checkset, skipping...")
+try eegChanges = ["","",""];
+    [EEG,eegChanges(1)] = eeg_checkset(EEG); 
+    [EEG,eegChanges(2)] = eeg_checkset(EEG,'eventconsistency');
+    [EEG,eegChanges(3)] = eeg_checkset(EEG,'chanlocs_homogeneous');
+    disp(eegChanges);
+catch ME; warning("Error in eeg_checkset, skipping..."); getReport(ME)
 end
+if isa(x,'double') && isa(EEG.data,'single')
+    warning("ASR: x is double *but* EEG.data is single-precision"); end % ensure no converting to single
 
 
 
