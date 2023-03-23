@@ -75,7 +75,7 @@ parfor ch = 1:nChs
     ch_xcorr(ch) = sum(abs(corrTmp(idx)),"omitnan") / length(idx);
 
     % Median variance
-    m_var(ch) = median(ch_var(sortIdx(1:nn))); %#ok<PFBNS> 
+    m_var(ch) = median(ch_var(sortIdx(1:nn)),"omitnan"); %#ok<PFBNS> 
 
     % Computer hurst exponent of time series
     ch_hurs(ch) = ec_generalizedHurst(x(ch,:)); %hurst_lfn(x(ch,:)); %fastHurst(x(ch,:));

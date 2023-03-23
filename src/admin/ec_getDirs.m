@@ -2,10 +2,10 @@ function dirs = ec_getDirs(proj,sbj,task,sbjID)
 % You must edit 'ec_paths' to match the directorieson your system
 %% Input validation
 arguments
-    proj {isstruct,ischar,isstring} = 'lbcn'
-    sbj {isstring,ischar,isnumeric} = []
-    task {ischar,isstring} = "MMR";
-    sbjID {isnumeric} = []
+    proj string = "lbcn"
+    sbj {istext,isnumeric} = []
+    task string = "MMR";
+    sbjID uint16 = []
 end
 
 if isempty(sbjID) && ~isempty(sbj)

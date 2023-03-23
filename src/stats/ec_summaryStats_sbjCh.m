@@ -23,7 +23,7 @@ if a.ICA && ~contains(a.sfx,"i"); a.sfx = a.sfx + "i"; end
 
 %% Calculate summary stats
 if a.stats
-    try parpool('Threads'); catch; end
+    % try parpool('Threads'); catch; end
     if a.type=="spec"
         spec_runStats(a,o,dirs);
     elseif a.type=="hfb-lfp"
@@ -56,6 +56,7 @@ function spec_runStats(a,o,dirs)
 % Load
 tic;
 [ns,xs,psy,trialNfo,chNfo] = ec_loadSbj(dirs,a.sfx+"s"); toc;
+xs = single(xs);
 ns.suffix = a.sfx+"s";
 if a.ICA; ns.ICA=1; else; ns.ICA=0; end
 if a.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
@@ -90,11 +91,10 @@ end
 B.Properties.RowNames = B.name;
 
 %% Get mean evoked magnitude per freq & cond
-fAvg = nan(numel(conds),nChs,numel(ns.freqs));
+fAvg = nan(numel(conds),nChs,numel(ns.freqs),"like",xs);
 for c = 1:numel(conds)
     idx = psy.stim & psy.cond==conds(c);
-    fAvg(c,:,:) = mean(xs(idx,:,:),1,'omitnan');
-    %fAvg(c,:,:) = normalize(fAvg(c,:,:),3,'zscore');
+    fAvg(c,:,:) = mean(xs(idx,:,:),1,"omitnan");
 end
 disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
@@ -110,13 +110,13 @@ ss = statsSpec_lfn(xs,ns,sbjChs,anT,B,o); toc;
 
 %% LFP: load & initialize
 [n,x,psy1,trialNfo1] = ec_loadSbj(dirs,a.sfx);
+x = single(x);
 n.suffix = a.sfx;
 if a.ICA; n.ICA=1; else; n.ICA=0; end
 if a.test; x1=x; end %#ok<NASGU>
 
 %% LFP: denoise, downsample & baseline correction
 x = blcFiltClean_lfn(x,n,psy1,anT,trialNfo1,o);
-x = single(x);
 if ~a.test; clear n; clear psy1; clear trialNfo1; end
 
 %% LFP: summary stats
@@ -128,8 +128,8 @@ nLats = numel(lats5);
 trialNfo.RT1 = int32(trialNfo.RT*1000);
 
 % Slice full timecourses for plotting
-xe = nan(nLats,nChs,nTrs);
-xhe = nan(nLats,nChs,nTrs);
+xe = nan(nLats,nChs,nTrs,"like",x);
+xhe = nan(nLats,nChs,nTrs,"like",x);
 for t = 1:nTrs
     idx = anT.idx(anT.trialA==trialNfo.trialA(t));
     idx = idx(ismember(anT.bin(idx),lats5));
@@ -155,7 +155,7 @@ try reset(gpuDevice(1)); catch;end
 if o.save
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
     else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
-    savefast(fn,'ss');
+    save(fn,'ss','-v7');
     disp("SAVED: "+fn);
 end
 
@@ -165,9 +165,9 @@ if ~a.plot
     savefast(fn,'xe','xhe','fAvg','B','trialNfo');
     disp("SAVED: "+fn);
 else
-    try delete(gcp('nocreate')); catch; end
+    %try delete(gcp('nocreate')); catch; end
     spec_runPlots(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo);
-    try delete(gcp('nocreate')); catch; end
+    %try delete(gcp('nocreate')); catch; end
 end
 end
 
@@ -237,7 +237,7 @@ conds2 = oP.conds2;
 lats5 = oP.lats5;
 
 % Channel plot data
-[dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN);
+[dCh,sbjCh,hemN,a] = getElecPlotData_lfn(a,dCh,oP,xN);
 
 %% Initialize figure
 if ~oP.save
@@ -432,8 +432,8 @@ nLats = numel(lats5);
 trialNfo.RT1 = int32(trialNfo.RT*1000);
 
 % Slice full timecourses for plotting
-xe = nan(nLats,nChs,nTrs);
-xhe = nan(nLats,nChs,nTrs);
+xe = nan(nLats,nChs,nTrs,"like",x);
+xhe = nan(nLats,nChs,nTrs,"like",x);
 for t = 1:nTrs
     idx = anT.idx(anT.trialA==trialNfo.trialA(t));
     idx = idx(ismember(anT.bin(idx),lats5));
@@ -459,7 +459,7 @@ try reset(gpuDevice(1)); catch;end
 if o.save
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
     else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
-    savefast(fn,'ss');
+    save(fn,'ss','-v7');
     disp("SAVED: "+fn);
 end
 
@@ -538,7 +538,7 @@ lats5 = oP.lats5;
 B = oP.B;
 
 % Channel plot data
-[dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN);
+[dCh,sbjCh,hemN,a] = getElecPlotData_lfn(a,dCh,oP,xN);
 
 %% Initialize figure
 if ~oP.save
@@ -698,7 +698,7 @@ try reset(gpuDevice(1)); catch;end
 if o.save
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
     else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
-    savefast(fn,'ss',"-v7.3");
+    save(fn,'ss','-v7');
     disp("SAVED: "+fn);
 end
 
@@ -774,7 +774,7 @@ lats5 = oP.lats5;
 B = oP.B;
 
 % Channel plot data
-[dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN);
+[dCh,sbjCh,hemN,a] = getElecPlotData_lfn(a,dCh,oP,xN);
 
 %% Initialize figure
 if ~oP.save
@@ -979,10 +979,10 @@ fsTarg = o.fsTarg;
 ds = floor(fs/fsTarg);
 badFields = o.badFields;
 missingInterp = o.missingInterp;
-thrOL = o.thrOL;
+%thrOL = o.thrOL;
 thrOLbl = o.thrOLbl;
 conds = o.conds;
-runIdx=na.runIdxOg(:,2);
+runIdx = na.runIdxOg(:,2);
 % runIdx = grpstats(psy,"run",["min" "max"],"DataVars","idx"); % Get run indices
 % runIdx = sortrows(runIdx,["min_idx" "max_idx"],"ascend");
 %nWorkers = gcp('nocreate').NumWorkers;
@@ -1014,12 +1014,6 @@ if any(diff(trIdx.min_idx)<1) || any(diff(trIdx.max_idx)<1)
     warning("psy.trialR frame idx NOT sequentially increasing: "+sbj);
 end
 
-% Prepare filters
-if o.loPass>0 && ~(ds>1 && o.loPass>fsTarg/2) % Antialias if LPF over nyquist frequency
-    loPassHz = o.loPass;
-    gusSz = floor(fs/loPassHz);
-    gusWin = gausswin(gusSz)/sum(gausswin(gusSz));
-end
 % [~,r] = min(runIdx.GroupCount);
 % idx = psy.run==runIdx.run(r) & ~isnan(xa(:,1,1));
 % % Remove frames excluded from ICA decomposition
@@ -1035,75 +1029,95 @@ end
 
 % Remove bad frames
 if ~isempty(badFields)
-    x_bad = na.badFrames;
-    parfor ch = 1:nChs
-        xCh = squeeze(xa(:,ch,:)); % load chan data
-        badIdxCh = x_bad(ch,:);
-        badIdxCh = badIdxCh(1,badFields);
-        badIdxCh = varfun(@rot90,badIdxCh);
-        badIdxCh = any(badIdxCh{:,:},2);
-        xCh(badIdxCh,:) = nan;
-        xa(:,ch,:) = xCh; % Copy back processed data
+    for f = 1:numel(badFields)
+        x_bad = na.xBad.(badFields(f));
+        parfor ch = 1:nChs
+            xCh = squeeze(xa(:,ch,:)); % load chan data
+            badIdxCh = squeeze(x_bad(:,ch,:));
+            xCh(badIdxCh) = nan;
+            xa(:,ch,:) = xCh; % Copy back processed data
+        end
     end
     disp("Removed bad frames: "+sbj);
 end
 
-%% Log-normal to normal distribution for time-frequency data (CWT outputs are log-normal)
-if o.logSpec && contains(na.suffix,"s"|"d"|"t"|"a"|"b"|"g"|"h")
-    xa = ec_abs2norm(xa);
-end
 
-%% Detrend & HPF
-if nnz(o.detrendOrder)
-    [na,xa] = ec_detrend(na,xa,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
-        win=o.detrendWin,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle);
-end
-if (isstring(o.hiPass) && o.hiPass~="") || nnz(o.hiPass)
-    [xa,na] = ec_HPF(na,xa,hpf=o.hiPass,gpu=o.hiPassGPU); % HPF
-end
-xa = mat2cell(xa,runIdx);
+%% Outliers, HPF, normalize, LPF & downsampling (within-run)
 
-%% Detrend, HPF, LPF, outliers & downsampling (within-run)
+% Prepare filters
 [ds1,ds2] = rat(fsTarg/fs); % downsampling factors
+loPassHz = o.loPass;
+if any(loPassHz)
+    gusSz = floor(fs/loPassHz);
+    gusWin = gausswin(gusSz)/sum(gausswin(gusSz));
+end
+
+hiPassHz = o.hiPass;
+if any(hiPassHz)
+    hpf = designfilt('highpassfir',StopbandFrequency=hiPassHz*.75,PassbandFrequency=hiPassHz,...
+        StopbandAttenuation=80,DesignMethod="kaiserwin",SampleRate=fs);
+else
+    hpf = [];
+end
+
+% Prepare normalization
+logSpec=[]; doNorm=[];
+if o.logSpec && contains(na.suffix,"s"|"d"|"t"|"a"|"b"|"g"|"h")
+    logSpec = o.normalizeSpec;
+elseif isany(o.normalizeSpec) && contains(na.suffix,"s"|"d"|"t"|"a"|"b"|"g"|"h")
+    doNorm = o.normalizeSpec;
+elseif isany(o.normalizeLFP) && ~contains(na.suffix,"s"|"d"|"t"|"a"|"b"|"g"|"h")
+    doNorm = o.normalizeLFP;
+end
+
+xa = mat2cell(xa,runIdx);
 for r = 1:nRuns
     xr = xa{r};
     parfor ch = 1:nChs
-        xCh = squeeze(xr(:,ch,:));
-        
-        % Outliers per cond
-        if thrOL>0
-            idr = psy.idx(psy.run==runs(r)); %#ok<PFBNS>
-            for c = 1:numel(conds)
-                idx = psy.cond(idr)==conds(c) & ~psy.stim(idr);
-                xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOLbl);
-                bl = mean(xCh(idx,:),1,"omitnan");
-                idx = psy.cond(idr)==conds(c);
-                xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOL);
-                xCh(idx,:) = xCh(idx,:) - bl; % Center at avg condition baseline
-            end
-        end
+        xCh = squeeze(xr(:,ch,:));     
+        % % Outliers per cond
+        % if thrOL>0
+        %    idr = psy.idx(psy.run==runs(r)); %#ok<PFBNS>
+        %    for c = 1:numel(conds)
+        %        idx = psy.cond(idr)==conds(c) & ~psy.stim(idr);
+        %        xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOLbl);
+        %        bl = mean(xCh(idx,:),1,"omitnan");
+        %        idx = psy.cond(idr)==conds(c);
+        %        xCh(idx,:) = filloutliers(xCh(idx,:),"clip","median",1,ThresholdFactor=thrOL);
+        %        xCh(idx,:) = xCh(idx,:) - bl; % Center at avg condition baseline
+        %    end
+        % end
 
         % Fill missing
         xCh = fillmissing(xCh,missingInterp,1); % Linear interpolation
 
-        % Low-pass filter
-        if loPassHz>0
-            xCh = convn(xCh,gusWin,'same'); % convolve gaussian
+        % High-pass filter
+        if any(hiPassHz)
+            xCh = filtfilt(hpf,double(xCh));
         end
-        xr(:,ch,:) = xCh;
-    end
-    if thrOL>0; disp("Interpolated outliers per condition: "+blocks(r)); end
-    if loPassHz>0; disp("Low-passed: "+blocks(r)); end
 
-    % LPF
-    %if loPassHz > 0
-    %    xr = lowpass(xr,loPassHz,fs,ImpulseResponse="fir");
-    %end
+        % Normalize
+        if ~isempty(logSpec)
+            xCh = ec_log2norm(double(xCh),1,scale=logSpec); % Log-normal to normal dist
+        elseif ~isempty(doNorm) && doNorm=="robust"
+            xCh = normalize(double(xCh),1,"zscore","robust"); % Robust z-score
+        elseif ~isempty(doNorm)
+            xCh = normalize(double(xCh),1,doNorm); % Other normalize
+        end
+
+        % Low-pass filter
+        if any(loPassHz)
+            xCh = convn(double(xCh),gusWin,'same'); % convolve gaussian
+            %xCh = lowpass(double(xCh),loPassHz,fs,ImpulseResponse="fir");
+        end
+        xr(:,ch,:) = single(xCh);
+    end
+    disp("Normalized & filtered Low-passed: "+blocks(r));
 
     % Downsample
     if ds>1
         if ~loPassHz
-            xr = resample(xr,ds1,ds2); % Antialiased downampling if LPF>nyquist or LPF==0
+            xr = single(resample(double(xr),ds1,ds2)); % Antialiased downampling if LPF>nyquist or LPF==0
         else
             xr = xr(1:ds:end,:); % Decimate if LPF <= nyquist freq
         end
@@ -1131,32 +1145,29 @@ anT = mat2cell(anT,trIdx.GroupCount);
 %     detrendWts = cell(height(trIdx),1);
 % end
 
-% Parfor across trials
+% Baseline correct within-trial (robust z-score) 
 parfor t = 1:height(trIdx)
-    xt = xa{t};
+    xt = fillmissing(xa{t},missingInterp,1); % Interpolate missing
     
-    % Robust z-score (within-trial)
-    xt = fillmissing(xt,missingInterp,1); % Interpolate missing
-    xt = normalize(xt,1,"zscore","robust"); % Median Absolute Deviation
-
-    % Baseline correction (within-trial)
-    bl = median(xt(anT{t}.pre,:,:),1,"omitnan"); % Trial baseline (median so outlier-resistant)
-    xt = xt - bl; % Subtract trial frames by baseline
-    xa{t} = xt;
+    % Trial baseline correction (robust z-score from prestimulus baseline)
+    bl = median(xt(anT{t}.pre,:,:),1,"omitnan"); % BL median
+    bl0 = mad(xt(anT{t}.pre,:,:),1,1) % BL MAD median absolute deviation
+    xa{t} = (xt-bl)./bl0; % Subtract median(BL) from trial then divide by mad(BL)
 end
-disp("Robust z-scored (trialwise): "+sbj);
+xa=vertcat(xa{:}); anT=vertcat(anT{:});
+disp("FINISHED baseline correction: "+sbj);
 
 % Interpolate baseline outliers & center at baseline mean (within-condition)
-xa=vertcat(xa{:}); anT=vertcat(anT{:});
 for c = 1:numel(conds)
     idx = anT.cond==conds(c) & anT.pre;
-    %xa(idx,:) = filloutliers(xa(idx,:),"clip","median",1,...
-    %    ThresholdFactor=thrOLbl); % Baseline outliers
+    if any(thrOLbl)
+        xa(idx,:) = filloutliers(xa(idx,:),"clip","median",1,ThresholdFactor=thrOLbl); % Baseline outliers
+    end
     bl = mean(xa(idx,:),1,"omitnan"); % Cleaned baseline mean
     idx = anT.cond==conds(c);
     xa(idx,:) = xa(idx,:) - bl; % Subtract by baseline mean
 end
-disp("FINISHED baseline correction: "+sbj);
+if thrOLbl>0; disp("Interpolated outliers per condition: "+blocks(r)); end
 end
 
 
@@ -1394,7 +1405,7 @@ end
 % Make ch plotting data table
 d = table;
 d.label = chNfo.sbjCh;
-d = [d,chNfo(:,2:12)];
+d = [d,chNfo(:,1:12)];
 d.line(:) = "o";
 d.line(~d.ECoG) = "s";
 d.sz(:) = 2;
@@ -1426,12 +1437,12 @@ end
 
 
 % Get electrode plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [dCh,sbjCh,hemN] = getElecPlotData_lfn(a,dCh,oP,xN)
+function [dCh,sbjCh,hemN,a] = getElecPlotData_lfn(a,dCh,oP,xN)
 if a.ICA
     % Color by ICA weights
     %dCh.wts = normalize(dCh.wts,"range",oP.climICA);
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z,center=0);
+        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
     ch = xN.ic;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
@@ -1448,28 +1459,34 @@ else
     dCh.order = dCh.ch;
     dCh.order(ch) = Inf;
 end
+a.ch = ch;
+a.sbjCh = sbjCh;
 dCh(ismember(dCh.pialRAS(:,1),[0 nan]),:) = [];
 dCh = sortrows(dCh,'order','ascend');
 end
 
 
 % Plot electrodes %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,medial) %#ok<INUSD>
+function plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,medial) 
 if nargin<7; medial=""; end
 %if a.type=="hfb"; span=5; else; span=[1 2]; end
 span = [1 2];
+hem = dCh.hem(dCh.ch==a.ch);
+dCh.pos = dCh.pialRAS;
 
 %% Plot lateral electrodes on native cortex
 if ismember(medial,["lateral" ""])
     if nnz(hemN)>1
-        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) & dCh.hem=="L",:),...
-            "latero-anterior","pialRAS","pial",sbj,oP);
+        % Left
+        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) &...
+            dCh.hem~="R",:),"latero-anterior","pial",sbj,oP,hem);
 
-        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) & dCh.hem=="R",:),...
-            "latero-anterior","pialRAS","pial",sbj,oP);
+        % Right
+        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) &...
+            dCh.hem~="L",:),"latero-anterior","pial",sbj,oP,hem);
     else
         plotCortex_lfn(nexttile(hl,span),dCh(ismember(dCh.lat,["lateral" "both"]),:),...
-            "lateral","pialRAS","pial",sbj,oP);
+            "lateral","pial",sbj,oP,hem);
     end
 end
 
@@ -1477,23 +1494,24 @@ end
 %if a.type=="hfb"; span=9; end
 if ismember(medial,["medial" ""])
     if nnz(hemN)>1
-        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) & dCh.hem=="L",:),...
-            "medio-posterior","pialRAS","pial",sbj,oP);
+        % Left
+        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) &...
+            dCh.hem~="R",:),"medio-posterior","pial",sbj,oP,hem);
 
-        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) & dCh.hem=="R",:), ...
-            "medio-posterior","pialRAS","pial",sbj,oP);
+        % Right
+        plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) &...
+            dCh.hem~="L",:),"medio-posterior","pial",sbj,oP,hem);
     else
         plotCortex_lfn(nexttile(hl,span),dCh(ismember(dCh.lat,["medial" "both"]),:),...
-            "medial","pialRAS","pial",sbj,oP);
+            "medial","pial",sbj,oP,hem);
     end
 end
 end
 
 
 % Plot cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCortex_lfn(h,dCh,lat,coord,surf,sbj,oP)
-dCh.pos = dCh.(coord);
-ec_plotCortex(unique(dCh.hem),lat,dCh,sbj=sbj,sbjDir=oP.dirFS,surfType=surf,...
+function plotCortex_lfn(h,dCh,lat,surf,sbj,oP,hem)
+ec_plotCortex(hem,lat,dCh,sbj=sbj,sbjDir=oP.dirFS,surfType=surf,...
     visible=oP.visible,opacity=oP.alpha,doGPU=oP.doGPU,h=h,...
     save=0,flip=0,pullF=15,parallel=0);
 end

@@ -62,16 +62,16 @@ function h = ec_plotCortex(hems,views,d,o,a)
 
 %% Input validation
 arguments
-    hems {ischar,isstring,iscell} = ["L","R"]
-    views {ischar,isstring,iscell} = ["medial","lateral"]
+    hems string = ["L","R"]
+    views string = ["medial","lateral"]
     d table = []
     o struct = struct
-    a.sbj {isstring,ischar} = []
-    a.sbjDir {isstring,ischar} = []
+    a.sbj string = []
+    a.sbjDir string = []
     a.doGPU logical = []
-    a.hem {isstring,ischar} = []
-    a.cView {isstring,ischar} = []
-    a.surfType {isstring,ischar}  = []
+    a.hem string = []
+    a.cView string = []
+    a.surfType string  = []
     a.opacity {isnumeric} = []
     a.figPos {isnumeric} = []
     a.insPos {isnumeric} = []

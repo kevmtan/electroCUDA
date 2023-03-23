@@ -10,7 +10,7 @@
 MEXFUNCTION_LINKAGE
 void mexfilerequiredapiversion(unsigned int* built_by_rel, unsigned int* target_api_ver)
 {
-  *built_by_rel = 0x2022b;
+  *built_by_rel = 0x2023a;
   *target_api_ver = MX_TMP_TARGET_API_VER;
 }
 #if defined(_MSC_VER) && !defined(__ICL)

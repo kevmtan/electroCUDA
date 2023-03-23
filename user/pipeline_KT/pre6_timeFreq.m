@@ -38,84 +38,157 @@
 %    research purposes only; NOT INTENDED FOR CLINICAL OR MEDICAL USE.
 % LICENSE: GNU General Public License
 
-%% Project info
-% Subject Names
- sbjs = {'S12_38_LK','S12_42_NC',...
-     'S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS','S12_39_RT',...
-     'S12_40_MJ','S12_41_KS','S12_45_LR','S13_46_JDB','S13_47_JT2','S13_50_LGM',...
-     'S13_51_MTL','S13_52_FVV','S13_53_KS2','S13_54_KDH','S13_56_THS','S13_57_TVD',...
-     'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
-     'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR',...
-     'S15_87_RL','S16_95_JOB','S16_96_LF'}';
- %sbjs = {'S12_38_LK'};
+%% Task info
 
-task = 'MMR'; % Project name
-pathFn = 'lbcn';
+% Subject Names
+sbjs = {'S12_38_LK','S12_42_NC',...
+    'S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS','S12_39_RT',...
+    'S12_40_MJ','S12_41_KS','S12_45_LR','S13_46_JDB','S13_47_JT2','S13_50_LGM',...
+    'S13_51_MTL','S13_52_FVV','S13_53_KS2','S13_54_KDH','S13_56_THS','S13_57_TVD',...
+    'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
+    'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR',...
+    'S15_87_RL','S16_95_JOB','S16_96_LF'}';
+%sbjs = {'S12_38_LK'};
+
+proj = 'lbcn';
+task = 'MMR'; % task name
 
 doSpec = 1; % Do time-frequency decomposition for multiple frequencies
 doHFB = 1; % Do time-frequency decomposition of HFB band (average across HFB freqs)
 doICAspec = 1;
-doICAhfb = 1;
+doICAhfb = 0;
+
+doHFB_ICA = 0; % Do ICA on HFB
+
+isTest=0;
 
 %% Options struct (can be modified for each function below)
 % NOTE: see individual functions for all inputs, descriptions & defaults
 o = struct;
 
-% Interpolate missing frames (within run & channel)
-o.missingInterp = "linear";
+% Bad channel identification
+o.doBadCh = true;
+o.badChProp = 0.5; % criterion proportion of bad samples
+o.thrHurst = 3; % Hurst threshold (median absolute deviation)
+o.interpolateCh = false; % interpolate bad chans
 
 % Bad frame detection per chan/IC
 o.doBadFrames = true; % outlier/noise detection
 o.thrHFO = 2; % threshold for epileptic HFO detection (default=2)
-o.thrMAD = 10; % z-threshold relative to all data points to exclude timepoints (default=5)
-o.thrDiff = 10; % z-threshold for amplitude difference of consecutive timepoints (default=5)
+o.thrMAD = 20; % z-threshold relative to all data points to exclude timepoints (default=5)
+o.thrDiff = 20; % z-threshold for amplitude difference of consecutive timepoints (default=5)
 o.thrSNS = 3;
 
-% Time-frequency decomposition
-o.fName = "hfb"; % name of frequency analysis
-o.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
-o.fMean = true; % average across freq bands: output if TRUE=[time,ch]; FALSE=[time,ch,freq]
-o.fVoices = 32; % voices per octave (default=10, HFB=20)
-o.dsTarg = []; % downsample target in Hz (leave empty if no downsampling)
-o.single = false; % Convert to double to single (if doGPU=true)
-o.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-o.doGPUarray = true; % Use arrayfun for GPU (faster, requires more VRAM)
+% Interpolate missing frames (within run & channel)
+o.missingInterp = "linear";
+
+% Detrending (within-run to avoid edge artifacts)
+o.detrendGPU = 0; % 0=CPU; 1=gpuArray; 2=compiled CUDA binaries (must compile: ec_compileBins)
+o.detrendSingle = false;
+o.detrendOL = "median"; %o.detrendInterp = "makima";
+% Robust detrending (pre-referencing)
+o.detrendOrder = 5; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+o.detrendThr =   2.5; %repmat(2.5,1,3); %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+o.detrendItr =   3;   %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+o.detrendWin =   0; % de% detrend timewindow in seconds {entire run=[],default=[]}
+% Robust detrending (post-referencing)
+o.detrendOrder2 = 10; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+o.detrendThr2 =   2.5; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+o.detrendItr2 =   2; %[5 3 3 3 3]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+o.detrendWin2 =   0; % de
+% % Robust detrending (post-ASR)
+% o.detrendOrder3 = [10 15 20]; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+% o.detrendThr3 =   2.5;  %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+% o.detrendItr3 =   5; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+% o.detrendWin3 =   0; % detrend timewindow in seconds {entire run=[],default=[]}
+
+% HPF (within-run to avoid edge artifacts)
+o.hiPassGPU = 0; % GPU slower than CPU??
+o.hiPass = 0.625; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
+o.hiPassSteep = 0.5;
+
+% Robust rereference
+o.doRereference = true;
+o.rrThr = 0; % outlier threshold for referencing (default=3)
+o.rrItr = 1;
+
+% Electric line noise removal
+o.cleanlineHz = [60 120]; 
+o.lineHz = 60; % Electricity hertz @ EEG recording site (default=50|60, skip=0)
+
+% ASR
+o.asr.do = true;
+o.asr.maxPctDiff = 0.15;
+o.asr.doGPU = true; % use GPU when appropriate
+o.asr.refBurst = 25; % BurstCriterion
+o.asr.refTols = [-5.5 5.5]; %[-3.5 5.5] BurstCriterionRefTolerances
+o.asr.refMaxBadChs = 0.07; % ReferenceMaxBadChannels
+o.asr.refWinSz = 0.5; % Granularity at which EEG time windows are extracted for calibration purposes, in seconds. Default: 1.
+o.asr.winSz = 0.5; % Length of stats window (secs), timescale of artifacts (default=0.5)
+o.asr.winOverlap = 3/4; % Overlap between windows 
+o.asr.blockSz = []; % Cut robust estimation by this factor (default=10)
+o.asr.filtHz =  [0  4 12 16 36 50 200 500]; % default=[]
+o.asr.filtMag = [2 .5 .5 1  1  2  1.5 2];   % default=[];
+o.asr.dimsPCA = 3/4; % Maximum dimensionality to reconstruct (default: 2/3)
+% % ASR all-chan
+% o.asr.do = false;
+% o.asr.doGPU = true; % use GPU when appropriate
+% o.asr.refBurst = 20; % BurstCriterion
+% o.asr.refTols = [-5.5 5.5]; %[-3.5 5.5] BurstCriterionRefTolerances
+% o.asr.refMaxBadChs = 0.075; % ReferenceMaxBadChannels
+% o.asr.refWinSz = 1; % Granularity at which EEG time windows are extracted for calibration purposes, in seconds. Default: 1.
+% o.asr.winSz = 0.5; % Length of stats window (secs), timescale of artifacts (default=0.5)
+% o.asr.winOverlap = 3/4; % Overlap between windows 
+% o.asr.blockSz = []; % Cut robust estimation by this factor (default=10)
+% o.asr.filtHz =  [0  4  12  16 36 48 192 500]; % default=[]
+% o.asr.filtMag = [3 1/3 1/3 1  1  2  2   3];   % default=[];
+% o.asr.dimsPCA = 0.75; % Maximum dimensionality to reconstruct (default: 2/3)
+
+% log2norm CWT output
+o.norm = false;
 
 %% Setup
 % % add existinge file if exist
 % fn = "/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc_221028_0653_errors.mat";
 % load(fn,'statusPP');
-
 if ~exist('statusPP','var')
     statusPP = table;
     statusPP.sbj = sbjs;
     statusPP.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
+    statusPP.psy(:) = nan;
+    statusPP.LFP(:) = nan;
     statusPP.spec(:) = nan;
     statusPP.HFB(:) = nan;
+    statusPP.ICA(:) = nan;
     statusPP.speci(:) = nan;
     statusPP.HFBi(:) = nan;
     statusPP.time(:) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+    statusPP.errorPsy = cell(length(sbjs),1);
+    statusPP.errorLFP = cell(length(sbjs),1);
     statusPP.errorSpec = cell(length(sbjs),1);
     statusPP.errorHFB = cell(length(sbjs),1);
-    statusPP.errorSpeci = cell(length(sbjs),1);
+    statusPP.errorICA = cell(length(sbjs),1);
     statusPP.errorHFBi = cell(length(sbjs),1);
+    statusPP.errorSpeci = cell(length(sbjs),1);
 end
 
 % filename of log
-sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc_'...
+sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc/preproc_'...
     char(datetime('now','TimeZone','local','Format','yyMMdd_HHmm')) '_errors.mat'];
 
 
-%% Loop across subjects
-for s = 1:height(statusPP) % Subject loop
-    sbj=statusPP.sbj{s}; sbjID=statusPP.sbjID(s);
-    dirs = ec_getDirs(pathFn,sbj,task,sbjID);
+%% ASR-ICA
+for s = 1:height(statusPP) % Subject loop %s=1;
+    sbj = statusPP.sbj{s};
+    sbjID = statusPP.sbjID(s);
+    dirs = ec_getDirs(proj,sbj,task,sbjID);
     o.dirOut = dirs.procSbj;
     o.fnStr = "s"+sbjID+"_"+task+".mat";
     o.suffix = "";
 
+
     %% Spec
-    if doSpec && statusPP.spec(s)~=1
+    if doSpec && statusPP.spec(s)~=1 %&& statusPP.LFP(s)==1
         % Modify options
         oSpec = o;
         oSpec.suffix = "s";
@@ -123,12 +196,19 @@ for s = 1:height(statusPP) % Subject loop
         oSpec.fName = "spec"; % Name of frequency analysis
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
-        oSpec.fVoices = 10; % Voices per octave (default=10, HFB=32)
+        oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
         oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
-        oSpec.single = true; % Convert to double to single (if doGPU=true)
+        oSpec.single = false; % Run & save as single (single much faster on GPU)
+        oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
         oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oSpec.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
+        oSpec.norm = false;
         oSpec.doBadFrames = false;
+        oSpec.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+        oSpec.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+        oSpec.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+        oSpec.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
+        oSpec.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
+        oSpec.hiPassGPU = false; % GPU slower than CPU??
 
         % Run
         try disp("Starting spec: "+sbj);
@@ -138,58 +218,38 @@ for s = 1:height(statusPP) % Subject loop
         catch ME; warning("ERROR spec: "+sbj); getReport(ME)
             statusPP.errorSpec{s} = {lastwarn,ME};
             statusPP.spec(s) = 0;
-            %try parfevalOnAll(@gpuDevice,0,[]); catch;end
-            %try reset(gpuDevice(1)); catch;end
+            try parfevalOnAll(@gpuDevice,0,[]); catch;end
+            try reset(gpuDevice()); catch;end
             try delete(gcp('nocreate')); catch;end
         end
-    end
-
-    %% Spec on IC timecourses
-    if doICAspec && statusPP.speci(s)~=1
-        % Modify options
-        oSpec = o;
-        oSpec.suffix = "is";
-        oSpec.sfx_src = "i";
-        oSpec.fName = "spec"; % Name of frequency analysis
-        oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
-        oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
-        oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
-        oSpec.single = true; % Convert to double to single (if doGPU=true)
-        oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oSpec.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
-        oSpec.doBadFrames = false;
-
-        % Run
-        try disp("Starting spec: "+sbj);
-            errSpec = ec_preprocTimeFreq(sbj,task,oSpec,save=1,ica=1,dirs=dirs);
-            if nnz(~cellfun(@isempty,errSpec)); statusPP.errorSpeci{s}=errSpec; end
-            statusPP.speci(s) = 1; disp("Finished spec: "+sbj);
-            try reset(gpuDevice(1)); catch;end
-        catch ME; warning("ERROR spec: "+sbj); getReport(ME)
-            statusPP.errorSpeci{s} = {lastwarn,ME};
-            statusPP.speci(s) = 0;
-            %try parfevalOnAll(@gpuDevice,0,[]); catch;end
-            %try reset(gpuDevice(1)); catch;end
-            try delete(gcp('nocreate')); catch;end
+        if ~isTest
+            statusPP.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(sbjFinFn,"statusPP");
         end
     end
 
     %% HFB: high-frequency broadband decomposition
-    if doHFB && statusPP.HFB(s)~=1
+    if doHFB && statusPP.HFB(s)~=1 %&& statusPP.LFP(s)==1
         % Modify options
         oHFB = o;
         oHFB.suffix = "h";
         oHFB.sfx_src = "";
         oHFB.fName = "hfb"; % Name of frequency analysis
-        oHFB.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
+        oHFB.fLims = [60 200]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
         oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
+        oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
         oHFB.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oHFB.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
+        oHFB.norm = false;
         oHFB.doBadFrames = true;
+        oHFB.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+        oHFB.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+        oHFB.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+        oHFB.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
+        oHFB.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
+        oHFB.hiPassGPU = false; % GPU slower than CPU??
 
         % Run
         try disp("Starting HFB: "+sbj);
@@ -199,28 +259,79 @@ for s = 1:height(statusPP) % Subject loop
         catch ME; warning("ERROR HFB: "+sbj); getReport(ME)
             statusPP.errorHFB{s} = {lastwarn,ME};
             statusPP.HFB(s) = 0;
-            %try parfevalOnAll(@gpuDevice,0,[]); catch;end
-            %try reset(gpuDevice(1)); catch;end
+            try parfevalOnAll(@gpuDevice,0,[]); catch;end
+            try reset(gpuDevice()); catch;end
             try delete(gcp('nocreate')); catch;end
+        end
+        if ~isTest
+            statusPP.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(sbjFinFn,"statusPP");
         end
     end
 
+    %% Spec on IC timecourses
+    if doICAspec && statusPP.speci(s)~=1 %&& statusPP.ICA(s)==1
+        % Modify options
+        oSpec = o;
+        oSpec.suffix = "is";
+        oSpec.sfx_src = "i";
+        oSpec.fName = "spec"; % Name of frequency analysis
+        oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
+        oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
+        oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
+        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.single = false; % Run & save as single (single much faster on GPU)
+        oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
+        oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
+        oSpec.norm = false;
+        oSpec.doBadFrames = false;
+        oSpec.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+        oSpec.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+        oSpec.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+        oSpec.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
+        oSpec.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
+        oSpec.hiPassGPU = false; % GPU slower than CPU??
+
+        % Run
+        try disp("Starting spec: "+sbj);
+            errSpec = ec_preprocTimeFreq(sbj,task,oSpec,save=1,ica=1,dirs=dirs);
+            if nnz(~cellfun(@isempty,errSpec)); statusPP.errorSpeci{s}=errSpec; end
+            statusPP.speci(s) = 1; disp("Finished spec: "+sbj);
+        catch ME; warning("ERROR spec: "+sbj); getReport(ME)
+            statusPP.errorSpeci{s} = {lastwarn,ME};
+            statusPP.speci(s) = 0;
+            try parfevalOnAll(@gpuDevice,0,[]); catch;end
+            try reset(gpuDevice(1)); catch;end
+            try delete(gcp('nocreate')); catch;end
+        end
+        if ~isTest
+            statusPP.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(sbjFinFn,"statusPP");
+        end
+    end
 
     %% HFB decomposition on IC timecourses
-    if doICAhfb && statusPP.HFBi(s)~=1
+    if doICAhfb && statusPP.HFBi(s)~=1 %&& statusPP.HFB(s)==1
         % Modify options
         oHFB = o;
         oHFB.suffix = "ih";
         oHFB.sfx_src = "i";
         oHFB.fName = "hfb"; % Name of frequency analysis
-        oHFB.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
+        oHFB.fLims = [60 200]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
         oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
+        oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
         oHFB.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oHFB.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
+        oHFB.norm = false;
         oHFB.doBadFrames = true;
+        oHFB.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
+        oHFB.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
+        oHFB.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
+        oHFB.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
+        oHFB.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
+        oHFB.hiPassGPU = false; % GPU slower than CPU??
 
         % Run
         try disp("Starting HFB: "+sbj);
@@ -230,15 +341,26 @@ for s = 1:height(statusPP) % Subject loop
         catch ME; warning("ERROR HFB: "+sbj); getReport(ME)
             statusPP.errorHFBi{s} = {lastwarn,ME};
             statusPP.HFBi(s) = 0;
-            %try parfevalOnAll(@gpuDevice,0,[]); catch;end
-            %try reset(gpuDevice(1)); catch;end
+            try parfevalOnAll(@gpuDevice,0,[]); catch;end
+            try reset(gpuDevice(1)); catch;end
             try delete(gcp('nocreate')); catch;end
+        end
+        if ~isTest
+            statusPP.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(sbjFinFn,"statusPP");
         end
     end
 
-    %% Log progress
-    statusPP.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-    save(sbjFinFn,"statusPP");
+
 end
 
-save
+% %% Initialize iEEG & task data for desired sampling rate
+%  NOTE: not necessary as this is called within the below functions
+%  if doPsy && statusPP.psy(s)~=1
+%    try [errPsy,o,n] = ec_initialize(sbj,task,o,dirs=dirs,save=1);
+%        if nnz(~cellfun(@isempty,errPsy)); statusPP.errorPsy{s}=errPsy; end
+%        statusPP.psy(s)=1;
+%    catch ME; warning("ERROR ec_initialize: "+sbj); getReport(ME)
+%        statusPP.errorPsy{s} = {lastwarn,ME}; statusPP.psy(s)=0;
+%    end
+% end

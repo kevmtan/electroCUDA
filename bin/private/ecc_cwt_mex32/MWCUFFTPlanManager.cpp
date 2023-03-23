@@ -1,4 +1,4 @@
-// Copyright 2019-2020 The MathWorks, Inc.
+// Copyright 2019-2022 The MathWorks, Inc.
 #include "MWCUFFTPlanManager.hpp"
 #include "MWCudaMemoryFunctions.hpp"
 
@@ -34,10 +34,10 @@ class CUFFTPlanConfig {
         , m_odist(odist)
         , m_type(type)
         , m_batch(batch) {
-        if (inembed != NULL) {
+        if (inembed != nullptr) {
             m_inembed = std::vector<int>(inembed, inembed + rank);
         }
-        if (onembed != NULL) {
+        if (onembed != nullptr) {
             m_onembed = std::vector<int>(onembed, onembed + rank);
         }
     }
@@ -156,7 +156,7 @@ namespace gcutil {
 
 CUFFTPlanManager::CUFFTPlanManager()
     : m_workSize(0)
-    , m_workArea(NULL) {
+    , m_workArea(nullptr) {
 }
 
 CUFFTPlanManager& CUFFTPlanManager::getInstance() {
@@ -182,7 +182,6 @@ cufftHandle CUFFTPlanManager::acquirePlan(int rank,
     } else {
         cufftHandle handle;
         cufftCreate(&handle);
-        ;
         cufftSetAutoAllocation(handle, 0);
         size_t workSize;
         cufftMakePlanMany(handle, rank, n, inembed, istride, idist, onembed, ostride, odist, type,
@@ -197,7 +196,7 @@ cufftHandle CUFFTPlanManager::acquirePlan(int rank,
 #ifdef MW_GPUCODER_RUNTIME_LOG
         std::stringstream msgStream;
         msgStream << "Created cufftHandle : " << handle << ", workSize = " << m_workSize;
-        mwGpuCoderRuntimeLog(msgStream.str());
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
         return handle;
     }

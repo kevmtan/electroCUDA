@@ -1,4 +1,4 @@
-function [x,mask,mn] = ec_rereference(x,mask,refChs,o)
+function [x,mask] = ec_rereference(x,mask,refChs,o)
 % Noisetools function modified by Kevin Tan (2022)
 %      Modifications: compute efficiency & reduce rank reduction
 %
@@ -17,45 +17,54 @@ function [x,mask,mn] = ec_rereference(x,mask,refChs,o)
 
 %% Input validation
 arguments
-    x {mustBeFloat}
+    x (:,:){mustBeFloat}
     mask (1,:) logical = true(1,size(x,2))
     refChs {isnumeric,islogical} = 0
-    o.thresh {isnumeric} = 0
-    o.iters {mustBeGreaterThanOrEqual(o.iters,1)} = 1
-    o.forceRankCorrect logical = false
+    o.thresh (1,1) double = 3
+    o.iters (1,1) double = 1
+    %o.forceRankCorrect logical = false
 end
 if numel(mask)~=width(x); error("Mask length must equal number of channels (width of x)"); end
 if islogical(refChs) && numel(refChs)~=width(x); error("refChs (logical) length must equal number of channels (width of x)"); end
-if o.forceRankCorrect || any(refChs); doRankCorrect=true; else; doRankCorrect=false; end
-if isempty(o.thresh); o.thresh=0; end
+%if o.forceRankCorrect || any(refChs); rankCorrect=true; else; rankCorrect=false; end
 
 %% Robust reference
-rnk = ec_rank(x); % get initial data rank
-if any(refChs); mask(refChs)=false; end % exclude reference chans
-disp("Robust rereference: iter=0 | chs="+width(x)+" | refChs="+nnz(mask)+" | rank="+rnk); 
+rnk = ec_rank(x,exact=true); % get initial data rank
+if any(refChs); mask(refChs)=true; end % exclude reference chans
+disp("[ec_rereference] iter=0 | chs="+width(x)+" | refChs="+nnz(mask)+" | rank="+rnk); 
 
-% Loop across iterations
+% Iteration loop
 for t = 1:o.iters
-    % Add 1 to denomenator of mean to avoid losing data rank
-    if doRankCorrect || rnk<width(x)
-        d = 1;
-    else
-        d = 0;
-    end
+    % Robust reference w/ rank correction
+    x1 = x - (sum(x(:,mask),2,"omitnan")/(nnz(mask)+eps(0)+1)); % add 1 to denominator
+    [rnk1,tol,eig1] = ec_rank(x,exact=true);
+    eig1 = min(eig1) - tol;
 
-    % Robust reference to good chans
-    mn = sum(x(:,mask),2,"omitnan") / (nnz(mask) + d); % d in denominator for rank correction
-    x = x - mn; % reference all chans to good chans
+    % Robust reference standard method
+    x = x - (sum(x(:,mask),2,"omitnan")/(nnz(mask)+eps(0)));
+    [rnk,tol,eig] = ec_rank(x,exact=true);
+    eig = min(eig) - tol;
+
+    % Display
+    disp("[ec_rereference] iter="+t+" | chs="+width(x)+" | refChs="+nnz(mask));
+    disp("[ec_rereference] iter="+t+" | rank="+rnk+" | minEig="+eig+" (standard)");
+    disp("[ec_rereference] iter="+t+" | rank="+rnk1+" | minEig="+eig1+" (rank-corrected)");
+
+    % Keep output with largest rank
+    if rnk1>rnk || (rnk1==rnk && eig1>eig)
+        x = x1;
+        disp("[ec_rereference] iter="+t+" | used rank-corrected referencing");
+    else
+        disp("[ec_rereference] iter="+t+" | used standard referencing");
+    end
 
     % Remove outlier chans from good chans
     if o.thresh > 0
-        x_mad = mad(x,1)/mad(x(:,mask),1);
-        mask(x_mad > o.thresh) = 0; % remove outlier chans from good chans
+        x_mad = mad(x,1) ./ mad(x(:,mask),1);
+        mask(x_mad > o.thresh) = false; % remove outlier chans from good chans
     end
 
-    % Check rank
-    rnk = ec_rank(x); % Compare num chans/rank with next iteration
-    disp("Robust rereference: iter="+t+" | chs="+width(x)+" | refChs="+nnz(mask)+" | rank="+rnk); 
+    
 end
 
 

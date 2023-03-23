@@ -56,8 +56,9 @@ if thr.sns > 0
     x_bad.sns  = isoutlier(ol,"median",ThresholdFactor=thr.sns);
     ch_bad.("sns"+sfx) = false(nChs,1); 
     ch_bad.("snsP"+sfx) = sum(ol,"omitnan")';
-    [~,~,thrHi] = isoutlier(ch_bad.("snsP"+sfx),"median",ThresholdFactor=thr.sns);
-    ch_bad.("sns"+sfx) = ch_bad.("snsP"+sfx) > thrHi;
+    ch_bad.("sns"+sfx) = isoutlier(ch_bad.("snsP"+sfx),"median",ThresholdFactor=thr.sns);
+    %[~,~,thrHi] = isoutlier(ch_bad.("snsP"+sfx),"median",ThresholdFactor=thr.sns);
+    %ch_bad.("sns"+sfx) = ch_bad.("snsP"+sfx) > thrHi;
 end
 
 %% Convert to sparse

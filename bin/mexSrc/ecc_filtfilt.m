@@ -1,13 +1,16 @@
 function x = ecc_filtfilt(x,coef)
-% Add kernelfun pragma to trigger kernel creation
-coder.gpu.kernelfun;
-nCh = size(x,2);
-ii = 1:size(x,1);
+% arguments
+%     x (:,:) double
+%     coef(1,:) double
+% end
+coder.gpu.kernelfun; % Add kernelfun pragma to trigger kernel creation
+%nChs = width(x);
 
-%% Zero-phase filtering
-for ch = 1:nCh
-   x(ii,ch) = filtfilt(coef,1,x(ii,ch));
-end
-
+x = filtfilt(coef,1,x);
 
 
+% % filtfilt
+% coder.gpu.kernel(nChs,-1)
+% for ch = 1:nChs
+%      x(:,ch) = filtfilt(coef,1,x(:,ch));
+% end

@@ -33,10 +33,11 @@ extern emlrtCTX emlrtRootTLSGlobal;
 extern emlrtContext emlrtContextGlobal;
 
 // Function Declarations
-void ecc_cwt(const emxArray_real_T *x, real_T fs, real_T fLims[2],
-             real_T fOctave, emxArray_real_T *xx, emxArray_real_T *freqs);
+void ecc_cwt(const emxArray_real_T *cpu_x, real_T fs, real_T cpu_fLims[2],
+             real_T fOctave, real_T ds2, emxArray_real_T *cpu_xx,
+             emxArray_real_T *cpu_freqs);
 
-void ecc_cwt_api(const mxArray *const prhs[4], int32_T nlhs,
+void ecc_cwt_api(const mxArray *const prhs[5], int32_T nlhs,
                  const mxArray *plhs[2]);
 
 void ecc_cwt_atexit();

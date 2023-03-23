@@ -1,4 +1,4 @@
-// Copyright 2021 The MathWorks, Inc.
+// Copyright 2021-2022 The MathWorks, Inc.
 
 #include "MWMemoryManager.hpp"
 
@@ -268,7 +268,7 @@ cudaError_t CudaAllocator::rawMalloc(void** devPtr, size_t size, MallocMode mode
        << " devPtr: " << std::setw(13) << *devPtr
        << " size: " << getSizeString(size)
        << " mode: " << std::setw(10) << mallocModeStr;
-    gcutil::mwGpuCoderRuntimeLog(ss.str());
+    mwGpuCoderRuntimeLog(ss.str().c_str());
 #endif
     return status;
 }
@@ -277,7 +277,7 @@ cudaError_t CudaAllocator::rawFree(void* devPtr) {
 #ifdef MW_GPUCODER_RUNTIME_LOG
     std::stringstream ss;
     ss << "rawFree    CudaAllocator:      " << " devPtr: " << std::setw(13) << devPtr;
-    gcutil::mwGpuCoderRuntimeLog(ss.str());
+    mwGpuCoderRuntimeLog(ss.str().c_str());
 #endif
     return cudaFree(devPtr);
 }
@@ -293,13 +293,13 @@ MemoryBlock::MemoryBlock(MemoryPool* pool, void* data, size_t size, bool logging
     fSize(size),
     fLoggingEnabled(loggingEnabled) {
     
-    gcassert(fPool != NULL);
-    gcassert(fData != NULL);
+    gcassert(fPool != nullptr);
+    gcassert(fData != nullptr);
     gcassert(fSize > 0);
 #ifdef MW_GPUCODER_RUNTIME_LOG
         std::stringstream msgStream2;
         msgStream2 << "new        MemoryBlock:      " << *this;
-        gcutil::mwGpuCoderRuntimeLog(msgStream2.str());
+        mwGpuCoderRuntimeLog(msgStream2.str().c_str());
 #endif
 }
 
@@ -355,7 +355,7 @@ MemoryBlock* MemoryBlock::split(size_t size) {
 }
 
 void MemoryBlock::mergeWithPrev() {
-    gcassert(fPrev != NULL);
+    gcassert(fPrev != nullptr);
     fData = fPrev->fData;
     fSize += fPrev->fSize;
     if (fPrev->fPrev) {
@@ -365,7 +365,7 @@ void MemoryBlock::mergeWithPrev() {
 }
 
 void MemoryBlock::mergeWithNext() {
-    gcassert(fNext != NULL);
+    gcassert(fNext != nullptr);
     fSize += fNext->fSize;
     if (fNext->fNext) {
         fNext->fNext->fPrev = this;
@@ -374,7 +374,7 @@ void MemoryBlock::mergeWithNext() {
 }
 
 void MemoryBlock::insertBefore(MemoryBlock* block) {
-    gcassert(block != NULL);
+    gcassert(block != nullptr);
     gcassert(block != this);
     gcassert(block->pool() == fPool);
     fPrev = block->fPrev;
@@ -386,7 +386,7 @@ void MemoryBlock::insertBefore(MemoryBlock* block) {
 }
 
 void MemoryBlock::insertAfter(MemoryBlock* block) {
-    gcassert(block != NULL);
+    gcassert(block != nullptr);
     gcassert(block != this);
     gcassert(block->pool() == fPool);
     fPrev = block;
@@ -423,11 +423,11 @@ bool MemoryBlock::operator<(const MemoryBlock& rhs) const {
 }
 
 bool MemoryBlock::PointerCompare::operator()(const MemoryBlock* lhs, const MemoryBlock* rhs) const {
-    if (lhs == NULL && rhs == NULL) {
+    if (lhs == nullptr && rhs == nullptr) {
         return false;
-    } else if (lhs == NULL) {
+    } else if (lhs == nullptr) {
         return true;
-    } else if (rhs == NULL) {
+    } else if (rhs == nullptr) {
         return false;
     } else {
         return *lhs < *rhs;
@@ -472,7 +472,7 @@ MemoryPool::MemoryPool(void* data, size_t size, Allocator& allocator,
 #ifdef MW_GPUCODER_RUNTIME_LOG
     std::stringstream msgStream;
     msgStream << "new         MemoryPool:      " << data << ":" << getSizeString(size);
-    gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+    mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
 }
 
@@ -481,7 +481,7 @@ MemoryPool::~MemoryPool() {
 #ifdef MW_GPUCODER_RUNTIME_LOG
     std::stringstream msgStream1;
     msgStream1 << "delete     MemoryBlock:      " << **(fFreeBlocks.begin());
-    gcutil::mwGpuCoderRuntimeLog(msgStream1.str());
+    mwGpuCoderRuntimeLog(msgStream1.str().c_str());
 #endif
     delete (*(fFreeBlocks.begin()));
     fAllocator.rawFree(fData);
@@ -520,7 +520,7 @@ MemoryBlock* MemoryPool::allocateBlock(size_t size) {
     MemoryBlockIter iter = fFreeBlocks.lower_bound(&tempBlock);
     gcassert(iter != fFreeBlocks.end());
     MemoryBlock* const freeBlock = *iter;
-    MemoryBlock* block = NULL;
+    MemoryBlock* block = nullptr;
     if (fConfig.mustSplitBlock(freeBlock->size(), size)) {
         fFreeBlocks.erase(iter);
         block = freeBlock->split(size);
@@ -529,7 +529,7 @@ MemoryBlock* MemoryPool::allocateBlock(size_t size) {
         block = freeBlock;
         fFreeBlocks.erase(iter);
     }
-    if (block->prev() == NULL) {
+    if (block->prev() == nullptr) {
         fFirstBlock = block;
     }
     block->setAllocated(true);
@@ -537,7 +537,7 @@ MemoryBlock* MemoryPool::allocateBlock(size_t size) {
 #ifdef MW_GPUCODER_RUNTIME_LOG
     std::stringstream msgStream;
     msgStream << "allocate   MemoryBlock:      " << *block;
-    gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+    mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
     
     return block;
@@ -550,7 +550,7 @@ void MemoryPool::deallocateBlock(MemoryBlock* memoryBlock) {
 #ifdef MW_GPUCODER_RUNTIME_LOG
     std::stringstream msgStream;
     msgStream << "deallocate MemoryBlock:      " << *memoryBlock;
-    gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+    mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
     
     mergeBlock(memoryBlock);
@@ -563,25 +563,25 @@ void MemoryPool::mergeBlock(MemoryBlock* block) {
 
     // If the previus block is not allocated, merge them and return
     MemoryBlock* prevBlock = block->prev();
-    if (prevBlock != NULL && !prevBlock->isAllocated()) {
+    if (prevBlock != nullptr && !prevBlock->isAllocated()) {
         fFreeBlocks.erase(prevBlock);
         block->mergeWithPrev();
 #ifdef MW_GPUCODER_RUNTIME_LOG
         std::stringstream msgStream;
         msgStream << "merge      MemoryBlock:      " << *prevBlock;
-        gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
         delete prevBlock;
     }
     // If the next block is not allocated, merge thema nd return
     MemoryBlock* nextBlock = block->next();
-    if (nextBlock != NULL && !nextBlock->isAllocated()) {
+    if (nextBlock != nullptr && !nextBlock->isAllocated()) {
         fFreeBlocks.erase(nextBlock);
         block->mergeWithNext();
 #ifdef MW_GPUCODER_RUNTIME_LOG
         std::stringstream msgStream;
         msgStream << "merge      MemoryBlock:      " << *nextBlock;
-        gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
         delete nextBlock;
     }
@@ -614,7 +614,7 @@ void MemoryManager::deletePools() {
         std::stringstream msgStream;
         msgStream << "delete      MemoryPool:      " << pool->data()
                   << ":" << getSizeString(pool->size());
-        gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
         delete pool;
     }
@@ -626,7 +626,7 @@ void MemoryManager::deletePools() {
         std::stringstream msgStream;
         msgStream << "delete      MemoryPool:      " << pool->data()
                   << ":" << getSizeString(pool->size());
-        gcutil::mwGpuCoderRuntimeLog(msgStream.str());
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
 #endif
         delete pool;
     }
@@ -640,7 +640,7 @@ cudaError_t MemoryManager::handleTerminate() {
 }
 
 cudaError_t MemoryManager::deallocateImpl(void* devPtr) {
-    if (devPtr == NULL) {
+    if (devPtr == nullptr) {
         return cudaSuccess;
     }
 
@@ -670,7 +670,7 @@ cudaError_t MemoryManager::deallocateImpl(void* devPtr) {
 cudaError_t MemoryManager::allocateImpl(void** devPtr, const size_t size, const MallocMode mode) {
     cudaError_t status = cudaSuccess;
     if (size == 0) {
-        *devPtr = NULL;
+        *devPtr = nullptr;
         return status;
     }
 
@@ -682,7 +682,7 @@ cudaError_t MemoryManager::allocateImpl(void** devPtr, const size_t size, const 
     const size_t blockSize = fConfig.calculateBlockSize(size);
     MemoryPool* suitablePool = getFirstSuitableMemoryPool(blockSize, mode);
     
-    if (suitablePool == NULL) {
+    if (suitablePool == nullptr) {
         // If no pool could be found, allocate a new pool
         const size_t poolSize = fConfig.calculatePoolSize(blockSize, mode);
         status = allocatePool(poolSize, mode, suitablePool);
@@ -722,7 +722,7 @@ cudaError_t MemoryManager::allocatePool(size_t size,
                                         MallocMode mode,
                                         MemoryPool*& pool) {
     // Allocate raw memory
-    void* data = NULL;
+    void* data = nullptr;
     cudaError_t status = fAllocator.rawMalloc(&data, size, mode);
     if (status != cudaSuccess) {
         return status;
@@ -746,7 +746,7 @@ MemoryPool* MemoryManager::getFirstSuitableMemoryPool(size_t size, MallocMode mo
             return pool;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 void MemoryManager::freeEmptyPools() {
@@ -826,7 +826,7 @@ void MemoryManager::printMemoryMap() {
         printMemoryPools(ss, fUnifiedPools);
     }
     ss << "////////////////////////////////////////////////////////////////////////////////////////////////////";    
-    gcutil::mwGpuCoderRuntimeLog(ss.str());
+    mwGpuCoderRuntimeLog(ss.str().c_str());
 }
 #endif
 

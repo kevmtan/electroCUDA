@@ -83,12 +83,12 @@ if ~isempty(wtsIn)
 end
 
 %% Ensure data not rank-deficient
-xRank = ec_rank(x,true);
-disp("Num components="+nChs+" | Data rank="+xRank);
+xRank = ec_rank(x,exact=1);
+disp("ICA input data: components="+nChs+" | rank="+xRank);
 if nComps>xRank && (isempty(arg.pca) || arg.pca==1)
     arg.pca = xRank;
     nComps = xRank;
-    warning("[ec_cudaica] Data is rank deficient, reducing to "+xRank+" components with PCA");
+    warning("[ec_cudaica] Data is rank-deficient, reducing to "+xRank+" components with PCA");
 elseif arg.pca>1
     arg.pca = arg.pca;
     nComps = arg.pca;
@@ -134,12 +134,7 @@ ica.cfg = sc;
 writematrix(sc,fnSc,'Delimiter',' ',"FileType","text");
 
 %% Write data
-prec = 'float';
-% if isa(x,'double')
-%     prec = 'float64';
-% else
-%     prec = 'float';
-% end
+prec = 'float'; % must save as single-precision float binary
 
 % EEG data
 x = x';
@@ -153,7 +148,7 @@ if ~isempty(wtsIn) && isnumeric(wtsIn)
     fwrite(fID,wtsIn,prec);
     fclose(fID);
 end
-if arg.dry; return; end
+if arg.dry; return;end
 
 %% Run CUDAICA
 [~,cmdout] = system(cudaica_bin+" -f "+fnSc,'-echo');

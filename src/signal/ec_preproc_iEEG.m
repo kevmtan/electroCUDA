@@ -54,12 +54,12 @@ arguments
     arg.test logical = false
 end
 blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; arg.save=0; arg.redo=1; arg.redoN=1; arg.test=1;
+% x=[]; n=[]; arg.save=0; arg.redo=0; arg.redoN=1; arg.test=1;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs=ec_getDirs(dirs,sbj,task); end
 if ~exist('blocks','var')||isempty(blocks); blocks=BlockBySubj(sbj,task); end
-if o.detrendGPU>0 || o.asr.gpu; reset(gpuDevice()); end
+if o.detrendGPU>0 || o.asr.doGPU; reset(gpuDevice()); end
 % % Filtering
 % if ~isfield(o,'hiPass');        o.hiPass=0; end
 % % Detrending
@@ -99,7 +99,7 @@ fs = floor(n.fs);
 ch_bad = chNfo.bad;
 n.task = task;
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
-try ppool=parpool('threads'); catch;end %#ok<*NASGU> 
+try parpool('threads'); catch;end 
 
 %% Load EEG data
 if isempty(x)
@@ -111,10 +111,21 @@ if isempty(x)
     ch_bad.nan(chNan) = true;
     toc(tt);
 end
-if arg.test; xOg=x; else; xOg=[]; end
+if arg.test; xOg=x; else; xOg=[]; end %#ok<*NASGU> 
 n.xChs = width(x);
 n.xFrames = height(x);
 n.dirs = dirs;
+
+%% Fill missing
+if isany(o.missingInterp)
+    for ir = 1:n.nRuns
+        rIdx = n.runIdx(ir,1):n.runIdx(ir,2); % Run indices
+        if any(ismissing(x(rIdx,:)),"all")
+            x(rIdx,:) = fillmissing(x(rIdx,:),"knn",25);
+            disp("Interpolated missing: "+runs(ir)+" time="+toc(o.tic));
+        end
+    end
+end
 
 %% Classify bad EEG channels
 if o.doBadCh
@@ -165,115 +176,176 @@ else
 end
 toc(tt);
 
-%% Robust detrend
-if nnz(o.detrendOrder) 
+
+%% Robust detrend (pre-reference)
+if nnz(o.detrendOrder)
     [n,x] = ec_detrend(n,x,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
-        win=o.detrendWin,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,tic=tt);
+        win=o.detrendWin,gpu=o.detrendGPU,single=o.detrendSingle,...
+        tic=tic); %tic=tt;
     if arg.test; x_detr=x; end
+
+    % Get detrend outlier chans
+    chDetr = sum(full(n.xBad.detrend),"omitnan"); 
+    [~,~,thr] = isoutlier(chDetr,"quartiles");
+    ch_bad.("detrend"+sfx) = chDetr' > thr;
+    ch_bad.("detrendP"+sfx) = chDetr';
 end
 % vis_artifacts(ec_exportEEGLAB(n,x_detr,psy,trialNfo,chNfo), ec_exportEEGLAB(n,xOg,psy,trialNfo,chNfo));
 
+% [n,x] = ec_detrend2(n,x,poly=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
+%     win=o.detrendWin,outlier=o.detrendOL,interp=o.detrendInterp,gpu=o.detrendGPU,...
+%     single=o.detrendSingle); %,tic=tt);
+% if arg.test; x_detr=x; end
+
+
 %% HPF
 if isany(o.hiPass) % HPF within-run to avoid edge artifacts
-    [n,x] = ec_HPF(n,x,tt,hpf=o.hiPass,missing=o.missingInterp,gpu=o.hiPassGPU,sfx=sfx);
+    [n,x] = ec_HPF(n,x,tt,hpf=o.hiPass,steepness=o.hiPassSteep,gpu=o.hiPassGPU);
     if arg.test; x_hpf=x; end
 end
-% vis_artifacts(ec_exportEEGLAB(n,x_hpf,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_zap,psy,trialNfo,chNfo));
+% vis_artifacts(ec_exportEEGLAB(n,x_hpf,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_detr,psy,trialNfo,chNfo));
+
+
+%% Power line noise removal (cleanline)
+% if any(o.lineHz)
+%     [x,n.cleanline] = ec_cleanline(ec_exportEEGLAB(n,x,psy,trialNfo,chNfo),...
+%         'LineFrequencies',o.lineHz,'SlidingWinLength',3,'p',0.01,'iter',10,...
+%         'SlidingWinStep',1.5,'Bandwidth',1,'VerboseOutput',1);
+%     disp("[ec_preproc] Finished cleanline: "+sbj+" time="+toc(tt));
+%     if arg.test; x_line=x; end
+% end
+% % vis_artifacts(ec_exportEEGLAB(n,x_line,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_hpf,psy,trialNfo,chNfo));
+
 
 %% Robust rereference
 if o.doRereference
-    % Figure out chans to include
+    % Figure out chans to include for average reference
     if isany(o.hiPass)
         [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,n.xBad,sfx,n.xBad.detrend,...
             mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     end
-    % Detrend outlier chans
-    chDetr = sum(full(n.xBad.detrend),"omitnan"); % Detrend outlier chans
-    [~,~,thr] = isoutlier(chDetr,"quartiles");
-    chDetr = chDetr' > thr;
     % Save for robust reference chans
     if ~isempty(sfx1)
         ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx1)|...
             sum([ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),ch_bad.("sns"+sfx)*2,...
             ch_bad.("cov"+sfx1),ch_bad.("dev"+sfx1)*2,ch_bad.("grad"+sfx1),...
-            ch_bad.("hurstL"+sfx1),ch_bad.("hurstH"+sfx1),chDetr],2)>=3;
+            ch_bad.("hurstL"+sfx1),ch_bad.("hurstH"+sfx1),ch_bad.("detrend"+sfx1)],2)>=3;
         chGood = ~ch_bad.("bad"+sfx); disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
     else
         chGood = chGood && sum([ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),...
-            ch_bad.("sns"+sfx)*2,chDetr],2)<=3;
+            ch_bad.("sns"+sfx)*2,ch_bad.("detrend"+sfx)],2)<=3;
     end
 
     % Run rereference
-    [x,chGood] = ec_rereference(x,chGood',ch_bad.ref); % rank correct previous referencing
+    [x,chGood] = ec_rereference(x,chGood',ch_bad.ref,thresh=o.rrThr,iters=o.rrItr); % rank correct previous referencing
     chGood=chGood'; ch_bad.("rr"+sfx)=~chGood; n.refChs=find(chGood);
-    disp("Finished robust referencing"); toc(tt);
+    disp("[ec_preproc] Finished robust referencing: "+sbj+" time="+toc(tt));
     if arg.test; x_rr=x; end
 end
-% vis_artifacts(ec_exportEEGLAB(n,x_rr,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_detr,psy,trialNfo,chNfo));
+% vis_artifacts(ec_exportEEGLAB(n,x_rr,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_hpf,psy,trialNfo,chNfo));
 
-%% Post-rereference detrend
+
+%% Robust detrend (post-reference)
 if nnz(o.detrendOrder2) % Detrend
     [n,x] = ec_detrend(n,x,order=o.detrendOrder2,thr=o.detrendThr2,itr=o.detrendItr2,...
-        win=o.detrendWin2,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,tic=tt);
+        win=o.detrendWin2,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,...
+        tic=tic);
     if arg.test; x_detr2=x; end
+
+    % Get detrend outlier chans
+    chDetr = sum(full(n.xBad.detrend),"omitnan"); 
+    [~,~,thr] = isoutlier(chDetr,"quartiles");
+    ch_bad.("detrend"+sfx) = chDetr' > thr;
+    ch_bad.("detrendP"+sfx) = chDetr';
 end
 % vis_artifacts(ec_exportEEGLAB(n,x_detr2,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_rr,psy,trialNfo,chNfo));
 
-%% High-frequency oscillations (HFO)
+
+%% Power line noise removal (zapline)
+if o.lineHz > 0
+    % Zapline
+    [x,~,n.zapline] = ec_zaplinePlus(x,fs,'noisefreqs',o.lineHz,'detectionWinsize',4,...
+       'noiseCompDetectSigma',3.5,'minsigma',3);
+    disp("[ec_preproc] Finished zapline power line noise removal: sbj="+...
+        sbj+" time="+toc(tt));
+    if arg.test; x_zap=x; end
+end
+% vis_artifacts(ec_exportEEGLAB(n,x_zap,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_detr2,psy,trialNfo,chNfo));
+
+
+%% Detect epileptic high-frequency oscillations (HFO)
 if o.thrHFO > 0
     [n,ch_bad,errors] = hfo_lfn(n,x,ch_bad,dirs,task,o,errors);
 end
 chNfo.bad = ch_bad;
 
-%% Power line noise removal
-if o.lineHz > 0
-    % Zapline
-    [x,~,n.lineNoise] = ec_zaplinePlus(x,fs,'noisefreqs',o.lineHz);
-    disp([sbj ': finished power line noise removal']); toc(tt);
-    % Cleanline (TO DO)
 
-    % Save
-    if arg.save
-        % Save n struct
-        fn = o.dirOut+"nz_"+o.fnStr;
-        save(fn,"n","-v7.3"); disp("SAVED: "+fn);
-        % Save processed iEEG data
-        fn = o.dirOut+"xz_"+o.fnStr;
-        savefast(fn,'x'); disp("SAVED: "+fn);
-    end
-    if arg.test; x_zap=x; end
+%% Save pre-ASR data
+if arg.save && sfx==""
+    % Save n struct
+    n.suffix = "z";
+    fn = o.dirOut+"nz_"+o.fnStr;
+    save(fn,"n","-v7"); disp("SAVED: "+fn);
+    n.suffix = sfx;
+    % Save processed iEEG data
+    fn = o.dirOut+"xz_"+o.fnStr;
+    savefast(fn,'x'); disp("SAVED: "+fn);
 end
-% vis_artifacts(ec_exportEEGLAB(n,x_zap,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_detr2,psy,trialNfo,chNfo));
+
 
 %% Artifact Subspace Reconstruction (ASR)
 if o.asr.do
+    % Save for comparison in determining if ASR too strong
+    xz = x; 
+
+    % Decide chans to exclude
     [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,n.xBad,sfx,n.xBad.detrend,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    % Detrend chans
-    chDetr = sum(full(n.xBad.detrend),"omitnan"); [~,~,thr]=isoutlier(chDetr,"quartiles");
-    chDetr = chDetr' > thr;
-    % Decide chans to exclude
+    
     chNoASR = ch_bad.empty | ch_bad.nan | sum([ch_bad.("ai"+sfx1),...
         ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),ch_bad.("sns"+sfx)*2,...
         ch_bad.("cov"+sfx1),ch_bad.("dev"+sfx1)*2,ch_bad.("grad"+sfx1),...
-        ch_bad.("hurstL"+sfx1),ch_bad.("hurstH"+sfx1),chDetr],2)>=6;
+        ch_bad.("hurstL"+sfx1),ch_bad.("hurstH"+sfx1),ch_bad.("detrend"+sfx1)],2)>=6;
     ch_bad.("asr"+sfx)=chNoASR; n.chNoASR=find(chNoASR); o.asr.chIgnore=chNoASR; % save to asr options struct
+    asr_reps = 0;
 
     % Run ASR
-    [x,n] = ec_ASR(o.asr,n,x,psy,trialNfo,chNfo);
-    disp("Finished ASR: chans="+nnz(~chNoASR)+" | rank="+ec_rank(x(:,~chNoASR))+" | time="+toc(tt));
+    while 1
+        [x,n] = ec_ASR(o.asr,n,x,psy,trialNfo,chNfo);
+        pctDiff = nnz(abs(x-xz)>eps(1e10))/numel(x);
+
+        % Redo with more conservative params if ASR too strong
+        if pctDiff>o.asr.maxPctDiff && o.asr.refBurst<100
+            x = xz;
+            if (pctDiff-o.asr.maxPctDiff) < 0.1
+                o.asr.refBurst = o.asr.refBurst+5;
+            elseif (pctDiff-o.asr.maxPctDiff) < 0.2
+                o.asr.refBurst = o.asr.refBurst+15;
+            elseif (pctDiff-o.asr.maxPctDiff) < 0.4
+                o.asr.refBurst = o.asr.refBurst+20;
+            else
+                o.asr.refBurst = o.asr.refBurst+25;
+            end
+            if o.asr.refBurst > 100
+                o.asr.refBurst = 100;
+            end
+            asr_reps = asr_reps+1;
+            disp("[ec_prepoc] ASR TOO STRONG!!! pctDiff="+pctDiff+...
+                " | increasing refBurst="+o.asr.refBurst+" | time="+toc(tt));
+        else
+            break;
+        end
+    end
+    disp("Finished ASR: chans="+nnz(~chNoASR)+" | rank="+ec_rank(x(:,~chNoASR))+...
+        " | pctDiff="+pctDiff+" | time="+toc(tt));
     if arg.test; x_asr=x; end
+    clear xz
 end
 % vis_artifacts(ec_exportEEGLAB(n,x_asr,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_zap,psy,trialNfo,chNfo));
 
+
 %% Identify bad frames per chan
 if o.doBadFrames
-    % Channels for ASR
-    chDetr = sum(full(n.xBad.detrend),"omitnan"); % Detrend Outliers
-    [~,~,thr] = isoutlier(chDetr,"quartiles");
-    ch_bad.("detrend"+sfx) = chDetr' > thr;
-    ch_bad.("detrendP"+sfx) = chDetr';
-
     [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,n.xBad,sfx,n.xBad.detrend,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS); 
     disp("Identified bad frames per chan: "+sbj);
@@ -332,6 +404,7 @@ if arg.save
     fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
     savefast(fn,'x'); disp("SAVED: "+fn);
 end
+try reset(gpuDevice()); catch;end
 toc(tt);
 end
 

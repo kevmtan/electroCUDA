@@ -1,4 +1,4 @@
-/* Copyright 2017-2020 The MathWorks, Inc. */
+/* Copyright 2017-2022 The MathWorks, Inc. */
 
 #ifndef MW_LAUNCH_PARAMETERS_HPP
 #define MW_LAUNCH_PARAMETERS_HPP
@@ -142,8 +142,8 @@ MW_STATIC_HOST_DEVICE_INLINE bool mwGetLaunchParameters(
 
 MW_STATIC_HOST_DEVICE_INLINE bool mwApplyLaunchParameters(
     double numberOfThreads,
-    const dim3* ingrid,
-    const dim3* inblock,
+    const dim3& ingrid,
+    const dim3& inblock,
     dim3* outgrid,
     dim3* outblock,
     MW_LAUNCH_UNSIGNED_TYPE MAX_THREADS_PER_BLOCK,
@@ -155,12 +155,12 @@ MW_STATIC_HOST_DEVICE_INLINE bool mwApplyLaunchParameters(
         return false;
     }
     // if input dims are not valid, use default computation.
-    if (!mwValidDim3(ingrid) || !mwValidDim3(inblock) || !mwWithBlockSizeLimits(inblock)) {
+    if (!mwValidDim3(&ingrid) || !mwValidDim3(&inblock) || !mwWithBlockSizeLimits(&inblock)) {
         return mwGetLaunchParameters(numberOfThreads, outgrid, outblock, MAX_THREADS_PER_BLOCK,
                                      MAX_BLOCKS_PER_GRID_DIM);
     }
-    *outgrid = *ingrid;
-    *outblock = *inblock;
+    *outgrid = ingrid;
+    *outblock = inblock;
     mwWrapToMultipleOf32(outblock);
     return true;
 }

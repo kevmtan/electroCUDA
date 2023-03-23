@@ -47,13 +47,13 @@ emlrtCTX mexFunctionCreateRootTLS()
 void unsafe_ecc_cwtAvg_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                                    const mxArray *prhs[4])
 {
+  const mxArray *b_prhs[4];
   const mxArray *outputs[2];
   int32_T b;
   // Check for proper number of arguments.
   if (nrhs != 4) {
-    emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,
-                        "EMLRT:runTime:WrongNumberOfInputsFAVDefaultValues", 5,
-                        12, 4, 4, 10, "ecc_cwtAvg");
+    emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal, "EMLRT:runTime:WrongNumberOfInputs",
+                        5, 12, 4, 4, 10, "ecc_cwtAvg");
   }
   if (nlhs > 2) {
     emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,
@@ -61,7 +61,11 @@ void unsafe_ecc_cwtAvg_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                         "ecc_cwtAvg");
   }
   // Call the function.
-  ecc_cwtAvg_api(prhs, nlhs, outputs);
+  b_prhs[0] = prhs[0];
+  b_prhs[1] = prhs[1];
+  b_prhs[2] = prhs[2];
+  b_prhs[3] = prhs[3];
+  ecc_cwtAvg_api(b_prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
     b = 1;
