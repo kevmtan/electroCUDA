@@ -66,24 +66,15 @@ blocks=arg.blocks; dirs=arg.dirs;
 if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
 if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,task); end
 try parpool('threads'); catch;end
-reset(gpuDevice()); 
+reset(gpuDevice());
+errors = {};
 tt = tic;
 
-% Load metadata
-[errors,o,n,chNfo,~,~] = ec_initialize(sbj,task,o,n,dirs=dirs,save=arg.save,...
-    redoN=arg.redoN); % Load metadata
-cd(o.dirOut); % set working directory to subject dir
-
 % Load EEG data
-if isempty(x) && arg.raw
-    [x,errors,chNan] = load_iEEG_LBCN(sbj,task,blocks,dirs,errors); toc(tt);
-    chNfo.bad.nan(chNan) = true;
-elseif isempty(x)
-    x = ec_loadSbj(dirs,o.sfx_src,"x");
+if isempty(x)
+    [n,x,~,~,chNfo] = ec_loadSbj(dirs,o.sfx_src);
 end
-if ~isempty(x)
-    xOg = x; % Save input data for later
-end
+xOg = x;
 
 % Suffixes
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
@@ -118,14 +109,14 @@ sfxB = "";
 
 %% Robust detrending (temporary, aggressive for better ICA decomposition)
 if nnz(o.detrendOrder)
-    [n,x] = ec_detrend(n,x,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
+    [x,n] = ec_detrend(x,n,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
         win=o.detrendWin,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,tic=tt);
     if arg.test; x_detr=x; end %#ok<*NASGU>
 end
 
 %% High-pass filtering (temporary, aggressive for better ICA decomposition)
 if nnz(o.hiPassICA) % HPF within-run to avoid edge artifacts
-    [n,x] = ec_HPF(n,x,tt,hpf=o.hiPassICA,missing=o.missingInterp,gpu=o.hiPassGPU,...
+    [x,n] = ec_HPF(x,n,o.hiPassICA,tt,missing=o.missingInterp,gpu=o.hiPassGPU,...
         steepness=o.hiPassSteep);
     if arg.test; x_hpf=x; end
 end
@@ -323,6 +314,7 @@ n.icaPCA = o.ica_pca;
 n.icOLidx = ol_idx;
 n.icOLpct = ol_pct;
 n.icOLq = ol_Q;
+n.xBad.ica = ol_idx;
 chNfo.("ica"+sfx1)(:) = false;
 chNfo.("ica"+sfx1)(chICA) = true;
 ch_bad.("ica"+sfx1) = sparse(~chNfo.("ica"+sfx1));
@@ -352,7 +344,7 @@ if isfield(arg,"nIn")
 end
 
 %% Infomax ICA compiled in CUDA
-ica = ec_cudaica(x(~idxOL,chICA),dirs.cudaica,ic_wtsIn,verbose="off",...
+ica = ec_cudaica(x(~idxOL,chICA),dirs.cudaica,ic_wtsIn,verbose=o.ica_verbose,...
     pca=o.ica_pca,dir=o.dirOut,sfx=sfx,lrate=o.ica_lrate,stop=o.ica_stop,maxsteps=o.ica_maxItr);
 nICs = height(ica.wts);
 disp("Finished CUDAICA: "+sbj); toc(tt);

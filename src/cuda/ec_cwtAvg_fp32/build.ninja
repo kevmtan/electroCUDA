@@ -1,0 +1,59 @@
+# CompilerName=gcc
+# Mode=optim
+ninja_required_version = 1.3
+
+# Basic folders
+root = .
+builddir = $root/build/glnxa64
+matlabdir = /usr/local/MATLAB/R2023a
+startdir = /home/kt/Gdrive/Git/electroCUDA/src/cuda
+
+# Toolchain information
+cc = gcc
+cxx = /usr/bin/g++
+linker = gcc
+linkerxx = /usr/bin/g++
+
+cflags =  -fexceptions -fPIC -fno-omit-frame-pointer -pthread -D_GNU_SOURCE -DMATLAB_MEX_FILE  -O2 -fwrapv -DNDEBUG -fvisibility=hidden -std=c99 -I "$root" -I "$startdir" -I "$root/interface" -I "$matlabdir/extern/include" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "." -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_cwtAvg_fp32 -DMW_NEEDS_VERSION_H -c 
+
+cxxflags =  -fexceptions -fPIC -fno-omit-frame-pointer -pthread -D_GNU_SOURCE -DMATLAB_MEX_FILE  -O2 -fwrapv -DNDEBUG -fvisibility=hidden -fno-gnu-unique -std=c++11 -I "$root" -I "$startdir" -I "$root/interface" -I "$matlabdir/extern/include" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "." -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_cwtAvg_fp32 -DMW_NEEDS_VERSION_H -c 
+
+ldflags =  -Xlinker --no-undefined  -shared -lstdc++ -Xlinker --as-needed -Xlinker -rpath-link,$matlabdir/bin/glnxa64 -L"$matlabdir/bin/glnxa64" -Xlinker -rpath-link,$matlabdir/extern/bin/glnxa64 -L"$matlabdir/extern/bin/glnxa64" -lMatlabDataArray -lmx -lmex -lm -lmat  -Xlinker -Bsymbolic -o ec_cwtAvg_fp32.mexa64 -Xlinker --exclude-libs,ALL -lemlrt -lcovrt -lut -lmwmathutil -arch sm_86  --fmad=false --extra-device-vectorization -I"$matlabdir/sys/cuda/glnxa64/cuda/include" -L"$matlabdir/sys/cuda/glnxa64/cuda/lib64" -l:libcudart.so.11.0 -l:libcublas.so.11 -l:libcusolver.so.11 -l:libcufft.so.10 -l:libcurand.so.10 -l:libcusparse.so.11 -lc -Xnvlink -w  -Wno-deprecated-gpu-targets
+
+linkobjs = 
+
+# Build Rules
+rule cc
+    command = $cc $cflags $in -o $out
+
+rule cxx
+    command = $cxx $cxxflags $in -o $out
+
+rule link
+    command = $linker $in $linkobjs $ldflags
+
+rule linkxx
+    command = $linkerxx $in $linkobjs $ldflags
+
+cudac = nvcc
+linkercuda = nvcc
+
+cudaflags =  -rdc=true -Wno-deprecated-gpu-targets -Xcompiler -fPIC,-fexceptions,-fno-omit-frame-pointer,-pthread -Xcudafe "--display_error_number --diag_suppress=2381 --diag_suppress=unsigned_compare_with_zero --diag_suppress=useless_type_qualifier_on_return_type" -D_GNU_SOURCE -DMATLAB_MEX_FILE -noprof -ldir "$matlabdir/bin/glnxa64" -Xcompiler -fvisibility=hidden -std=c++11 -I "$root" -I "$startdir" -I "$root/interface" -I "$matlabdir/extern/include" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "." -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_cwtAvg_fp32 -DMW_NEEDS_VERSION_H -c -arch sm_86  --fmad=false --extra-device-vectorization -I "$matlabdir/simulink/include" -I "$matlabdir/toolbox/shared/simtargets"
+rule cudac
+    command = $cudac $cudaflags $in -o $out
+
+rule linkcuda
+    command = $linkercuda $in $linkobjs $ldflags
+
+# Build
+build $builddir/MWMemoryManager.o : cudac $root/MWMemoryManager.cpp
+build $builddir/MWCUFFTPlanManager.o : cudac $root/MWCUFFTPlanManager.cpp
+build $builddir/MWCUBLASUtils.o : cudac $root/MWCUBLASUtils.cpp
+build $builddir/rt_nonfinite.o : cudac $root/rt_nonfinite.cu
+build $builddir/ec_cwtAvg.o : cudac $root/ec_cwtAvg.cu
+build $builddir/_coder_ec_cwtAvg_mex.o : cudac $root/interface/_coder_ec_cwtAvg_mex.cu
+build $builddir/_coder_ec_cwtAvg_info.o : cxx $root/interface/_coder_ec_cwtAvg_info.cpp
+build $builddir/cpp_mexapi_version.o : cudac $root/cpp_mexapi_version.cpp
+
+# Link
+build $root/ec_cwtAvg_fp32.mexa64 : linkcuda $builddir/MWMemoryManager.o $builddir/MWCUFFTPlanManager.o $builddir/MWCUBLASUtils.o $builddir/rt_nonfinite.o $builddir/ec_cwtAvg.o $builddir/_coder_ec_cwtAvg_mex.o $builddir/_coder_ec_cwtAvg_info.o $builddir/cpp_mexapi_version.o 

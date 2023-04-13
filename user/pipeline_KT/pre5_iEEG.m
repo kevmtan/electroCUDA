@@ -41,28 +41,24 @@
 %% Task info
 
 % Subject Names
-sbjs = {'S12_38_LK','S12_42_NC',...
-    'S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS','S12_39_RT',...
-    'S12_40_MJ','S12_41_KS','S12_45_LR','S13_46_JDB','S13_47_JT2','S13_50_LGM',...
-    'S13_51_MTL','S13_52_FVV','S13_53_KS2','S13_54_KDH','S13_56_THS','S13_57_TVD',...
-    'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
-    'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR',...
-    'S15_87_RL','S16_95_JOB','S16_96_LF'}';
-%sbjs = {'S12_38_LK'};
+% sbjs = ["S12_38_LK","S12_42_NC",...
+%     "S12_33_DA","S12_34_TC","S12_35_LM","S12_36_SrS","S12_39_RT",...
+%     "S12_40_MJ","S12_41_KS","S12_45_LR","S13_46_JDB","S13_47_JT2","S13_50_LGM",...
+%     "S13_51_MTL","S13_52_FVV","S13_53_KS2","S13_54_KDH","S13_56_THS","S13_57_TVD",...
+%     "S13_59_SRR","S13_60_DY","S14_62_JW","S14_66_CZ","S14_67_RH","S14_74_OD",...
+%     "S14_75_TB","S14_76_AA","S14_78_RS","S15_81_RM","S15_82_JB","S15_83_RR",...
+%     "S15_87_RL","S16_95_JOB","S16_96_LF"];
+sbjs = ["S12_39_RT","S13_57_TVD","S14_76_AA","S15_87_RL"]; 
 
-proj = 'lbcn';
-task = 'MMR'; % task name
+proj = "lbcn";
+task = "MMR"; % task name
 
-doPsy = 0; % Align EEG-behavioral task timings
 doLFP = 1; % Do preprocesing of raw EEG data
-doICA = 1; % Do independent components analysis
-
+doICA = 0; % Do independent components analysis
 doSpec = 0; % Do time-frequency decomposition for multiple frequencies
 doHFB = 0; % Do time-frequency decomposition of HFB band (average across HFB freqs)
 doICAspec = 0;
 doICAhfb = 0;
-
-doHFB_ICA = 0; % Do ICA on HFB
 
 isTest=0;
 
@@ -123,7 +119,7 @@ o.lineHz = 60; % Electricity hertz @ EEG recording site (default=50|60, skip=0)
 % ASR
 o.asr.do = true;
 o.asr.maxPctDiff = 0.15;
-o.asr.doGPU = true; % use GPU when appropriate
+o.asr.doGPU = false; % use GPU when appropriate
 o.asr.refBurst = 25; % BurstCriterion
 o.asr.refTols = [-5.5 5.5]; %[-3.5 5.5] BurstCriterionRefTolerances
 o.asr.refMaxBadChs = 0.07; % ReferenceMaxBadChannels
@@ -134,22 +130,9 @@ o.asr.blockSz = []; % Cut robust estimation by this factor (default=10)
 o.asr.filtHz =  [0  4 12 16 36 50 200 500]; % default=[]
 o.asr.filtMag = [2 .5 .5 1  1  2  1.5 2];   % default=[];
 o.asr.dimsPCA = 3/4; % Maximum dimensionality to reconstruct (default: 2/3)
-% % ASR all-chan
-% o.asr.do = false;
-% o.asr.doGPU = true; % use GPU when appropriate
-% o.asr.refBurst = 20; % BurstCriterion
-% o.asr.refTols = [-5.5 5.5]; %[-3.5 5.5] BurstCriterionRefTolerances
-% o.asr.refMaxBadChs = 0.075; % ReferenceMaxBadChannels
-% o.asr.refWinSz = 1; % Granularity at which EEG time windows are extracted for calibration purposes, in seconds. Default: 1.
-% o.asr.winSz = 0.5; % Length of stats window (secs), timescale of artifacts (default=0.5)
-% o.asr.winOverlap = 3/4; % Overlap between windows 
-% o.asr.blockSz = []; % Cut robust estimation by this factor (default=10)
-% o.asr.filtHz =  [0  4  12  16 36 48 192 500]; % default=[]
-% o.asr.filtMag = [3 1/3 1/3 1  1  2  2   3];   % default=[];
-% o.asr.dimsPCA = 0.75; % Maximum dimensionality to reconstruct (default: 2/3)
 
-% log2norm CWT output
-o.norm = false;
+% % log2norm CWT output
+% o.norm = false;
 
 %% Setup
 % % add existinge file if exist
@@ -157,8 +140,8 @@ o.norm = false;
 % load(fn,'statusPP');
 if ~exist('statusPP','var')
     statusPP = table;
-    statusPP.sbj = sbjs;
-    statusPP.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
+    statusPP.sbj = sbjs';
+    statusPP.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")))';
     statusPP.psy(:) = nan;
     statusPP.LFP(:) = nan;
     statusPP.spec(:) = nan;
@@ -175,6 +158,8 @@ if ~exist('statusPP','var')
     statusPP.errorHFBi = cell(length(sbjs),1);
     statusPP.errorSpeci = cell(length(sbjs),1);
 end
+if ~doLFP; statusPP.LFP(:)=1; end
+if ~doICA; statusPP.ICA(:)=1; end
 
 % filename of log
 sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc/preproc_'...
@@ -207,6 +192,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
             try parfevalOnAll(@gpuDevice,0,[]); catch;end
             try reset(gpuDevice()); catch;end
             try delete(gcp('nocreate')); catch;end
+            continue;
         end
         if ~isTest
             statusPP.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
@@ -215,7 +201,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
     end
 
     %% ICA: Independent components analysis
-    if doICA && statusPP.ICA(s)~=1 && statusPP.LFP(s)==1
+    if doICA && statusPP.ICA(s)~=1
         % Modify options
         oICA = o;
         oICA.suffix = "i";
@@ -224,6 +210,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oICA.ica_lrate = 1e-4; % starting learning rate
         oICA.ica_stop = 1e-10; % stopping learning rate
         oICA.ica_maxItr = 1024; % max iterations
+        oICA.ica_verbose = "off";
         oICA.doRereference = false;
         oICA.hiPassICA = []; %[0.75 1.25]; % temporary - only used for ICA input
         oICA.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
@@ -270,8 +257,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = false; % Run & save as single (single much faster on GPU)
         oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-        oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oSpec.norm = false;
+        oSpec.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oSpec.doBadFrames = false;
         oSpec.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oSpec.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -311,8 +297,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = false; % Run & save as single (single much faster on GPU)
         oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-        oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oSpec.norm = false;
+        oSpec.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oSpec.doBadFrames = false;
         oSpec.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oSpec.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -352,8 +337,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
         oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
-        oHFB.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oHFB.norm = false;
+        oHFB.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oHFB.doBadFrames = true;
         oHFB.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oHFB.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -382,7 +366,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
 
 
     %% HFB decomposition on IC timecourses
-    if doICAhfb && statusPP.HFBi(s)~=1 && statusPP.HFB(s)==1
+    if doICAhfb && statusPP.HFBi(s)~=1 && statusPP.ICA(s)==1
         % Modify options
         oHFB = o;
         oHFB.suffix = "ih";
@@ -394,8 +378,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
         oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
-        oHFB.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
-        oHFB.norm = false;
+        oHFB.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oHFB.doBadFrames = true;
         oHFB.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oHFB.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -421,8 +404,6 @@ for s = 1:height(statusPP) % Subject loop %s=1;
             save(sbjFinFn,"statusPP");
         end
     end
-
-
 end
 
 % %% Initialize iEEG & task data for desired sampling rate

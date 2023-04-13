@@ -22,17 +22,12 @@ end
 if isstruct(proj)
     dirs = proj;
 else
-    [dirFreesufer,dirMain,dirCode,path_cudaica] = ec_paths(proj);
-    dirs.proj = proj;
-    dirs.code = string(dirCode);
-    dirs.data = string(dirMain);
+    dirs = ec_paths(proj);
     dirs.orig = dirs.data+"orig"+filesep;
     dirs.psych = dirs.orig;
     dirs.proc = dirs.data+"proc"+filesep;
-    dirs.anal = dirMain+"anal"+filesep;
-    dirs.freesurfer = string(dirFreesufer);
+    dirs.anal = dirs.data+"anal"+filesep;
     dirs.fsaverage = dirs.freesurfer+"fsaverage"+filesep;
-    dirs.cudaica = path_cudaica;
 end
 
 % Subject-specific

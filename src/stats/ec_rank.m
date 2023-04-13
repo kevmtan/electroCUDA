@@ -28,7 +28,7 @@ if ~tol
 end
 
 %% Calculate data rank from covariance eigenvectors (Sven Hoffman)
-xEig = eig(cov(x,1,"omitrows"));
+xEig = eig(cov(x,1,"partialrows"));
 xRank = nnz(xEig>tol);
 
 %% Compare with built-in Matlab function: rank() 

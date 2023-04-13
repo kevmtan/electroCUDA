@@ -330,9 +330,9 @@ if opts.enableGpu, flags.base{end+1} = '-DENABLE_GPU' ; end
 if opts.enableDouble, flags.base{end+1} = '-DENABLE_DOUBLE' ; end
 if opts.enableCudnn
     flags.base{end+1} = '-DENABLE_CUDNN' ;
-    flags.base{end+1} = ['-I "' opts.cudnnIncludeDir '"'] ;
+    flags.base{end+1} = ['-I"' opts.cudnnIncludeDir '"'] ;
 end
-%flags.base{end+1} = '-extra-device-vectorization';
+%flags.base{end+1} = '--extra-device-vectorization';
 if opts.verbose > 1, flags.base{end+1} = '-v' ; end
 % if opts.debug
 %   flags.base{end+1} = '-g' ;
@@ -364,15 +364,15 @@ flags.mexlink_linklibs = {} ;
 
 % NVCC: Additional flags passed to `nvcc` for compiling CUDA code.
 flags.nvcc = {'-D_FORCE_INLINES',... % '--std=c++11'
-    sprintf('-I "%s"',fullfile(matlabroot,'extern','include')), ...
-    sprintf('-I "%s"',fullfile(toolboxdir('parallel'),'gpu','extern','include')), ...
+    sprintf('-I"%s"',fullfile(matlabroot,'extern','include')), ...
+    sprintf('-I"%s"',fullfile(toolboxdir('parallel'),'gpu','extern','include')), ...
     opts.cudaArch} ;
 
 switch arch
     case {'maci64','glnxa64'}
         %flags.cxx{end+1} = '--std=c++11' ;
         flags.nvcc{end+1} =...
-            '--compiler-options=-fPIC,-extra-device-vectorization';
+            '--compiler-options=-fPIC';
         if ~opts.debug
             flags.cxxoptim = horzcat(flags.cxxoptim,'-march=native','-mssse3','-ffast-math') ;
             flags.mexcuda_cxxoptim{end+1} = '--compiler-options=-use_fast_math,-march=native,-mssse3,-ffast-math' ;
@@ -609,7 +609,7 @@ function nvcc_compile(opts, src, tgt, flags)
 % --------------------------------------------------------------------
 if check_deps(opts, tgt, src), return ; end
 nvcc_path = fullfile(opts.cudaRoot, 'bin', 'nvcc');
-nvcc_cmd = sprintf('%s -c -o "%s" "%s" %s ', ...
+nvcc_cmd = sprintf('%s -c -O3 "%s" "%s" %s ', ...
     nvcc_path, tgt, src, ...
     strjoin(horzcat(flags.base,flags.nvcc)));
 fprintf('%s: NVCC CC: %s\n', mfilename, nvcc_cmd) ;

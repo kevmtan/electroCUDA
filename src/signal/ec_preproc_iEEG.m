@@ -179,7 +179,7 @@ toc(tt);
 
 %% Robust detrend (pre-reference)
 if nnz(o.detrendOrder)
-    [n,x] = ec_detrend(n,x,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
+    [x,n] = ec_detrend(x,n,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
         win=o.detrendWin,gpu=o.detrendGPU,single=o.detrendSingle,...
         tic=tic); %tic=tt;
     if arg.test; x_detr=x; end
@@ -192,15 +192,10 @@ if nnz(o.detrendOrder)
 end
 % vis_artifacts(ec_exportEEGLAB(n,x_detr,psy,trialNfo,chNfo), ec_exportEEGLAB(n,xOg,psy,trialNfo,chNfo));
 
-% [n,x] = ec_detrend2(n,x,poly=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
-%     win=o.detrendWin,outlier=o.detrendOL,interp=o.detrendInterp,gpu=o.detrendGPU,...
-%     single=o.detrendSingle); %,tic=tt);
-% if arg.test; x_detr=x; end
-
 
 %% HPF
 if isany(o.hiPass) % HPF within-run to avoid edge artifacts
-    [n,x] = ec_HPF(n,x,tt,hpf=o.hiPass,steepness=o.hiPassSteep,gpu=o.hiPassGPU);
+    [x,n] = ec_HPF(x,n,o.hiPass,tt,steepness=o.hiPassSteep,gpu=o.hiPassGPU);
     if arg.test; x_hpf=x; end
 end
 % vis_artifacts(ec_exportEEGLAB(n,x_hpf,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_detr,psy,trialNfo,chNfo));
@@ -247,7 +242,7 @@ end
 
 %% Robust detrend (post-reference)
 if nnz(o.detrendOrder2) % Detrend
-    [n,x] = ec_detrend(n,x,order=o.detrendOrder2,thr=o.detrendThr2,itr=o.detrendItr2,...
+    [x,n] = ec_detrend(x,n,order=o.detrendOrder2,thr=o.detrendThr2,itr=o.detrendItr2,...
         win=o.detrendWin2,missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,...
         tic=tic);
     if arg.test; x_detr2=x; end

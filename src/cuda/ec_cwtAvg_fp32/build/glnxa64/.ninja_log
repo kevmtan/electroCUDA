@@ -1,0 +1,10 @@
+# ninja log v5
+1	31	1680996042718469122	build/glnxa64/cpp_mexapi_version.o	55dea8f1534ffa5c
+2	38	1680996042726469392	build/glnxa64/_coder_ec_cwtAvg_info.o	83a3c9171c4e7a43
+1	99	1680996042786471411	build/glnxa64/MWCUBLASUtils.o	ff1fe48153acdf1f
+1	356	1680996043046480163	build/glnxa64/MWCUFFTPlanManager.o	b52d83a2ee9f744b
+2	422	1680996043110482317	build/glnxa64/rt_nonfinite.o	7dcb1edad2ba7d99
+0	524	1680996043210485683	build/glnxa64/MWMemoryManager.o	a37124c659234206
+2	689	1680996043378491337	build/glnxa64/_coder_ec_cwtAvg_mex.o	912d63a9e5ac6b4d
+2	2656	1680996045342557426	build/glnxa64/ec_cwtAvg.o	44fa23f3201baacf
+2656	2850	1680996045534563886	ec_cwtAvg_fp32.mexa64	782fdf2d756932ce

@@ -1,4 +1,4 @@
-function [n,x] = ec_detrend(n,x,w,o)
+function [x,n] = ec_detrend(x,n,w,o)
 %% Robust detrending - wrapper for CPU processing
 %
 % INPUTS:
@@ -17,8 +17,8 @@ function [n,x] = ec_detrend(n,x,w,o)
 
 %% Input validation
 arguments
-    n struct                        % Metadata
     x {mustBeFloat}                 % Raw data: x(frames,chans)|x(frames,chans,freqs)
+    n struct = struct               % Metadata
     w logical = false(size(x))      % Input weights: w(frames,chans)|w(frames,chans,freqs)
     o.missing {istext} = "" % Interpolation method for missing
     o.order (1,:){isfloat} = 10   % Polynomial order (can be vector of polynomials)

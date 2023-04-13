@@ -19,7 +19,7 @@ arguments
 end	                                 %     symRange rescales pos & neg values to have symmetric range from 0
 if numel(x)<2; error("Input data 'x' must contain multiple numeric values"); end
 if isempty(dim) || dim<1 || size(x,dim)<2
-    dim = find(max(size(x))); disp("ec_abs2norm: set dim="+dim); end
+    dim = find(max(size(x))); disp("[ec_abs2norm] set dim="+dim); end
 if isempty(o.scale); o.scale=''; end
 %if ~o.log && isempty(o.center); o.center="median"; end
 

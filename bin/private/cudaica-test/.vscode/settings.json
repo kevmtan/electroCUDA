@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "*.tcc": "c",
-        "complex": "c",
-        "config.h": "c"
-    }
-}

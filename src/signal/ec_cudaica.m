@@ -33,7 +33,7 @@ function [ica,x] = ec_cudaica(x,cudaica_bin,wtsIn,arg)
 %% Input validation
 arguments
     x {mustBeFloat}                      % x(frames,chans) = data to decompose
-    cudaica_bin {mustBeText}             % Path to CUDAICA compiled binary
+    cudaica_bin string                   % Path to CUDAICA compiled binary
     wtsIn {isfloat,isstring,ischar} = '' % wtsIn(comps,chans) = starting weights (e.g. from previous ICA decomposition)
     % Name-value arguments
     arg.pca {isnumeric} = []             % Number of PCA components to decompose {auto=[], skip=0}
