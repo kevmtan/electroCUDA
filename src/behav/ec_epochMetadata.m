@@ -10,8 +10,9 @@ fs = n.fs;
 BLpre=o.BLpre*fs; BLend=o.BLend*fs; epoch=o.epoch*fs; epochRT=o.epochRT*fs;
 if ~isempty(epoch)
     sz = numel(epoch(1):epoch(2));
-    if ~isempty(epochRT) && epochRT(end)<=0
-        epochRT(2)=abs(epoch(1));
+    if ~isempty(epochRT)
+        if epochRT(end)<=0
+            epochRT(2)=abs(epoch(1)); end
         szRT = numel(1:epochRT(2));
     end
 end

@@ -14,24 +14,41 @@ task = 'MMR';
 usrStr = "Kevin_DMN";
 plotType = "spec"; % "hfb-lfp"; % "spec";
 doICA = false;
-nameStr = "230320_";
+nameStr = "230413_";
 sfx = ""; %"";
 
 isTest = false;
 
+% Options struct
 o = struct;
 o.name = nameStr;
 o.save = true; %% save summary stats data %%%%
-o.BLpre = [-0.2,0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
-o.BLend = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
-o.epoch = [-0.2,3]; % Stimulus-locked epochs start/end (secs from stim onset); ex=[-0.2 3]
-o.epoch5 = [-0.2,5];
-o.epochRT = [-1.5,0.5]; % RT-locked epochs start/end (secs from RT; ex=[-1.5 .5], skip=[])
-o.epochPct = [o.epoch(1) 1+o.epochRT(2)];
+o.gpu = false;
 
-o.binP = 0.01; % Latency bin width for analysis (seconds)
-%o.binP_max = 100; % Max number of bins
-%o.timeBins = 0.05; % secs
+% Timing (in seconds)
+o.fsTarg = []; % Target sampling rate
+o.dsTarg = [];
+o.BLpre = [-0.3 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
+o.BLend = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
+o.bin = 0.02; % Latency bin width (seconds)
+o.bin2 = 0.1; % Latency bin2 width (seconds)
+o.pct2 = 10; % 'Downsampled version' Percent RT width (percentile)
+
+% Ensure trial epochs contain these times (skip=[])
+o.epoch = []; %[-0.2 3]; % Stimulus-locked epochs start/end (secs from stim onset); ex=[-0.2 3]
+o.epochRT = []; %o.BLpre; % RT-locked epochs start/end (secs from RT; ex=[-1.5 .5])
+o.epochPct = []; %[o.epoch(1) 1+o.epochRT(2)];
+
+% Frequency bands
+o.freqIdx = []; %[1 14 20:4:83];
+o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band name
+o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-13hz)" "Beta (13-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
+o.bandsF = [1 4; 4 8; 8 13; 13 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+
+% All Conditions
+o.conds = ["other" "selfinternal" "selfexternal" "autobio" "math" "rest"]; % order
+o.conds2 = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % custom condition names
 
 o.logSpec = false; %
 o.normalizeSpec = [];
@@ -47,29 +64,24 @@ o.detrendItr =   5;  %[10 2]; % number of iterations [iterChunkedRun iterEntireR
 o.detrendWin =   0; % detrend timewindow in seconds {entire run=[],default=[]}
 
 % Filtering (within blocks)
-o.hiPassGPU = false; % GPU slower than CPU??
-o.hiPass = []; % Hi-pass cutoff in hertz (skip=0)
-o.loPass = 10; % lo-pass in hz
-
-% Downsamplig
-o.dsTarg = [];
+o.hiPass = 0.1; % Hi-pass cutoff in hertz (skip=0)
+o.hiPassSteep = 0.5;
+o.hiPassImpulse = "iir"; % GPU slower than CPU??
+o.loPass = 20; % lo-pass in hz (skip=0)
+o.loPassSteep = 0.5;
+o.loPassImpulse = "auto";
 
 % Bad frames
 o.missingInterp = "linear";
 o.badFields = []; %["hfo" "mad" "diff" "sns"]
 o.outlierCenter = "median";
-o.thrOL = 3; %[5 5]; % Lower and upper quantiles for outlier
-o.thrOLbl = 3;
+o.thrOL = 5; %[5 5]; % Lower and upper quantiles for outlier
+o.thrOLbl = 2.5;
 
-% Conditions
-o.conds = ["other" "selfinternal" "selfexternal" "autobio" "math" "rest"]; % order
-o.conds2 = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"];
-
-% Bands
-o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band name
-o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-13hz)" "Beta (13-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
-o.bandsF = [1 4; 4 8; 8 13; 13 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+% PCA
+o.pca = 0;
+o.pcaOl = "quartiles";
+o.pcaOlThr = 3;
 
 % Plot options
 o.oP = genPlotParams('MMR','timecourse');
@@ -113,7 +125,7 @@ end
 %% Run sum stats %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for s = 1:height(statusSum)
     for ii = 1:2 %1 %:2
-        if statusSum.stats(s,ii)~=1 %&& isempty(statusP.error{s})
+        if statusSum.stats(s,ii)~=1  % s=1; ii=1;
             if ii==1; doICA=1; sfx="i"; o.name=nameStr+"ic_"+plotType; end
             if ii==2; doICA=0; sfx=""; o.name=nameStr+"ch_"+plotType; end
             sbj = statusSum.sbj{s};

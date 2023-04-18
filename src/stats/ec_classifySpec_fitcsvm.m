@@ -1,4 +1,4 @@
-function [rs,ra] = ec_classifySpec(dirs,o,oi)
+function [rs,ra] = ec_classifySpec_fitcsvm(dirs,o,oi)
 arguments
     dirs struct = []
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
@@ -11,36 +11,47 @@ arguments
     oi.plot logical = true
     oi.test logical = false
 end
-% oi.ICA=doICA; oi.sfx=sfx; oi.test=true; oi.gpu=true;
+% oi.ICA=doICA; oi.sfx=sfx; oi.prep=1; oi.test=1; oi.svm=1; oi.stats=1;
 try mkdir(o.dirOutSbj); catch;end
 cd(o.dirOutSbj);
 
-%% Prep
+% Preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if oi.prep
-    % Run Prep
-    [x,a,n,ss] = prep_lfn(dirs,o,oi);
+    %% Run preprocessing
+    [x,a,n,r0] = prep_lfn(dirs,o,oi);
 
     % Save prepped data if not continuing
     if ~oi.svm || ~oi.stats
         fn = o.dirOutSbj+"s"+n.sbjID+"_prep.mat";
-        savefast(fn,'x','a','n','ss');
+        savefast(fn,'x','a','n','r0');
     end
 end
 
-%% SVM
+
+% SVM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if oi.svm
     if ~oi.prep
         % Load prepped data
         fn = o.dirOutSbj+"s"+o.sbjID+"_prep.mat";
-        load(fn,'x','a','n','ss');
+        load(fn,'x','a','n','r0');
+    end
+    if o.gpu
+        % try parfevalOnAll(@gpuDevice,0,[]); catch;end
+        try reset(gpuDevice()); catch;end
+        % try delete(gcp('nocreate')); catch;end
     end
 
     %% Run SVM
-    [rs,ra] = wrapper_lfn(x,a,n,ss,o,oi);
+    [rs,ra] = svmWrapper_lfn(x,a,n,r0,o);
 
     % Save results
     fn = o.dirOut+"s"+n.sbjID+"_svmSpectral_"+o.name+".mat";
     save(fn,"rs","ra","-v7.3");
+    if o.gpu
+        % try parfevalOnAll(@gpuDevice,0,[]); catch;end
+        try reset(gpuDevice()); catch;end
+        % try delete(gcp('nocreate')); catch;end
+    end
 end
 
 
@@ -51,8 +62,8 @@ end
 
 
 
-function [x,a,n,ss] = prep_lfn(dirs,o,oi)
-%% Initialize
+function [x,a,n,r0] = prep_lfn(dirs,o,oi)
+%% Preprocess data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tic;
 
 % Load
@@ -113,17 +124,16 @@ if oi.test; x1=x; end %#ok<NASGU>
 
 %% Organize data for classifier
 if n.xChs>255; u0=zeros(1,"uint16"); else; u0=zeros(1,"uint8"); end
-s0=nan(1,"single"); i0=zeros(1,"int16");
+s0=nan(1,"single"); % i0=zeros(1,"int16");
 n.chNfo.ch = cast(n.chNfo.ch,like=u0);
-vars = o.bayesopt.vars;
 
 % Compact metadata
 a = ep(:,unique(["cond" "trialA" "latency" o.t "pct" "stim" "RT"],"stable"));
+a.RT = single(a.RT);
 a.ch(:) = u0;
-a.pred(:) = false;
+a.pred(:) = s0;
 a.p(:) = s0;
-a.p0 = a.p;
-a.p1 = a.p;
+a.p1(:,2) = s0;
 a.in = ismember(a.cond,o.svm_cond); % Conditions to classify
 a.inx = ismember(a.cond,o.svm_condx);
 a.y(:) = s0;
@@ -132,7 +142,11 @@ a.y(a.in) = y-1;
 [~,y] = max(a.cond(a.inx)==o.svm_condx,[],2);
 a.y(a.inx) = y-1;
 a.sbjCh(:) = "";
-a = movevars(a,["ch" "latency" o.t "pred" "p" "p0" "p1" "y"],"After","trialA");
+a = movevars(a,["ch" "latency" o.t "pred" "p" "p1" "y"],"After","trialA");
+if numel(o.svm_cond)==2
+    a.y(isnan(a.y))=false; a.pred(isnan(a.pred))=false;
+    a = convertvars(a,["y" "pred"],"logical");
+end
 
 % Only inlcude classifier conds
 id = a.in | a.inx;
@@ -140,182 +154,178 @@ a = a(id,:);
 x = x(id,:,:);
 
 % Preallocate classifier results
-ss = table;
-ss.sbjID = n.sbjID;
-ss.ch = u0;
-ss.(o.t) = i0;
-ss.acc = s0;
-ss.accCV = s0;
-ss.p = s0;
-ss.p_SD = s0;
-ss.n = u0;
-ss.o = table(0,'VariableNames',vars(1));
-ss.sbjCh = "";
-for v = 1:numel(vars)
-    ss.o.(vars(v)) = single(0); end
+r0 = table;
+r0.sbjID = n.sbjID;
+r0.ch = u0;
+r0.acc = s0;
+r0.accCV = s0;
+r0.p = s0;
+r0.p_SD = s0;
+r0.n = uint32(0);
+r0.sbjCh = "";
+% r0.(o.t) = i0;
 
 
 
-function [rs,ra] = wrapper_lfn(x,a,n,ss,o,oi)
+function [rs,ra] = svmWrapper_lfn(x,a,n,r0,o)
 %% Classifier wrapper %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic;
 id = a.in | a.inx;
 a = a(id,:);
 x = x(id,:,:);
 sbjChs = n.chNfo.sbjCh;
+chs = cast(1:n.xChs,like=a.ch)';
 
-% Copy to GPU
-if oi.gpu
-    x = gpuArray(x);
-    a = convertvars(a,@(v) isnumeric(v)||islogical(v),"gpuArray");
+% Weights for unbalanced classes
+id = a.in;
+a.wt(:) = single(0);
+a.wt(id) = 1;
+for c = unique(a.y)'
+    a.wt(a.y(id)==c) = sum(a.y(id)==c)/sum(~a.y(id)); end
+
+% Trigger CUDA kernel generation
+if o.gpu
+    gpu = gpuDevice();
+    gpu.CachePolicy = 'maximum';
 end
 
-% Get timebins (time windows to classify)
-nBins = numel(unique(a.(o.t)));
-t = groupcounts(a,o.t);
-t.i = cell(nBins,1); % Get latency indices
-for v=1:nBins; t.i{v}=sparse(a.(o.t)==t.(o.t)(v)); end
-t = renamevars(t,"GroupCount","n");
+% Reshape by channel
+x = arrayfun(@(ch) squeeze(x(:,ch,:)), chs,UniformOutput=false);
 
-% Loop across timebins
-x = arrayfun(@(ch) x(:,ch,:), 1:n.xChs, UniformOutput=false); 
-rs = cell(n.xChs,1);
-ra = rs;
-for ch = 1:n.xChs
-    [rs{ch},ra{ch}] = chan_lfn(x(:,ch,:),a,t,ss,o,ch,sbjChs(ch));
+% SVM across channels
+if o.gpu
+    [rs,ra] = arrayfun(@(x,ch,sch) classifyCh_lfn(gpuArray(x{:}),a,r0,o,ch,sch),...
+        x,chs,sbjChs,UniformOutput=false);
+else
+    rs = cell(n.xChs,1); ra=rs;
+    parfor ch = 1:n.xChs
+        [rs{ch},ra{ch}] = classifyCh_lfn(x{ch},a,r0,o,ch,sbjChs(ch));
+    end
 end
 
 % Finalize
 rs = vertcat(rs{:});
 ra = vertcat(ra{:});
-rs = sortrows(rs,["ch" o.t],"ascend");
-ra = sortrows(ra,["ch" o.t],"ascend");
+rs = sortrows(rs,"ch","ascend");
+ra = sortrows(ra,["ch" "latency"],"ascend");
 disp("[ec_svmSpectral] Finished classification: "+n.sbj+" t="+toc);
 
 
 
-function [sc,ac] = chan_lfn(xc,ac,t,ss,o,ch,sbjCh)
+function [rs,ra] = classifyCh_lfn(xc,ra,rs,o,ch,sbjCh)
 %% Within-chan compute %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ch=96; xc=x(:,ch,:); ac=a; sbjCh=sbjChs(ch);
-tic;
-xc = squeeze(xc); 
-ss.ch=ch; ss.sbjCh=sbjCh; ac.ch(:)=ch; ac.sbjCh(:)=sbjCh; nBins=height(t);
+% ch=96; xc=x{ch}; xc=gpuArray(xc); ra=a; rs=r0; sbjCh=sbjChs(ch);
+rs.ch=ch; rs.sbjCh=sbjCh; ra.ch(:)=ch; ra.sbjCh(:)=sbjCh; tic;
 
-xc = [single(ac.latency) xc];
+% Move to GPU
+if o.gpu
+    ra = convertvars(ra,["y" "in" "inx" "wt"],"gpuArray"); end
 
+% Add timing metrics as predictors for non-stationary classification
+xc = [cast(ra.latency,like=xc) cast(ra.pct,like=xc) xc];
 
-tic;
-svm = fitcsvm(gpuArray(xc(ac.in,:)),gpuArray(a.y(ac.in)),"KernelFunction","rbf","Standardize",true,...
-    "OptimizeHyperparameters","auto"); toc
-svmx = gather(svm.crossval(KFold=10));
-[a.pred,aa.p] = svmx.kfoldPredict;
-ss.accCV = svm.kfoldLoss;
+% Train
+id = ra.in;
+mdl = fitcsvm(xc(id,:),ra.y(id),o.fitcsvm{:},'Weights',ra.wt(id)); %fitclinear
+% % Optimize score transform (posterior probability)
+% mdl = mdl.fitPosterior(KFold=5);
 
+% Cross-validate
+mx = mdl.crossval(KFold=o.svm_kfold);
+[ra.pred(id),ra.p1(id,:)] = mx.kfoldPredict;
+rs.accCV = 1-mx.kfoldLoss;
 
+% Cross-classify
+mx = ra.inx;
+mdl = mdl.compact;
+[ra.pred(mx),ra.p1(mx,:)] = mdl.predict(xc(mx,:));
 
+% Calculate classifier metrics
+id = ra.in;
+ra.p1 = ra.p1(:,2);
+ra.p = abs(ra.p1);
+ra.acc = ra.pred==ra.y;
+rs.acc = mean(ra.acc(id));
+rs.p = mean(ra.p(id));
+rs.p_SD = std(ra.p(id));
+rs.n = height(ra);
 
-
-% Reshape data into timebins
-ac = cellfun(@(i) ac(i,:), t.i,UniformOutput=false); % Reshape metadata by latency
-xc = cellfun(@(i) xc(i,:), t.i,UniformOutput=false); % Reshape EEG data by latency
-t.i = [];
-
-% Loop across timebins
-sc = cell(nBins,1);
-for b = [1 7] %1:nBins
-    [sc{b},ac{b}] = classify_lfn(xc{b},ac{b},t(b,:),ss,o);
+% Move back to CPU
+if isgpuarray(ra.y)
+    ra = ec_varfun(@gather,ra);
+    rs = ec_varfun(@gather,rs);
 end
-
-% Finalize
-sc = vertcat(sc{:});
-ac = vertcat(ac{:});
-disp("[ec_svmSpectral] Classified: "+sbjCh+" t="+toc);
-% delete(o.dirOutSbj+"svm_ch"+ch+"*");
+disp("[ec_svmSpectral] Classified in "+toc+"secs:");
+disp(rs);
 
 
-
-function [sb,ab] = classify_lfn(xb,ab,tb,sb,o)                      % tb = t(61,:);
-%% Compute per latency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-sb.n = tb.n;
-sb.(o.t) = tb.(o.t);
-ab.(o.t)(:) = tb.(o.t);
-if nnz(ab.in)<width(xb); return; end
-
-% Setup SVM
-ax = nan(height(ab),3,"single");
-fn = o.dirOutSbj+"svm_ch"+sb.ch+".b"+tb.(o.t);
-wi = o.svm.wi;
-for v = 1:numel(wi)
-        wi(v) = nnz(ab.y(ab.in)==v-1)/nnz(ab.y(ab.in)==0); end
-if o.bayesopt_do && tb.(o.t)>=0
-    svm = o.bayesopt;
-    opt = true;
-else
-    svm = o.svm;
-    opt = false;
-end
-svm.data = fn;
-svm.std = o.svm_std;
-svm.rmData = false;
-svm.wi = wi;
-svm.kfold = o.svm_kFold;
-svm = namedargs2cell(svm);
-
-%% Optimize/cross-validate
-if opt
-    % Optimize & cross-validate
-    [sb.o,r] = ec_thundersvm_optimize(xb(ab.in,:),ab.y(ab.in),svm{:});
-    sb.accCV = 1-r.MinObjective;
-else
-    % Cross-validate
-    svm = ec_thundersvm_train(xb(ab.in,:),ab.y(ab.in),svm{:});
-    sb.accCV = svm.acc;
-end
-
-% Set optimized hyperparameters
-svm = o.svm;
-svm.data = fn;
-svm.std = o.svm_std;
-svm.rmData = false;
-svm.wi = wi;
-if opt
-    p = string(sb.o.Properties.VariableNames);
-    for v = 1:numel(p)
-        svm.(p(v)) = sb.o.(p(v)); end
-end
-
-%% Train
-svm.kfold = 0;
-svm = namedargs2cell(svm);
-svm = ec_thundersvm_train(svm{:});
-
-%% Classify
-ax(ab.in,:) = ec_thundersvm_predict(svm=svm);
-
-%% Cross-classify
-svm.rmData = true;
-ax(ab.inx,:) = ec_thundersvm_predict(xb(ab.inx,:),svm=svm);
-
-%% Finalize
-ab.y = logical(ab.y); % assumes BINARY classification !!!
-ab.pred = logical(ax(:,1));
-ab.p(ab.pred) = ax(ab.pred,2);
-ab.p(~ab.pred) = ax(~ab.pred,3);
-ab.p0 = ax(:,3);
-ab.p1 = ax(:,2);
-id = ab.in;
-sb.acc = nnz(ab.y(id)==ab.pred(id))/nnz(id);
-sb.p = mean(ab.p(id));
-sb.p_SD = std(ab.p(id));
+% % Reshape data into timebins
+% id = tc.i; tc.i=[];
+% xc = cellfun(@(i) xc(i,:),id,UniformOutput=false); % Reshape EEG data by latency
+% ac = cellfun(@(i) ac(i,:),id,UniformOutput=false); % Reshape metadata by latency
+% tc = table2struct(tc);
+%
+% % Arrayfun across timebins
+% [sc,ac] = arrayfun(@(x,a,t) classifyBin_lfn(x{:},a{:},t,sc,o),...
+%     xc,ac,tc,UniformOutput=false);
+%
+% % Finalize
+% sc = vertcat(sc{:});
+% ac = vertcat(ac{:});
+% disp("[ec_svmSpectral] Classified: "+sbjCh+" t="+toc);
+% % sc = cell(nBins,1);
+% % for b = [1 7] %1:nBins
+% %     [sc{b},ac{b}] = classify_lfn(xc{b},ac{b},t(b,:),ss,o);
+% % end
+%
+%
+%
+% function [sb,ab] = classifyBin_lfn(xb,ab,tb,sb,o)                            % tb = t(61,:);
+% %% Compute per latency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% sb.n = tb.n;
+% sb.(o.t) = tb.(o.t);
+% ab.(o.t)(:) = tb.(o.t);
+% if nnz(ab.in)<width(xb); return; end
+%
+% % Weights
+% id = ab.in;
+% wb = ones(nnz(id),1,"single");
+% wb(ab.y(id)==1) = nnz(ab.y(id)==1)/nnz(~ab.y(id));
+% if o.gpu; wb=gpuArray(wb); end
+%
+% % Train & optimize
+% svm = fitcsvm(xb(id,:),ab.y(id),o.fitcsvm{:},'Weights',wb);
+%
+% % Cross-validate
+% svx = svm.crossval(KFold=o.svm_kfold);
+% [ab.pred(id),ab.p1(id,:)] = svx.kfoldPredict;
+% sb.accCV = 1-gather(svx.kfoldLoss);
+% clear svx
+%
+% % Cross-classify
+% id = ab.inx;
+% svm = svm.compact;
+% [ab.pred(id),ab.p1(id,:)] = svm.predict(xb(id,:));
+%
+% % Finalize
+% id = ab.in;
+% ab.p1 = ab.p1(:,2);
+% ab.p = abs(ab.p1);
+% ab.acc = ab.pred==ab.y;
+% sb.acc = mean(ab.acc(id));
+% sb.p = mean(ab.p(id));
+% sb.p_SD = std(ab.p(id));
+% disp(sb);
 
 
 %%
-% function [sc,ac] = classifyCh_lfn(xc,ac,tb,sc,o,ch,sbjCh)                       
+% function [sc,ac] = classifyCh_lfn(xc,ac,tb,sc,o,ch,sbjCh)
 % %% Classify latency bin per chan/IC  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % ch=104; xc=x{61}(:,ch,:); ac=a{61}; oc=oSVM.o(ch,:); sc=s0;
 % xc = squeeze(xc);
 % sc.ch=ch; sc.sbjCh=sbjCh; ac.ch(:)=ch; ac.sbjCh(:)=sbjCh;
 % if nnz(ac.in)<width(xc); return; end
-% 
+%
 % % Prep
 % ax = nan(height(ac),3,"single");
 % fn = o.dirOutSbj+"svm_b"+tb.(o.t)+".ch"+ch;
@@ -335,7 +345,7 @@ sb.p_SD = std(ab.p(id));
 % svm.wi = wi;
 % svm.kfold = o.svm_kFold;
 % svm = namedargs2cell(svm);
-% 
+%
 % %% Optimize/cross-validate
 % if opt
 %     % Optimize & cross-validate
@@ -346,7 +356,7 @@ sb.p_SD = std(ab.p(id));
 %     svm = ec_thundersvm_train(xc(ac.in),ac.y(ac.in),svm{:});
 %     sc.accCV = svm.acc;
 % end
-% 
+%
 % % Set optimized hyperparameters
 % svm = o.svm;
 % svm.data = fn;
@@ -358,19 +368,19 @@ sb.p_SD = std(ab.p(id));
 %     for v = 1:numel(p)
 %         svm.(p(v)) = sc.o.(p(v)); end
 % end
-% 
+%
 % %% Train
 % svm.kfold = 0;
 % svm = namedargs2cell(svm);
 % svm = ec_thundersvm_train(svm{:});
-% 
+%
 % %% Classify
 % ax(ac.in,:) = ec_thundersvm_predict(svm=svm);
-% 
+%
 % %% Cross-classify
 % % svm.rmData = true;
 % ax(ac.inx,:) = ec_thundersvm_predict(xc(ac.inx,:),svm=svm);
-% 
+%
 % %% Finalize
 % ac.y = logical(ac.y); % assumes BINARY classification !!!
 % ac.pred = logical(ax(:,1));
@@ -400,7 +410,7 @@ sb.p_SD = std(ab.p(id));
 % oB.data = o.dirOutSbj+"svm_o.";
 % tO = o.tO;
 % doZ = o.svm_std;
-% 
+%
 % % Parfor across chans
 % if o.bayesopt_do
 %     parfor ch = 1:n.xChs
@@ -425,7 +435,7 @@ sb.p_SD = std(ab.p(id));
 % %% Optimize hyperparameters for highest-eigendistance bin in chan %%%%%%%%%
 % tic;
 % vars = oB.vars;
-% 
+%
 % % Find bin with max Euclidian distance across classifier conds
 % c0 = grpstats(ac(ac.y==0,:),tO,"mean",DataVars="x");
 % c = grpstats(ac(ac.y==1,:),tO,"mean",DataVars="x");
@@ -435,10 +445,10 @@ sb.p_SD = std(ab.p(id));
 % [~,c] = max(c0.d);
 % c0  = c0.(tO)(c);
 % c = ac.(tO)==c0;
-% 
+%
 % % Prep
 % ac = ac(c,:);
-% if doZ 
+% if doZ
 %     ac.x = normalize(ac.x,1,"zscore"); end % z-score
 % oB.wi(1) = 1;
 % for v = 2:numel(oB.wi)
@@ -448,7 +458,7 @@ sb.p_SD = std(ab.p(id));
 % oc = table;
 % oc.sbjCh = sbjCh;
 % oc.(tO) = c0;
-% 
+%
 % % Run optimization
 % [oc.o,oc.r,oc.svm] = ec_thundersvm_optimize(ac.x,ac.y,oB{:});
 % oc.err = oc.r.MinObjective;
@@ -469,39 +479,39 @@ sb.p_SD = std(ab.p(id));
 %     oSVM{ch} = optimizeSVM_lfn(ac,o,sbjChs(ch));
 % end
 % disp("[ec_svmSpectral] Optimized SVM hyperparameters: "+n.sbj+" t="+toc);
-% 
-% 
+%
+%
 % %% Classify latency bins per chan
 % an = cellfun(@(i) an(i,:), t.i,UniformOutput=false); % Reshape metadata by latency
 % x = cellfun(@(i) x(i,:,:), t.i,UniformOutput=false); % Reshape EEG data by latency
 % sv = cell(nBins,1);
 % av = sv;
-% 
+%
 % % Parfor across chans
 % parfor b = 1:nBins % ch=104; tc=t; svc=sv0;
-%     [sv{b},av{b}] = classifyLatency_lfn(x{b},an{b},t(b,:),n,o,oSVM,sv0); 
+%     [sv{b},av{b}] = classifyLatency_lfn(x{b},an{b},t(b,:),n,o,oSVM,sv0);
 % end
 % disp("[ec_svmSpectral] Finished SVM: "+n.sbj+" t="+toc);
 
-% function oCh = optimizeSVM_lfn(ac,o,sbjCh)                       
+% function oCh = optimizeSVM_lfn(ac,o,sbjCh)
 % %% Classify latency bin per chan/IC  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tic;
-% 
+%
 % % Get bin2 with max euclidian distance between cond0 & cond1
 % c0 = grpstats(ac(ac.y==0 & ac.stim,:),o.tO,"median",DataVars="x");
 % c1 = grpstats(ac(ac.y==1 & ac.stim,:),o.tO,"median",DataVars="x");
 % c0.d = pdist2(c0.median_x,c1.median_x,"euclidean",Largest=1)';
 % [~,c1] = max(c0.d);
 % c1 = ac.(o.tO)==c0.(o.tO)(c1);
-% 
+%
 % if o.gpu
 %     ac.x = gpuArray(ac.x);
 %     ac.y = gpuArray(ac.y);
 % end
-% 
+%
 % % Train & optimize
-% svm = fitcsvm(ac.x(c1,:),ac.y(c1),o.svmOpt{:}); 
-% 
+% svm = fitcsvm(ac.x(c1,:),ac.y(c1),o.svmOpt{:});
+%
 % % Save optimized hyperparameters
 % oCh = o.fitcsvm;
 % opt = svm.HyperparameterOptimizationResults.XAtMinEstimatedObjective;
@@ -510,20 +520,20 @@ sb.p_SD = std(ab.p(id));
 % end
 % disp("[ec_svmSpectral] Optimized SVM hyperparameters: "+sbjCh+" t="+toc);
 
-% function [svb,ab] = classifyLatency_lfn(xb,ab,tb,n,o,oSVM,svb)                       
+% function [svb,ab] = classifyLatency_lfn(xb,ab,tb,n,o,oSVM,svb)
 % %% Compute per latency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tic;
 % svb.(o.t) = tb.(o.t);
-% 
+%
 % % Move data to GPU
 % if o.gpu
 %     xb = gpuArray(xb);
 %     ab = convertvars(ab,@(v) isnumeric(v)|islogical(v),'gpuArray');
 % end
-% 
+%
 % % Reshape data by chan
 % xb = num2cell(xb,[1 3])';
-% 
+%
 % %% Compute across chans/ICs (vectorized)
 % [svb,ab] = arrayfun(@(xc,oc,ch) classifyCh_lfn(xc{:},ab,svb,o,oc{:},ch),...
 %     xb,oSVM,n.chNfo.ch,UniformOutput=false);
@@ -531,23 +541,23 @@ sb.p_SD = std(ab.p(id));
 % ab = vertcat(ab{:});
 % disp("[ec_svmSpectral] Finished classification: bin="+tb.(o.t)+"  sbj="+n.sbj+"  t="+toc);
 
-% function [svc,ac] = classifyCh_lfn(xc,ac,svc,o,oc,ch)                       
+% function [svc,ac] = classifyCh_lfn(xc,ac,svc,o,oc,ch)
 % %% Classify latency bin per chan/IC  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % ch=104; xc=xb{ch}; ac=ab; svc=svb; oc=oSVM{ch};
 % in=ac.in; inx=ac.inx; nObs=nnz(in); svc.ch=ch; ac.ch(:)=ch;
 % if nObs<width(xc); return; end
-% 
+%
 % % Train
 % svm = fitcsvm(xc(in,:),ac.y(in),oc{:});
 % % svm = svm.discardSupportVectors;
-% 
+%
 % % Predict
 % [y,p] = predict(svm,xc(inx,:));
 % ac.pred(inx)=y; ac.p(inx)=p(:,1);
-% 
+%
 % % Cross-validate
 % svm = crossval(svm,o.crossval{:});
-% 
+%
 % % Assess performance
 % [y,p] = kfoldPredict(svm);
 % svc.acc = nnz(y==ac.y(in))/nnz(in);

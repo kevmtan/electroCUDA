@@ -54,7 +54,7 @@ o.t = "pct2";                          % Time variable to classify by
 o.tO = "pct2";                        % Time variable to optimize by
 o.svm_cond = ["Semantic" "Episodic"]; % Conds for binary SVM classificaiton
 o.svm_condx = ["Self" "Other"];       % Conds for cross-classification
-o.svm_kFold = 5;                     % Cross-validation folds
+o.svm_kFold = 10;                     % Cross-validation folds
 o.svm_std = true;                    % Z-score predictors
 o.svm_rmData = 1;                 % Remove libsvm-formatted data from disk after completion
 o.svm_par = {'Processes',20};
@@ -62,7 +62,7 @@ o.svm_par = {'Processes',20};
 % SVM hyperparameters (defined here: github.com/cjlin1/libsvm)
 %   use default value = 0
 o.svm.type = 0;     % SVM type (-s)
-o.svm.kernel = 2;   % kernel type (-t)
+o.svm.kernel = 0;   % kernel type (-t)
 o.svm.degree = 0;   % Polynomial degree (-d)
 o.svm.gamma = 0;    % Gamma of kernel function (-g)
 o.svm.cost = 0;     % Cost/boxconstraint (-c)
@@ -82,13 +82,13 @@ o.svm.binary = ec_paths().thundersvm; % Directory for ThunderSVM binaries
 % SVM hyperparameter Bayesian optimization (mathworks.com/help/stats/bayesopt.html)
 o.bayesopt_do = false;
 o.bayesopt = o.svm;
-o.bayesopt.vars = ["cost" "gamma"];                  % hyperparameters to optimize (just 2)
-o.bayesopt.varsRng = [1e-3 1e3; 1e-3 1e3];           % value range
-o.bayesopt.varsInit = []; %[.01 .1 1 10; .05 .05 .05 .05]; % initial values
+o.bayesopt.vars = "cost";                  % hyperparameters to optimize (just 2)
+o.bayesopt.varsRng = [1e-3 1e3];           % value range
+o.bayesopt.varsInit = [.01 .1 1 10]; %[.01 .1 1 10; .05 .05 .05 .05]; % initial values
 o.bayesopt.deterministic = true;                     % Deterministic or stochastic objective?
 o.bayesopt.acFun = "expected-improvement-plus";      % Acquisition function
-o.bayesopt.maxEvals = 30;                            % Maximum evaluations (iterations)
-o.bayesopt.verbose = 0;                              % Command window output
+o.bayesopt.maxEvals = 20;                            % Maximum evaluations (iterations)
+o.bayesopt.verbose = 1;                              % Command window output
 o.bayesopt.plot = [];                                % Plot handles (no plots = [])
 o.bayesopt.parallel = false;                         % Do parallel (disable: already parallel)
 o.bayesopt.kfold = 5;                               % Cross-validation folds (-v)
@@ -112,7 +112,7 @@ o.normalizeSpec = "robust";
 o.hiPass = 0.1; % Hi-pass cutoff in hertz (skip=0)
 o.hiPassSteep = 0.5;
 o.hiPassImpulse = "iir"; % GPU slower than CPU??
-o.loPass = 20; % lo-pass in hz (skip=0)
+o.loPass = 0; % lo-pass in hz (skip=0)
 o.loPassSteep = 0.5;
 o.loPassImpulse = "auto";
 
@@ -127,7 +127,7 @@ o.thrOL = 5; %[5 5]; % Lower and upper quantiles for outlier
 o.thrOLbl = 2.5;
 
 % PCA
-o.pca = 20;
+o.pca = 30;
 o.pcaOl = "quartiles";
 o.pcaOlThr = 3;
 
@@ -208,7 +208,7 @@ for s = 1:height(statusEC)
             %%
             try
                 disp("[ec_svmSpectral] STARTING SVM: "+sbj);
-                ec_svmSpectral(dirs,o,prep=1,svm=1,stats=0,plot=0,...
+                ec_classifySpec_thundersvm(dirs,o,prep=1,svm=1,stats=0,plot=0,...
                     sfx=sfx,ICA=doICA,test=isTest);
                 statusEC.prep(s,ii) = 1;
                 statusEC.svm(s,ii) = 1;

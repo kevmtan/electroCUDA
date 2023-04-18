@@ -16,13 +16,15 @@ cd(o.dirOutSbj);
 
 %% Prep
 if oi.prep
+    try parpool('threads'); catch;end
+
     % Run Prep
-    [x,a,n,ss] = prep_lfn(dirs,o,oi);
+    [x,a,n,r0] = prep_lfn(dirs,o,oi);
 
     % Save prepped data if not continuing
     if ~oi.svm || ~oi.stats
         fn = o.dirOutSbj+"s"+n.sbjID+"_prep.mat";
-        savefast(fn,'x','a','n','ss');
+        savefast(fn,'x','a','n','r0');
     end
 end
 
@@ -31,11 +33,13 @@ if oi.svm
     if ~oi.prep
         % Load prepped data
         fn = o.dirOutSbj+"s"+o.sbjID+"_prep.mat";
-        load(fn,'x','a','n','ss');
+        load(fn,'x','a','n','r0');
     end
+    % try delete(gcp('nocreate')); catch;end
+    % try parpool('Local12',4); catch;end
 
     %% Run SVM
-    [rs,ra] = wrapper_lfn(x,a,n,ss,o);
+    [rs,ra] = wrapper_lfn(x,a,n,r0,o);
 
     % Save results
     fn = o.dirOut+"s"+n.sbjID+"_svmSpectral_"+o.name+".mat";
@@ -50,8 +54,8 @@ end
 
 
 
-function [x,a,n,ss] = prep_lfn(dirs,o,oi)
-%% Initialize
+function [x,a,n,r0] = prep_lfn(dirs,o,oi)
+%% Preprocess data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tic;
 
 % Load
@@ -112,17 +116,17 @@ if oi.test; x1=x; end %#ok<NASGU>
 
 %% Organize data for classifier
 if n.xChs>255; u0=zeros(1,"uint16"); else; u0=zeros(1,"uint8"); end
-s0=nan(1,"single"); i0=zeros(1,"int16");
+s0=nan(1,"single"); % i0=zeros(1,"int16");
 n.chNfo.ch = cast(n.chNfo.ch,like=u0);
-vars = o.bayesopt.vars;
 
 % Compact metadata
 a = ep(:,unique(["cond" "trialA" "latency" o.t "pct" "stim" "RT"],"stable"));
+a.RT = single(a.RT);
 a.ch(:) = u0;
-a.pred(:) = false;
+a.pred(:) = s0;
 a.p(:) = s0;
-a.p0 = a.p;
-a.p1 = a.p;
+a.p0(:) = s0;
+a.p1(:) = s0;
 a.in = ismember(a.cond,o.svm_cond); % Conditions to classify
 a.inx = ismember(a.cond,o.svm_condx);
 a.y(:) = s0;
@@ -131,7 +135,11 @@ a.y(a.in) = y-1;
 [~,y] = max(a.cond(a.inx)==o.svm_condx,[],2);
 a.y(a.inx) = y-1;
 a.sbjCh(:) = "";
-a = movevars(a,["ch" "latency" o.t "pred" "p" "p0" "p1" "y"],"After","trialA");
+a = movevars(a,["ch" "latency" o.t "pred" "p" "p1" "y"],"After","trialA");
+if numel(o.svm_cond)==2
+    a.y(isnan(a.y))=false; a.pred(isnan(a.pred))=false;
+    a = convertvars(a,["y" "pred"],"logical");
+end
 
 % Only inlcude classifier conds
 id = a.in | a.inx;
@@ -139,41 +147,35 @@ a = a(id,:);
 x = x(id,:,:);
 
 % Preallocate classifier results
-ss = table;
-ss.sbjID = n.sbjID;
-ss.ch = u0;
-ss.(o.t) = i0;
-ss.acc = s0;
-ss.accCV = s0;
-ss.p = s0;
-ss.p_SD = s0;
-ss.n = u0;
-ss.o = table(0,'VariableNames',vars(1));
-ss.sbjCh = "";
+vars = o.bayesopt.vars;
+r0 = table;
+r0.sbjID = n.sbjID;
+r0.ch = u0;
+r0.acc = s0;
+r0.accCV = s0;
+r0.p = s0;
+r0.p_SD = s0;
+r0.n = uint32(0);
+r0.sbjCh = "";
+r0.o = table(0,'VariableNames',vars(1));
+r0.sbjCh = "";
 for v = 1:numel(vars)
-    ss.o.(vars(v)) = single(0); end
+    r0.o.(vars(v)) = single(0); end
 
 
 
-function [rs,ra] = wrapper_lfn(x,a,n,ss,o)
+function [rs,ra] = wrapper_lfn(x,a,n,r0,o)
 %% Classifier wrapper %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 id = a.in | a.inx;
 a = a(id,:);
 x = x(id,:,:);
 sbjChs = n.chNfo.sbjCh;
 
-% Get timebins (time windows to classify)
-nBins = numel(unique(a.(o.t)));
-t = groupcounts(a,o.t);
-t.i = cell(nBins,1); % Get latency indices
-for v=1:nBins; t.i{v}=sparse(a.(o.t)==t.(o.t)(v)); end
-t = renamevars(t,"GroupCount","n");
-
 % Loop across timebins
 rs = cell(n.xChs,1);
 ra = rs;
-parfor ch = 1:n.xChs
-    [rs{ch},ra{ch}] = chan_lfn(x(:,ch,:),a,t,ss,o,ch,sbjChs(ch));
+for ch = 1:n.xChs
+    [rs{ch},ra{ch}] = chan_lfn(x(:,ch,:),a,r0,o,ch,sbjChs(ch));
 end
 
 % Finalize
@@ -185,46 +187,23 @@ disp("[ec_svmSpectral] Finished classification: "+n.sbj+" t="+toc);
 
 
 
-function [sc,ac] = chan_lfn(xc,ac,t,ss,o,ch,sbjCh)
+function [rs,ra] = chan_lfn(xc,ra,rs,o,ch,sbjCh)
 %% Within-chan compute %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ch=104; xc=x(:,ch,:); ac=a; 
 tic;
 xc = squeeze(xc); 
-ss.ch=ch; ss.sbjCh=sbjCh; ac.ch(:)=ch; ac.sbjCh(:)=sbjCh; nBins=height(t);
+ra.ch(:)=ch; ra.sbjCh(:)=sbjCh; rs.ch=ch; rs.sbjCh=sbjCh; 
 
-% Reshape data into timebins
-ac = cellfun(@(i) ac(i,:), t.i,UniformOutput=false); % Reshape metadata by latency
-xc = cellfun(@(i) xc(i,:), t.i,UniformOutput=false); % Reshape EEG data by latency
-t.i = [];
-
-% Loop across timebins
-sc = cell(nBins,1);
-for b = [1 7] %1:nBins
-    [sc{b},ac{b}] = classify_lfn(xc{b},ac{b},t(b,:),ss,o);
-end
-
-% Finalize
-sc = vertcat(sc{:});
-ac = vertcat(ac{:});
-disp("[ec_svmSpectral] Classified: "+sbjCh+" t="+toc);
-% delete(o.dirOutSbj+"svm_ch"+ch+"*");
-
-
-
-function [sb,ab] = classify_lfn(xb,ab,tb,sb,o)                      % tb = t(61,:);
-%% Compute per latency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-sb.n = tb.n;
-sb.(o.t) = tb.(o.t);
-ab.(o.t)(:) = tb.(o.t);
-if nnz(ab.in)<width(xb); return; end
+% Add timing metrics as predictors for non-stationary classification
+xc = [cast(ra.latency,like=xc) cast(ra.pct,like=xc) xc];
 
 % Setup SVM
-ax = nan(height(ab),3,"single");
-fn = o.dirOutSbj+"svm_ch"+sb.ch+".b"+tb.(o.t);
+ax = nan(height(ra),3,"single");
+fn = o.dirOutSbj+"svm.ch"+ch;
 wi = o.svm.wi;
 for v = 1:numel(wi)
-        wi(v) = nnz(ab.y(ab.in)==v-1)/nnz(ab.y(ab.in)==0); end
-if o.bayesopt_do && tb.(o.t)>=0
+        wi(v) = nnz(ra.y(ra.in)==v-1)/nnz(ra.y(ra.in)==0); end
+if o.bayesopt_do
     svm = o.bayesopt;
     opt = true;
 else
@@ -238,15 +217,16 @@ svm.wi = wi;
 svm.kfold = o.svm_kFold;
 svm = namedargs2cell(svm);
 
+
 %% Optimize/cross-validate
 if opt
     % Optimize & cross-validate
-    [sb.o,r] = ec_thundersvm_optimize(xb(ab.in,:),ab.y(ab.in),svm{:});
-    sb.accCV = 1-r.MinObjective;
+    [rs.o,r] = ec_thundersvm_optimize(xc(ra.in,:),ra.y(ra.in),svm{:});
+    rs.accCV = 1-r.MinObjective;
 else
     % Cross-validate
-    svm = ec_thundersvm_train(xb(ab.in,:),ab.y(ab.in),svm{:});
-    sb.accCV = svm.acc;
+    svm = ec_thundersvm_train(xc(ra.in,:),ra.y(ra.in),svm{:});
+    rs.accCV = svm.acc;
 end
 
 % Set optimized hyperparameters
@@ -256,9 +236,9 @@ svm.std = o.svm_std;
 svm.rmData = false;
 svm.wi = wi;
 if opt
-    p = string(sb.o.Properties.VariableNames);
+    p = string(rs.o.Properties.VariableNames);
     for v = 1:numel(p)
-        svm.(p(v)) = sb.o.(p(v)); end
+        svm.(p(v)) = rs.o.(p(v)); end
 end
 
 %% Train
@@ -267,23 +247,29 @@ svm = namedargs2cell(svm);
 svm = ec_thundersvm_train(svm{:});
 
 %% Classify
-ax(ab.in,:) = ec_thundersvm_predict(svm=svm);
+ax(ra.in,:) = ec_thundersvm_predict(svm=svm);
 
 %% Cross-classify
 svm.rmData = true;
-ax(ab.inx,:) = ec_thundersvm_predict(xb(ab.inx,:),svm=svm);
+ax(ra.inx,:) = ec_thundersvm_predict(xc(ra.inx,:),svm=svm);
 
 %% Finalize
-ab.y = logical(ab.y); % assumes BINARY classification !!!
-ab.pred = logical(ax(:,1));
-ab.p(ab.pred) = ax(ab.pred,2);
-ab.p(~ab.pred) = ax(~ab.pred,3);
-ab.p0 = ax(:,3);
-ab.p1 = ax(:,2);
-id = ab.in;
-sb.acc = nnz(ab.y(id)==ab.pred(id))/nnz(id);
-sb.p = mean(ab.p(id));
-sb.p_SD = std(ab.p(id));
+id = ra.in;
+ra.y = logical(ra.y); % assumes BINARY classification !!!
+ra.pred = logical(ax(:,1));
+ra.p(ra.pred) = ax(ra.pred,2);
+ra.p(~ra.pred) = ax(~ra.pred,3);
+ra.p0 = ax(:,3);
+ra.p1 = ax(:,2);
+rs.acc = nnz(ra.y(id)==ra.pred(id))/nnz(id);
+rs.p = mean(ra.p(id));
+rs.p_SD = std(ra.p(id));
+disp("[ec_svmSpectral] Classified "+sbjCh+" t="+toc+":");
+disp(rs);
+
+
+
+
 
 
 %%
