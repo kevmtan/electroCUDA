@@ -71,7 +71,7 @@ o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-13hz)" "Beta (13-30hz)"...
 o.bandsF = [1 4; 4 8; 8 13; 13 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
 
 % Plot options
-o.oP = genPlotParams('MMR','timecourse');
+o.oP = ecu_genPlotParams('MMR','timecourse');
 o.oP.visible = 0;
 o.oP.save = 1;
 o.oP.doGPU = 0;

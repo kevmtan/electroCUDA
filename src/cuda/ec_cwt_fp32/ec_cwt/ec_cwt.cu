@@ -1,7 +1,6 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// Prerelease License - for engineering feedback and testing purposes
+// only. Not for sale.
 //
 // ec_cwt.cu
 //
@@ -20,6 +19,7 @@
 #include "MWMemoryManager.hpp"
 #include "cufft.h"
 #include "emlrt.h"
+#include "math_constants.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -29,6 +29,15 @@
 struct emxArray_char_T
 {
   char_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_int32_T
+{
+  int32_T *data;
   int32_T *size;
   int32_T allocatedSize;
   int32_T numDimensions;
@@ -49,7 +58,7 @@ emlrtCTX emlrtRootTLSGlobal{ nullptr };
 
 emlrtContext emlrtContextGlobal{ true, // bFirstTime
   false,                               // bInitialized
-  131642U,                             // fVersionInfo
+  131643U,                             // fVersionInfo
   nullptr,                             // fErrorFunction
   "ec_cwt",                            // fFunctionName
   nullptr,                             // fRTCallStack
@@ -62,390 +71,385 @@ emlrtContext emlrtContextGlobal{ true, // bFirstTime
 static emlrtRTEInfo emlrtRTEI{ 95,     // lineNo
   22,                                  // colNo
   "sprintf",                           // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/strfun/sprintf.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/strfun/sprintf.m"// pName
 };
 
-static emlrtRTEInfo b_emlrtRTEI{ 986,  // lineNo
+static emlrtRTEInfo b_emlrtRTEI{ 988,  // lineNo
+  17,                                  // colNo
+  "cwtfilterbank",                     // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+};
+
+static emlrtRTEInfo c_emlrtRTEI{ 989,  // lineNo
+  17,                                  // colNo
+  "cwtfilterbank",                     // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+};
+
+static emlrtRTEInfo d_emlrtRTEI{ 998,  // lineNo
   13,                                  // colNo
   "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
 };
 
-static emlrtRTEInfo c_emlrtRTEI{ 987,  // lineNo
-  13,                                  // colNo
-  "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
-};
-
-static emlrtRTEInfo d_emlrtRTEI{ 988,  // lineNo
-  21,                                  // colNo
-  "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
-};
-
-static emlrtRTEInfo e_emlrtRTEI{ 988,  // lineNo
-  13,                                  // colNo
-  "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
-};
-
-static emlrtRTEInfo f_emlrtRTEI{ 273,  // lineNo
+static emlrtRTEInfo e_emlrtRTEI{ 273,  // lineNo
   5,                                   // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
 };
 
-static emlrtRTEInfo g_emlrtRTEI{ 445,  // lineNo
+static emlrtRTEInfo f_emlrtRTEI{ 445,  // lineNo
   20,                                  // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
 };
 
-static emlrtRTEInfo h_emlrtRTEI{ 446,  // lineNo
+static emlrtRTEInfo g_emlrtRTEI{ 446,  // lineNo
   21,                                  // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
 };
 
-static emlrtRTEInfo i_emlrtRTEI{ 28,   // lineNo
+static emlrtRTEInfo h_emlrtRTEI{ 28,   // lineNo
   9,                                   // colNo
   "colon",                             // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/ops/colon.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/ops/colon.m"// pName
 };
 
-static emlrtRTEInfo j_emlrtRTEI{ 129,  // lineNo
+static emlrtRTEInfo i_emlrtRTEI{ 129,  // lineNo
   6,                                   // colNo
   "applyBinaryScalarFunction",         // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/eml/+coder/+internal/applyBinaryScalarFunction.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/eml/+coder/+internal/applyBinaryScalarFunction.m"// pName
 };
 
-static emlrtRTEInfo k_emlrtRTEI{ 28,   // lineNo
+static emlrtRTEInfo j_emlrtRTEI{ 28,   // lineNo
   1,                                   // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo l_emlrtRTEI{ 486,  // lineNo
+static emlrtRTEInfo k_emlrtRTEI{ 486,  // lineNo
   5,                                   // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
 };
 
-static emlrtRTEInfo m_emlrtRTEI{ 20,   // lineNo
+static emlrtRTEInfo l_emlrtRTEI{ 20,   // lineNo
   1,                                   // colNo
   "wavbpfilters",                      // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/wavbpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/wavbpfilters.m"// pName
 };
 
-static emlrtRTEInfo n_emlrtRTEI{ 18,   // lineNo
+static emlrtRTEInfo m_emlrtRTEI{ 18,   // lineNo
   5,                                   // colNo
   "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
 };
 
-static emlrtRTEInfo o_emlrtRTEI{ 60,   // lineNo
+static emlrtRTEInfo n_emlrtRTEI{ 60,   // lineNo
   20,                                  // colNo
   "bsxfun",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/elmat/bsxfun.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/elmat/bsxfun.m"// pName
 };
 
-static emlrtRTEInfo p_emlrtRTEI{ 63,   // lineNo
+static emlrtRTEInfo o_emlrtRTEI{ 63,   // lineNo
   17,                                  // colNo
   "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
-static emlrtRTEInfo q_emlrtRTEI{ 43,   // lineNo
+static emlrtRTEInfo p_emlrtRTEI{ 43,   // lineNo
   1,                                   // colNo
   "wavbpfilters",                      // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/wavbpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/wavbpfilters.m"// pName
 };
 
-static emlrtRTEInfo r_emlrtRTEI{ 946,  // lineNo
+static emlrtRTEInfo q_emlrtRTEI{ 945,  // lineNo
   13,                                  // colNo
   "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+};
+
+static emlrtRTEInfo r_emlrtRTEI{ 30,   // lineNo
+  21,                                  // colNo
+  "applyScalarFunction",               // fName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/eml/+coder/+internal/applyScalarFunction.m"// pName
 };
 
 static emlrtRTEInfo s_emlrtRTEI{ 30,   // lineNo
-  21,                                  // colNo
-  "applyScalarFunction",               // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/eml/+coder/+internal/applyScalarFunction.m"// pName
-};
-
-static emlrtRTEInfo t_emlrtRTEI{ 30,   // lineNo
   1,                                   // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo u_emlrtRTEI{ 25,   // lineNo
+static emlrtRTEInfo t_emlrtRTEI{ 25,   // lineNo
   5,                                   // colNo
   "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
 };
 
-static emlrtRTEInfo v_emlrtRTEI{ 32,   // lineNo
+static emlrtRTEInfo u_emlrtRTEI{ 63,   // lineNo
+  57,                                  // colNo
+  "morseproperties",                   // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+};
+
+static emlrtRTEInfo v_emlrtRTEI{ 64,   // lineNo
+  28,                                  // colNo
+  "morseproperties",                   // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+};
+
+static emlrtRTEInfo w_emlrtRTEI{ 32,   // lineNo
   24,                                  // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo w_emlrtRTEI{ 63,   // lineNo
-  57,                                  // colNo
-  "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
-};
-
-static emlrtRTEInfo x_emlrtRTEI{ 64,   // lineNo
-  28,                                  // colNo
-  "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
-};
-
-static emlrtRTEInfo y_emlrtRTEI{ 31,   // lineNo
+static emlrtRTEInfo x_emlrtRTEI{ 31,   // lineNo
   23,                                  // colNo
   "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
 };
 
-static emlrtRTEInfo ab_emlrtRTEI{ 35,  // lineNo
+static emlrtRTEInfo y_emlrtRTEI{ 35,   // lineNo
   21,                                  // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo bb_emlrtRTEI{ 498, // lineNo
+static emlrtRTEInfo ab_emlrtRTEI{ 498, // lineNo
   5,                                   // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
 };
 
-static emlrtRTEInfo cb_emlrtRTEI{ 31,  // lineNo
+static emlrtRTEInfo bb_emlrtRTEI{ 31,  // lineNo
   1,                                   // colNo
   "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
 };
 
-static emlrtRTEInfo db_emlrtRTEI{ 33,  // lineNo
+static emlrtRTEInfo cb_emlrtRTEI{ 33,  // lineNo
   1,                                   // colNo
   "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
 };
 
-static emlrtRTEInfo eb_emlrtRTEI{ 102, // lineNo
+static emlrtRTEInfo db_emlrtRTEI{ 102, // lineNo
   5,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
-static emlrtRTEInfo fb_emlrtRTEI{ 135, // lineNo
+static emlrtRTEInfo eb_emlrtRTEI{ 135, // lineNo
   1,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
-static emlrtRTEInfo gb_emlrtRTEI{ 143, // lineNo
+static emlrtRTEInfo fb_emlrtRTEI{ 143, // lineNo
   1,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
-static emlrtRTEInfo hb_emlrtRTEI{ 1,   // lineNo
+static emlrtRTEInfo gb_emlrtRTEI{ 1,   // lineNo
   1,                                   // colNo
   "cuFFTNDCallback",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/gpucoder/gpucoder/+gpucoder/+internal/cuFFTNDCallback.p"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/gpucoder/gpucoder/+gpucoder/+internal/cuFFTNDCallback.p"// pName
+};
+
+static emlrtRTEInfo hb_emlrtRTEI{ 138, // lineNo
+  19,                                  // colNo
+  "wt",                                // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
 static emlrtRTEInfo ib_emlrtRTEI{ 138, // lineNo
-  19,                                  // colNo
-  "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
-};
-
-static emlrtRTEInfo jb_emlrtRTEI{ 138, // lineNo
   6,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
-static emlrtRTEInfo kb_emlrtRTEI{ 161, // lineNo
+static emlrtRTEInfo jb_emlrtRTEI{ 161, // lineNo
   1,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
-static emlrtRTEInfo lb_emlrtRTEI{ 180, // lineNo
+static emlrtRTEInfo kb_emlrtRTEI{ 180, // lineNo
   5,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
 };
 
-static emlrtRTEInfo mb_emlrtRTEI{ 42,  // lineNo
+static emlrtRTEInfo lb_emlrtRTEI{ 42,  // lineNo
   6,                                   // colNo
+  "ec_cwt",                            // fName
+  "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
+};
+
+static emlrtRTEInfo mb_emlrtRTEI{ 44,  // lineNo
+  16,                                  // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
 static emlrtRTEInfo nb_emlrtRTEI{ 44,  // lineNo
-  16,                                  // colNo
-  "ec_cwt",                            // fName
-  "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
-};
-
-static emlrtRTEInfo ob_emlrtRTEI{ 44,  // lineNo
   10,                                  // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo pb_emlrtRTEI{ 95,  // lineNo
+static emlrtRTEInfo ob_emlrtRTEI{ 95,  // lineNo
   1,                                   // colNo
   "sprintf",                           // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/strfun/sprintf.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/strfun/sprintf.m"// pName
 };
 
-static emlrtRTEInfo qb_emlrtRTEI{ 1256,// lineNo
+static emlrtRTEInfo pb_emlrtRTEI{ 1265,// lineNo
   30,                                  // colNo
   "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
 };
 
-static emlrtRTEInfo rb_emlrtRTEI{ 1256,// lineNo
+static emlrtRTEInfo qb_emlrtRTEI{ 1265,// lineNo
   25,                                  // colNo
   "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
 };
 
-static emlrtRTEInfo sb_emlrtRTEI{ 1,   // lineNo
+static emlrtRTEInfo rb_emlrtRTEI{ 1,   // lineNo
   23,                                  // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo tb_emlrtRTEI{ 924, // lineNo
+static emlrtRTEInfo sb_emlrtRTEI{ 923, // lineNo
   26,                                  // colNo
   "cwtfilterbank",                     // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/cwtfilterbank.m"// pName
 };
 
-static emlrtRTEInfo ub_emlrtRTEI{ 16,  // lineNo
+static emlrtRTEInfo tb_emlrtRTEI{ 16,  // lineNo
   5,                                   // colNo
   "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+};
+
+static emlrtRTEInfo ub_emlrtRTEI{ 21,  // lineNo
+  1,                                   // colNo
+  "morsebpfilters",                    // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
 };
 
 static emlrtRTEInfo vb_emlrtRTEI{ 32,  // lineNo
   18,                                  // colNo
-  "getCWTScales",                      // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/getCWTScales.m"// pName
+  "ec_cwt",                            // fName
+  "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo wb_emlrtRTEI{ 21,  // lineNo
-  1,                                   // colNo
-  "morsebpfilters",                    // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morsebpfilters.m"// pName
+static emlrtRTEInfo wb_emlrtRTEI{ 32,  // lineNo
+  18,                                  // colNo
+  "getCWTScales",                      // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/getCWTScales.m"// pName
 };
 
 static emlrtRTEInfo xb_emlrtRTEI{ 32,  // lineNo
   13,                                  // colNo
   "getCWTScales",                      // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/getCWTScales.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/getCWTScales.m"// pName
 };
 
-static emlrtRTEInfo yb_emlrtRTEI{ 32,  // lineNo
-  18,                                  // colNo
-  "ec_cwt",                            // fName
-  "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
-};
-
-static emlrtRTEInfo ac_emlrtRTEI{ 445, // lineNo
+static emlrtRTEInfo yb_emlrtRTEI{ 445, // lineNo
   1,                                   // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
 };
 
-static emlrtRTEInfo bc_emlrtRTEI{ 446, // lineNo
+static emlrtRTEInfo ac_emlrtRTEI{ 446, // lineNo
   1,                                   // colNo
   "quadgk",                            // fName
-  "/usr/local/MATLAB/R2023a/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/eml/lib/matlab/funfun/quadgk.m"// pName
+};
+
+static emlrtRTEInfo bc_emlrtRTEI{ 63,  // lineNo
+  20,                                  // colNo
+  "morseproperties",                   // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
 static emlrtRTEInfo cc_emlrtRTEI{ 63,  // lineNo
-  20,                                  // colNo
-  "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
-};
-
-static emlrtRTEInfo dc_emlrtRTEI{ 63,  // lineNo
   34,                                  // colNo
   "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
-static emlrtRTEInfo ec_emlrtRTEI{ 151, // lineNo
+static emlrtRTEInfo dc_emlrtRTEI{ 151, // lineNo
   5,                                   // colNo
   "wt",                                // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m"// pName
+};
+
+static emlrtRTEInfo ec_emlrtRTEI{ 63,  // lineNo
+  16,                                  // colNo
+  "morseproperties",                   // fName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
 static emlrtRTEInfo fc_emlrtRTEI{ 63,  // lineNo
-  16,                                  // colNo
-  "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
-};
-
-static emlrtRTEInfo gc_emlrtRTEI{ 63,  // lineNo
   60,                                  // colNo
   "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
-static emlrtRTEInfo hc_emlrtRTEI{ 42,  // lineNo
+static emlrtRTEInfo gc_emlrtRTEI{ 42,  // lineNo
   12,                                  // colNo
   "ec_cwt",                            // fName
   "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"// pName
 };
 
-static emlrtRTEInfo ic_emlrtRTEI{ 64,  // lineNo
+static emlrtRTEInfo hc_emlrtRTEI{ 64,  // lineNo
   12,                                  // colNo
   "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
-static emlrtRTEInfo jc_emlrtRTEI{ 64,  // lineNo
+static emlrtRTEInfo ic_emlrtRTEI{ 64,  // lineNo
   31,                                  // colNo
   "morseproperties",                   // fName
-  "/usr/local/MATLAB/R2023a/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
+  "/usr/local/MATLAB/R2023b/toolbox/wavelet/wavelet/+wavelet/+internal/+cwt/morseproperties.m"// pName
 };
 
-static emlrtRTEInfo kc_emlrtRTEI{ 1,   // lineNo
+static emlrtRTEInfo jc_emlrtRTEI{ 1,   // lineNo
   1,                                   // colNo
   "_coder_ec_cwt_api",                 // fName
   ""                                   // pName
 };
 
-static char_T (*cpu_cv_gpu_clone)[128];
+static char_T (*global_gpu_cv)[128];
 static boolean_T gpuConstsCopied_ec_cwt;
 
 // Function Declarations
-static void b_binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
-  const emxArray_real_T *in3);
 static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   *msgId, emxArray_real32_T *ret);
-static real_T (*b_emlrt_marshallIn(const mxArray *fLims, const char_T
+static real_T (*b_emlrt_marshallIn(const mxArray *b_nullptr, const char_T
   *identifier))[2];
 static real_T (*b_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   *parentId))[2];
 static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
   const emxArray_real_T *in3);
-static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
-  const emxArray_real_T *in3, const emxArray_real_T *in4);
-static void c_binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
+static void binary_expand_op_1(emxArray_real_T *in1, const emxArray_real_T *in2,
   const emxArray_real_T *in3);
-static real32_T c_emlrt_marshallIn(const mxArray *ds2, const char_T *identifier);
+static void binary_expand_op_2(emxArray_real_T *in1, const emxArray_real_T *in2,
+  const emxArray_real_T *in3, const emxArray_real_T *in4);
+static void binary_expand_op_4(emxArray_real_T *in1, const emxArray_real_T *in2,
+  const emxArray_real_T *in3);
 static real32_T c_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   *parentId);
+static real32_T c_emlrt_marshallIn(const mxArray *b_nullptr, const char_T
+  *identifier);
 static int64_T computeEndIdx(int64_T start, int64_T end, int64_T stride);
 static real_T d_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   *msgId);
@@ -453,186 +457,208 @@ static int32_T div_s32(int32_T numerator, int32_T denominator);
 static real_T (*e_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier *
   msgId))[2];
 static __global__ void ec_cwt_kernel1(const real_T fLims[2], boolean_T b[2]);
-static __global__ void ec_cwt_kernel10(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel11(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel12(const emxArray_real_T y, const
-  emxArray_real_T b_y, int32_T c_y, emxArray_real_T a);
-static __global__ void ec_cwt_kernel13(const emxArray_real_T a, int32_T bcoef,
-  emxArray_real_T dv3);
-static __global__ void ec_cwt_kernel14(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel15(const emxArray_real_T y, int32_T b_y,
-  emxArray_real_T dv6);
-static __global__ void ec_cwt_kernel16(const emxArray_real_T xt, const
-  emxArray_real_T dv6, const emxArray_real_T dv3, int32_T b_dv3, emxArray_real_T
+static __global__ void ec_cwt_kernel10(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel11(const emxArray_real_T y, const
+  emxArray_real_T b_y, const int32_T c_y, emxArray_real_T a);
+static __global__ void ec_cwt_kernel12(const emxArray_real_T a, const int32_T
+  bcoef, emxArray_real_T dv3);
+static __global__ void ec_cwt_kernel13(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel14(const emxArray_real_T y, const int32_T
+  b_y, emxArray_real_T dv6);
+static __global__ void ec_cwt_kernel15(const emxArray_real_T xt, const
+  emxArray_real_T dv6, const emxArray_real_T dv3, const int32_T b_dv3,
+  emxArray_real_T fx);
+static __global__ void ec_cwt_kernel16(const int16_T dv2_idx_1, emxArray_real_T
   fx);
-static __global__ void ec_cwt_kernel17(int16_T dv2_idx_1, emxArray_real_T fx);
+static __global__ void ec_cwt_kernel17(real_T interval[650]);
 static __global__ void ec_cwt_kernel18(real_T interval[650]);
-static __global__ void ec_cwt_kernel19(real_T interval[650]);
+static __global__ void ec_cwt_kernel19(const int32_T bcoef, real_T interval[650]);
 static __global__ void ec_cwt_kernel2(const real_T fLims[2], real_T freqrange[2]);
-static __global__ void ec_cwt_kernel20(const int32_T bcoef, real_T interval[650]);
-static __global__ void ec_cwt_kernel21(const real_T interval[650], int32_T nsubs,
-  real_T subs[1298]);
-static __global__ void ec_cwt_kernel22(const emxArray_real_T x, int32_T nbytes,
-  emxArray_real_T xt, emxArray_real_T b_x);
-static __global__ void ec_cwt_kernel23(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T dv10);
-static __global__ void ec_cwt_kernel24(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel25(const emxArray_real_T y, int32_T b_y,
-  emxArray_real_T dv12);
-static __global__ void ec_cwt_kernel26(const emxArray_real_T xt, const
-  emxArray_real_T dv12, const emxArray_real_T dv10, int32_T b_dv10,
+static __global__ void ec_cwt_kernel20(const real_T interval[650], const int32_T
+  nsubs, real_T subs[1298]);
+static __global__ void ec_cwt_kernel21(const emxArray_real_T x, const int32_T
+  nbytes, emxArray_real_T xt, emxArray_real_T b_x);
+static __global__ void ec_cwt_kernel22(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T dv10);
+static __global__ void ec_cwt_kernel23(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel24(const emxArray_real_T y, const int32_T
+  b_y, emxArray_real_T dv12);
+static __global__ void ec_cwt_kernel25(const emxArray_real_T xt, const
+  emxArray_real_T dv12, const emxArray_real_T dv10, const int32_T b_dv10,
   emxArray_real_T fx);
-static __global__ void ec_cwt_kernel27(int16_T dv2_idx_1, emxArray_real_T fx);
-static __global__ void ec_cwt_kernel28(const real_T r, real_T freqrange[2],
+static __global__ void ec_cwt_kernel26(const int16_T dv2_idx_1, emxArray_real_T
+  fx);
+static __global__ void ec_cwt_kernel27(const real_T r, real_T freqrange[2],
   real_T fLims[2]);
-static __global__ void ec_cwt_kernel29(const real_T fs, real_T freqrange[2],
+static __global__ void ec_cwt_kernel28(const real_T fs, real_T freqrange[2],
   real_T fLims[2]);
-static __global__ void ec_cwt_kernel3(const real_T fs, real_T NyquistRange[2]);
-static __global__ void ec_cwt_kernel30(int32_T nbytes, emxArray_real_T omega);
-static __global__ void ec_cwt_kernel31(const uint32_T N, int32_T i,
-  emxArray_real_T omega);
-static __global__ void ec_cwt_kernel32(emxArray_real_T r);
-static __global__ void ec_cwt_kernel33(const emxArray_real_T omega, int32_T j,
-  emxArray_real_T r);
-static __global__ void ec_cwt_kernel34(const int32_T nbytes, const int32_T nsubs,
-  const emxArray_real_T omega, int32_T j, emxArray_real_T r, int32_T omega_dim1);
-static __global__ void ec_cwt_kernel35(const emxArray_real_T r, int32_T b_r,
-  emxArray_real_T omega);
-static __global__ void ec_cwt_kernel36(const real_T fLims[2], boolean_T b[2]);
-static __global__ void ec_cwt_kernel37(const char_T cv[128], char_T wav[5],
-  char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T b_dim3, char_T b_dim4);
-static __global__ void ec_cwt_kernel38(real_T interval[650]);
-static __global__ void ec_cwt_kernel39(real_T interval[650]);
-static __global__ void ec_cwt_kernel4(const char_T cv[128], char_T wav[5],
-  char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T b_dim3, char_T b_dim4);
-static __global__ void ec_cwt_kernel40(const int32_T bcoef, real_T interval[650]);
-static __global__ void ec_cwt_kernel41(const real_T interval[650], int32_T nsubs,
-  real_T subs[1298]);
-static __global__ void ec_cwt_kernel42(const emxArray_real_T x, int32_T nbytes,
-  emxArray_real_T xt, emxArray_real_T b_x);
-static __global__ void ec_cwt_kernel43(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel44(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel45(const emxArray_real_T y, const
-  emxArray_real_T b_y, int32_T c_y, emxArray_real_T a);
-static __global__ void ec_cwt_kernel46(const emxArray_real_T a, int32_T bcoef,
-  emxArray_real_T dv11);
-static __global__ void ec_cwt_kernel47(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel48(const emxArray_real_T y, int32_T b_y,
-  emxArray_real_T dv13);
-static __global__ void ec_cwt_kernel49(const emxArray_real_T xt, const
-  emxArray_real_T dv13, const emxArray_real_T dv11, int32_T b_dv11,
+static __global__ void ec_cwt_kernel29(const int32_T nbytes, emxArray_int32_T
+  omega_tmp1);
+static __global__ void ec_cwt_kernel3(const char_T cv[128], char_T wname[5],
+  char_T wav[5], char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T b_dim3,
+  char_T b_dim4);
+static __global__ void ec_cwt_kernel30(const real_T maxScale, const
+  emxArray_int32_T omega_tmp1, const int32_T b_omega_tmp1, emxArray_real_T
+  omega_tmp2);
+static __global__ void ec_cwt_kernel31(emxArray_real_T fb_Omega);
+static __global__ void ec_cwt_kernel32(const emxArray_real_T omega_tmp2, const
+  int32_T k, emxArray_real_T fb_Omega);
+static __global__ void ec_cwt_kernel33(const int32_T nbytes, const int32_T i,
+  const emxArray_real_T omega_tmp2, const int32_T k, emxArray_real_T fb_Omega,
+  int32_T omega_tmp2_dim1);
+static __global__ void ec_cwt_kernel34(const real_T fLims[2], boolean_T b[2]);
+static __global__ void ec_cwt_kernel35(const char_T cv[128], char_T wav[5],
+  char_T wname[5], char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T b_dim3,
+  char_T b_dim4);
+static __global__ void ec_cwt_kernel36(real_T interval[650]);
+static __global__ void ec_cwt_kernel37(real_T interval[650]);
+static __global__ void ec_cwt_kernel38(const int32_T bcoef, real_T interval[650]);
+static __global__ void ec_cwt_kernel39(const real_T interval[650], const int32_T
+  nsubs, real_T subs[1298]);
+static __global__ void ec_cwt_kernel4(real_T interval[650]);
+static __global__ void ec_cwt_kernel40(const emxArray_real_T x, const int32_T
+  nbytes, emxArray_real_T xt, emxArray_real_T b_x);
+static __global__ void ec_cwt_kernel41(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel42(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel43(const emxArray_real_T y, const
+  emxArray_real_T b_y, const int32_T c_y, emxArray_real_T a);
+static __global__ void ec_cwt_kernel44(const emxArray_real_T a, const int32_T
+  bcoef, emxArray_real_T dv11);
+static __global__ void ec_cwt_kernel45(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel46(const emxArray_real_T y, const int32_T
+  b_y, emxArray_real_T dv13);
+static __global__ void ec_cwt_kernel47(const emxArray_real_T xt, const
+  emxArray_real_T dv13, const emxArray_real_T dv11, const int32_T b_dv11,
   emxArray_real_T fx);
+static __global__ void ec_cwt_kernel48(const int16_T dv2_idx_1, emxArray_real_T
+  fx);
+static __global__ void ec_cwt_kernel49(real_T interval[650]);
 static __global__ void ec_cwt_kernel5(real_T interval[650]);
-static __global__ void ec_cwt_kernel50(int16_T dv2_idx_1, emxArray_real_T fx);
-static __global__ void ec_cwt_kernel51(real_T interval[650]);
-static __global__ void ec_cwt_kernel52(real_T interval[650]);
-static __global__ void ec_cwt_kernel53(const int32_T bcoef, real_T interval[650]);
-static __global__ void ec_cwt_kernel54(const real_T interval[650], int32_T nsubs,
-  real_T subs[1298]);
-static __global__ void ec_cwt_kernel55(const emxArray_real_T x, int32_T nbytes,
-  emxArray_real_T xt, emxArray_real_T b_x);
-static __global__ void ec_cwt_kernel56(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T dv15);
-static __global__ void ec_cwt_kernel57(const emxArray_real_T x, int32_T bcoef,
-  emxArray_real_T y);
-static __global__ void ec_cwt_kernel58(const emxArray_real_T y, int32_T b_y,
-  emxArray_real_T dv16);
-static __global__ void ec_cwt_kernel59(const emxArray_real_T xt, const
-  emxArray_real_T dv16, const emxArray_real_T dv15, int32_T b_dv15,
+static __global__ void ec_cwt_kernel50(real_T interval[650]);
+static __global__ void ec_cwt_kernel51(const int32_T bcoef, real_T interval[650]);
+static __global__ void ec_cwt_kernel52(const real_T interval[650], const int32_T
+  nsubs, real_T subs[1298]);
+static __global__ void ec_cwt_kernel53(const emxArray_real_T x, const int32_T
+  nbytes, emxArray_real_T xt, emxArray_real_T b_x);
+static __global__ void ec_cwt_kernel54(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T dv15);
+static __global__ void ec_cwt_kernel55(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel56(const emxArray_real_T y, const int32_T
+  b_y, emxArray_real_T dv16);
+static __global__ void ec_cwt_kernel57(const emxArray_real_T xt, const
+  emxArray_real_T dv16, const emxArray_real_T dv15, const int32_T b_dv15,
   emxArray_real_T fx);
-static __global__ void ec_cwt_kernel6(real_T interval[650]);
-static __global__ void ec_cwt_kernel60(int16_T dv2_idx_1, emxArray_real_T fx);
-static __global__ void ec_cwt_kernel61(real_T r, emxArray_real_T y);
-static __global__ void ec_cwt_kernel62(const emxArray_real_T y, const real_T r,
-  int32_T bcoef, emxArray_real_T b_y);
-static __global__ void ec_cwt_kernel63(const emxArray_real_T y, const real_T
-  halfh, int32_T b_y, emxArray_real_T fb_Scales);
-static __global__ void ec_cwt_kernel64(const real_T fs, const real_T fLims[2],
+static __global__ void ec_cwt_kernel58(const int16_T dv2_idx_1, emxArray_real_T
+  fx);
+static __global__ void ec_cwt_kernel59(const real_T r, emxArray_real_T y);
+static __global__ void ec_cwt_kernel6(const int32_T bcoef, real_T interval[650]);
+static __global__ void ec_cwt_kernel60(emxArray_real_T y);
+static __global__ void ec_cwt_kernel61(const emxArray_real_T y, const real_T r,
+  const int32_T bcoef, emxArray_real_T b_y);
+static __global__ void ec_cwt_kernel62(const emxArray_real_T y, const real_T
+  halfh, const int32_T b_y, emxArray_real_T fb_Scales);
+static __global__ void ec_cwt_kernel63(const real_T fs, const real_T fLims[2],
   real_T NyquistRange[2]);
-static __global__ void ec_cwt_kernel65(real_T r, emxArray_real_T y);
-static __global__ void ec_cwt_kernel66(const emxArray_real_T y, const real_T tol,
-  int32_T bcoef, emxArray_real_T b_y);
-static __global__ void ec_cwt_kernel67(const emxArray_real_T y, const real_T
-  halfh, int32_T b_y, emxArray_real_T fb_Scales);
-static __global__ void ec_cwt_kernel68(int32_T fb_Scales, emxArray_real_T psidft);
-static __global__ void ec_cwt_kernel69(const emxArray_real_T fb_Scales, int32_T
-  b_fb_Scales, emxArray_real_T f);
-static __global__ void ec_cwt_kernel7(const int32_T bcoef, real_T interval[650]);
-static __global__ void ec_cwt_kernel70(const emxArray_real_T omega, const
-  emxArray_real_T fb_Scales, const int32_T b_fb_Scales, int32_T j,
+static __global__ void ec_cwt_kernel64(const char_T cv[128], char_T wname[5],
+  char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T b_dim3, char_T b_dim4);
+static __global__ void ec_cwt_kernel65(const real_T r, emxArray_real_T y);
+static __global__ void ec_cwt_kernel66(emxArray_real_T y);
+static __global__ void ec_cwt_kernel67(const emxArray_real_T y, const real_T tol,
+  const int32_T bcoef, emxArray_real_T b_y);
+static __global__ void ec_cwt_kernel68(const emxArray_real_T y, const real_T
+  halfh, const int32_T b_y, emxArray_real_T fb_Scales);
+static __global__ void ec_cwt_kernel69(const int32_T fb_Scales, emxArray_real_T
+  psidft);
+static __global__ void ec_cwt_kernel7(const real_T interval[650], const int32_T
+  nsubs, real_T subs[1298]);
+static __global__ void ec_cwt_kernel70(const emxArray_real_T fb_Scales, const
+  int32_T b_fb_Scales, emxArray_real_T f);
+static __global__ void ec_cwt_kernel71(const emxArray_real_T fb_Omega, const
+  emxArray_real_T fb_Scales, const int32_T b_fb_Scales, const int32_T k,
   emxArray_real_T somega, int32_T somega_dim0);
-static __global__ void ec_cwt_kernel71(const emxArray_real_T somega, int32_T
-  bcoef, emxArray_real_T absomega);
-static __global__ void ec_cwt_kernel72(const emxArray_real_T absomega, int32_T
-  b_absomega, emxArray_real_T powscales);
-static __global__ void ec_cwt_kernel73(int32_T bcoef, emxArray_real_T absomega);
-static __global__ void ec_cwt_kernel74(const emxArray_real_T powscales, const
-  emxArray_real_T absomega, int32_T b_absomega, emxArray_real_T x);
-static __global__ void ec_cwt_kernel75(int32_T bcoef, emxArray_real_T x);
-static __global__ void ec_cwt_kernel76(const emxArray_real_T somega, const
-  emxArray_real_T x, int32_T b_x, emxArray_real_T psidft);
-static __global__ void ec_cwt_kernel77(const emxArray_real_T fb_Scales, int32_T
-  b_fb_Scales, emxArray_real_T f);
-static __global__ void ec_cwt_kernel78(const real_T fs, int32_T i,
+static __global__ void ec_cwt_kernel72(const emxArray_real_T somega, const
+  int32_T bcoef, emxArray_real_T absomega);
+static __global__ void ec_cwt_kernel73(const emxArray_real_T absomega, const
+  int32_T b_absomega, emxArray_real_T powscales);
+static __global__ void ec_cwt_kernel74(const int32_T bcoef, emxArray_real_T
+  absomega);
+static __global__ void ec_cwt_kernel75(const emxArray_real_T powscales, const
+  emxArray_real_T absomega, const int32_T b_absomega, emxArray_real_T x);
+static __global__ void ec_cwt_kernel76(const int32_T bcoef, emxArray_real_T x);
+static __global__ void ec_cwt_kernel77(const emxArray_real_T somega, const
+  emxArray_real_T x, const int32_T b_x, emxArray_real_T psidft);
+static __global__ void ec_cwt_kernel78(const emxArray_real_T fb_Scales, const
+  int32_T b_fb_Scales, emxArray_real_T f);
+static __global__ void ec_cwt_kernel79(const real_T fs, const int32_T j,
   emxArray_real_T f);
-static __global__ void ec_cwt_kernel79(const emxArray_real_T f, int32_T b_f,
-  emxArray_real_T freqs);
-static __global__ void ec_cwt_kernel8(const real_T interval[650], int32_T nsubs,
-  real_T subs[1298]);
-static __global__ void ec_cwt_kernel80(const real32_T ds2, int32_T i,
+static __global__ void ec_cwt_kernel8(const emxArray_real_T x, const int32_T
+  nbytes, emxArray_real_T xt, emxArray_real_T b_x);
+static __global__ void ec_cwt_kernel80(const emxArray_real_T f, const int32_T
+  b_f, emxArray_real_T freqs);
+static __global__ void ec_cwt_kernel81(const real32_T ds2, const int32_T j,
   emxArray_real32_T fv);
-static __global__ void ec_cwt_kernel81(const emxArray_real_T psidft, int32_T
-  b_psidft, emxArray_real32_T psihat);
-static __global__ void ec_cwt_kernel82(const int32_T k, const emxArray_real32_T
-  x, int32_T b_x, emxArray_real32_T xv, int32_T x_dim0);
-static __global__ void ec_cwt_kernel83(const int32_T k, const emxArray_real32_T
-  x, int32_T fb_SignalPad, emxArray_real32_T b_x, int32_T x_dim0);
-static __global__ void ec_cwt_kernel84(const emxArray_real32_T x, int32_T j,
-  emxArray_real32_T xv);
-static __global__ void ec_cwt_kernel85(const emxArray_real32_T xv, int32_T b_xv,
-  emxArray_creal32_T xposdft);
-static __global__ void ec_cwt_kernel86(const emxArray_creal32_T xposdft, const
-  emxArray_real32_T psihat, const int32_T bcoef, const int32_T cfsposdft,
+static __global__ void ec_cwt_kernel82(const emxArray_real_T psidft, const
+  int32_T b_psidft, emxArray_real32_T psihat);
+static __global__ void ec_cwt_kernel83(const int32_T i, const emxArray_real32_T
+  x, const int32_T b_x, emxArray_real32_T xv, int32_T x_dim0);
+static __global__ void ec_cwt_kernel84(const int32_T i, const emxArray_real32_T
+  x, const int32_T fb_SignalPad, emxArray_real32_T b_x, int32_T x_dim0);
+static __global__ void ec_cwt_kernel85(const int32_T fb_SignalPad, const int32_T
+  bcoef, emxArray_real32_T x);
+static __global__ void ec_cwt_kernel86(const emxArray_real32_T x, const int32_T
+  k, emxArray_real32_T xv);
+static __global__ void ec_cwt_kernel87(const uint32_T xSize[2], const int32_T
+  nbytes, emxArray_creal32_T xposdft);
+static __global__ void ec_cwt_kernel88(const emxArray_real32_T xv, const int32_T
+  b_xv, emxArray_creal32_T xposdft);
+static __global__ void ec_cwt_kernel89(const emxArray_creal32_T xposdft, const
+  emxArray_real32_T psihat, const int32_T bcoef, const int32_T cfsposdft, const
   int32_T nbytes, emxArray_creal32_T b_cfsposdft, int32_T psihat_dim0, int32_T
   cfsposdft_dim0);
-static __global__ void ec_cwt_kernel87(const real32_T cfsposdft_re, const
-  emxArray_creal32_T cfsposdft, int32_T b_cfsposdft, emxArray_creal32_T cfspos);
-static __global__ void ec_cwt_kernel88(uint32_T xSize[2], int32_T cfsposdft_dim1);
-static __global__ void ec_cwt_kernel89(int32_T xSize, emxArray_creal32_T cfspos);
-static __global__ void ec_cwt_kernel9(const emxArray_real_T x, int32_T nbytes,
-  emxArray_real_T xt, emxArray_real_T b_x);
-static __global__ void ec_cwt_kernel90(const emxArray_creal32_T cfspos, int32_T
-  bcoef, emxArray_real32_T y);
-static __global__ void ec_cwt_kernel91(const emxArray_real32_T y, const int32_T
-  b_y, int32_T c_y, emxArray_real32_T xCh, int32_T xCh_dim0, int32_T y_dim0);
-static __global__ void ec_cwt_kernel92(const emxArray_real32_T xCh, const
-  int32_T nbytes, const int32_T bcoef, int32_T k, emxArray_real32_T b_xCh,
+static __global__ void ec_cwt_kernel9(const emxArray_real_T x, const int32_T
+  bcoef, emxArray_real_T y);
+static __global__ void ec_cwt_kernel90(const real32_T cfsposdft_re, const
+  emxArray_creal32_T cfsposdft, const int32_T b_cfsposdft, emxArray_creal32_T
+  cfspos);
+static __global__ void ec_cwt_kernel91(uint32_T xSize[2], int32_T cfsposdft_dim1);
+static __global__ void ec_cwt_kernel92(const int32_T xSize, emxArray_creal32_T
+  cfspos);
+static __global__ void ec_cwt_kernel93(const emxArray_creal32_T cfspos, const
+  int32_T bcoef, emxArray_real32_T y);
+static __global__ void ec_cwt_kernel94(const emxArray_real32_T y, const int32_T
+  b_y, const int32_T c_y, emxArray_real32_T xCh, int32_T xCh_dim0, int32_T
+  y_dim0);
+static __global__ void ec_cwt_kernel95(const emxArray_real32_T xCh, const
+  int32_T nbytes, const int32_T bcoef, const int32_T i, emxArray_real32_T b_xCh,
   int32_T xCh_dim0, int32_T b_xCh_dim0);
-static __global__ void ec_cwt_kernel93(const emxArray_real32_T xCh, int32_T
-  b_xCh, emxArray_real32_T c_xCh);
-static __global__ void ec_cwt_kernel94(const emxArray_real32_T xCh, const
-  int32_T xx_dim0, const int32_T k, const int32_T xx, int32_T b_xx,
+static __global__ void ec_cwt_kernel96(const emxArray_real32_T xCh, const
+  int32_T b_xCh, emxArray_real32_T c_xCh);
+static __global__ void ec_cwt_kernel97(const emxArray_real32_T xCh, const
+  int32_T xx_dim0, const int32_T i, const int32_T xx, const int32_T b_xx,
   emxArray_real32_T c_xx, int32_T b_xx_dim0, int32_T xx_dim1);
 static void ec_cwt_once();
-static void emlrt_marshallIn(const mxArray *x, const char_T *identifier,
+static void emlrt_marshallIn(const mxArray *b_nullptr, const char_T *identifier,
   emxArray_real32_T *y);
 static real_T emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   *parentId);
-static real_T emlrt_marshallIn(const mxArray *fs, const char_T *identifier);
 static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   *parentId, emxArray_real32_T *y);
+static real_T emlrt_marshallIn(const mxArray *b_nullptr, const char_T
+  *identifier);
 static const mxArray *emlrt_marshallOut(const emxArray_real_T *u);
 static const mxArray *emlrt_marshallOut(const emxArray_real32_T *u);
 static void emxEnsureCapacity_char_T(emxArray_char_T *emxArray, int32_T oldNumel,
   const emlrtRTEInfo *srcLocation);
 static void emxEnsureCapacity_creal32_T(emxArray_creal32_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation);
+static void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T
   oldNumel, const emlrtRTEInfo *srcLocation);
 static void emxEnsureCapacity_real32_T(emxArray_real32_T *emxArray, int32_T
   oldNumel, const emlrtRTEInfo *srcLocation);
@@ -640,12 +666,15 @@ static void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel
   const emlrtRTEInfo *srcLocation);
 static void emxFree_char_T(emxArray_char_T **pEmxArray);
 static void emxFree_creal32_T(emxArray_creal32_T **pEmxArray);
+static void emxFree_int32_T(emxArray_int32_T **pEmxArray);
 static void emxFree_real32_T(emxArray_real32_T **pEmxArray);
 static void emxFree_real_T(emxArray_real_T **pEmxArray);
 static void emxInit_char_T(emxArray_char_T **pEmxArray, int32_T numDimensions,
   const emlrtRTEInfo *srcLocation, boolean_T doPush);
 static void emxInit_creal32_T(emxArray_creal32_T **pEmxArray, int32_T
   numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
+static void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush);
 static void emxInit_real32_T(emxArray_real32_T **pEmxArray, int32_T
   numDimensions, const emlrtRTEInfo *srcLocation, boolean_T doPush);
 static void emxInit_real_T(emxArray_real_T **pEmxArray, int32_T numDimensions,
@@ -654,11 +683,14 @@ static real32_T f_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier 
   msgId);
 static void gpuEmxEnsureCapacity_creal32_T(const emxArray_creal32_T *cpu,
   emxArray_creal32_T *gpu);
+static void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
+  emxArray_int32_T *gpu);
 static void gpuEmxEnsureCapacity_real32_T(const emxArray_real32_T *cpu,
   emxArray_real32_T *gpu);
 static void gpuEmxEnsureCapacity_real_T(const emxArray_real_T *cpu,
   emxArray_real_T *gpu);
 static void gpuEmxFree_creal32_T(emxArray_creal32_T *gpu);
+static void gpuEmxFree_int32_T(emxArray_int32_T *gpu);
 static void gpuEmxFree_real32_T(emxArray_real32_T *gpu);
 static void gpuEmxFree_real_T(emxArray_real_T *gpu);
 static void gpuEmxMemcpyCpuToGpu_creal32_T(emxArray_creal32_T *gpu, const
@@ -674,67 +706,12 @@ static void gpuEmxMemcpyGpuToCpu_real32_T(emxArray_real32_T *cpu,
 static void gpuEmxMemcpyGpuToCpu_real_T(emxArray_real_T *cpu, emxArray_real_T
   *gpu);
 static void gpuEmxReset_creal32_T(emxArray_creal32_T *gpu);
+static void gpuEmxReset_int32_T(emxArray_int32_T *gpu);
 static void gpuEmxReset_real32_T(emxArray_real32_T *gpu);
 static void gpuEmxReset_real_T(emxArray_real_T *gpu);
 static real_T rt_powd_snf(real_T u0, real_T u1);
 
 // Function Definitions
-static void b_binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
-  const emxArray_real_T *in3)
-{
-  int32_T aux_0_1;
-  int32_T aux_1_1;
-  int32_T b;
-  int32_T i;
-  int32_T stride_0_0;
-  int32_T stride_0_1;
-  int32_T stride_1_0;
-  int32_T stride_1_1;
-  i = in1->size[0] * in1->size[1];
-  if (in3->size[0] == 1) {
-    in1->size[0] = in2->size[0];
-  } else {
-    in1->size[0] = in3->size[0];
-  }
-
-  if (in3->size[1] == 1) {
-    in1->size[1] = in2->size[1];
-  } else {
-    in1->size[1] = in3->size[1];
-  }
-
-  emxEnsureCapacity_real_T(in1, i, &y_emlrtRTEI);
-  stride_0_0 = (in2->size[0] != 1);
-  stride_0_1 = (in2->size[1] != 1);
-  stride_1_0 = (in3->size[0] != 1);
-  stride_1_1 = (in3->size[1] != 1);
-  aux_0_1 = 0;
-  aux_1_1 = 0;
-  if (in3->size[1] == 1) {
-    b = in2->size[1];
-  } else {
-    b = in3->size[1];
-  }
-
-  for (i = 0; i < b; i++) {
-    int32_T c;
-    if (in3->size[0] == 1) {
-      c = in2->size[0];
-    } else {
-      c = in3->size[0];
-    }
-
-    for (int32_T i1{0}; i1 < c; i1++) {
-      in1->data[i1 + in1->size[0] * i] = 20.0 * in2->data[i1 * stride_0_0 +
-        in2->size[0] * aux_0_1] - in3->data[i1 * stride_1_0 + in3->size[0] *
-        aux_1_1];
-    }
-
-    aux_1_1 += stride_1_1;
-    aux_0_1 += stride_0_1;
-  }
-}
-
 static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   *msgId, emxArray_real32_T *ret)
 {
@@ -756,7 +733,7 @@ static void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier
   emlrtDestroyArray(&src);
 }
 
-static real_T (*b_emlrt_marshallIn(const mxArray *fLims, const char_T
+static real_T (*b_emlrt_marshallIn(const mxArray *b_nullptr, const char_T
   *identifier))[2]
 {
   emlrtMsgIdentifier thisId;
@@ -764,8 +741,8 @@ static real_T (*b_emlrt_marshallIn(const mxArray *fLims, const char_T
   thisId.fIdentifier = const_cast<const char_T *>(identifier);
   thisId.fParent = nullptr;
   thisId.bParentIsCell = false;
-  y = b_emlrt_marshallIn(emlrtAlias(fLims), &thisId);
-  emlrtDestroyArray(&fLims);
+  y = b_emlrt_marshallIn(emlrtAlias(b_nullptr), &thisId);
+  emlrtDestroyArray(&b_nullptr);
   return y;
 }
 static real_T (*b_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
@@ -801,7 +778,7 @@ static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
     in1->size[1] = in3->size[1];
   }
 
-  emxEnsureCapacity_real_T(in1, i, &cb_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &bb_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_0_1 = (in2->size[1] != 1);
   stride_1_0 = (in3->size[0] != 1);
@@ -833,7 +810,63 @@ static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
   }
 }
 
-static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
+static void binary_expand_op_1(emxArray_real_T *in1, const emxArray_real_T *in2,
+  const emxArray_real_T *in3)
+{
+  int32_T aux_0_1;
+  int32_T aux_1_1;
+  int32_T b;
+  int32_T i;
+  int32_T stride_0_0;
+  int32_T stride_0_1;
+  int32_T stride_1_0;
+  int32_T stride_1_1;
+  i = in1->size[0] * in1->size[1];
+  if (in3->size[0] == 1) {
+    in1->size[0] = in2->size[0];
+  } else {
+    in1->size[0] = in3->size[0];
+  }
+
+  if (in3->size[1] == 1) {
+    in1->size[1] = in2->size[1];
+  } else {
+    in1->size[1] = in3->size[1];
+  }
+
+  emxEnsureCapacity_real_T(in1, i, &x_emlrtRTEI);
+  stride_0_0 = (in2->size[0] != 1);
+  stride_0_1 = (in2->size[1] != 1);
+  stride_1_0 = (in3->size[0] != 1);
+  stride_1_1 = (in3->size[1] != 1);
+  aux_0_1 = 0;
+  aux_1_1 = 0;
+  if (in3->size[1] == 1) {
+    b = in2->size[1];
+  } else {
+    b = in3->size[1];
+  }
+
+  for (i = 0; i < b; i++) {
+    int32_T c;
+    if (in3->size[0] == 1) {
+      c = in2->size[0];
+    } else {
+      c = in3->size[0];
+    }
+
+    for (int32_T i1{0}; i1 < c; i1++) {
+      in1->data[i1 + in1->size[0] * i] = 20.0 * in2->data[i1 * stride_0_0 +
+        in2->size[0] * aux_0_1] - in3->data[i1 * stride_1_0 + in3->size[0] *
+        aux_1_1];
+    }
+
+    aux_1_1 += stride_1_1;
+    aux_0_1 += stride_0_1;
+  }
+}
+
+static void binary_expand_op_2(emxArray_real_T *in1, const emxArray_real_T *in2,
   const emxArray_real_T *in3, const emxArray_real_T *in4)
 {
   int32_T i;
@@ -842,7 +875,7 @@ static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
   i = in1->size[0] * in1->size[1];
   in1->size[0] = 1;
   in1->size[1] = in4->size[1];
-  emxEnsureCapacity_real_T(in1, i, &bb_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &ab_emlrtRTEI);
   stride_0_1 = (in2->size[1] != 1);
   stride_1_1 = (in3->size[1] != 1);
   for (i = 0; i < in4->size[1]; i++) {
@@ -851,7 +884,7 @@ static void binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
   }
 }
 
-static void c_binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
+static void binary_expand_op_4(emxArray_real_T *in1, const emxArray_real_T *in2,
   const emxArray_real_T *in3)
 {
   int32_T b;
@@ -866,7 +899,7 @@ static void c_binary_expand_op(emxArray_real_T *in1, const emxArray_real_T *in2,
     in1->size[1] = in3->size[1];
   }
 
-  emxEnsureCapacity_real_T(in1, i, &p_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &o_emlrtRTEI);
   stride_0_1 = (in2->size[1] != 1);
   stride_1_1 = (in3->size[1] != 1);
   if (in3->size[1] == 1) {
@@ -890,15 +923,16 @@ static real32_T c_emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   return y;
 }
 
-static real32_T c_emlrt_marshallIn(const mxArray *ds2, const char_T *identifier)
+static real32_T c_emlrt_marshallIn(const mxArray *b_nullptr, const char_T
+  *identifier)
 {
   emlrtMsgIdentifier thisId;
   real32_T y;
   thisId.fIdentifier = const_cast<const char_T *>(identifier);
   thisId.fParent = nullptr;
   thisId.bParentIsCell = false;
-  y = c_emlrt_marshallIn(emlrtAlias(ds2), &thisId);
-  emlrtDestroyArray(&ds2);
+  y = c_emlrt_marshallIn(emlrtAlias(b_nullptr), &thisId);
+  emlrtDestroyArray(&b_nullptr);
   return y;
 }
 
@@ -978,32 +1012,16 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel1(const real_T
 fLims[2], boolean_T b[2])
 {
   uint64_T threadId;
-  int32_T varargin_3;
+  int32_T k;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  varargin_3 = static_cast<int32_T>(threadId);
-  if (varargin_3 < 2) {
-    b[varargin_3] = isnan(fLims[varargin_3]);
+  k = static_cast<int32_T>(threadId);
+  if (k < 2) {
+    b[k] = isnan(fLims[k]);
   }
 }
 
 static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel10(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T k;
-    k = static_cast<int32_T>(idx);
-    y.data[k] = pow(x.data[k], 19.0);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel11(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1018,8 +1036,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel11(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel12(const
-  emxArray_real_T y, const emxArray_real_T b_y, int32_T c_y, emxArray_real_T a)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel11(const
+  emxArray_real_T y, const emxArray_real_T b_y, const int32_T c_y,
+  emxArray_real_T a)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1028,14 +1047,14 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel12(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(c_y);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    a.data[varargin_3] = 20.0 * b_y.data[varargin_3] - 3.0 * y.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    a.data[k] = 20.0 * b_y.data[k] - 3.0 * y.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel13(const
-  emxArray_real_T a, int32_T bcoef, emxArray_real_T dv3)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel12(const
+  emxArray_real_T a, const int32_T bcoef, emxArray_real_T dv3)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1052,8 +1071,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel13(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel14(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel13(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1068,8 +1087,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel14(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel15(const
-  emxArray_real_T y, int32_T b_y, emxArray_real_T dv6)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel14(const
+  emxArray_real_T y, const int32_T b_y, emxArray_real_T dv6)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1084,9 +1103,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel15(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel16(const
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel15(const
   emxArray_real_T xt, const emxArray_real_T dv6, const emxArray_real_T dv3,
-  int32_T b_dv3, emxArray_real_T fx)
+  const int32_T b_dv3, emxArray_real_T fx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1095,14 +1114,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel16(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_dv3);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = dv3.data[varargin_3] * dv6.data[varargin_3] *
-      xt.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = dv3.data[k] * dv6.data[k] * xt.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel17(int16_T
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel16(const int16_T
   dv2_idx_1, emxArray_real_T fx)
 {
   uint64_T loopEnd;
@@ -1112,13 +1130,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel17(int16_T
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(dv2_idx_1) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = 0.0;
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = 0.0;
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel18(real_T interval
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel17(real_T interval
   [650])
 {
   uint64_T threadId;
@@ -1131,7 +1149,7 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel18(real_T interval
   }
 }
 
-static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel19(real_T
+static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel18(real_T
   interval[650])
 {
   uint64_T threadId;
@@ -1143,19 +1161,7 @@ static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel19(real_T
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel2(const real_T
-  fLims[2], real_T freqrange[2])
-{
-  uint64_T threadId;
-  int32_T varargin_3;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  varargin_3 = static_cast<int32_T>(threadId);
-  if (varargin_3 < 2) {
-    freqrange[varargin_3] = fLims[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel20(const int32_T
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel19(const int32_T
   bcoef, real_T interval[650])
 {
   uint64_T threadId;
@@ -1167,8 +1173,20 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel20(const int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel21(const real_T
-  interval[650], int32_T nsubs, real_T subs[1298])
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel2(const real_T
+  fLims[2], real_T freqrange[2])
+{
+  uint64_T threadId;
+  int32_T k;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  k = static_cast<int32_T>(threadId);
+  if (k < 2) {
+    freqrange[k] = fLims[k];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel20(const real_T
+  interval[650], const int32_T nsubs, real_T subs[1298])
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1184,8 +1202,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel21(const real_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel22(const
-  emxArray_real_T x, int32_T nbytes, emxArray_real_T xt, emxArray_real_T b_x)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel21(const
+  emxArray_real_T x, const int32_T nbytes, emxArray_real_T xt, emxArray_real_T
+  b_x)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1205,8 +1224,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel22(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel23(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T dv10)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel22(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T dv10)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1221,8 +1240,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel23(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel24(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel23(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1237,8 +1256,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel24(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel25(const
-  emxArray_real_T y, int32_T b_y, emxArray_real_T dv12)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel24(const
+  emxArray_real_T y, const int32_T b_y, emxArray_real_T dv12)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1253,9 +1272,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel25(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel26(const
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel25(const
   emxArray_real_T xt, const emxArray_real_T dv12, const emxArray_real_T dv10,
-  int32_T b_dv10, emxArray_real_T fx)
+  const int32_T b_dv10, emxArray_real_T fx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1264,14 +1283,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel26(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_dv10);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = dv10.data[varargin_3] * dv12.data[varargin_3] *
-      xt.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = dv10.data[k] * dv12.data[k] * xt.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel27(int16_T
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel26(const int16_T
   dv2_idx_1, emxArray_real_T fx)
 {
   uint64_T loopEnd;
@@ -1281,13 +1299,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel27(int16_T
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(dv2_idx_1) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = 0.0;
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = 0.0;
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel28(const real_T r,
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel27(const real_T r,
   real_T freqrange[2], real_T fLims[2])
 {
   uint64_T threadId;
@@ -1300,7 +1318,7 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel28(const real_T r,
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel29(const real_T fs,
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel28(const real_T fs,
   real_T freqrange[2], real_T fLims[2])
 {
   uint64_T threadId;
@@ -1313,20 +1331,8 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel29(const real_T fs,
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel3(const real_T fs,
-  real_T NyquistRange[2])
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    NyquistRange[1] = fs / 2.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel30(int32_T nbytes,
-  emxArray_real_T omega)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel29(const int32_T
+  nbytes, emxArray_int32_T omega_tmp1)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1335,106 +1341,15 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel30(int32_T nbytes
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(nbytes) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    omega.data[varargin_3] = static_cast<real_T>(varargin_3) + 1.0;
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    omega_tmp1.data[k] = k + 1;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel31(const uint32_T
-  N, int32_T i, emxArray_real_T omega)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(i);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    omega.data[varargin_3] = omega.data[varargin_3] * 6.2831853071795862 /
-      static_cast<real_T>(N);
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel32(emxArray_real_T
-  r)
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    r.data[0] = 0.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel33(const
-  emxArray_real_T omega, int32_T j, emxArray_real_T r)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(j) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    r.data[varargin_3 + 1] = omega.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel34(const int32_T
-  nbytes, const int32_T nsubs, const emxArray_real_T omega, int32_T j,
-  emxArray_real_T r, int32_T omega_dim1)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(j);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    r.data[(varargin_3 + omega_dim1) + 1] = -omega.data[nsubs + nbytes *
-      varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel35(const
-  emxArray_real_T r, int32_T b_r, emxArray_real_T omega)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_r);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    omega.data[varargin_3] = r.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel36(const real_T
-  fLims[2], boolean_T b[2])
-{
-  uint64_T threadId;
-  int32_T varargin_3;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  varargin_3 = static_cast<int32_T>(threadId);
-  if (varargin_3 < 2) {
-    b[varargin_3] = isnan(fLims[varargin_3]);
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel37(const char_T cv
-  [128], char_T wav[5], char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T
-  b_dim3, char_T b_dim4)
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel3(const char_T cv
+  [128], char_T wname[5], char_T wav[5], char_T b_dim0, char_T b_dim1, char_T
+  b_dim2, char_T b_dim3, char_T b_dim4)
 {
   __shared__ char_T b_shared[5];
   uint64_T threadId;
@@ -1452,10 +1367,110 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel37(const char_T cv
   k = static_cast<int32_T>(threadId);
   if (k < 5) {
     wav[k] = cv[static_cast<int32_T>(b_shared[k])];
+    wname[k] = cv[static_cast<int32_T>(cv[static_cast<int32_T>(b_shared[k])])];
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel38(real_T interval
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel30(const real_T
+  maxScale, const emxArray_int32_T omega_tmp1, const int32_T b_omega_tmp1,
+  emxArray_real_T omega_tmp2)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_omega_tmp1);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    omega_tmp2.data[k] = static_cast<real_T>(omega_tmp1.data[k]) * maxScale;
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel31(emxArray_real_T
+  fb_Omega)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    fb_Omega.data[0] = 0.0;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel32(const
+  emxArray_real_T omega_tmp2, const int32_T k, emxArray_real_T fb_Omega)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(k) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T b_k;
+    b_k = static_cast<int32_T>(idx);
+    fb_Omega.data[b_k + 1] = omega_tmp2.data[b_k];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel33(const int32_T
+  nbytes, const int32_T i, const emxArray_real_T omega_tmp2, const int32_T k,
+  emxArray_real_T fb_Omega, int32_T omega_tmp2_dim1)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(k);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T b_k;
+    b_k = static_cast<int32_T>(idx);
+    fb_Omega.data[(b_k + omega_tmp2_dim1) + 1] = -omega_tmp2.data[i + nbytes *
+      b_k];
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel34(const real_T
+  fLims[2], boolean_T b[2])
+{
+  uint64_T threadId;
+  int32_T k;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  k = static_cast<int32_T>(threadId);
+  if (k < 2) {
+    b[k] = isnan(fLims[k]);
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel35(const char_T cv
+  [128], char_T wav[5], char_T wname[5], char_T b_dim0, char_T b_dim1, char_T
+  b_dim2, char_T b_dim3, char_T b_dim4)
+{
+  __shared__ char_T b_shared[5];
+  uint64_T threadId;
+  int32_T k;
+  if (mwGetThreadIndexWithinBlock() == 0) {
+    b_shared[0] = b_dim0;
+    b_shared[1] = b_dim1;
+    b_shared[2] = b_dim2;
+    b_shared[3] = b_dim3;
+    b_shared[4] = b_dim4;
+  }
+
+  __syncthreads();
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  k = static_cast<int32_T>(threadId);
+  if (k < 5) {
+    wname[k] = cv[static_cast<int32_T>(b_shared[k])];
+    wav[k] = cv[static_cast<int32_T>(cv[static_cast<int32_T>(b_shared[k])])];
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel36(real_T interval
   [650])
 {
   uint64_T threadId;
@@ -1468,7 +1483,7 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel38(real_T interval
   }
 }
 
-static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel39(real_T
+static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel37(real_T
   interval[650])
 {
   uint64_T threadId;
@@ -1480,30 +1495,7 @@ static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel39(real_T
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel4(const char_T cv
-  [128], char_T wav[5], char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T
-  b_dim3, char_T b_dim4)
-{
-  __shared__ char_T b_shared[5];
-  uint64_T threadId;
-  int32_T k;
-  if (mwGetThreadIndexWithinBlock() == 0) {
-    b_shared[0] = b_dim0;
-    b_shared[1] = b_dim1;
-    b_shared[2] = b_dim2;
-    b_shared[3] = b_dim3;
-    b_shared[4] = b_dim4;
-  }
-
-  __syncthreads();
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  k = static_cast<int32_T>(threadId);
-  if (k < 5) {
-    wav[k] = cv[static_cast<int32_T>(b_shared[k])];
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel40(const int32_T
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel38(const int32_T
   bcoef, real_T interval[650])
 {
   uint64_T threadId;
@@ -1515,8 +1507,8 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel40(const int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel41(const real_T
-  interval[650], int32_T nsubs, real_T subs[1298])
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel39(const real_T
+  interval[650], const int32_T nsubs, real_T subs[1298])
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1532,8 +1524,22 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel41(const real_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel42(const
-  emxArray_real_T x, int32_T nbytes, emxArray_real_T xt, emxArray_real_T b_x)
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel4(real_T interval
+  [650])
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    interval[0] = 0.0;
+    interval[1] = 1.0;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel40(const
+  emxArray_real_T x, const int32_T nbytes, emxArray_real_T xt, emxArray_real_T
+  b_x)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1553,8 +1559,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel42(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel43(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel41(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1569,8 +1575,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel43(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel44(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel42(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1585,8 +1591,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel44(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel45(const
-  emxArray_real_T y, const emxArray_real_T b_y, int32_T c_y, emxArray_real_T a)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel43(const
+  emxArray_real_T y, const emxArray_real_T b_y, const int32_T c_y,
+  emxArray_real_T a)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1595,14 +1602,14 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel45(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(c_y);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    a.data[varargin_3] = 20.0 * b_y.data[varargin_3] - 3.0 * y.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    a.data[k] = 20.0 * b_y.data[k] - 3.0 * y.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel46(const
-  emxArray_real_T a, int32_T bcoef, emxArray_real_T dv11)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel44(const
+  emxArray_real_T a, const int32_T bcoef, emxArray_real_T dv11)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1619,8 +1626,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel46(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel47(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel45(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1635,8 +1642,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel47(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel48(const
-  emxArray_real_T y, int32_T b_y, emxArray_real_T dv13)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel46(const
+  emxArray_real_T y, const int32_T b_y, emxArray_real_T dv13)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1651,9 +1658,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel48(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel49(const
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel47(const
   emxArray_real_T xt, const emxArray_real_T dv13, const emxArray_real_T dv11,
-  int32_T b_dv11, emxArray_real_T fx)
+  const int32_T b_dv11, emxArray_real_T fx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1662,27 +1669,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel49(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_dv11);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = dv11.data[varargin_3] * dv13.data[varargin_3] *
-      xt.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = dv11.data[k] * dv13.data[k] * xt.data[k];
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel5(real_T interval
-  [650])
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    interval[0] = 0.0;
-    interval[1] = 1.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel50(int16_T
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel48(const int16_T
   dv2_idx_1, emxArray_real_T fx)
 {
   uint64_T loopEnd;
@@ -1692,13 +1685,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel50(int16_T
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(dv2_idx_1) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = 0.0;
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = 0.0;
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel51(real_T interval
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel49(real_T interval
   [650])
 {
   uint64_T threadId;
@@ -1711,7 +1704,19 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel51(real_T interval
   }
 }
 
-static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel52(real_T
+static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel5(real_T interval
+  [650])
+{
+  uint64_T threadId;
+  int32_T k;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  k = static_cast<int32_T>(threadId);
+  if (k < 648) {
+    interval[k + 2] = 0.0;
+  }
+}
+
+static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel50(real_T
   interval[650])
 {
   uint64_T threadId;
@@ -1723,7 +1728,7 @@ static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel52(real_T
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel53(const int32_T
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel51(const int32_T
   bcoef, real_T interval[650])
 {
   uint64_T threadId;
@@ -1735,8 +1740,8 @@ static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel53(const int32_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel54(const real_T
-  interval[650], int32_T nsubs, real_T subs[1298])
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel52(const real_T
+  interval[650], const int32_T nsubs, real_T subs[1298])
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1752,8 +1757,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel54(const real_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel55(const
-  emxArray_real_T x, int32_T nbytes, emxArray_real_T xt, emxArray_real_T b_x)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel53(const
+  emxArray_real_T x, const int32_T nbytes, emxArray_real_T xt, emxArray_real_T
+  b_x)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1773,8 +1779,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel55(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel56(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T dv15)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel54(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T dv15)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1789,8 +1795,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel56(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel57(const
-  emxArray_real_T x, int32_T bcoef, emxArray_real_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel55(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1805,8 +1811,8 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel57(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel58(const
-  emxArray_real_T y, int32_T b_y, emxArray_real_T dv16)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel56(const
+  emxArray_real_T y, const int32_T b_y, emxArray_real_T dv16)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1821,9 +1827,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel58(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel59(const
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel57(const
   emxArray_real_T xt, const emxArray_real_T dv16, const emxArray_real_T dv15,
-  int32_T b_dv15, emxArray_real_T fx)
+  const int32_T b_dv15, emxArray_real_T fx)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1832,26 +1838,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel59(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_dv15);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = dv15.data[varargin_3] * dv16.data[varargin_3] *
-      xt.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = dv15.data[k] * dv16.data[k] * xt.data[k];
   }
 }
 
-static __global__ __launch_bounds__(512, 1) void ec_cwt_kernel6(real_T interval
-  [650])
-{
-  uint64_T threadId;
-  int32_T k;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  k = static_cast<int32_T>(threadId);
-  if (k < 648) {
-    interval[k + 2] = 0.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel60(int16_T
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel58(const int16_T
   dv2_idx_1, emxArray_real_T fx)
 {
   uint64_T loopEnd;
@@ -1861,13 +1854,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel60(int16_T
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(dv2_idx_1) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fx.data[varargin_3] = 0.0;
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fx.data[k] = 0.0;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel61(real_T r,
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel59(const real_T r,
   emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -1877,14 +1870,38 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel61(real_T r,
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(r);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    y.data[varargin_3] = static_cast<real_T>(varargin_3);
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    y.data[k] = static_cast<real_T>(k);
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel62(const
-  emxArray_real_T y, const real_T r, int32_T bcoef, emxArray_real_T b_y)
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel6(const int32_T
+  bcoef, real_T interval[650])
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    interval[1] = interval[bcoef];
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel60(emxArray_real_T
+  y)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    y.data[0] = CUDART_NAN;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel61(const
+  emxArray_real_T y, const real_T r, const int32_T bcoef, emxArray_real_T b_y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1899,8 +1916,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel62(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel63(const
-  emxArray_real_T y, const real_T halfh, int32_T b_y, emxArray_real_T fb_Scales)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel62(const
+  emxArray_real_T y, const real_T halfh, const int32_T b_y, emxArray_real_T
+  fb_Scales)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1909,25 +1927,48 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel63(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_y);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fb_Scales.data[varargin_3] = halfh * y.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fb_Scales.data[k] = halfh * y.data[k];
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel64(const real_T fs,
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel63(const real_T fs,
   const real_T fLims[2], real_T NyquistRange[2])
 {
   uint64_T threadId;
-  int32_T varargin_3;
+  int32_T k;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  varargin_3 = static_cast<int32_T>(threadId);
-  if (varargin_3 < 2) {
-    NyquistRange[varargin_3] = fLims[varargin_3] / fs * 2.0 * 3.1415926535897931;
+  k = static_cast<int32_T>(threadId);
+  if (k < 2) {
+    NyquistRange[k] = fLims[k] / fs * 2.0 * 3.1415926535897931;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel65(real_T r,
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel64(const char_T cv
+  [128], char_T wname[5], char_T b_dim0, char_T b_dim1, char_T b_dim2, char_T
+  b_dim3, char_T b_dim4)
+{
+  __shared__ char_T b_shared[5];
+  uint64_T threadId;
+  int32_T k;
+  if (mwGetThreadIndexWithinBlock() == 0) {
+    b_shared[0] = b_dim0;
+    b_shared[1] = b_dim1;
+    b_shared[2] = b_dim2;
+    b_shared[3] = b_dim3;
+    b_shared[4] = b_dim4;
+  }
+
+  __syncthreads();
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  k = static_cast<int32_T>(threadId);
+  if (k < 5) {
+    wname[k] = cv[static_cast<int32_T>(b_shared[k])];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel65(const real_T r,
   emxArray_real_T y)
 {
   uint64_T loopEnd;
@@ -1937,14 +1978,26 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel65(real_T r,
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(r);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    y.data[varargin_3] = static_cast<real_T>(varargin_3);
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    y.data[k] = static_cast<real_T>(k);
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel66(const
-  emxArray_real_T y, const real_T tol, int32_T bcoef, emxArray_real_T b_y)
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel66(emxArray_real_T
+  y)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    y.data[0] = CUDART_NAN;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel67(const
+  emxArray_real_T y, const real_T tol, const int32_T bcoef, emxArray_real_T b_y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1959,8 +2012,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel66(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel67(const
-  emxArray_real_T y, const real_T halfh, int32_T b_y, emxArray_real_T fb_Scales)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel68(const
+  emxArray_real_T y, const real_T halfh, const int32_T b_y, emxArray_real_T
+  fb_Scales)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -1969,13 +2023,13 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel67(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_y);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fb_Scales.data[varargin_3] = halfh * y.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fb_Scales.data[k] = halfh * y.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel68(int32_T
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel69(const int32_T
   fb_Scales, emxArray_real_T psidft)
 {
   uint64_T loopEnd;
@@ -1985,214 +2039,14 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel68(int32_T
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(fb_Scales);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    psidft.data[varargin_3] = 0.0;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel69(const
-  emxArray_real_T fb_Scales, int32_T b_fb_Scales, emxArray_real_T f)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_fb_Scales);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    f.data[varargin_3] = 0.0 / fb_Scales.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel7(const int32_T
-  bcoef, real_T interval[650])
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    interval[1] = interval[bcoef];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel70(const
-  emxArray_real_T omega, const emxArray_real_T fb_Scales, const int32_T
-  b_fb_Scales, int32_T j, emxArray_real_T somega, int32_T somega_dim0)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(b_fb_Scales) + 1UL) * static_cast<uint64_T>(j)
-    - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T bcoef;
-    int32_T varargin_3;
-    bcoef = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_fb_Scales) + 1UL));
-    varargin_3 = static_cast<int32_T>((idx - static_cast<uint64_T>(bcoef)) / (
-      static_cast<uint64_T>(b_fb_Scales) + 1UL));
-    somega.data[bcoef + somega_dim0 * varargin_3] = fb_Scales.data[bcoef] *
-      omega.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel71(const
-  emxArray_real_T somega, int32_T bcoef, emxArray_real_T absomega)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T k;
     k = static_cast<int32_T>(idx);
-    absomega.data[k] = fabs(somega.data[k]);
+    psidft.data[k] = 0.0;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel72(const
-  emxArray_real_T absomega, int32_T b_absomega, emxArray_real_T powscales)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_absomega);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    powscales.data[varargin_3] = absomega.data[varargin_3] *
-      absomega.data[varargin_3] * absomega.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel73(int32_T bcoef,
-  emxArray_real_T absomega)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T k;
-    k = static_cast<int32_T>(idx);
-    absomega.data[k] = log(absomega.data[k]);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel74(const
-  emxArray_real_T powscales, const emxArray_real_T absomega, int32_T b_absomega,
-  emxArray_real_T x)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_absomega);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    x.data[varargin_3] = 20.0 * absomega.data[varargin_3] -
-      powscales.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel75(int32_T bcoef,
-  emxArray_real_T x)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T k;
-    k = static_cast<int32_T>(idx);
-    x.data[k] = exp(x.data[k]);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel76(const
-  emxArray_real_T somega, const emxArray_real_T x, int32_T b_x, emxArray_real_T
-  psidft)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_x);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    psidft.data[varargin_3] = 0.0050536085896138528 * x.data[varargin_3] *
-      static_cast<real_T>(somega.data[varargin_3] > 0.0);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel77(const
-  emxArray_real_T fb_Scales, int32_T b_fb_Scales, emxArray_real_T f)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_fb_Scales);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    f.data[varargin_3] = 1.8820720577620569 / fb_Scales.data[varargin_3] /
-      6.2831853071795862;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel78(const real_T
-  fs, int32_T i, emxArray_real_T f)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(i);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    f.data[varargin_3] *= fs;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel79(const
-  emxArray_real_T f, int32_T b_f, emxArray_real_T freqs)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_f);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    freqs.data[varargin_3] = f.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel8(const real_T
-  interval[650], int32_T nsubs, real_T subs[1298])
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel7(const real_T
+  interval[650], const int32_T nsubs, real_T subs[1298])
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2208,43 +2062,128 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel8(const real_T
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel80(const real32_T
-  ds2, int32_T i, emxArray_real32_T fv)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel70(const
+  emxArray_real_T fb_Scales, const int32_T b_fb_Scales, emxArray_real_T f)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>((static_cast<real_T>(i) - 1.0) /
-    static_cast<real_T>(ds2));
+  loopEnd = static_cast<uint64_T>(b_fb_Scales);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    fv.data[varargin_3] = static_cast<real32_T>(static_cast<real_T>(ds2) *
-      static_cast<real_T>(varargin_3) + 1.0);
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    f.data[k] = 0.0 / fb_Scales.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel81(const
-  emxArray_real_T psidft, int32_T b_psidft, emxArray_real32_T psihat)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel71(const
+  emxArray_real_T fb_Omega, const emxArray_real_T fb_Scales, const int32_T
+  b_fb_Scales, const int32_T k, emxArray_real_T somega, int32_T somega_dim0)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_psidft);
+  loopEnd = (static_cast<uint64_T>(b_fb_Scales) + 1UL) * static_cast<uint64_T>(k)
+    - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    psihat.data[varargin_3] = static_cast<real32_T>(psidft.data[varargin_3]);
+    int32_T b_k;
+    int32_T bcoef;
+    bcoef = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_fb_Scales) + 1UL));
+    b_k = static_cast<int32_T>((idx - static_cast<uint64_T>(bcoef)) / (
+      static_cast<uint64_T>(b_fb_Scales) + 1UL));
+    somega.data[bcoef + somega_dim0 * b_k] = fb_Scales.data[bcoef] *
+      fb_Omega.data[b_k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel82(const int32_T
-  k, const emxArray_real32_T x, int32_T b_x, emxArray_real32_T xv, int32_T
-  x_dim0)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel72(const
+  emxArray_real_T somega, const int32_T bcoef, emxArray_real_T absomega)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    absomega.data[k] = fabs(somega.data[k]);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel73(const
+  emxArray_real_T absomega, const int32_T b_absomega, emxArray_real_T powscales)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_absomega);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    powscales.data[k] = absomega.data[k] * absomega.data[k] * absomega.data[k];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel74(const int32_T
+  bcoef, emxArray_real_T absomega)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    absomega.data[k] = log(absomega.data[k]);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel75(const
+  emxArray_real_T powscales, const emxArray_real_T absomega, const int32_T
+  b_absomega, emxArray_real_T x)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_absomega);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    x.data[k] = 20.0 * absomega.data[k] - powscales.data[k];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel76(const int32_T
+  bcoef, emxArray_real_T x)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    x.data[k] = exp(x.data[k]);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel77(const
+  emxArray_real_T somega, const emxArray_real_T x, const int32_T b_x,
+  emxArray_real_T psidft)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2253,152 +2192,48 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel82(const int32_T
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_x);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    xv.data[varargin_3] = x.data[varargin_3 + x_dim0 * (k - 1)];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel83(const int32_T
-  k, const emxArray_real32_T x, int32_T fb_SignalPad, emxArray_real32_T b_x,
-  int32_T x_dim0)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(fb_SignalPad) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    b_x.data[varargin_3] = x.data[varargin_3 + x_dim0 * (k - 1)];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel84(const
-  emxArray_real32_T x, int32_T j, emxArray_real32_T xv)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(j) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    xv.data[varargin_3] = x.data[varargin_3];
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel85(const
-  emxArray_real32_T xv, int32_T b_xv, emxArray_creal32_T xposdft)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_xv);
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    xposdft.data[varargin_3].re = xv.data[varargin_3];
-    xposdft.data[varargin_3].im = 0.0F;
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel86(const
-  emxArray_creal32_T xposdft, const emxArray_real32_T psihat, const int32_T
-  bcoef, const int32_T cfsposdft, int32_T nbytes, emxArray_creal32_T b_cfsposdft,
-  int32_T psihat_dim0, int32_T cfsposdft_dim0)
-{
-  uint64_T loopEnd;
-  uint64_T threadId;
-  uint64_T threadStride;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = (static_cast<uint64_T>(cfsposdft) + 1UL) * (static_cast<uint64_T>
-    (nbytes) + 1UL) - 1UL;
-  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T b_bcoef;
-    int32_T b_k;
     int32_T k;
-    int32_T varargin_3;
-    b_k = static_cast<int32_T>(idx % (static_cast<uint64_T>(cfsposdft) + 1UL));
-    k = static_cast<int32_T>((idx - static_cast<uint64_T>(b_k)) /
-      (static_cast<uint64_T>(cfsposdft) + 1UL));
-    varargin_3 = bcoef * k + 1;
-    b_bcoef = static_cast<int32_T>(psihat_dim0 != 1);
-    b_cfsposdft.data[b_k + cfsposdft_dim0 * k].re = psihat.data[b_bcoef * b_k +
-      psihat_dim0 * (varargin_3 - 1)] * xposdft.data[k].re;
-    b_cfsposdft.data[b_k + cfsposdft_dim0 * k].im = psihat.data[b_bcoef * b_k +
-      psihat_dim0 * (varargin_3 - 1)] * xposdft.data[k].im;
+    k = static_cast<int32_T>(idx);
+    psidft.data[k] = 0.0050536085896138528 * x.data[k] * static_cast<real_T>
+      (somega.data[k] > 0.0);
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel87(const real32_T
-  cfsposdft_re, const emxArray_creal32_T cfsposdft, int32_T b_cfsposdft,
-  emxArray_creal32_T cfspos)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel78(const
+  emxArray_real_T fb_Scales, const int32_T b_fb_Scales, emxArray_real_T f)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(b_cfsposdft);
+  loopEnd = static_cast<uint64_T>(b_fb_Scales);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    real32_T ai;
-    real32_T ar;
-    varargin_3 = static_cast<int32_T>(idx);
-    ar = cfsposdft.data[varargin_3].re;
-    ai = cfsposdft.data[varargin_3].im;
-    if (ai == 0.0F) {
-      cfspos.data[varargin_3].re = ar / cfsposdft_re;
-      cfspos.data[varargin_3].im = 0.0F;
-    } else if (ar == 0.0F) {
-      cfspos.data[varargin_3].re = 0.0F;
-      cfspos.data[varargin_3].im = ai / cfsposdft_re;
-    } else {
-      cfspos.data[varargin_3].re = ar / cfsposdft_re;
-      cfspos.data[varargin_3].im = ai / cfsposdft_re;
-    }
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    f.data[k] = 1.8820720577620569 / fb_Scales.data[k] / 6.2831853071795862;
   }
 }
 
-static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel88(uint32_T xSize[2],
-  int32_T cfsposdft_dim1)
-{
-  uint64_T threadId;
-  int32_T tmpIdx;
-  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
-  tmpIdx = static_cast<int32_T>(threadId);
-  if (tmpIdx < 1) {
-    xSize[1] = static_cast<uint32_T>(cfsposdft_dim1);
-  }
-}
-
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel89(int32_T xSize,
-  emxArray_creal32_T cfspos)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel79(const real_T
+  fs, const int32_T j, emxArray_real_T f)
 {
   uint64_T loopEnd;
   uint64_T threadId;
   uint64_T threadStride;
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(xSize);
+  loopEnd = static_cast<uint64_T>(j);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    cfspos.data[varargin_3].re = 0.0F;
-    cfspos.data[varargin_3].im = 0.0F;
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    f.data[k] *= fs;
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel9(const
-  emxArray_real_T x, int32_T nbytes, emxArray_real_T xt, emxArray_real_T b_x)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel8(const
+  emxArray_real_T x, const int32_T nbytes, emxArray_real_T xt, emxArray_real_T
+  b_x)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2418,8 +2253,269 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel9(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel90(const
-  emxArray_creal32_T cfspos, int32_T bcoef, emxArray_real32_T y)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel80(const
+  emxArray_real_T f, const int32_T b_f, emxArray_real_T freqs)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_f);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    freqs.data[k] = f.data[k];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel81(const real32_T
+  ds2, const int32_T j, emxArray_real32_T fv)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>((static_cast<real_T>(j) - 1.0) /
+    static_cast<real_T>(ds2));
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    fv.data[k] = static_cast<real32_T>(static_cast<real_T>(ds2) *
+      static_cast<real_T>(k) + 1.0);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel82(const
+  emxArray_real_T psidft, const int32_T b_psidft, emxArray_real32_T psihat)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_psidft);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    psihat.data[k] = static_cast<real32_T>(psidft.data[k]);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel83(const int32_T
+  i, const emxArray_real32_T x, const int32_T b_x, emxArray_real32_T xv, int32_T
+  x_dim0)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_x);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    xv.data[k] = x.data[k + x_dim0 * (i - 1)];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel84(const int32_T
+  i, const emxArray_real32_T x, const int32_T fb_SignalPad, emxArray_real32_T
+  b_x, int32_T x_dim0)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(fb_SignalPad) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    b_x.data[k] = x.data[k + x_dim0 * (i - 1)];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel85(const int32_T
+  fb_SignalPad, const int32_T bcoef, emxArray_real32_T x)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T b_bcoef;
+    int32_T j2;
+    real32_T xtmp;
+    b_bcoef = static_cast<int32_T>(idx);
+    j2 = (fb_SignalPad - b_bcoef) - 1;
+    xtmp = x.data[b_bcoef];
+    x.data[b_bcoef] = x.data[j2];
+    x.data[j2] = xtmp;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel86(const
+  emxArray_real32_T x, const int32_T k, emxArray_real32_T xv)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(k) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T b_k;
+    b_k = static_cast<int32_T>(idx);
+    xv.data[b_k] = x.data[b_k];
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel87(const uint32_T
+  xSize[2], const int32_T nbytes, emxArray_creal32_T xposdft)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(nbytes) - 2UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T bcoef;
+    bcoef = static_cast<int32_T>(idx);
+    xposdft.data[(static_cast<int32_T>(xSize[1]) - bcoef) - 1].re =
+      xposdft.data[bcoef + 1].re;
+    xposdft.data[(static_cast<int32_T>(xSize[1]) - bcoef) - 1].im =
+      -xposdft.data[bcoef + 1].im;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel88(const
+  emxArray_real32_T xv, const int32_T b_xv, emxArray_creal32_T xposdft)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_xv);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    xposdft.data[k].re = xv.data[k];
+    xposdft.data[k].im = 0.0F;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel89(const
+  emxArray_creal32_T xposdft, const emxArray_real32_T psihat, const int32_T
+  bcoef, const int32_T cfsposdft, const int32_T nbytes, emxArray_creal32_T
+  b_cfsposdft, int32_T psihat_dim0, int32_T cfsposdft_dim0)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = (static_cast<uint64_T>(cfsposdft) + 1UL) * (static_cast<uint64_T>
+    (nbytes) + 1UL) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T b_bcoef;
+    int32_T b_k;
+    int32_T j2;
+    int32_T k;
+    b_k = static_cast<int32_T>(idx % (static_cast<uint64_T>(cfsposdft) + 1UL));
+    k = static_cast<int32_T>((idx - static_cast<uint64_T>(b_k)) /
+      (static_cast<uint64_T>(cfsposdft) + 1UL));
+    j2 = bcoef * k + 1;
+    b_bcoef = static_cast<int32_T>(psihat_dim0 != 1);
+    b_cfsposdft.data[b_k + cfsposdft_dim0 * k].re = psihat.data[b_bcoef * b_k +
+      psihat_dim0 * (j2 - 1)] * xposdft.data[k].re;
+    b_cfsposdft.data[b_k + cfsposdft_dim0 * k].im = psihat.data[b_bcoef * b_k +
+      psihat_dim0 * (j2 - 1)] * xposdft.data[k].im;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel9(const
+  emxArray_real_T x, const int32_T bcoef, emxArray_real_T y)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(bcoef) - 1UL;
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    y.data[k] = pow(x.data[k], 19.0);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel90(const real32_T
+  cfsposdft_re, const emxArray_creal32_T cfsposdft, const int32_T b_cfsposdft,
+  emxArray_creal32_T cfspos)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(b_cfsposdft);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    real32_T ai;
+    real32_T xtmp;
+    k = static_cast<int32_T>(idx);
+    xtmp = cfsposdft.data[k].re;
+    ai = cfsposdft.data[k].im;
+    if (ai == 0.0F) {
+      cfspos.data[k].re = xtmp / cfsposdft_re;
+      cfspos.data[k].im = 0.0F;
+    } else if (xtmp == 0.0F) {
+      cfspos.data[k].re = 0.0F;
+      cfspos.data[k].im = ai / cfsposdft_re;
+    } else {
+      cfspos.data[k].re = xtmp / cfsposdft_re;
+      cfspos.data[k].im = ai / cfsposdft_re;
+    }
+  }
+}
+
+static __global__ __launch_bounds__(32, 1) void ec_cwt_kernel91(uint32_T xSize[2],
+  int32_T cfsposdft_dim1)
+{
+  uint64_T threadId;
+  int32_T tmpIdx;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  tmpIdx = static_cast<int32_T>(threadId);
+  if (tmpIdx < 1) {
+    xSize[1] = static_cast<uint32_T>(cfsposdft_dim1);
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel92(const int32_T
+  xSize, emxArray_creal32_T cfspos)
+{
+  uint64_T loopEnd;
+  uint64_T threadId;
+  uint64_T threadStride;
+  threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
+  threadStride = mwGetTotalThreadsLaunched();
+  loopEnd = static_cast<uint64_T>(xSize);
+  for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    cfspos.data[k].re = 0.0F;
+    cfspos.data[k].im = 0.0F;
+  }
+}
+
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel93(const
+  emxArray_creal32_T cfspos, const int32_T bcoef, emxArray_real32_T y)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2434,9 +2530,9 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel90(const
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel91(const
-  emxArray_real32_T y, const int32_T b_y, int32_T c_y, emxArray_real32_T xCh,
-  int32_T xCh_dim0, int32_T y_dim0)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel94(const
+  emxArray_real32_T y, const int32_T b_y, const int32_T c_y, emxArray_real32_T
+  xCh, int32_T xCh_dim0, int32_T y_dim0)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2447,17 +2543,17 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel91(const
     1UL) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T bcoef;
-    int32_T varargin_3;
+    int32_T k;
     bcoef = static_cast<int32_T>(idx % (static_cast<uint64_T>(b_y) + 1UL));
-    varargin_3 = static_cast<int32_T>((idx - static_cast<uint64_T>(bcoef)) / (
+    k = static_cast<int32_T>((idx - static_cast<uint64_T>(bcoef)) / (
       static_cast<uint64_T>(b_y) + 1UL));
-    xCh.data[bcoef + xCh_dim0 * varargin_3] = y.data[varargin_3 + y_dim0 * bcoef];
+    xCh.data[bcoef + xCh_dim0 * k] = y.data[k + y_dim0 * bcoef];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel92(const
-  emxArray_real32_T xCh, const int32_T nbytes, const int32_T bcoef, int32_T k,
-  emxArray_real32_T b_xCh, int32_T xCh_dim0, int32_T b_xCh_dim0)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel95(const
+  emxArray_real32_T xCh, const int32_T nbytes, const int32_T bcoef, const
+  int32_T i, emxArray_real32_T b_xCh, int32_T xCh_dim0, int32_T b_xCh_dim0)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2465,21 +2561,21 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel92(const
   threadId = static_cast<uint64_T>(mwGetGlobalThreadIndexInXDimension());
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = (static_cast<uint64_T>(bcoef / nbytes) + 1UL) * static_cast<uint64_T>
-    (k) - 1UL;
+    (i) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T b_bcoef;
-    int32_T varargin_3;
+    int32_T k;
     b_bcoef = static_cast<int32_T>(idx % (static_cast<uint64_T>(bcoef / nbytes)
       + 1UL));
-    varargin_3 = static_cast<int32_T>((idx - static_cast<uint64_T>(b_bcoef)) / (
+    k = static_cast<int32_T>((idx - static_cast<uint64_T>(b_bcoef)) / (
       static_cast<uint64_T>(bcoef / nbytes) + 1UL));
-    b_xCh.data[b_bcoef + xCh_dim0 * varargin_3] = xCh.data[nbytes * b_bcoef +
-      b_xCh_dim0 * varargin_3];
+    b_xCh.data[b_bcoef + xCh_dim0 * k] = xCh.data[nbytes * b_bcoef + b_xCh_dim0 *
+      k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel93(const
-  emxArray_real32_T xCh, int32_T b_xCh, emxArray_real32_T c_xCh)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel96(const
+  emxArray_real32_T xCh, const int32_T b_xCh, emxArray_real32_T c_xCh)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2488,15 +2584,16 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel93(const
   threadStride = mwGetTotalThreadsLaunched();
   loopEnd = static_cast<uint64_T>(b_xCh);
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
-    int32_T varargin_3;
-    varargin_3 = static_cast<int32_T>(idx);
-    c_xCh.data[varargin_3] = xCh.data[varargin_3];
+    int32_T k;
+    k = static_cast<int32_T>(idx);
+    c_xCh.data[k] = xCh.data[k];
   }
 }
 
-static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel94(const
-  emxArray_real32_T xCh, const int32_T xx_dim0, const int32_T k, const int32_T
-  xx, int32_T b_xx, emxArray_real32_T c_xx, int32_T b_xx_dim0, int32_T xx_dim1)
+static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel97(const
+  emxArray_real32_T xCh, const int32_T xx_dim0, const int32_T i, const int32_T
+  xx, const int32_T b_xx, emxArray_real32_T c_xx, int32_T b_xx_dim0, int32_T
+  xx_dim1)
 {
   uint64_T loopEnd;
   uint64_T threadId;
@@ -2507,40 +2604,31 @@ static __global__ __launch_bounds__(1024, 1) void ec_cwt_kernel94(const
     1UL) - 1UL;
   for (uint64_T idx{threadId}; idx <= loopEnd; idx += threadStride) {
     int32_T bcoef;
-    int32_T varargin_3;
+    int32_T k;
     bcoef = static_cast<int32_T>(idx % (static_cast<uint64_T>(xx) + 1UL));
-    varargin_3 = static_cast<int32_T>((idx - static_cast<uint64_T>(bcoef)) / (
+    k = static_cast<int32_T>((idx - static_cast<uint64_T>(bcoef)) / (
       static_cast<uint64_T>(xx) + 1UL));
-    c_xx.data[(bcoef + b_xx_dim0 * (k - 1)) + b_xx_dim0 * xx_dim1 * varargin_3] =
-      xCh.data[bcoef + xx_dim0 * varargin_3];
+    c_xx.data[(bcoef + b_xx_dim0 * (i - 1)) + b_xx_dim0 * xx_dim1 * k] =
+      xCh.data[bcoef + xx_dim0 * k];
   }
 }
 
 static void ec_cwt_once()
 {
+  mex_InitInfAndNan();
   mwMemoryManagerInit(256U, 2U, 8U, 2048U);
-  mwCudaMalloc(&cpu_cv_gpu_clone, sizeof(char_T [128]));
+  mwCudaMalloc(&global_gpu_cv, sizeof(char_T [128]));
 }
 
-static real_T emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
-  *parentId)
-{
-  real_T y;
-  y = d_emlrt_marshallIn(emlrtAlias(u), parentId);
-  emlrtDestroyArray(&u);
-  return y;
-}
-
-static real_T emlrt_marshallIn(const mxArray *fs, const char_T *identifier)
+static void emlrt_marshallIn(const mxArray *b_nullptr, const char_T *identifier,
+  emxArray_real32_T *y)
 {
   emlrtMsgIdentifier thisId;
-  real_T y;
   thisId.fIdentifier = const_cast<const char_T *>(identifier);
   thisId.fParent = nullptr;
   thisId.bParentIsCell = false;
-  y = emlrt_marshallIn(emlrtAlias(fs), &thisId);
-  emlrtDestroyArray(&fs);
-  return y;
+  emlrt_marshallIn(emlrtAlias(b_nullptr), &thisId, y);
+  emlrtDestroyArray(&b_nullptr);
 }
 
 static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
@@ -2550,28 +2638,25 @@ static void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
   emlrtDestroyArray(&u);
 }
 
-static void emlrt_marshallIn(const mxArray *x, const char_T *identifier,
-  emxArray_real32_T *y)
+static real_T emlrt_marshallIn(const mxArray *b_nullptr, const char_T
+  *identifier)
 {
   emlrtMsgIdentifier thisId;
+  real_T y;
   thisId.fIdentifier = const_cast<const char_T *>(identifier);
   thisId.fParent = nullptr;
   thisId.bParentIsCell = false;
-  emlrt_marshallIn(emlrtAlias(x), &thisId, y);
-  emlrtDestroyArray(&x);
+  y = emlrt_marshallIn(emlrtAlias(b_nullptr), &thisId);
+  emlrtDestroyArray(&b_nullptr);
+  return y;
 }
 
-static const mxArray *emlrt_marshallOut(const emxArray_real_T *u)
+static real_T emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier
+  *parentId)
 {
-  static const int32_T iv[1]{ 0 };
-
-  const mxArray *m;
-  const mxArray *y;
-  y = nullptr;
-  m = emlrtCreateNumericArray(1, (const void *)&iv[0], mxDOUBLE_CLASS, mxREAL);
-  emlrtMxSetData((mxArray *)m, &u->data[0]);
-  emlrtSetDimensions((mxArray *)m, &u->size[0], 1);
-  emlrtAssign(&y, m);
+  real_T y;
+  y = d_emlrt_marshallIn(emlrtAlias(u), parentId);
+  emlrtDestroyArray(&u);
   return y;
 }
 
@@ -2585,6 +2670,20 @@ static const mxArray *emlrt_marshallOut(const emxArray_real32_T *u)
   m = emlrtCreateNumericArray(3, (const void *)&iv[0], mxSINGLE_CLASS, mxREAL);
   emlrtMxSetData((mxArray *)m, &u->data[0]);
   emlrtSetDimensions((mxArray *)m, &u->size[0], 3);
+  emlrtAssign(&y, m);
+  return y;
+}
+
+static const mxArray *emlrt_marshallOut(const emxArray_real_T *u)
+{
+  static const int32_T iv[1]{ 0 };
+
+  const mxArray *m;
+  const mxArray *y;
+  y = nullptr;
+  m = emlrtCreateNumericArray(1, (const void *)&iv[0], mxDOUBLE_CLASS, mxREAL);
+  emlrtMxSetData((mxArray *)m, &u->data[0]);
+  emlrtSetDimensions((mxArray *)m, &u->size[0], 1);
   emlrtAssign(&y, m);
   return y;
 }
@@ -2620,7 +2719,7 @@ static void emxEnsureCapacity_char_T(emxArray_char_T *emxArray, int32_T oldNumel
       }
     }
 
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(char_T));
+    newData = emlrtMallocMex(static_cast<uint32_T>(i) * sizeof(char_T));
     if (newData == nullptr) {
       emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
     }
@@ -2670,7 +2769,7 @@ static void emxEnsureCapacity_creal32_T(emxArray_creal32_T *emxArray, int32_T
       }
     }
 
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(creal32_T));
+    newData = emlrtMallocMex(static_cast<uint32_T>(i) * sizeof(creal32_T));
     if (newData == nullptr) {
       emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
     }
@@ -2684,6 +2783,56 @@ static void emxEnsureCapacity_creal32_T(emxArray_creal32_T *emxArray, int32_T
     }
 
     emxArray->data = static_cast<creal32_T *>(newData);
+    emxArray->allocatedSize = i;
+    emxArray->canFreeData = true;
+  }
+}
+
+static void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T
+  oldNumel, const emlrtRTEInfo *srcLocation)
+{
+  int32_T i;
+  int32_T newNumel;
+  void *newData;
+  if (oldNumel < 0) {
+    oldNumel = 0;
+  }
+
+  newNumel = 1;
+  for (i = 0; i < emxArray->numDimensions; i++) {
+    newNumel = static_cast<int32_T>(emlrtSizeMulR2012b((size_t)
+      static_cast<uint32_T>(newNumel), (size_t)static_cast<uint32_T>
+      (emxArray->size[i]), srcLocation, emlrtRootTLSGlobal));
+  }
+
+  if (newNumel > emxArray->allocatedSize) {
+    i = emxArray->allocatedSize;
+    if (i < 16) {
+      i = 16;
+    }
+
+    while (i < newNumel) {
+      if (i > 1073741823) {
+        i = MAX_int32_T;
+      } else {
+        i *= 2;
+      }
+    }
+
+    newData = emlrtMallocMex(static_cast<uint32_T>(i) * sizeof(int32_T));
+    if (newData == nullptr) {
+      emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+    }
+
+    if (emxArray->data != nullptr) {
+      std::copy(emxArray->data, emxArray->data + static_cast<uint32_T>(oldNumel),
+                static_cast<int32_T *>(newData));
+      if (emxArray->canFreeData) {
+        emlrtFreeMex(emxArray->data);
+      }
+    }
+
+    emxArray->data = static_cast<int32_T *>(newData);
     emxArray->allocatedSize = i;
     emxArray->canFreeData = true;
   }
@@ -2720,7 +2869,7 @@ static void emxEnsureCapacity_real32_T(emxArray_real32_T *emxArray, int32_T
       }
     }
 
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(real32_T));
+    newData = emlrtMallocMex(static_cast<uint32_T>(i) * sizeof(real32_T));
     if (newData == nullptr) {
       emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
     }
@@ -2770,7 +2919,7 @@ static void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel
       }
     }
 
-    newData = emlrtCallocMex(static_cast<uint32_T>(i), sizeof(real_T));
+    newData = emlrtMallocMex(static_cast<uint32_T>(i) * sizeof(real_T));
     if (newData == nullptr) {
       emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
     }
@@ -2816,6 +2965,21 @@ static void emxFree_creal32_T(emxArray_creal32_T **pEmxArray)
     emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
     emlrtFreeEmxArray(*pEmxArray);
     *pEmxArray = static_cast<emxArray_creal32_T *>(nullptr);
+  }
+}
+
+static void emxFree_int32_T(emxArray_int32_T **pEmxArray)
+{
+  if (*pEmxArray != static_cast<emxArray_int32_T *>(nullptr)) {
+    if (((*pEmxArray)->data != static_cast<int32_T *>(nullptr)) && (*pEmxArray
+        )->canFreeData) {
+      emlrtFreeMex((*pEmxArray)->data);
+    }
+
+    emlrtFreeMex((*pEmxArray)->size);
+    emlrtRemoveHeapReference(emlrtRootTLSGlobal, (void *)pEmxArray);
+    emlrtFreeEmxArray(*pEmxArray);
+    *pEmxArray = static_cast<emxArray_int32_T *>(nullptr);
   }
 }
 
@@ -2897,6 +3061,37 @@ static void emxInit_creal32_T(emxArray_creal32_T **pEmxArray, int32_T
 
   emxArray = *pEmxArray;
   emxArray->data = static_cast<creal32_T *>(nullptr);
+  emxArray->numDimensions = numDimensions;
+  emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
+    static_cast<uint32_T>(numDimensions)));
+  if ((void *)emxArray->size == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  emxArray->allocatedSize = 0;
+  emxArray->canFreeData = true;
+  for (int32_T i{0}; i < numDimensions; i++) {
+    emxArray->size[i] = 0;
+  }
+}
+
+static void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
+  const emlrtRTEInfo *srcLocation, boolean_T doPush)
+{
+  emxArray_int32_T *emxArray;
+  *pEmxArray = static_cast<emxArray_int32_T *>(emlrtMallocEmxArray(sizeof
+    (emxArray_int32_T)));
+  if ((void *)*pEmxArray == nullptr) {
+    emlrtHeapAllocationErrorR2012b(srcLocation, emlrtRootTLSGlobal);
+  }
+
+  if (doPush) {
+    emlrtPushHeapReferenceStackEmxArray(emlrtRootTLSGlobal, false, (void *)
+      pEmxArray, (void *)&emxFree_int32_T, nullptr, nullptr, nullptr);
+  }
+
+  emxArray = *pEmxArray;
+  emxArray->data = static_cast<int32_T *>(nullptr);
   emxArray->numDimensions = numDimensions;
   emxArray->size = static_cast<int32_T *>(emlrtMallocMex(sizeof(int32_T) *
     static_cast<uint32_T>(numDimensions)));
@@ -3032,6 +3227,52 @@ static void gpuEmxEnsureCapacity_creal32_T(const emxArray_creal32_T *cpu,
   }
 }
 
+static void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
+  emxArray_int32_T *gpu)
+{
+  int32_T *newData;
+  if (gpu->data == 0) {
+    newData = 0UL;
+    mwCudaMalloc(&newData, static_cast<uint32_T>(cpu->allocatedSize) * sizeof
+                 (int32_T));
+    gpu->numDimensions = cpu->numDimensions;
+    gpu->size = static_cast<int32_T *>(emlrtCallocMex(static_cast<uint32_T>
+      (gpu->numDimensions), sizeof(int32_T)));
+    for (int32_T i{0}; i < cpu->numDimensions; i++) {
+      gpu->size[i] = cpu->size[i];
+    }
+
+    gpu->allocatedSize = cpu->allocatedSize;
+    gpu->canFreeData = true;
+    gpu->data = newData;
+  } else {
+    int32_T actualSizeCpu;
+    int32_T actualSizeGpu;
+    actualSizeCpu = 1;
+    actualSizeGpu = 1;
+    for (int32_T i{0}; i < cpu->numDimensions; i++) {
+      actualSizeGpu *= gpu->size[i];
+      actualSizeCpu *= cpu->size[i];
+      gpu->size[i] = cpu->size[i];
+    }
+
+    if (gpu->allocatedSize < actualSizeCpu) {
+      newData = 0UL;
+      mwCudaMalloc(&newData, static_cast<uint32_T>(cpu->allocatedSize) * sizeof
+                   (int32_T));
+      cudaMemcpy(newData, gpu->data, static_cast<uint32_T>(actualSizeGpu) *
+                 sizeof(int32_T), cudaMemcpyDeviceToDevice);
+      gpu->allocatedSize = cpu->allocatedSize;
+      if (gpu->canFreeData) {
+        mwCudaFree(gpu->data);
+      }
+
+      gpu->canFreeData = true;
+      gpu->data = newData;
+    }
+  }
+}
+
 static void gpuEmxEnsureCapacity_real32_T(const emxArray_real32_T *cpu,
   emxArray_real32_T *gpu)
 {
@@ -3125,6 +3366,15 @@ static void gpuEmxEnsureCapacity_real_T(const emxArray_real_T *cpu,
 }
 
 static void gpuEmxFree_creal32_T(emxArray_creal32_T *gpu)
+{
+  if (gpu->data != (void *)4207599121UL) {
+    mwCudaFree(gpu->data);
+  }
+
+  emlrtFreeMex(gpu->size);
+}
+
+static void gpuEmxFree_int32_T(emxArray_int32_T *gpu)
 {
   if (gpu->data != (void *)4207599121UL) {
     mwCudaFree(gpu->data);
@@ -3315,6 +3565,11 @@ static void gpuEmxReset_creal32_T(emxArray_creal32_T *gpu)
   std::memset(gpu, 0, sizeof(emxArray_creal32_T));
 }
 
+static void gpuEmxReset_int32_T(emxArray_int32_T *gpu)
+{
+  std::memset(gpu, 0, sizeof(emxArray_int32_T));
+}
+
 static void gpuEmxReset_real32_T(emxArray_real32_T *gpu)
 {
   std::memset(gpu, 0, sizeof(emxArray_real32_T));
@@ -3445,13 +3700,12 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}',
     '~', '\x7f' };
 
-  static const char_T Bndry[10]{ 'r', 'e', 'f', 'l', 'e', 'c', 't', 'i', 'o',
-    'n' };
+  static const char_T b[10]{ 'r', 'e', 'f', 'l', 'e', 'c', 't', 'i', 'o', 'n' };
 
   static const char_T cv1[10]{ 'r', 'e', 'f', 'l', 'e', 'c', 't', 'i', 'o', 'n'
   };
 
-  static const char_T b[5]{ 'M', 'o', 'r', 's', 'e' };
+  static const char_T b_b[5]{ 'M', 'o', 'r', 's', 'e' };
 
   static const char_T cv3[5]{ 'M', 'o', 'r', 's', 'e' };
 
@@ -3467,6 +3721,8 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   emxArray_creal32_T *cpu_cfspos;
   emxArray_creal32_T *cpu_cfsposdft;
   emxArray_creal32_T *cpu_xposdft;
+  emxArray_int32_T gpu_omega_tmp1;
+  emxArray_int32_T *cpu_omega_tmp1;
   emxArray_real32_T b_gpu_x;
   emxArray_real32_T b_gpu_xCh;
   emxArray_real32_T c_gpu_x;
@@ -3510,13 +3766,13 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   emxArray_real_T gpu_dv3;
   emxArray_real_T gpu_dv6;
   emxArray_real_T gpu_f;
+  emxArray_real_T gpu_fb_Omega;
   emxArray_real_T gpu_fb_Scales;
   emxArray_real_T gpu_freqs;
   emxArray_real_T gpu_fx;
-  emxArray_real_T gpu_omega;
+  emxArray_real_T gpu_omega_tmp2;
   emxArray_real_T gpu_powscales;
   emxArray_real_T gpu_psidft;
-  emxArray_real_T gpu_r;
   emxArray_real_T gpu_somega;
   emxArray_real_T gpu_x;
   emxArray_real_T gpu_xt;
@@ -3551,12 +3807,12 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   emxArray_real_T *cpu_dv3;
   emxArray_real_T *cpu_dv6;
   emxArray_real_T *cpu_f;
+  emxArray_real_T *cpu_fb_Omega;
   emxArray_real_T *cpu_fb_Scales;
   emxArray_real_T *cpu_fx;
-  emxArray_real_T *cpu_omega;
+  emxArray_real_T *cpu_omega_tmp2;
   emxArray_real_T *cpu_powscales;
   emxArray_real_T *cpu_psidft;
-  emxArray_real_T *cpu_r;
   emxArray_real_T *cpu_somega;
   emxArray_real_T *cpu_xt;
   emxArray_real_T *cpu_y;
@@ -3626,80 +3882,78 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   uint32_T nChs;
   int16_T dv2_idx_1;
   char_T cpu_wav[5];
+  char_T cpu_wname[5];
   char_T (*gpu_wav)[5];
+  char_T (*gpu_wname)[5];
   int8_T n_idx_0;
   boolean_T cpu_b[2];
   boolean_T (*gpu_b)[2];
-  boolean_T a_dirtyOnCpu;
-  boolean_T a_dirtyOnGpu;
-  boolean_T absomega_dirtyOnGpu;
-  boolean_T b_a_dirtyOnCpu;
-  boolean_T b_a_dirtyOnGpu;
-  boolean_T b_dirtyOnGpu;
-  boolean_T b_fx_dirtyOnCpu;
-  boolean_T b_fx_dirtyOnGpu;
-  boolean_T b_guard1{ false };
-
-  boolean_T b_x_dirtyOnCpu;
-  boolean_T b_x_dirtyOnGpu;
-  boolean_T b_xt_dirtyOnGpu;
-  boolean_T b_y_dirtyOnCpu;
-  boolean_T b_y_dirtyOnGpu;
-  boolean_T c_fx_dirtyOnCpu;
-  boolean_T c_fx_dirtyOnGpu;
-  boolean_T c_x_dirtyOnCpu;
-  boolean_T c_x_dirtyOnGpu;
-  boolean_T c_xt_dirtyOnGpu;
-  boolean_T c_y_dirtyOnGpu;
-  boolean_T cfspos_dirtyOnCpu;
-  boolean_T cfspos_dirtyOnGpu;
-  boolean_T d_fx_dirtyOnCpu;
-  boolean_T d_fx_dirtyOnGpu;
-  boolean_T d_x_dirtyOnCpu;
-  boolean_T d_x_dirtyOnGpu;
-  boolean_T d_xt_dirtyOnGpu;
-  boolean_T d_y_dirtyOnGpu;
-  boolean_T dv10_dirtyOnGpu;
-  boolean_T dv11_dirtyOnGpu;
-  boolean_T dv12_dirtyOnGpu;
-  boolean_T dv13_dirtyOnGpu;
-  boolean_T dv15_dirtyOnGpu;
-  boolean_T dv16_dirtyOnGpu;
-  boolean_T dv3_dirtyOnGpu;
-  boolean_T dv6_dirtyOnGpu;
-  boolean_T e_x_dirtyOnCpu;
-  boolean_T e_x_dirtyOnGpu;
+  boolean_T NyquistRange_outdatedOnGpu;
+  boolean_T a_outdatedOnCpu;
+  boolean_T a_outdatedOnGpu;
+  boolean_T absomega_outdatedOnCpu;
+  boolean_T b_a_outdatedOnCpu;
+  boolean_T b_a_outdatedOnGpu;
+  boolean_T b_fx_outdatedOnCpu;
+  boolean_T b_fx_outdatedOnGpu;
+  boolean_T b_outdatedOnCpu;
+  boolean_T b_x_outdatedOnCpu;
+  boolean_T b_x_outdatedOnGpu;
+  boolean_T b_xt_outdatedOnCpu;
+  boolean_T b_y_outdatedOnCpu;
+  boolean_T c_fx_outdatedOnCpu;
+  boolean_T c_fx_outdatedOnGpu;
+  boolean_T c_x_outdatedOnCpu;
+  boolean_T c_x_outdatedOnGpu;
+  boolean_T c_xt_outdatedOnCpu;
+  boolean_T c_y_outdatedOnCpu;
+  boolean_T cfspos_outdatedOnCpu;
+  boolean_T cfspos_outdatedOnGpu;
+  boolean_T d_fx_outdatedOnCpu;
+  boolean_T d_fx_outdatedOnGpu;
+  boolean_T d_x_outdatedOnCpu;
+  boolean_T d_x_outdatedOnGpu;
+  boolean_T d_xt_outdatedOnCpu;
+  boolean_T d_y_outdatedOnCpu;
+  boolean_T dv10_outdatedOnCpu;
+  boolean_T dv11_outdatedOnCpu;
+  boolean_T dv12_outdatedOnCpu;
+  boolean_T dv13_outdatedOnCpu;
+  boolean_T dv15_outdatedOnCpu;
+  boolean_T dv16_outdatedOnCpu;
+  boolean_T dv3_outdatedOnCpu;
+  boolean_T dv6_outdatedOnCpu;
+  boolean_T e_x_outdatedOnCpu;
+  boolean_T e_x_outdatedOnGpu;
   boolean_T exitg2;
-  boolean_T f_x_dirtyOnCpu;
-  boolean_T f_x_dirtyOnGpu;
-  boolean_T fb_Scales_dirtyOnGpu;
+  boolean_T f_x_outdatedOnGpu;
+  boolean_T fb_Scales_outdatedOnCpu;
   boolean_T first_iteration;
-  boolean_T freqs_dirtyOnGpu;
-  boolean_T fx_dirtyOnCpu;
-  boolean_T fx_dirtyOnGpu;
-  boolean_T g_x_dirtyOnCpu;
-  boolean_T interval_dirtyOnCpu;
-  boolean_T omega_dirtyOnGpu;
-  boolean_T powscales_dirtyOnGpu;
-  boolean_T psidft_dirtyOnCpu;
-  boolean_T somega_dirtyOnCpu;
-  boolean_T somega_dirtyOnGpu;
-  boolean_T subs_dirtyOnCpu;
-  boolean_T subs_dirtyOnGpu;
-  boolean_T xSize_dirtyOnCpu;
-  boolean_T x_dirtyOnCpu;
-  boolean_T x_dirtyOnGpu;
-  boolean_T xposdft_dirtyOnCpu;
-  boolean_T xt_dirtyOnGpu;
-  boolean_T xv_dirtyOnCpu;
-  boolean_T xv_dirtyOnGpu;
-  boolean_T xx_dirtyOnCpu;
-  boolean_T xx_dirtyOnGpu;
-  boolean_T y_dirtyOnCpu;
-  boolean_T y_dirtyOnGpu;
+  boolean_T freqs_outdatedOnCpu;
+  boolean_T fx_outdatedOnCpu;
+  boolean_T fx_outdatedOnGpu;
+  boolean_T guard1;
+  boolean_T interval_outdatedOnGpu;
+  boolean_T powscales_outdatedOnCpu;
+  boolean_T psidft_outdatedOnGpu;
+  boolean_T somega_outdatedOnCpu;
+  boolean_T somega_outdatedOnGpu;
+  boolean_T subs_outdatedOnCpu;
+  boolean_T subs_outdatedOnGpu;
+  boolean_T validLaunchParams;
+  boolean_T wav_outdatedOnCpu;
+  boolean_T xSize_outdatedOnGpu;
+  boolean_T x_outdatedOnCpu;
+  boolean_T x_outdatedOnGpu;
+  boolean_T xt_outdatedOnCpu;
+  boolean_T xv_outdatedOnCpu;
+  boolean_T xv_outdatedOnGpu;
+  boolean_T xx_outdatedOnCpu;
+  boolean_T xx_outdatedOnGpu;
+  boolean_T y_outdatedOnCpu;
   if (!gpuConstsCopied_ec_cwt) {
     gpuConstsCopied_ec_cwt = true;
-    cudaMemcpy(*cpu_cv_gpu_clone, cpu_cv, sizeof(char_T [128]),
+    cudaMemcpy(*global_gpu_cv, cpu_cv, sizeof(char_T [128]),
                cudaMemcpyHostToDevice);
   }
 
@@ -3715,10 +3969,10 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   gpuEmxReset_real_T(&gpu_x);
   gpuEmxReset_real32_T(&gpu_fv);
   gpuEmxReset_real_T(&gpu_dv16);
+  gpuEmxReset_real_T(&gpu_powscales);
   gpuEmxReset_real_T(&f_gpu_y);
   gpuEmxReset_real_T(&gpu_fx);
   gpuEmxReset_real_T(&gpu_dv15);
-  gpuEmxReset_real_T(&gpu_powscales);
   gpuEmxReset_real_T(&gpu_xt);
   gpuEmxReset_real_T(&e_gpu_x);
   gpuEmxReset_real_T(&d_gpu_x);
@@ -3727,25 +3981,25 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   gpuEmxReset_real_T(&gpu_dv13);
   gpuEmxReset_real_T(&i_gpu_y);
   gpuEmxReset_real_T(&gpu_dv11);
+  gpuEmxReset_real_T(&gpu_somega);
   gpuEmxReset_real_T(&gpu_a);
   gpuEmxReset_real_T(&h_gpu_y);
+  gpuEmxReset_real_T(&gpu_f);
   gpuEmxReset_real_T(&b_gpu_fx);
-  gpuEmxReset_real_T(&gpu_somega);
+  gpuEmxReset_real_T(&gpu_psidft);
   gpuEmxReset_real_T(&g_gpu_y);
   gpuEmxReset_real_T(&b_gpu_xt);
-  gpuEmxReset_real_T(&gpu_f);
   gpuEmxReset_real_T(&g_gpu_x);
-  gpuEmxReset_real_T(&gpu_psidft);
   gpuEmxReset_real_T(&f_gpu_x);
   gpuEmxReset_real_T(&e_gpu_y);
-  gpuEmxReset_real_T(&gpu_dv12);
   gpuEmxReset_real_T(&d_gpu_y);
+  gpuEmxReset_real_T(&gpu_dv12);
   gpuEmxReset_real_T(&j_gpu_y);
   gpuEmxReset_real_T(&c_gpu_fx);
   gpuEmxReset_real_T(&gpu_dv10);
   gpuEmxReset_real_T(&c_gpu_xt);
-  gpuEmxReset_real_T(&i_gpu_x);
   gpuEmxReset_real_T(&b_gpu_y);
+  gpuEmxReset_real_T(&i_gpu_x);
   gpuEmxReset_real_T(&h_gpu_x);
   gpuEmxReset_real_T(&gpu_y);
   gpuEmxReset_real_T(&gpu_dv6);
@@ -3760,9 +4014,11 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   gpuEmxReset_real_T(&j_gpu_x);
   gpuEmxReset_real_T(&gpu_fb_Scales);
   mwCudaMalloc(&gpu_subs, 10384UL);
+  gpuEmxReset_real_T(&gpu_fb_Omega);
   mwCudaMalloc(&gpu_interval, 5200UL);
-  gpuEmxReset_real_T(&gpu_r);
-  gpuEmxReset_real_T(&gpu_omega);
+  gpuEmxReset_real_T(&gpu_omega_tmp2);
+  mwCudaMalloc(&gpu_wname, 5UL);
+  gpuEmxReset_int32_T(&gpu_omega_tmp1);
   mwCudaMalloc(&gpu_wav, 5UL);
   mwCudaMalloc(&gpu_NyquistRange, 16UL);
   mwCudaMalloc(&gpu_freqrange, 16UL);
@@ -3771,68 +4027,63 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   gpuEmxReset_real32_T(&gpu_xx);
   mwCudaMalloc(&gpu_fLims, 16UL);
   gpuEmxReset_real32_T(&b_gpu_x);
-  f_x_dirtyOnGpu = false;
-  g_x_dirtyOnCpu = false;
-  xposdft_dirtyOnCpu = false;
-  xv_dirtyOnGpu = false;
-  xv_dirtyOnCpu = false;
-  cfspos_dirtyOnGpu = false;
-  cfspos_dirtyOnCpu = false;
-  e_x_dirtyOnGpu = false;
-  f_x_dirtyOnCpu = false;
-  dv16_dirtyOnGpu = false;
-  d_fx_dirtyOnGpu = false;
-  d_fx_dirtyOnCpu = false;
-  dv15_dirtyOnGpu = false;
-  powscales_dirtyOnGpu = false;
-  d_xt_dirtyOnGpu = false;
-  d_x_dirtyOnGpu = false;
-  e_x_dirtyOnCpu = false;
-  absomega_dirtyOnGpu = false;
-  xSize_dirtyOnCpu = false;
-  dv13_dirtyOnGpu = false;
-  dv11_dirtyOnGpu = false;
-  b_a_dirtyOnGpu = false;
-  b_a_dirtyOnCpu = false;
-  d_y_dirtyOnGpu = false;
-  c_fx_dirtyOnGpu = false;
-  c_fx_dirtyOnCpu = false;
-  somega_dirtyOnGpu = false;
-  somega_dirtyOnCpu = false;
-  c_y_dirtyOnGpu = false;
-  c_xt_dirtyOnGpu = false;
-  c_x_dirtyOnGpu = false;
-  psidft_dirtyOnCpu = false;
-  d_x_dirtyOnCpu = false;
-  dv12_dirtyOnGpu = false;
-  b_y_dirtyOnCpu = false;
-  b_fx_dirtyOnGpu = false;
-  b_fx_dirtyOnCpu = false;
-  dv10_dirtyOnGpu = false;
-  b_xt_dirtyOnGpu = false;
-  b_x_dirtyOnGpu = false;
-  c_x_dirtyOnCpu = false;
-  y_dirtyOnCpu = false;
-  dv6_dirtyOnGpu = false;
-  dv3_dirtyOnGpu = false;
-  a_dirtyOnGpu = false;
-  a_dirtyOnCpu = false;
-  b_y_dirtyOnGpu = false;
-  fx_dirtyOnGpu = false;
-  fx_dirtyOnCpu = false;
-  y_dirtyOnGpu = false;
-  xt_dirtyOnGpu = false;
-  x_dirtyOnGpu = false;
-  b_x_dirtyOnCpu = false;
-  fb_Scales_dirtyOnGpu = false;
-  subs_dirtyOnGpu = false;
-  subs_dirtyOnCpu = false;
-  interval_dirtyOnCpu = false;
-  omega_dirtyOnGpu = false;
-  freqs_dirtyOnGpu = false;
-  xx_dirtyOnCpu = true;
-  xx_dirtyOnGpu = false;
-  x_dirtyOnCpu = true;
+  xv_outdatedOnCpu = false;
+  xv_outdatedOnGpu = false;
+  cfspos_outdatedOnCpu = false;
+  cfspos_outdatedOnGpu = false;
+  e_x_outdatedOnCpu = false;
+  f_x_outdatedOnGpu = false;
+  dv16_outdatedOnCpu = false;
+  powscales_outdatedOnCpu = false;
+  d_fx_outdatedOnCpu = false;
+  d_fx_outdatedOnGpu = false;
+  dv15_outdatedOnCpu = false;
+  d_xt_outdatedOnCpu = false;
+  d_x_outdatedOnCpu = false;
+  e_x_outdatedOnGpu = false;
+  absomega_outdatedOnCpu = false;
+  xSize_outdatedOnGpu = false;
+  dv13_outdatedOnCpu = false;
+  dv11_outdatedOnCpu = false;
+  somega_outdatedOnCpu = false;
+  somega_outdatedOnGpu = false;
+  b_a_outdatedOnCpu = false;
+  b_a_outdatedOnGpu = false;
+  d_y_outdatedOnCpu = false;
+  c_fx_outdatedOnCpu = false;
+  c_fx_outdatedOnGpu = false;
+  psidft_outdatedOnGpu = false;
+  c_y_outdatedOnCpu = false;
+  c_xt_outdatedOnCpu = false;
+  c_x_outdatedOnCpu = false;
+  d_x_outdatedOnGpu = false;
+  dv12_outdatedOnCpu = false;
+  b_fx_outdatedOnCpu = false;
+  b_fx_outdatedOnGpu = false;
+  dv10_outdatedOnCpu = false;
+  b_xt_outdatedOnCpu = false;
+  b_x_outdatedOnCpu = false;
+  c_x_outdatedOnGpu = false;
+  dv6_outdatedOnCpu = false;
+  dv3_outdatedOnCpu = false;
+  a_outdatedOnCpu = false;
+  a_outdatedOnGpu = false;
+  b_y_outdatedOnCpu = false;
+  fx_outdatedOnCpu = false;
+  fx_outdatedOnGpu = false;
+  y_outdatedOnCpu = false;
+  xt_outdatedOnCpu = false;
+  x_outdatedOnCpu = false;
+  b_x_outdatedOnGpu = false;
+  fb_Scales_outdatedOnCpu = false;
+  subs_outdatedOnCpu = false;
+  subs_outdatedOnGpu = false;
+  interval_outdatedOnGpu = false;
+  NyquistRange_outdatedOnGpu = false;
+  freqs_outdatedOnCpu = false;
+  xx_outdatedOnCpu = false;
+  xx_outdatedOnGpu = true;
+  x_outdatedOnGpu = true;
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
 
   //  Continuous wavelet transform - CUDA binary wrapper (double-precision, FP64)
@@ -3901,8 +4152,8 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   do {
     exitg1 = 0;
     if (bcoef + 1 < 11) {
-      if (cpu_cv[static_cast<int32_T>(Bndry[bcoef])] != cpu_cv
-          [static_cast<int32_T>(cv1[bcoef])]) {
+      if (cpu_cv[static_cast<int32_T>(b[bcoef])] != cpu_cv[static_cast<int32_T>
+          (cv1[bcoef])]) {
         exitg1 = 1;
       } else {
         bcoef++;
@@ -3934,16 +4185,16 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
   cudaMemcpy(*gpu_fLims, cpu_fLims, 16UL, cudaMemcpyHostToDevice);
   ec_cwt_kernel1<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_fLims, *gpu_b);
-  b_dirtyOnGpu = true;
+  b_outdatedOnCpu = true;
   first_iteration = true;
   k = 0;
   exitg2 = false;
   while ((!exitg2) && (k < 2)) {
-    if (b_dirtyOnGpu) {
+    if (b_outdatedOnCpu) {
       cudaMemcpy(cpu_b, *gpu_b, 2UL, cudaMemcpyDeviceToHost);
     }
 
-    b_dirtyOnGpu = false;
+    b_outdatedOnCpu = false;
     if (!cpu_b[k]) {
       first_iteration = false;
       exitg2 = true;
@@ -3954,96 +4205,64 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
   if (!first_iteration) {
     real_T cf;
-    boolean_T guard1{ false };
-
     ec_cwt_kernel2<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_fLims,
       *gpu_freqrange);
-    ec_cwt_kernel3<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(fs,
-      *gpu_NyquistRange);
-    b_dirtyOnGpu = true;
-    emxInit_char_T(&str, 2, &pb_emlrtRTEI, true);
-    guard1 = false;
-    if (cpu_fLims[1] <= 0.0) {
-      guard1 = true;
-    } else {
-      cudaMemcpy(cpu_NyquistRange, *gpu_NyquistRange, 16UL,
-                 cudaMemcpyDeviceToHost);
-      b_dirtyOnGpu = false;
-      if (cpu_fLims[0] >= cpu_NyquistRange[1]) {
-        guard1 = true;
-      }
-    }
-
-    if (guard1) {
-      if (b_dirtyOnGpu) {
-        cudaMemcpy(cpu_NyquistRange, *gpu_NyquistRange, 16UL,
-                   cudaMemcpyDeviceToHost);
-      }
-
+    cpu_NyquistRange[1] = fs / 2.0;
+    NyquistRange_outdatedOnGpu = true;
+    emxInit_char_T(&str, 2, &ob_emlrtRTEI, true);
+    if ((cpu_fLims[1] <= 0.0) || (cpu_fLims[0] >= cpu_NyquistRange[1])) {
       nbytes = (int32_T)emlrtMexSnprintf(nullptr, 0, "%f", cpu_NyquistRange[1])
         + 1;
-      i = str->size[0] * str->size[1];
+      j = str->size[0] * str->size[1];
       str->size[0] = 1;
       str->size[1] = nbytes;
-      emxEnsureCapacity_char_T(str, i, &emlrtRTEI);
+      emxEnsureCapacity_char_T(str, j, &emlrtRTEI);
       emlrtMexSnprintf(&str->data[0], (size_t)nbytes, "%f", cpu_NyquistRange[1]);
     }
 
     emxFree_char_T(&str);
-    ec_cwt_kernel4<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*cpu_cv_gpu_clone,
-      *gpu_wav, b[0], b[1], b[2], b[3], b[4]);
     omegac = 3.1415926535897931;
-    cf = 0.0;
-    b_r = 0.0;
-    cudaMemcpy(cpu_wav, *gpu_wav, 5UL, cudaMemcpyDeviceToHost);
-    if (cpu_cv[static_cast<int32_T>(cpu_wav[0])] == 'm') {
-      nbytes = 0;
-    } else if (cpu_cv[static_cast<int32_T>(cpu_wav[0])] == 'a') {
-      nbytes = 1;
-    } else if (cpu_cv[static_cast<int32_T>(cpu_wav[0])] == 'b') {
-      nbytes = 2;
-    } else {
-      nbytes = -1;
-    }
-
-    switch (nbytes) {
-     case 0:
+    ec_cwt_kernel3<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*global_gpu_cv,
+      *gpu_wname, *gpu_wav, b_b[0], b_b[1], b_b[2], b_b[3], b_b[4]);
+    wav_outdatedOnCpu = true;
+    cudaMemcpy(cpu_wname, *gpu_wname, 5UL, cudaMemcpyDeviceToHost);
+    if (cpu_wname[0] == 'm') {
       cf = 1.8820720577620569;
-      c_r = 0.0057083835261;
       b_r = 0.0057083835261;
+      c_r = 0.0057083835261;
       r = 0.0057083835261;
-      for (nsubs = 0; nsubs < 6; nsubs++) {
-        maxScale = c[nsubs];
-        c_r = c_r * 0.005353955978584176 + maxScale;
+      for (i = 0; i < 6; i++) {
+        maxScale = c[i];
         b_r = b_r * 0.005353955978584176 + maxScale;
+        c_r = c_r * 0.005353955978584176 + maxScale;
         r = r * 0.005353955978584176 + maxScale;
       }
 
-      c_r /= 13.666666666666666;
       b_r /= 13.666666666666666;
+      c_r /= 13.666666666666666;
       r /= 13.666666666666666;
-      b_r = std::sqrt((std::exp((table100[12] + 7.7183093240718676) - (((c_r +
+      c_r = std::sqrt((std::exp((table100[12] + 7.7183093240718676) - (((b_r +
         0.91893853320467278) - 1.307479889018099) + 22.071116966494703)) + std::
-                       exp((table100[14] + 2.5377749931802178) - (((b_r +
+                       exp((table100[14] + 2.5377749931802178) - (((c_r +
         0.91893853320467278) - 1.307479889018099) + 22.071116966494703))) - std::
                       exp((table100[13] + 5.8211893391859881) - (((r +
         0.91893853320467278) - 1.307479889018099) + 22.071116966494703)));
-      if (std::isinf(b_r) || std::isnan(b_r)) {
-        ec_cwt_kernel5<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
-        ec_cwt_kernel6<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
+      if (std::isinf(c_r) || std::isnan(c_r)) {
+        ec_cwt_kernel4<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
+        ec_cwt_kernel5<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
         intDsq = 0.0;
         bcoef = 1;
         cudaMemcpy(cpu_interval, *gpu_interval, 5200UL, cudaMemcpyDeviceToHost);
-        k = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
+        i = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
           (cpu_interval[0]);
-        if (k > 0) {
+        if (i > 0) {
           n_idx_0 = static_cast<int8_T>(static_cast<int32_T>(std::abs
             (cpu_interval[1] - cpu_interval[0])) * 10 - 1);
           nsubs = n_idx_0 + 1;
           if (n_idx_0 + 2 > 2) {
             nbytes = n_idx_0;
             cpu_interval[n_idx_0 + 1] = cpu_interval[1];
-            interval_dirtyOnCpu = true;
+            interval_outdatedOnGpu = true;
             r = (cpu_interval[1] - cpu_interval[0]) / (static_cast<real_T>
               (n_idx_0) + 1.0);
             for (j = 0; j < nbytes; j++) {
@@ -4058,125 +4277,125 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         }
 
         nbytes = 0;
-        for (j = 0; j < bcoef; j++) {
-          if (std::abs(cpu_interval[j + 1] - cpu_interval[nbytes]) > 0.0) {
+        for (k = 0; k < bcoef; k++) {
+          if (std::abs(cpu_interval[k + 1] - cpu_interval[nbytes]) > 0.0) {
             nbytes++;
-            cpu_interval[nbytes] = cpu_interval[j + 1];
-            interval_dirtyOnCpu = true;
+            cpu_interval[nbytes] = cpu_interval[k + 1];
+            interval_outdatedOnGpu = true;
           } else {
             nsubs--;
           }
         }
 
         if (nsubs + 1 < 2) {
-          if (interval_dirtyOnCpu) {
+          if (interval_outdatedOnGpu) {
             cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                        cudaMemcpyHostToDevice);
           }
 
-          ec_cwt_kernel7<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
+          ec_cwt_kernel6<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
             *gpu_interval);
-          interval_dirtyOnCpu = false;
+          interval_outdatedOnGpu = false;
           nsubs = 1;
         }
 
-        if (k <= 0) {
+        if (i <= 0) {
           intDsq = rtNaN;
         } else {
-          b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
             &grid, &block, 1024U, 65535U);
-          if (b_dirtyOnGpu) {
-            if (interval_dirtyOnCpu) {
+          if (validLaunchParams) {
+            if (interval_outdatedOnGpu) {
               cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                          cudaMemcpyHostToDevice);
             }
 
-            interval_dirtyOnCpu = false;
-            ec_cwt_kernel8<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
-            subs_dirtyOnGpu = true;
+            interval_outdatedOnGpu = false;
+            ec_cwt_kernel7<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
+            subs_outdatedOnCpu = true;
           }
 
           q_ok = 0.0;
           err_ok = 0.0;
           first_iteration = true;
-          emxInit_real_T(&b_cpu_x, 2, &f_emlrtRTEI, true);
-          emxInit_real_T(&c_cpu_x, 2, &ac_emlrtRTEI, true);
-          emxInit_real_T(&cpu_xt, 2, &bc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_y, 2, &cc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_fx, 2, &sb_emlrtRTEI, true);
-          emxInit_real_T(&b_cpu_y, 2, &dc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_a, 2, &p_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv3, 2, &fc_emlrtRTEI, true);
-          emxInit_real_T(&c_cpu_y, 2, &gc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv6, 2, &fc_emlrtRTEI, true);
+          emxInit_real_T(&b_cpu_x, 2, &e_emlrtRTEI, true);
+          emxInit_real_T(&c_cpu_x, 2, &yb_emlrtRTEI, true);
+          emxInit_real_T(&cpu_xt, 2, &ac_emlrtRTEI, true);
+          emxInit_real_T(&cpu_y, 2, &bc_emlrtRTEI, true);
+          emxInit_real_T(&cpu_fx, 2, &rb_emlrtRTEI, true);
+          emxInit_real_T(&b_cpu_y, 2, &cc_emlrtRTEI, true);
+          emxInit_real_T(&cpu_a, 2, &o_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv3, 2, &ec_emlrtRTEI, true);
+          emxInit_real_T(&c_cpu_y, 2, &fc_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv6, 2, &ec_emlrtRTEI, true);
           do {
             exitg1 = 0;
-            i = b_cpu_x->size[0] * b_cpu_x->size[1];
+            j = b_cpu_x->size[0] * b_cpu_x->size[1];
             b_cpu_x->size[0] = 1;
             b_cpu_x->size[1] = 15 * nsubs;
-            emxEnsureCapacity_real_T(b_cpu_x, i, &f_emlrtRTEI);
-            if (!b_x_dirtyOnCpu) {
+            emxEnsureCapacity_real_T(b_cpu_x, j, &e_emlrtRTEI);
+            if (!b_x_outdatedOnGpu) {
               gpuEmxEnsureCapacity_real_T(b_cpu_x, &j_gpu_x);
             }
 
             nbytes = -1;
             for (k = 0; k < nsubs; k++) {
-              if (subs_dirtyOnGpu) {
+              if (subs_outdatedOnCpu) {
                 cudaMemcpy(cpu_subs, *gpu_subs, 10384UL, cudaMemcpyDeviceToHost);
               }
 
               maxScale = cpu_subs[k << 1];
-              subs_dirtyOnGpu = false;
+              subs_outdatedOnCpu = false;
               r = cpu_subs[(k << 1) + 1];
-              b_r = (maxScale + r) / 2.0;
+              c_r = (maxScale + r) / 2.0;
               halfh = (r - maxScale) / 2.0;
               for (j = 0; j < 15; j++) {
-                b_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + b_r;
-                b_x_dirtyOnCpu = true;
+                b_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + c_r;
+                b_x_outdatedOnGpu = true;
               }
 
               nbytes += 15;
             }
 
-            i = c_cpu_x->size[0] * c_cpu_x->size[1];
+            j = c_cpu_x->size[0] * c_cpu_x->size[1];
             c_cpu_x->size[0] = 1;
             c_cpu_x->size[1] = b_cpu_x->size[1];
-            emxEnsureCapacity_real_T(c_cpu_x, i, &g_emlrtRTEI);
+            emxEnsureCapacity_real_T(c_cpu_x, j, &f_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(c_cpu_x, &k_gpu_x);
-            i = cpu_xt->size[0] * cpu_xt->size[1];
+            j = cpu_xt->size[0] * cpu_xt->size[1];
             cpu_xt->size[0] = 1;
             cpu_xt->size[1] = b_cpu_x->size[1];
-            emxEnsureCapacity_real_T(cpu_xt, i, &h_emlrtRTEI);
+            emxEnsureCapacity_real_T(cpu_xt, j, &g_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(cpu_xt, &d_gpu_xt);
             nbytes = b_cpu_x->size[1];
-            b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nbytes),
-              &grid, &block, 1024U, 65535U);
-            if (b_dirtyOnGpu) {
-              if (b_x_dirtyOnCpu) {
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+              (nbytes), &grid, &block, 1024U, 65535U);
+            if (validLaunchParams) {
+              if (b_x_outdatedOnGpu) {
                 gpuEmxMemcpyCpuToGpu_real_T(&j_gpu_x, b_cpu_x);
               }
 
-              b_x_dirtyOnCpu = false;
-              ec_cwt_kernel9<<<grid, block>>>(j_gpu_x, nbytes, d_gpu_xt, k_gpu_x);
-              x_dirtyOnGpu = true;
-              xt_dirtyOnGpu = true;
+              b_x_outdatedOnGpu = false;
+              ec_cwt_kernel8<<<grid, block>>>(j_gpu_x, nbytes, d_gpu_xt, k_gpu_x);
+              x_outdatedOnCpu = true;
+              xt_outdatedOnCpu = true;
             }
 
-            b_guard1 = false;
+            guard1 = false;
             if (!first_iteration) {
-              if (x_dirtyOnGpu) {
+              if (x_outdatedOnCpu) {
                 gpuEmxMemcpyGpuToCpu_real_T(c_cpu_x, &k_gpu_x);
               }
 
-              x_dirtyOnGpu = false;
-              b_r = std::abs(c_cpu_x->data[0]);
+              x_outdatedOnCpu = false;
+              c_r = std::abs(c_cpu_x->data[0]);
               k = 0;
               exitg2 = false;
               while ((!exitg2) && (k <= c_cpu_x->size[1] - 2)) {
-                tol = b_r;
-                b_r = std::abs(c_cpu_x->data[k + 1]);
+                tol = c_r;
+                c_r = std::abs(c_cpu_x->data[k + 1]);
                 if (std::abs(c_cpu_x->data[k + 1] - c_cpu_x->data[k]) <=
-                    2.2204460492503131E-14 * std::fmax(tol, b_r)) {
+                    2.2204460492503131E-14 * std::fmax(tol, c_r)) {
                   first_iteration = true;
                   exitg2 = true;
                 } else {
@@ -4186,236 +4405,236 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
               if (first_iteration) {
                 dv2_idx_1 = static_cast<int16_T>(b_cpu_x->size[1]);
-                i = cpu_fx->size[0] * cpu_fx->size[1];
+                j = cpu_fx->size[0] * cpu_fx->size[1];
                 cpu_fx->size[0] = 1;
                 cpu_fx->size[1] = b_cpu_x->size[1];
-                emxEnsureCapacity_real_T(cpu_fx, i, &l_emlrtRTEI);
-                if (!fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(cpu_fx, j, &k_emlrtRTEI);
+                if (!fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(cpu_fx, &d_gpu_fx);
                 }
 
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                   (dv2_idx_1), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (fx_dirtyOnCpu) {
+                if (validLaunchParams) {
+                  if (fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&d_gpu_fx, cpu_fx);
                   }
 
-                  ec_cwt_kernel17<<<grid, block>>>(dv2_idx_1, d_gpu_fx);
+                  ec_cwt_kernel16<<<grid, block>>>(dv2_idx_1, d_gpu_fx);
                 }
 
                 exitg1 = 1;
               } else {
-                b_guard1 = true;
+                guard1 = true;
               }
             } else {
-              b_guard1 = true;
+              guard1 = true;
             }
 
-            if (b_guard1) {
+            if (guard1) {
               first_iteration = false;
-              i = cpu_y->size[0] * cpu_y->size[1];
+              j = cpu_y->size[0] * cpu_y->size[1];
               cpu_y->size[0] = 1;
               cpu_y->size[1] = c_cpu_x->size[1];
-              emxEnsureCapacity_real_T(cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_y, &k_gpu_y);
               bcoef = c_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel10<<<grid, block>>>(k_gpu_x, bcoef, k_gpu_y);
-                y_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel9<<<grid, block>>>(k_gpu_x, bcoef, k_gpu_y);
+                y_outdatedOnCpu = true;
               }
 
-              i = b_cpu_y->size[0] * b_cpu_y->size[1];
+              j = b_cpu_y->size[0] * b_cpu_y->size[1];
               b_cpu_y->size[0] = 1;
               b_cpu_y->size[1] = c_cpu_x->size[1];
-              emxEnsureCapacity_real_T(b_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(b_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(b_cpu_y, &l_gpu_y);
               bcoef = c_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel11<<<grid, block>>>(k_gpu_x, bcoef, l_gpu_y);
-                b_y_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel10<<<grid, block>>>(k_gpu_x, bcoef, l_gpu_y);
+                b_y_outdatedOnCpu = true;
               }
 
               if (cpu_y->size[1] == b_cpu_y->size[1]) {
-                i = cpu_a->size[0] * cpu_a->size[1];
+                j = cpu_a->size[0] * cpu_a->size[1];
                 cpu_a->size[0] = 1;
                 cpu_a->size[1] = cpu_y->size[1];
-                emxEnsureCapacity_real_T(cpu_a, i, &p_emlrtRTEI);
-                if (!a_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(cpu_a, j, &o_emlrtRTEI);
+                if (!a_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(cpu_a, &b_gpu_a);
                 }
 
                 bcoef = cpu_y->size[1] - 1;
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef
-                  + 1L), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (a_dirtyOnCpu) {
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                  (bcoef + 1L), &grid, &block, 1024U, 65535U);
+                if (validLaunchParams) {
+                  if (a_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_a, cpu_a);
                   }
 
-                  ec_cwt_kernel12<<<grid, block>>>(l_gpu_y, k_gpu_y, bcoef,
+                  ec_cwt_kernel11<<<grid, block>>>(l_gpu_y, k_gpu_y, bcoef,
                     b_gpu_a);
-                  a_dirtyOnGpu = true;
-                  a_dirtyOnCpu = false;
+                  a_outdatedOnGpu = false;
+                  a_outdatedOnCpu = true;
                 }
               } else {
-                if (a_dirtyOnGpu) {
+                if (a_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_a, &b_gpu_a);
                 }
 
-                if (y_dirtyOnGpu) {
+                if (y_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_y, &k_gpu_y);
                 }
 
-                y_dirtyOnGpu = false;
-                if (b_y_dirtyOnGpu) {
+                y_outdatedOnCpu = false;
+                if (b_y_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(b_cpu_y, &l_gpu_y);
                 }
 
-                b_y_dirtyOnGpu = false;
-                c_binary_expand_op(cpu_a, cpu_y, b_cpu_y);
-                a_dirtyOnCpu = true;
-                a_dirtyOnGpu = false;
+                b_y_outdatedOnCpu = false;
+                binary_expand_op_4(cpu_a, cpu_y, b_cpu_y);
+                a_outdatedOnCpu = false;
+                a_outdatedOnGpu = true;
               }
 
-              i = cpu_dv3->size[0] * cpu_dv3->size[1];
+              j = cpu_dv3->size[0] * cpu_dv3->size[1];
               cpu_dv3->size[0] = 1;
               cpu_dv3->size[1] = cpu_a->size[1];
-              emxEnsureCapacity_real_T(cpu_dv3, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv3, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv3, &gpu_dv3);
               bcoef = cpu_a->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                if (a_dirtyOnCpu) {
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                if (a_outdatedOnGpu) {
                   gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_a, cpu_a);
                 }
 
-                a_dirtyOnCpu = false;
-                ec_cwt_kernel13<<<grid, block>>>(b_gpu_a, bcoef, gpu_dv3);
-                dv3_dirtyOnGpu = true;
+                a_outdatedOnGpu = false;
+                ec_cwt_kernel12<<<grid, block>>>(b_gpu_a, bcoef, gpu_dv3);
+                dv3_outdatedOnCpu = true;
               }
 
-              i = c_cpu_y->size[0] * c_cpu_y->size[1];
+              j = c_cpu_y->size[0] * c_cpu_y->size[1];
               c_cpu_y->size[0] = 1;
               c_cpu_y->size[1] = c_cpu_x->size[1];
-              emxEnsureCapacity_real_T(c_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(c_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(c_cpu_y, &m_gpu_y);
               bcoef = c_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel14<<<grid, block>>>(k_gpu_x, bcoef, m_gpu_y);
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel13<<<grid, block>>>(k_gpu_x, bcoef, m_gpu_y);
               }
 
-              i = cpu_dv6->size[0] * cpu_dv6->size[1];
+              j = cpu_dv6->size[0] * cpu_dv6->size[1];
               cpu_dv6->size[0] = 1;
               cpu_dv6->size[1] = c_cpu_y->size[1];
-              emxEnsureCapacity_real_T(cpu_dv6, i, &w_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv6, j, &u_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv6, &gpu_dv6);
               bcoef = c_cpu_y->size[1] - 1;
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef +
-                1L), &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel15<<<grid, block>>>(m_gpu_y, bcoef, gpu_dv6);
-                dv6_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef + 1L), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel14<<<grid, block>>>(m_gpu_y, bcoef, gpu_dv6);
+                dv6_outdatedOnCpu = true;
               }
 
               if (cpu_dv3->size[1] == cpu_dv6->size[1]) {
-                i = cpu_fx->size[0] * cpu_fx->size[1];
+                j = cpu_fx->size[0] * cpu_fx->size[1];
                 cpu_fx->size[0] = 1;
                 cpu_fx->size[1] = cpu_dv3->size[1];
-                emxEnsureCapacity_real_T(cpu_fx, i, &bb_emlrtRTEI);
-                if (!fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(cpu_fx, j, &ab_emlrtRTEI);
+                if (!fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(cpu_fx, &d_gpu_fx);
                 }
 
-                k = cpu_dv3->size[1] - 1;
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k +
-                  1L), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (fx_dirtyOnCpu) {
+                i = cpu_dv3->size[1] - 1;
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                  (i + 1L), &grid, &block, 1024U, 65535U);
+                if (validLaunchParams) {
+                  if (fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&d_gpu_fx, cpu_fx);
                   }
 
-                  ec_cwt_kernel16<<<grid, block>>>(d_gpu_xt, gpu_dv6, gpu_dv3, k,
+                  ec_cwt_kernel15<<<grid, block>>>(d_gpu_xt, gpu_dv6, gpu_dv3, i,
                     d_gpu_fx);
-                  fx_dirtyOnGpu = true;
-                  fx_dirtyOnCpu = false;
+                  fx_outdatedOnGpu = false;
+                  fx_outdatedOnCpu = true;
                 }
               } else {
-                if (fx_dirtyOnGpu) {
+                if (fx_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_fx, &d_gpu_fx);
                 }
 
-                if (dv3_dirtyOnGpu) {
+                if (dv3_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv3, &gpu_dv3);
                 }
 
-                dv3_dirtyOnGpu = false;
-                if (dv6_dirtyOnGpu) {
+                dv3_outdatedOnCpu = false;
+                if (dv6_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv6, &gpu_dv6);
                 }
 
-                dv6_dirtyOnGpu = false;
-                if (xt_dirtyOnGpu) {
+                dv6_outdatedOnCpu = false;
+                if (xt_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_xt, &d_gpu_xt);
                 }
 
-                xt_dirtyOnGpu = false;
-                binary_expand_op(cpu_fx, cpu_dv3, cpu_dv6, cpu_xt);
-                fx_dirtyOnCpu = true;
-                fx_dirtyOnGpu = false;
+                xt_outdatedOnCpu = false;
+                binary_expand_op_2(cpu_fx, cpu_dv3, cpu_dv6, cpu_xt);
+                fx_outdatedOnCpu = false;
+                fx_outdatedOnGpu = true;
               }
 
-              b_r = 0.0;
+              c_r = 0.0;
               nbytes = -1;
               for (k = 0; k < nsubs; k++) {
                 maxScale = 0.0;
                 r = 0.0;
                 for (j = 0; j < 15; j++) {
-                  if (fx_dirtyOnGpu) {
+                  if (fx_outdatedOnCpu) {
                     gpuEmxMemcpyGpuToCpu_real_T(cpu_fx, &d_gpu_fx);
                   }
 
                   maxScale += dv4[j] * cpu_fx->data[(nbytes + j) + 1];
-                  fx_dirtyOnGpu = false;
+                  fx_outdatedOnCpu = false;
                   r += dv5[j] * cpu_fx->data[(nbytes + j) + 1];
                 }
 
                 nbytes += 15;
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
+                subs_outdatedOnCpu = false;
                 halfh = (cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) / 2.0;
                 maxScale *= halfh;
                 qsub[k] = maxScale;
-                b_r += maxScale;
+                c_r += maxScale;
                 errsub[k] = r * halfh;
               }
 
-              intDsq = b_r + q_ok;
+              intDsq = c_r + q_ok;
               tol = std::fmax(1.0E-10, 1.0E-6 * std::abs(intDsq));
-              b_r = 2.0 * tol;
+              c_r = 2.0 * tol;
               r = 0.0;
               nbytes = 0;
               for (k = 0; k < nsubs; k++) {
                 maxScale = errsub[k];
                 halfh = std::abs(maxScale);
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
-                if (halfh <= b_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
+                subs_outdatedOnCpu = false;
+                if (halfh <= c_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
                                     2.0)) {
                   err_ok += maxScale;
                   q_ok += qsub[k];
@@ -4424,20 +4643,20 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                   nbytes++;
                   cpu_subs[(nbytes - 1) << 1] = cpu_subs[k << 1];
                   cpu_subs[((nbytes - 1) << 1) + 1] = cpu_subs[(k << 1) + 1];
-                  subs_dirtyOnCpu = true;
+                  subs_outdatedOnGpu = true;
                 }
               }
 
-              b_r = std::abs(err_ok) + r;
+              c_r = std::abs(err_ok) + r;
               if ((!std::isinf(intDsq)) && (!std::isnan(intDsq)) && ((!std::
-                    isinf(b_r)) && (!std::isnan(b_r))) && (nbytes != 0) &&
-                  (!(b_r <= tol))) {
+                    isinf(c_r)) && (!std::isnan(c_r))) && (nbytes != 0) &&
+                  (!(c_r <= tol))) {
                 nsubs = nbytes << 1;
                 if (nsubs > 650) {
                   exitg1 = 1;
                 } else {
                   for (k = 0; k < nbytes; k++) {
-                    if (subs_dirtyOnGpu) {
+                    if (subs_outdatedOnCpu) {
                       cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                                  cudaMemcpyDeviceToHost);
                     }
@@ -4451,8 +4670,8 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                       [(((nbytes - k) << 1) - 1) << 1];
                     cpu_subs[(((nbytes - k) << 1) - 2) << 1] = cpu_subs[((nbytes
                       - k) - 1) << 1];
-                    subs_dirtyOnCpu = true;
-                    subs_dirtyOnGpu = false;
+                    subs_outdatedOnCpu = false;
+                    subs_outdatedOnGpu = true;
                   }
                 }
               } else {
@@ -4473,26 +4692,26 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           emxFree_real_T(&b_cpu_x);
         }
 
-        if (interval_dirtyOnCpu) {
+        if (interval_outdatedOnGpu) {
           cudaMemcpy(*gpu_interval, cpu_interval, 5200UL, cudaMemcpyHostToDevice);
         }
 
-        ec_cwt_kernel18<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
-        ec_cwt_kernel19<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
-        interval_dirtyOnCpu = false;
+        ec_cwt_kernel17<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
+        ec_cwt_kernel18<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
+        interval_outdatedOnGpu = false;
         intFsq = 0.0;
         bcoef = 1;
         cudaMemcpy(cpu_interval, *gpu_interval, 5200UL, cudaMemcpyDeviceToHost);
-        k = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
+        i = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
           (cpu_interval[0]);
-        if (k > 0) {
+        if (i > 0) {
           n_idx_0 = static_cast<int8_T>(static_cast<int32_T>(std::abs
             (cpu_interval[1] - cpu_interval[0])) * 10 - 1);
           nsubs = n_idx_0 + 1;
           if (n_idx_0 + 2 > 2) {
             nbytes = n_idx_0;
             cpu_interval[n_idx_0 + 1] = cpu_interval[1];
-            interval_dirtyOnCpu = true;
+            interval_outdatedOnGpu = true;
             r = (cpu_interval[1] - cpu_interval[0]) / (static_cast<real_T>
               (n_idx_0) + 1.0);
             for (j = 0; j < nbytes; j++) {
@@ -4507,128 +4726,128 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         }
 
         nbytes = 0;
-        for (j = 0; j < bcoef; j++) {
-          if (std::abs(cpu_interval[j + 1] - cpu_interval[nbytes]) > 0.0) {
+        for (k = 0; k < bcoef; k++) {
+          if (std::abs(cpu_interval[k + 1] - cpu_interval[nbytes]) > 0.0) {
             nbytes++;
-            cpu_interval[nbytes] = cpu_interval[j + 1];
-            interval_dirtyOnCpu = true;
+            cpu_interval[nbytes] = cpu_interval[k + 1];
+            interval_outdatedOnGpu = true;
           } else {
             nsubs--;
           }
         }
 
         if (nsubs + 1 < 2) {
-          if (interval_dirtyOnCpu) {
+          if (interval_outdatedOnGpu) {
             cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                        cudaMemcpyHostToDevice);
           }
 
-          ec_cwt_kernel20<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
+          ec_cwt_kernel19<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
             *gpu_interval);
-          interval_dirtyOnCpu = false;
+          interval_outdatedOnGpu = false;
           nsubs = 1;
         }
 
-        if (k <= 0) {
+        if (i <= 0) {
           intFsq = rtNaN;
         } else {
-          b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
             &grid, &block, 1024U, 65535U);
-          if (b_dirtyOnGpu) {
-            if (interval_dirtyOnCpu) {
+          if (validLaunchParams) {
+            if (interval_outdatedOnGpu) {
               cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                          cudaMemcpyHostToDevice);
             }
 
-            interval_dirtyOnCpu = false;
-            if (subs_dirtyOnCpu) {
+            interval_outdatedOnGpu = false;
+            if (subs_outdatedOnGpu) {
               cudaMemcpy(*gpu_subs, cpu_subs, 10384UL, cudaMemcpyHostToDevice);
             }
 
-            ec_cwt_kernel21<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
-            subs_dirtyOnGpu = true;
-            subs_dirtyOnCpu = false;
+            ec_cwt_kernel20<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
+            subs_outdatedOnGpu = false;
+            subs_outdatedOnCpu = true;
           }
 
           q_ok = 0.0;
           err_ok = 0.0;
           first_iteration = true;
-          emxInit_real_T(&d_cpu_x, 2, &f_emlrtRTEI, true);
-          emxInit_real_T(&e_cpu_x, 2, &ac_emlrtRTEI, true);
-          emxInit_real_T(&b_cpu_xt, 2, &bc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv10, 2, &ic_emlrtRTEI, true);
-          emxInit_real_T(&b_cpu_fx, 2, &sb_emlrtRTEI, true);
-          emxInit_real_T(&f_cpu_y, 2, &jc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv12, 2, &ic_emlrtRTEI, true);
+          emxInit_real_T(&d_cpu_x, 2, &e_emlrtRTEI, true);
+          emxInit_real_T(&e_cpu_x, 2, &yb_emlrtRTEI, true);
+          emxInit_real_T(&b_cpu_xt, 2, &ac_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv10, 2, &hc_emlrtRTEI, true);
+          emxInit_real_T(&b_cpu_fx, 2, &rb_emlrtRTEI, true);
+          emxInit_real_T(&f_cpu_y, 2, &ic_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv12, 2, &hc_emlrtRTEI, true);
           do {
             exitg1 = 0;
-            i = d_cpu_x->size[0] * d_cpu_x->size[1];
+            j = d_cpu_x->size[0] * d_cpu_x->size[1];
             d_cpu_x->size[0] = 1;
             d_cpu_x->size[1] = 15 * nsubs;
-            emxEnsureCapacity_real_T(d_cpu_x, i, &f_emlrtRTEI);
-            if (!c_x_dirtyOnCpu) {
+            emxEnsureCapacity_real_T(d_cpu_x, j, &e_emlrtRTEI);
+            if (!c_x_outdatedOnGpu) {
               gpuEmxEnsureCapacity_real_T(d_cpu_x, &h_gpu_x);
             }
 
             nbytes = -1;
             for (k = 0; k < nsubs; k++) {
-              if (subs_dirtyOnGpu) {
+              if (subs_outdatedOnCpu) {
                 cudaMemcpy(cpu_subs, *gpu_subs, 10384UL, cudaMemcpyDeviceToHost);
               }
 
               maxScale = cpu_subs[k << 1];
-              subs_dirtyOnGpu = false;
+              subs_outdatedOnCpu = false;
               r = cpu_subs[(k << 1) + 1];
-              b_r = (maxScale + r) / 2.0;
+              c_r = (maxScale + r) / 2.0;
               halfh = (r - maxScale) / 2.0;
               for (j = 0; j < 15; j++) {
-                d_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + b_r;
-                c_x_dirtyOnCpu = true;
+                d_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + c_r;
+                c_x_outdatedOnGpu = true;
               }
 
               nbytes += 15;
             }
 
-            i = e_cpu_x->size[0] * e_cpu_x->size[1];
+            j = e_cpu_x->size[0] * e_cpu_x->size[1];
             e_cpu_x->size[0] = 1;
             e_cpu_x->size[1] = d_cpu_x->size[1];
-            emxEnsureCapacity_real_T(e_cpu_x, i, &g_emlrtRTEI);
+            emxEnsureCapacity_real_T(e_cpu_x, j, &f_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(e_cpu_x, &i_gpu_x);
-            i = b_cpu_xt->size[0] * b_cpu_xt->size[1];
+            j = b_cpu_xt->size[0] * b_cpu_xt->size[1];
             b_cpu_xt->size[0] = 1;
             b_cpu_xt->size[1] = d_cpu_x->size[1];
-            emxEnsureCapacity_real_T(b_cpu_xt, i, &h_emlrtRTEI);
+            emxEnsureCapacity_real_T(b_cpu_xt, j, &g_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(b_cpu_xt, &c_gpu_xt);
             nbytes = d_cpu_x->size[1];
-            b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nbytes),
-              &grid, &block, 1024U, 65535U);
-            if (b_dirtyOnGpu) {
-              if (c_x_dirtyOnCpu) {
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+              (nbytes), &grid, &block, 1024U, 65535U);
+            if (validLaunchParams) {
+              if (c_x_outdatedOnGpu) {
                 gpuEmxMemcpyCpuToGpu_real_T(&h_gpu_x, d_cpu_x);
               }
 
-              c_x_dirtyOnCpu = false;
-              ec_cwt_kernel22<<<grid, block>>>(h_gpu_x, nbytes, c_gpu_xt,
+              c_x_outdatedOnGpu = false;
+              ec_cwt_kernel21<<<grid, block>>>(h_gpu_x, nbytes, c_gpu_xt,
                 i_gpu_x);
-              b_x_dirtyOnGpu = true;
-              b_xt_dirtyOnGpu = true;
+              b_x_outdatedOnCpu = true;
+              b_xt_outdatedOnCpu = true;
             }
 
-            b_guard1 = false;
+            guard1 = false;
             if (!first_iteration) {
-              if (b_x_dirtyOnGpu) {
+              if (b_x_outdatedOnCpu) {
                 gpuEmxMemcpyGpuToCpu_real_T(e_cpu_x, &i_gpu_x);
               }
 
-              b_x_dirtyOnGpu = false;
-              b_r = std::abs(e_cpu_x->data[0]);
+              b_x_outdatedOnCpu = false;
+              c_r = std::abs(e_cpu_x->data[0]);
               k = 0;
               exitg2 = false;
               while ((!exitg2) && (k <= e_cpu_x->size[1] - 2)) {
-                tol = b_r;
-                b_r = std::abs(e_cpu_x->data[k + 1]);
+                tol = c_r;
+                c_r = std::abs(e_cpu_x->data[k + 1]);
                 if (std::abs(e_cpu_x->data[k + 1] - e_cpu_x->data[k]) <=
-                    2.2204460492503131E-14 * std::fmax(tol, b_r)) {
+                    2.2204460492503131E-14 * std::fmax(tol, c_r)) {
                   first_iteration = true;
                   exitg2 = true;
                 } else {
@@ -4638,163 +4857,163 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
               if (first_iteration) {
                 dv2_idx_1 = static_cast<int16_T>(d_cpu_x->size[1]);
-                i = b_cpu_fx->size[0] * b_cpu_fx->size[1];
+                j = b_cpu_fx->size[0] * b_cpu_fx->size[1];
                 b_cpu_fx->size[0] = 1;
                 b_cpu_fx->size[1] = d_cpu_x->size[1];
-                emxEnsureCapacity_real_T(b_cpu_fx, i, &l_emlrtRTEI);
-                if (!b_fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(b_cpu_fx, j, &k_emlrtRTEI);
+                if (!b_fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(b_cpu_fx, &c_gpu_fx);
                 }
 
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                   (dv2_idx_1), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (b_fx_dirtyOnCpu) {
+                if (validLaunchParams) {
+                  if (b_fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&c_gpu_fx, b_cpu_fx);
                   }
 
-                  ec_cwt_kernel27<<<grid, block>>>(dv2_idx_1, c_gpu_fx);
+                  ec_cwt_kernel26<<<grid, block>>>(dv2_idx_1, c_gpu_fx);
                 }
 
                 exitg1 = 1;
               } else {
-                b_guard1 = true;
+                guard1 = true;
               }
             } else {
-              b_guard1 = true;
+              guard1 = true;
             }
 
-            if (b_guard1) {
+            if (guard1) {
               first_iteration = false;
-              i = cpu_dv10->size[0] * cpu_dv10->size[1];
+              j = cpu_dv10->size[0] * cpu_dv10->size[1];
               cpu_dv10->size[0] = 1;
               cpu_dv10->size[1] = e_cpu_x->size[1];
-              emxEnsureCapacity_real_T(cpu_dv10, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv10, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv10, &gpu_dv10);
               bcoef = e_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel23<<<grid, block>>>(i_gpu_x, bcoef, gpu_dv10);
-                dv10_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel22<<<grid, block>>>(i_gpu_x, bcoef, gpu_dv10);
+                dv10_outdatedOnCpu = true;
               }
 
-              i = f_cpu_y->size[0] * f_cpu_y->size[1];
+              j = f_cpu_y->size[0] * f_cpu_y->size[1];
               f_cpu_y->size[0] = 1;
               f_cpu_y->size[1] = e_cpu_x->size[1];
-              emxEnsureCapacity_real_T(f_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(f_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(f_cpu_y, &j_gpu_y);
               bcoef = e_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel24<<<grid, block>>>(i_gpu_x, bcoef, j_gpu_y);
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel23<<<grid, block>>>(i_gpu_x, bcoef, j_gpu_y);
               }
 
-              i = cpu_dv12->size[0] * cpu_dv12->size[1];
+              j = cpu_dv12->size[0] * cpu_dv12->size[1];
               cpu_dv12->size[0] = 1;
               cpu_dv12->size[1] = f_cpu_y->size[1];
-              emxEnsureCapacity_real_T(cpu_dv12, i, &x_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv12, j, &v_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv12, &gpu_dv12);
               bcoef = f_cpu_y->size[1] - 1;
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef +
-                1L), &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel25<<<grid, block>>>(j_gpu_y, bcoef, gpu_dv12);
-                dv12_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef + 1L), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel24<<<grid, block>>>(j_gpu_y, bcoef, gpu_dv12);
+                dv12_outdatedOnCpu = true;
               }
 
               if (cpu_dv10->size[1] == cpu_dv12->size[1]) {
-                i = b_cpu_fx->size[0] * b_cpu_fx->size[1];
+                j = b_cpu_fx->size[0] * b_cpu_fx->size[1];
                 b_cpu_fx->size[0] = 1;
                 b_cpu_fx->size[1] = cpu_dv10->size[1];
-                emxEnsureCapacity_real_T(b_cpu_fx, i, &bb_emlrtRTEI);
-                if (!b_fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(b_cpu_fx, j, &ab_emlrtRTEI);
+                if (!b_fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(b_cpu_fx, &c_gpu_fx);
                 }
 
                 bcoef = cpu_dv10->size[1] - 1;
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef
-                  + 1L), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (b_fx_dirtyOnCpu) {
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                  (bcoef + 1L), &grid, &block, 1024U, 65535U);
+                if (validLaunchParams) {
+                  if (b_fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&c_gpu_fx, b_cpu_fx);
                   }
 
-                  ec_cwt_kernel26<<<grid, block>>>(c_gpu_xt, gpu_dv12, gpu_dv10,
+                  ec_cwt_kernel25<<<grid, block>>>(c_gpu_xt, gpu_dv12, gpu_dv10,
                     bcoef, c_gpu_fx);
-                  b_fx_dirtyOnGpu = true;
-                  b_fx_dirtyOnCpu = false;
+                  b_fx_outdatedOnGpu = false;
+                  b_fx_outdatedOnCpu = true;
                 }
               } else {
-                if (b_fx_dirtyOnGpu) {
+                if (b_fx_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(b_cpu_fx, &c_gpu_fx);
                 }
 
-                if (dv10_dirtyOnGpu) {
+                if (dv10_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv10, &gpu_dv10);
                 }
 
-                dv10_dirtyOnGpu = false;
-                if (dv12_dirtyOnGpu) {
+                dv10_outdatedOnCpu = false;
+                if (dv12_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv12, &gpu_dv12);
                 }
 
-                dv12_dirtyOnGpu = false;
-                if (b_xt_dirtyOnGpu) {
+                dv12_outdatedOnCpu = false;
+                if (b_xt_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(b_cpu_xt, &c_gpu_xt);
                 }
 
-                b_xt_dirtyOnGpu = false;
-                binary_expand_op(b_cpu_fx, cpu_dv10, cpu_dv12, b_cpu_xt);
-                b_fx_dirtyOnCpu = true;
-                b_fx_dirtyOnGpu = false;
+                b_xt_outdatedOnCpu = false;
+                binary_expand_op_2(b_cpu_fx, cpu_dv10, cpu_dv12, b_cpu_xt);
+                b_fx_outdatedOnCpu = false;
+                b_fx_outdatedOnGpu = true;
               }
 
-              b_r = 0.0;
+              c_r = 0.0;
               nbytes = -1;
               for (k = 0; k < nsubs; k++) {
                 maxScale = 0.0;
                 r = 0.0;
                 for (j = 0; j < 15; j++) {
-                  if (b_fx_dirtyOnGpu) {
+                  if (b_fx_outdatedOnCpu) {
                     gpuEmxMemcpyGpuToCpu_real_T(b_cpu_fx, &c_gpu_fx);
                   }
 
                   maxScale += dv4[j] * b_cpu_fx->data[(nbytes + j) + 1];
-                  b_fx_dirtyOnGpu = false;
+                  b_fx_outdatedOnCpu = false;
                   r += dv5[j] * b_cpu_fx->data[(nbytes + j) + 1];
                 }
 
                 nbytes += 15;
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
+                subs_outdatedOnCpu = false;
                 halfh = (cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) / 2.0;
                 maxScale *= halfh;
                 qsub[k] = maxScale;
-                b_r += maxScale;
+                c_r += maxScale;
                 errsub[k] = r * halfh;
               }
 
-              intFsq = b_r + q_ok;
+              intFsq = c_r + q_ok;
               tol = std::fmax(1.0E-10, 1.0E-6 * std::abs(intFsq));
-              b_r = 2.0 * tol;
+              c_r = 2.0 * tol;
               r = 0.0;
               nbytes = 0;
               for (k = 0; k < nsubs; k++) {
                 maxScale = errsub[k];
                 halfh = std::abs(maxScale);
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
-                if (halfh <= b_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
+                subs_outdatedOnCpu = false;
+                if (halfh <= c_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
                                     2.0)) {
                   err_ok += maxScale;
                   q_ok += qsub[k];
@@ -4803,20 +5022,20 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                   nbytes++;
                   cpu_subs[(nbytes - 1) << 1] = cpu_subs[k << 1];
                   cpu_subs[((nbytes - 1) << 1) + 1] = cpu_subs[(k << 1) + 1];
-                  subs_dirtyOnCpu = true;
+                  subs_outdatedOnGpu = true;
                 }
               }
 
-              b_r = std::abs(err_ok) + r;
+              c_r = std::abs(err_ok) + r;
               if ((!std::isinf(intFsq)) && (!std::isnan(intFsq)) && ((!std::
-                    isinf(b_r)) && (!std::isnan(b_r))) && (nbytes != 0) &&
-                  (!(b_r <= tol))) {
+                    isinf(c_r)) && (!std::isnan(c_r))) && (nbytes != 0) &&
+                  (!(c_r <= tol))) {
                 nsubs = nbytes << 1;
                 if (nsubs > 650) {
                   exitg1 = 1;
                 } else {
                   for (k = 0; k < nbytes; k++) {
-                    if (subs_dirtyOnGpu) {
+                    if (subs_outdatedOnCpu) {
                       cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                                  cudaMemcpyDeviceToHost);
                     }
@@ -4830,8 +5049,8 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                       [(((nbytes - k) << 1) - 1) << 1];
                     cpu_subs[(((nbytes - k) << 1) - 2) << 1] = cpu_subs[((nbytes
                       - k) - 1) << 1];
-                    subs_dirtyOnCpu = true;
-                    subs_dirtyOnGpu = false;
+                    subs_outdatedOnCpu = false;
+                    subs_outdatedOnGpu = true;
                   }
                 }
               } else {
@@ -4849,28 +5068,28 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           emxFree_real_T(&d_cpu_x);
         }
 
-        b_r = std::sqrt(3.5421952306087032 * (intDsq / intFsq));
+        c_r = std::sqrt(3.5421952306087032 * (intDsq / intFsq));
       }
-      break;
-
-     case 1:
+    } else if (cpu_wname[0] == 'a') {
       cf = 6.0;
-      b_r = 1.4142135623730951;
-      break;
-
-     case 2:
+      c_r = 1.4142135623730951;
+    } else {
       cf = 5.0;
-      b_r = 5.847705;
-      break;
+      c_r = 5.847705;
     }
 
-    halfh = static_cast<real_T>(cpu_x->size[0]) / (b_r * 2.0);
+    halfh = static_cast<real_T>(cpu_x->size[0]) / (c_r * 2.0);
     first_iteration = false;
     bcoef = 0;
     do {
       exitg1 = 0;
       if (bcoef + 1 < 6) {
-        if (cpu_wav[bcoef] != cv4[bcoef]) {
+        if (wav_outdatedOnCpu) {
+          cudaMemcpy(cpu_wav, *gpu_wav, 5UL, cudaMemcpyDeviceToHost);
+        }
+
+        wav_outdatedOnCpu = false;
+        if (cv4[bcoef] != cpu_wav[bcoef]) {
           exitg1 = 1;
         } else {
           bcoef++;
@@ -4882,12 +5101,12 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     } while (exitg1 == 0);
 
     if (first_iteration) {
-      k = 0;
+      i = 0;
     } else {
-      k = -1;
+      i = -1;
     }
 
-    if (k == 0) {
+    if (i == 0) {
       if (1.0 - 0.0050536085896138528 * rt_powd_snf(cf, 20.0) * std::exp
           (-rt_powd_snf(cf, 3.0)) >= 0.0) {
         if (1.0 - 0.0050536085896138528 * rt_powd_snf(cf, 20.0) * std::exp
@@ -4899,10 +5118,10 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
       } else {
         a = cf;
         omegac = 9.0856029641606977;
-        b_r = 1.0 - 0.0050536085896138528 * rt_powd_snf(cf, 20.0) * std::exp
+        c_r = 1.0 - 0.0050536085896138528 * rt_powd_snf(cf, 20.0) * std::exp
           (-rt_powd_snf(cf, 3.0));
         q_ok = 1.0;
-        if (b_r == 0.0) {
+        if (c_r == 0.0) {
           omegac = cf;
         } else {
           err_ok = 1.0;
@@ -4913,7 +5132,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           while ((!exitg2) && ((q_ok != 0.0) && (a != omegac))) {
             if ((q_ok > 0.0) == (err_ok > 0.0)) {
               intFsq = a;
-              err_ok = b_r;
+              err_ok = c_r;
               d = omegac - a;
               intDsq = d;
             }
@@ -4922,9 +5141,9 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
               a = omegac;
               omegac = intFsq;
               intFsq = a;
-              b_r = q_ok;
+              c_r = q_ok;
               q_ok = err_ok;
-              err_ok = b_r;
+              err_ok = c_r;
             }
 
             m = 0.5 * (intFsq - omegac);
@@ -4932,33 +5151,33 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
             if ((std::abs(m) <= toler) || (q_ok == 0.0)) {
               exitg2 = true;
             } else {
-              if ((std::abs(intDsq) < toler) || (std::abs(b_r) <= std::abs(q_ok)))
+              if ((std::abs(intDsq) < toler) || (std::abs(c_r) <= std::abs(q_ok)))
               {
                 d = m;
                 intDsq = m;
               } else {
-                s = q_ok / b_r;
+                s = q_ok / c_r;
                 if (a == intFsq) {
-                  b_r = 2.0 * m * s;
+                  c_r = 2.0 * m * s;
                   tol = 1.0 - s;
                 } else {
-                  tol = b_r / err_ok;
-                  c_r = q_ok / err_ok;
-                  b_r = s * (2.0 * m * tol * (tol - c_r) - (omegac - a) * (c_r -
+                  tol = c_r / err_ok;
+                  b_r = q_ok / err_ok;
+                  c_r = s * (2.0 * m * tol * (tol - b_r) - (omegac - a) * (b_r -
                               1.0));
-                  tol = (tol - 1.0) * (c_r - 1.0) * (s - 1.0);
+                  tol = (tol - 1.0) * (b_r - 1.0) * (s - 1.0);
                 }
 
-                if (b_r > 0.0) {
+                if (c_r > 0.0) {
                   tol = -tol;
                 } else {
-                  b_r = -b_r;
+                  c_r = -c_r;
                 }
 
-                if ((2.0 * b_r < 3.0 * m * tol - std::abs(toler * tol)) && (b_r <
+                if ((2.0 * c_r < 3.0 * m * tol - std::abs(toler * tol)) && (c_r <
                      std::abs(0.5 * intDsq * tol))) {
                   intDsq = d;
-                  d = b_r / tol;
+                  d = c_r / tol;
                 } else {
                   d = m;
                   intDsq = m;
@@ -4966,7 +5185,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
               }
 
               a = omegac;
-              b_r = q_ok;
+              c_r = q_ok;
               if (std::abs(d) > toler) {
                 omegac += d;
               } else if (omegac > intFsq) {
@@ -4990,33 +5209,33 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
     r = 1.0 / (halfh * (6.2831853071795862 / cf)) * fs;
     if (cpu_fLims[0] < r) {
-      ec_cwt_kernel28<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(r, *gpu_freqrange,
+      ec_cwt_kernel27<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(r, *gpu_freqrange,
         *gpu_fLims);
       cudaMemcpy(cpu_fLims, *gpu_fLims, 16UL, cudaMemcpyDeviceToHost);
     }
 
     if (cpu_fLims[1] > fs / 2.0) {
-      ec_cwt_kernel29<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(fs,
+      ec_cwt_kernel28<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(fs,
         *gpu_freqrange, *gpu_fLims);
     }
 
     cudaMemcpy(cpu_freqrange, *gpu_freqrange, 16UL, cudaMemcpyDeviceToHost);
     if (cpu_freqrange[1] == 0.0) {
-      b_r = rtMinusInf;
+      c_r = rtMinusInf;
     } else if (cpu_freqrange[1] < 0.0) {
-      b_r = rtNaN;
+      c_r = rtNaN;
     } else if ((!std::isinf(cpu_freqrange[1])) && (!std::isnan(cpu_freqrange[1])))
     {
       r = std::frexp(cpu_freqrange[1], &eint);
       if (r == 0.5) {
-        b_r = static_cast<real_T>(eint) - 1.0;
+        c_r = static_cast<real_T>(eint) - 1.0;
       } else if ((eint == 1) && (r < 0.75)) {
-        b_r = std::log(2.0 * r) / 0.69314718055994529;
+        c_r = std::log(2.0 * r) / 0.69314718055994529;
       } else {
-        b_r = std::log(r) / 0.69314718055994529 + static_cast<real_T>(eint);
+        c_r = std::log(r) / 0.69314718055994529 + static_cast<real_T>(eint);
       }
     } else {
-      b_r = cpu_freqrange[1];
+      c_r = cpu_freqrange[1];
     }
 
     if ((!std::isinf(cpu_freqrange[0])) && (!std::isnan(cpu_freqrange[0]))) {
@@ -5032,14 +5251,14 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
       r = cpu_freqrange[0];
     }
 
-    if (!(b_r - r >= 1.0 / fb_VoicesPerOctave)) {
+    if (!(c_r - r >= 1.0 / fb_VoicesPerOctave)) {
       r = 1.0 / fb_VoicesPerOctave;
       nbytes = (int32_T)emlrtMexSnprintf(nullptr, 0, "%2.2f", r) + 1;
-      emxInit_char_T(&b_str, 2, &pb_emlrtRTEI, true);
-      i = b_str->size[0] * b_str->size[1];
+      emxInit_char_T(&b_str, 2, &ob_emlrtRTEI, true);
+      j = b_str->size[0] * b_str->size[1];
       b_str->size[0] = 1;
       b_str->size[1] = nbytes;
-      emxEnsureCapacity_char_T(b_str, i, &emlrtRTEI);
+      emxEnsureCapacity_char_T(b_str, j, &emlrtRTEI);
       emlrtMexSnprintf(&b_str->data[0], (size_t)nbytes, "%2.2f", r);
       emxFree_char_T(&b_str);
     }
@@ -5050,7 +5269,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   do {
     exitg1 = 0;
     if (bcoef + 1 < 6) {
-      if (cpu_cv[static_cast<int32_T>(b[bcoef])] != cpu_cv[static_cast<int32_T>
+      if (cpu_cv[static_cast<int32_T>(b_b[bcoef])] != cpu_cv[static_cast<int32_T>
           (cv3[bcoef])]) {
         exitg1 = 1;
       } else {
@@ -5069,93 +5288,85 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   N = static_cast<uint32_T>(cpu_x->size[0]) + static_cast<uint32_T>(fb_SignalPad
     << 1);
   nbytes = static_cast<int32_T>(std::trunc(static_cast<real_T>(N) / 2.0));
-  emxInit_real_T(&cpu_omega, 2, &b_emlrtRTEI, true);
+  emxInit_int32_T(&cpu_omega_tmp1, 2, &b_emlrtRTEI, true);
   if (nbytes < 1) {
-    cpu_omega->size[1] = 0;
+    cpu_omega_tmp1->size[0] = 1;
+    cpu_omega_tmp1->size[1] = 0;
   } else {
-    i = cpu_omega->size[0] * cpu_omega->size[1];
-    cpu_omega->size[0] = 1;
-    cpu_omega->size[1] = nbytes;
-    emxEnsureCapacity_real_T(cpu_omega, i, &b_emlrtRTEI);
-    gpuEmxEnsureCapacity_real_T(cpu_omega, &gpu_omega);
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nbytes), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel30<<<grid, block>>>(nbytes, gpu_omega);
-      omega_dirtyOnGpu = true;
+    j = cpu_omega_tmp1->size[0] * cpu_omega_tmp1->size[1];
+    cpu_omega_tmp1->size[0] = 1;
+    cpu_omega_tmp1->size[1] = nbytes;
+    emxEnsureCapacity_int32_T(cpu_omega_tmp1, j, &b_emlrtRTEI);
+    gpuEmxEnsureCapacity_int32_T(cpu_omega_tmp1, &gpu_omega_tmp1);
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nbytes),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel29<<<grid, block>>>(nbytes, gpu_omega_tmp1);
     }
   }
 
-  i = cpu_omega->size[0] * cpu_omega->size[1];
-  cpu_omega->size[0] = 1;
-  emxEnsureCapacity_real_T(cpu_omega, i, &c_emlrtRTEI);
-  gpuEmxEnsureCapacity_real_T(cpu_omega, &gpu_omega);
-  i = cpu_omega->size[1] - 1;
-  b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L), &grid,
+  emxInit_real_T(&cpu_omega_tmp2, 2, &c_emlrtRTEI, true);
+  j = cpu_omega_tmp2->size[0] * cpu_omega_tmp2->size[1];
+  cpu_omega_tmp2->size[0] = 1;
+  cpu_omega_tmp2->size[1] = cpu_omega_tmp1->size[1];
+  emxEnsureCapacity_real_T(cpu_omega_tmp2, j, &c_emlrtRTEI);
+  gpuEmxEnsureCapacity_real_T(cpu_omega_tmp2, &gpu_omega_tmp2);
+  i = cpu_omega_tmp1->size[1] - 1;
+  validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L), &grid,
     &block, 1024U, 65535U);
-  if (b_dirtyOnGpu) {
-    ec_cwt_kernel31<<<grid, block>>>(N, i, gpu_omega);
-    omega_dirtyOnGpu = true;
+  if (validLaunchParams) {
+    ec_cwt_kernel30<<<grid, block>>>(6.2831853071795862 / static_cast<real_T>(N),
+      gpu_omega_tmp1, i, gpu_omega_tmp2);
   }
 
+  emxFree_int32_T(&cpu_omega_tmp1);
   nbytes = static_cast<int32_T>(std::trunc((static_cast<real_T>(N) - 1.0) / 2.0));
   if (nbytes < 1) {
-    nsubs = 0;
+    i = 0;
     nbytes = 1;
     bcoef = -1;
   } else {
-    nsubs = nbytes - 1;
+    i = nbytes - 1;
     nbytes = -1;
     bcoef = 0;
   }
 
-  emxInit_real_T(&cpu_r, 2, &d_emlrtRTEI, true);
-  i = cpu_r->size[0] * cpu_r->size[1];
-  cpu_r->size[0] = 1;
-  cpu_r->size[1] = (cpu_omega->size[1] + div_s32(bcoef - nsubs, nbytes)) + 2;
-  emxEnsureCapacity_real_T(cpu_r, i, &d_emlrtRTEI);
-  gpuEmxEnsureCapacity_real_T(cpu_r, &gpu_r);
-  ec_cwt_kernel32<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_r);
-  j = cpu_omega->size[1];
-  b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(j), &grid, &block,
-    1024U, 65535U);
-  if (b_dirtyOnGpu) {
-    ec_cwt_kernel33<<<grid, block>>>(gpu_omega, j, gpu_r);
-  }
-
-  j = div_s32(bcoef - nsubs, nbytes);
-  b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(j + 1L), &grid,
+  emxInit_real_T(&cpu_fb_Omega, 2, &j_emlrtRTEI, true);
+  j = cpu_fb_Omega->size[0] * cpu_fb_Omega->size[1];
+  cpu_fb_Omega->size[0] = 1;
+  cpu_fb_Omega->size[1] = (cpu_omega_tmp2->size[1] + div_s32(bcoef - i, nbytes))
+    + 2;
+  emxEnsureCapacity_real_T(cpu_fb_Omega, j, &d_emlrtRTEI);
+  gpuEmxEnsureCapacity_real_T(cpu_fb_Omega, &gpu_fb_Omega);
+  ec_cwt_kernel31<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_fb_Omega);
+  wav_outdatedOnCpu = true;
+  k = cpu_omega_tmp2->size[1];
+  validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(k), &grid,
     &block, 1024U, 65535U);
-  if (b_dirtyOnGpu) {
-    ec_cwt_kernel34<<<grid, block>>>(nbytes, nsubs, gpu_omega, j, gpu_r,
-      cpu_omega->size[1U]);
+  if (validLaunchParams) {
+    ec_cwt_kernel32<<<grid, block>>>(gpu_omega_tmp2, k, gpu_fb_Omega);
   }
 
-  i = cpu_omega->size[0] * cpu_omega->size[1];
-  cpu_omega->size[0] = 1;
-  cpu_omega->size[1] = cpu_r->size[1];
-  emxEnsureCapacity_real_T(cpu_omega, i, &e_emlrtRTEI);
-  gpuEmxEnsureCapacity_real_T(cpu_omega, &gpu_omega);
-  k = cpu_r->size[1] - 1;
-  b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
+  k = div_s32(bcoef - i, nbytes);
+  validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
     &block, 1024U, 65535U);
-  if (b_dirtyOnGpu) {
-    ec_cwt_kernel35<<<grid, block>>>(gpu_r, k, gpu_omega);
-    omega_dirtyOnGpu = true;
+  if (validLaunchParams) {
+    ec_cwt_kernel33<<<grid, block>>>(nbytes, i, gpu_omega_tmp2, k, gpu_fb_Omega,
+      cpu_omega_tmp2->size[1U]);
   }
 
-  emxFree_real_T(&cpu_r);
-  ec_cwt_kernel36<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_fLims, *gpu_b);
-  b_dirtyOnGpu = true;
+  emxFree_real_T(&cpu_omega_tmp2);
+  ec_cwt_kernel34<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_fLims, *gpu_b);
+  b_outdatedOnCpu = true;
   first_iteration = true;
   k = 0;
   exitg2 = false;
   while ((!exitg2) && (k < 2)) {
-    if (b_dirtyOnGpu) {
+    if (b_outdatedOnCpu) {
       cudaMemcpy(cpu_b, *gpu_b, 2UL, cudaMemcpyDeviceToHost);
     }
 
-    b_dirtyOnGpu = false;
+    b_outdatedOnCpu = false;
     if (!cpu_b[k]) {
       first_iteration = false;
       exitg2 = true;
@@ -5164,33 +5375,31 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     }
   }
 
-  emxInit_real_T(&cpu_fb_Scales, 2, &k_emlrtRTEI, true);
+  emxInit_real_T(&cpu_fb_Scales, 2, &j_emlrtRTEI, true);
   if (!first_iteration) {
-    ec_cwt_kernel64<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(fs, *gpu_fLims,
-      *gpu_NyquistRange);
-    r = 0.0;
-    if (cpu_cv[77] == 'm') {
-      nbytes = 0;
-    } else if (cpu_cv[77] == 'a') {
-      nbytes = 1;
-    } else if (cpu_cv[77] == 'b') {
-      nbytes = 2;
-    } else {
-      nbytes = -1;
+    if (NyquistRange_outdatedOnGpu) {
+      cudaMemcpy(*gpu_NyquistRange, cpu_NyquistRange, 16UL,
+                 cudaMemcpyHostToDevice);
     }
 
-    switch (nbytes) {
-     case 0:
+    ec_cwt_kernel63<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(fs, *gpu_fLims,
+      *gpu_NyquistRange);
+    ec_cwt_kernel64<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*global_gpu_cv,
+      *gpu_wname, b_b[0], b_b[1], b_b[2], b_b[3], b_b[4]);
+    cudaMemcpy(cpu_wname, *gpu_wname, 5UL, cudaMemcpyDeviceToHost);
+    if (cpu_wname[0] == 'm') {
       r = 1.8820720577620569;
-      break;
+    } else {
+      j = 1;
+      if (cpu_wname[0] == 'a') {
+        j = 2;
+      }
 
-     case 1:
-      r = 6.0;
-      break;
-
-     case 2:
-      r = 5.0;
-      break;
+      if (j > 1) {
+        r = 6.0;
+      } else {
+        r = 5.0;
+      }
     }
 
     cudaMemcpy(cpu_NyquistRange, *gpu_NyquistRange, 16UL, cudaMemcpyDeviceToHost);
@@ -5211,125 +5420,108 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
       }
     }
 
-    emxInit_real_T(&d_cpu_y, 2, &qb_emlrtRTEI, true);
+    emxInit_real_T(&d_cpu_y, 2, &pb_emlrtRTEI, true);
     r *= fb_VoicesPerOctave;
     if (std::isnan(r)) {
-      i = d_cpu_y->size[0] * d_cpu_y->size[1];
+      j = d_cpu_y->size[0] * d_cpu_y->size[1];
       d_cpu_y->size[0] = 1;
       d_cpu_y->size[1] = 1;
-      emxEnsureCapacity_real_T(d_cpu_y, i, &i_emlrtRTEI);
+      emxEnsureCapacity_real_T(d_cpu_y, j, &h_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(d_cpu_y, &gpu_y);
-      d_cpu_y->data[0] = rtNaN;
-      y_dirtyOnCpu = true;
+      ec_cwt_kernel66<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_y);
     } else if (r < 0.0) {
       d_cpu_y->size[0] = 1;
       d_cpu_y->size[1] = 0;
     } else {
-      i = d_cpu_y->size[0] * d_cpu_y->size[1];
+      j = d_cpu_y->size[0] * d_cpu_y->size[1];
       d_cpu_y->size[0] = 1;
       d_cpu_y->size[1] = static_cast<int32_T>(r) + 1;
-      emxEnsureCapacity_real_T(d_cpu_y, i, &i_emlrtRTEI);
+      emxEnsureCapacity_real_T(d_cpu_y, j, &h_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(d_cpu_y, &gpu_y);
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(static_cast<
-        int64_T>(r) + 1L), &grid, &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(
+        static_cast<int64_T>(r) + 1L), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
         ec_cwt_kernel65<<<grid, block>>>(r, gpu_y);
       }
     }
 
-    emxInit_real_T(&e_cpu_y, 2, &rb_emlrtRTEI, true);
-    i = e_cpu_y->size[0] * e_cpu_y->size[1];
+    emxInit_real_T(&e_cpu_y, 2, &qb_emlrtRTEI, true);
+    j = e_cpu_y->size[0] * e_cpu_y->size[1];
     e_cpu_y->size[0] = 1;
     e_cpu_y->size[1] = d_cpu_y->size[1];
-    emxEnsureCapacity_real_T(e_cpu_y, i, &j_emlrtRTEI);
+    emxEnsureCapacity_real_T(e_cpu_y, j, &i_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(e_cpu_y, &b_gpu_y);
     bcoef = d_cpu_y->size[1];
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (y_dirtyOnCpu) {
-        gpuEmxMemcpyCpuToGpu_real_T(&gpu_y, d_cpu_y);
-      }
-
-      ec_cwt_kernel66<<<grid, block>>>(gpu_y, rt_powd_snf(2.0, 1.0 /
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel67<<<grid, block>>>(gpu_y, rt_powd_snf(2.0, 1.0 /
         fb_VoicesPerOctave), bcoef, b_gpu_y);
     }
 
     emxFree_real_T(&d_cpu_y);
-    i = cpu_fb_Scales->size[0] * cpu_fb_Scales->size[1];
+    j = cpu_fb_Scales->size[0] * cpu_fb_Scales->size[1];
     cpu_fb_Scales->size[0] = 1;
     cpu_fb_Scales->size[1] = e_cpu_y->size[1];
-    emxEnsureCapacity_real_T(cpu_fb_Scales, i, &k_emlrtRTEI);
+    emxEnsureCapacity_real_T(cpu_fb_Scales, j, &j_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_fb_Scales, &gpu_fb_Scales);
     bcoef = e_cpu_y->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef + 1L),
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef + 1L),
       &grid, &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel67<<<grid, block>>>(b_gpu_y, halfh, bcoef, gpu_fb_Scales);
-      fb_Scales_dirtyOnGpu = true;
+    if (validLaunchParams) {
+      ec_cwt_kernel68<<<grid, block>>>(b_gpu_y, halfh, bcoef, gpu_fb_Scales);
+      fb_Scales_outdatedOnCpu = true;
     }
 
     emxFree_real_T(&e_cpu_y);
   } else {
-    ec_cwt_kernel37<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*cpu_cv_gpu_clone, *
-      gpu_wav, b[0], b[1], b[2], b[3], b[4]);
     omegac = 3.1415926535897931;
-    a = 0.0;
-    b_r = 0.0;
+    ec_cwt_kernel35<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*global_gpu_cv,
+      *gpu_wav, *gpu_wname, b_b[0], b_b[1], b_b[2], b_b[3], b_b[4]);
+    b_outdatedOnCpu = true;
     cudaMemcpy(cpu_wav, *gpu_wav, 5UL, cudaMemcpyDeviceToHost);
-    if (cpu_cv[static_cast<int32_T>(cpu_wav[0])] == 'm') {
-      nbytes = 0;
-    } else if (cpu_cv[static_cast<int32_T>(cpu_wav[0])] == 'a') {
-      nbytes = 1;
-    } else if (cpu_cv[static_cast<int32_T>(cpu_wav[0])] == 'b') {
-      nbytes = 2;
-    } else {
-      nbytes = -1;
-    }
-
-    switch (nbytes) {
-     case 0:
+    if (cpu_wav[0] == 'm') {
       a = 1.8820720577620569;
-      c_r = 0.0057083835261;
       b_r = 0.0057083835261;
+      c_r = 0.0057083835261;
       r = 0.0057083835261;
-      for (nsubs = 0; nsubs < 6; nsubs++) {
-        maxScale = c[nsubs];
-        c_r = c_r * 0.005353955978584176 + maxScale;
+      for (i = 0; i < 6; i++) {
+        maxScale = c[i];
         b_r = b_r * 0.005353955978584176 + maxScale;
+        c_r = c_r * 0.005353955978584176 + maxScale;
         r = r * 0.005353955978584176 + maxScale;
       }
 
-      c_r /= 13.666666666666666;
       b_r /= 13.666666666666666;
+      c_r /= 13.666666666666666;
       r /= 13.666666666666666;
-      b_r = std::sqrt((std::exp((table100[12] + 7.7183093240718676) - (((c_r +
+      c_r = std::sqrt((std::exp((table100[12] + 7.7183093240718676) - (((b_r +
         0.91893853320467278) - 1.307479889018099) + 22.071116966494703)) + std::
-                       exp((table100[14] + 2.5377749931802178) - (((b_r +
+                       exp((table100[14] + 2.5377749931802178) - (((c_r +
         0.91893853320467278) - 1.307479889018099) + 22.071116966494703))) - std::
                       exp((table100[13] + 5.8211893391859881) - (((r +
         0.91893853320467278) - 1.307479889018099) + 22.071116966494703)));
-      if (std::isinf(b_r) || std::isnan(b_r)) {
-        if (interval_dirtyOnCpu) {
+      if (std::isinf(c_r) || std::isnan(c_r)) {
+        if (interval_outdatedOnGpu) {
           cudaMemcpy(*gpu_interval, cpu_interval, 5200UL, cudaMemcpyHostToDevice);
         }
 
-        ec_cwt_kernel38<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
-        ec_cwt_kernel39<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
-        interval_dirtyOnCpu = false;
+        ec_cwt_kernel36<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
+        ec_cwt_kernel37<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
+        interval_outdatedOnGpu = false;
         intDsq = 0.0;
         bcoef = 1;
         cudaMemcpy(cpu_interval, *gpu_interval, 5200UL, cudaMemcpyDeviceToHost);
-        k = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
+        i = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
           (cpu_interval[0]);
-        if (k > 0) {
+        if (i > 0) {
           n_idx_0 = static_cast<int8_T>(static_cast<int32_T>(std::abs
             (cpu_interval[1] - cpu_interval[0])) * 10 - 1);
           nsubs = n_idx_0 + 1;
           if (n_idx_0 + 2 > 2) {
             bcoef = n_idx_0;
             cpu_interval[n_idx_0 + 1] = cpu_interval[1];
-            interval_dirtyOnCpu = true;
+            interval_outdatedOnGpu = true;
             r = (cpu_interval[1] - cpu_interval[0]) / (static_cast<real_T>
               (n_idx_0) + 1.0);
             for (j = 0; j < bcoef; j++) {
@@ -5344,130 +5536,130 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         }
 
         nbytes = 0;
-        for (j = 0; j < bcoef; j++) {
-          if (std::abs(cpu_interval[j + 1] - cpu_interval[nbytes]) > 0.0) {
+        for (k = 0; k < bcoef; k++) {
+          if (std::abs(cpu_interval[k + 1] - cpu_interval[nbytes]) > 0.0) {
             nbytes++;
-            cpu_interval[nbytes] = cpu_interval[j + 1];
-            interval_dirtyOnCpu = true;
+            cpu_interval[nbytes] = cpu_interval[k + 1];
+            interval_outdatedOnGpu = true;
           } else {
             nsubs--;
           }
         }
 
         if (nsubs + 1 < 2) {
-          if (interval_dirtyOnCpu) {
+          if (interval_outdatedOnGpu) {
             cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                        cudaMemcpyHostToDevice);
           }
 
-          ec_cwt_kernel40<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
+          ec_cwt_kernel38<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
             *gpu_interval);
-          interval_dirtyOnCpu = false;
+          interval_outdatedOnGpu = false;
           nsubs = 1;
         }
 
-        if (k <= 0) {
+        if (i <= 0) {
           intDsq = rtNaN;
         } else {
-          b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
             &grid, &block, 1024U, 65535U);
-          if (b_dirtyOnGpu) {
-            if (interval_dirtyOnCpu) {
+          if (validLaunchParams) {
+            if (interval_outdatedOnGpu) {
               cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                          cudaMemcpyHostToDevice);
             }
 
-            interval_dirtyOnCpu = false;
-            if (subs_dirtyOnCpu) {
+            interval_outdatedOnGpu = false;
+            if (subs_outdatedOnGpu) {
               cudaMemcpy(*gpu_subs, cpu_subs, 10384UL, cudaMemcpyHostToDevice);
             }
 
-            ec_cwt_kernel41<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
-            subs_dirtyOnGpu = true;
-            subs_dirtyOnCpu = false;
+            ec_cwt_kernel39<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
+            subs_outdatedOnGpu = false;
+            subs_outdatedOnCpu = true;
           }
 
           q_ok = 0.0;
           err_ok = 0.0;
-          emxInit_real_T(&f_cpu_x, 2, &f_emlrtRTEI, true);
-          emxInit_real_T(&g_cpu_x, 2, &ac_emlrtRTEI, true);
-          emxInit_real_T(&c_cpu_xt, 2, &bc_emlrtRTEI, true);
-          emxInit_real_T(&i_cpu_y, 2, &cc_emlrtRTEI, true);
-          emxInit_real_T(&c_cpu_fx, 2, &sb_emlrtRTEI, true);
-          emxInit_real_T(&j_cpu_y, 2, &dc_emlrtRTEI, true);
-          emxInit_real_T(&b_cpu_a, 2, &p_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv11, 2, &fc_emlrtRTEI, true);
-          emxInit_real_T(&k_cpu_y, 2, &gc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv13, 2, &fc_emlrtRTEI, true);
+          emxInit_real_T(&f_cpu_x, 2, &e_emlrtRTEI, true);
+          emxInit_real_T(&g_cpu_x, 2, &yb_emlrtRTEI, true);
+          emxInit_real_T(&c_cpu_xt, 2, &ac_emlrtRTEI, true);
+          emxInit_real_T(&i_cpu_y, 2, &bc_emlrtRTEI, true);
+          emxInit_real_T(&c_cpu_fx, 2, &rb_emlrtRTEI, true);
+          emxInit_real_T(&j_cpu_y, 2, &cc_emlrtRTEI, true);
+          emxInit_real_T(&b_cpu_a, 2, &o_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv11, 2, &ec_emlrtRTEI, true);
+          emxInit_real_T(&k_cpu_y, 2, &fc_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv13, 2, &ec_emlrtRTEI, true);
           do {
             exitg1 = 0;
-            i = f_cpu_x->size[0] * f_cpu_x->size[1];
+            j = f_cpu_x->size[0] * f_cpu_x->size[1];
             f_cpu_x->size[0] = 1;
             f_cpu_x->size[1] = 15 * nsubs;
-            emxEnsureCapacity_real_T(f_cpu_x, i, &f_emlrtRTEI);
-            if (!d_x_dirtyOnCpu) {
+            emxEnsureCapacity_real_T(f_cpu_x, j, &e_emlrtRTEI);
+            if (!d_x_outdatedOnGpu) {
               gpuEmxEnsureCapacity_real_T(f_cpu_x, &f_gpu_x);
             }
 
             nbytes = -1;
             for (k = 0; k < nsubs; k++) {
-              if (subs_dirtyOnGpu) {
+              if (subs_outdatedOnCpu) {
                 cudaMemcpy(cpu_subs, *gpu_subs, 10384UL, cudaMemcpyDeviceToHost);
               }
 
               maxScale = cpu_subs[k << 1];
-              subs_dirtyOnGpu = false;
+              subs_outdatedOnCpu = false;
               r = cpu_subs[(k << 1) + 1];
-              b_r = (maxScale + r) / 2.0;
+              c_r = (maxScale + r) / 2.0;
               halfh = (r - maxScale) / 2.0;
               for (j = 0; j < 15; j++) {
-                f_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + b_r;
-                d_x_dirtyOnCpu = true;
+                f_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + c_r;
+                d_x_outdatedOnGpu = true;
               }
 
               nbytes += 15;
             }
 
-            i = g_cpu_x->size[0] * g_cpu_x->size[1];
+            j = g_cpu_x->size[0] * g_cpu_x->size[1];
             g_cpu_x->size[0] = 1;
             g_cpu_x->size[1] = f_cpu_x->size[1];
-            emxEnsureCapacity_real_T(g_cpu_x, i, &g_emlrtRTEI);
+            emxEnsureCapacity_real_T(g_cpu_x, j, &f_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(g_cpu_x, &g_gpu_x);
-            i = c_cpu_xt->size[0] * c_cpu_xt->size[1];
+            j = c_cpu_xt->size[0] * c_cpu_xt->size[1];
             c_cpu_xt->size[0] = 1;
             c_cpu_xt->size[1] = f_cpu_x->size[1];
-            emxEnsureCapacity_real_T(c_cpu_xt, i, &h_emlrtRTEI);
+            emxEnsureCapacity_real_T(c_cpu_xt, j, &g_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(c_cpu_xt, &b_gpu_xt);
             nbytes = f_cpu_x->size[1];
-            b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nbytes),
-              &grid, &block, 1024U, 65535U);
-            if (b_dirtyOnGpu) {
-              if (d_x_dirtyOnCpu) {
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+              (nbytes), &grid, &block, 1024U, 65535U);
+            if (validLaunchParams) {
+              if (d_x_outdatedOnGpu) {
                 gpuEmxMemcpyCpuToGpu_real_T(&f_gpu_x, f_cpu_x);
               }
 
-              d_x_dirtyOnCpu = false;
-              ec_cwt_kernel42<<<grid, block>>>(f_gpu_x, nbytes, b_gpu_xt,
+              d_x_outdatedOnGpu = false;
+              ec_cwt_kernel40<<<grid, block>>>(f_gpu_x, nbytes, b_gpu_xt,
                 g_gpu_x);
-              c_x_dirtyOnGpu = true;
-              c_xt_dirtyOnGpu = true;
+              c_x_outdatedOnCpu = true;
+              c_xt_outdatedOnCpu = true;
             }
 
-            b_guard1 = false;
+            guard1 = false;
             if (!first_iteration) {
-              if (c_x_dirtyOnGpu) {
+              if (c_x_outdatedOnCpu) {
                 gpuEmxMemcpyGpuToCpu_real_T(g_cpu_x, &g_gpu_x);
               }
 
-              c_x_dirtyOnGpu = false;
-              b_r = std::abs(g_cpu_x->data[0]);
+              c_x_outdatedOnCpu = false;
+              c_r = std::abs(g_cpu_x->data[0]);
               k = 0;
               exitg2 = false;
               while ((!exitg2) && (k <= g_cpu_x->size[1] - 2)) {
-                tol = b_r;
-                b_r = std::abs(g_cpu_x->data[k + 1]);
+                tol = c_r;
+                c_r = std::abs(g_cpu_x->data[k + 1]);
                 if (std::abs(g_cpu_x->data[k + 1] - g_cpu_x->data[k]) <=
-                    2.2204460492503131E-14 * std::fmax(tol, b_r)) {
+                    2.2204460492503131E-14 * std::fmax(tol, c_r)) {
                   first_iteration = true;
                   exitg2 = true;
                 } else {
@@ -5477,236 +5669,236 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
               if (first_iteration) {
                 dv2_idx_1 = static_cast<int16_T>(f_cpu_x->size[1]);
-                i = c_cpu_fx->size[0] * c_cpu_fx->size[1];
+                j = c_cpu_fx->size[0] * c_cpu_fx->size[1];
                 c_cpu_fx->size[0] = 1;
                 c_cpu_fx->size[1] = f_cpu_x->size[1];
-                emxEnsureCapacity_real_T(c_cpu_fx, i, &l_emlrtRTEI);
-                if (!c_fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(c_cpu_fx, j, &k_emlrtRTEI);
+                if (!c_fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(c_cpu_fx, &b_gpu_fx);
                 }
 
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                   (dv2_idx_1), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (c_fx_dirtyOnCpu) {
+                if (validLaunchParams) {
+                  if (c_fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_fx, c_cpu_fx);
                   }
 
-                  ec_cwt_kernel50<<<grid, block>>>(dv2_idx_1, b_gpu_fx);
+                  ec_cwt_kernel48<<<grid, block>>>(dv2_idx_1, b_gpu_fx);
                 }
 
                 exitg1 = 1;
               } else {
-                b_guard1 = true;
+                guard1 = true;
               }
             } else {
-              b_guard1 = true;
+              guard1 = true;
             }
 
-            if (b_guard1) {
+            if (guard1) {
               first_iteration = false;
-              i = i_cpu_y->size[0] * i_cpu_y->size[1];
+              j = i_cpu_y->size[0] * i_cpu_y->size[1];
               i_cpu_y->size[0] = 1;
               i_cpu_y->size[1] = g_cpu_x->size[1];
-              emxEnsureCapacity_real_T(i_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(i_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(i_cpu_y, &g_gpu_y);
               bcoef = g_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel43<<<grid, block>>>(g_gpu_x, bcoef, g_gpu_y);
-                c_y_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel41<<<grid, block>>>(g_gpu_x, bcoef, g_gpu_y);
+                c_y_outdatedOnCpu = true;
               }
 
-              i = j_cpu_y->size[0] * j_cpu_y->size[1];
+              j = j_cpu_y->size[0] * j_cpu_y->size[1];
               j_cpu_y->size[0] = 1;
               j_cpu_y->size[1] = g_cpu_x->size[1];
-              emxEnsureCapacity_real_T(j_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(j_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(j_cpu_y, &h_gpu_y);
               bcoef = g_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel44<<<grid, block>>>(g_gpu_x, bcoef, h_gpu_y);
-                d_y_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel42<<<grid, block>>>(g_gpu_x, bcoef, h_gpu_y);
+                d_y_outdatedOnCpu = true;
               }
 
               if (i_cpu_y->size[1] == j_cpu_y->size[1]) {
-                i = b_cpu_a->size[0] * b_cpu_a->size[1];
+                j = b_cpu_a->size[0] * b_cpu_a->size[1];
                 b_cpu_a->size[0] = 1;
                 b_cpu_a->size[1] = i_cpu_y->size[1];
-                emxEnsureCapacity_real_T(b_cpu_a, i, &p_emlrtRTEI);
-                if (!b_a_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(b_cpu_a, j, &o_emlrtRTEI);
+                if (!b_a_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(b_cpu_a, &gpu_a);
                 }
 
                 bcoef = i_cpu_y->size[1] - 1;
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef
-                  + 1L), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (b_a_dirtyOnCpu) {
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                  (bcoef + 1L), &grid, &block, 1024U, 65535U);
+                if (validLaunchParams) {
+                  if (b_a_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&gpu_a, b_cpu_a);
                   }
 
-                  ec_cwt_kernel45<<<grid, block>>>(h_gpu_y, g_gpu_y, bcoef,
+                  ec_cwt_kernel43<<<grid, block>>>(h_gpu_y, g_gpu_y, bcoef,
                     gpu_a);
-                  b_a_dirtyOnGpu = true;
-                  b_a_dirtyOnCpu = false;
+                  b_a_outdatedOnGpu = false;
+                  b_a_outdatedOnCpu = true;
                 }
               } else {
-                if (b_a_dirtyOnGpu) {
+                if (b_a_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(b_cpu_a, &gpu_a);
                 }
 
-                if (c_y_dirtyOnGpu) {
+                if (c_y_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(i_cpu_y, &g_gpu_y);
                 }
 
-                c_y_dirtyOnGpu = false;
-                if (d_y_dirtyOnGpu) {
+                c_y_outdatedOnCpu = false;
+                if (d_y_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(j_cpu_y, &h_gpu_y);
                 }
 
-                d_y_dirtyOnGpu = false;
-                c_binary_expand_op(b_cpu_a, i_cpu_y, j_cpu_y);
-                b_a_dirtyOnCpu = true;
-                b_a_dirtyOnGpu = false;
+                d_y_outdatedOnCpu = false;
+                binary_expand_op_4(b_cpu_a, i_cpu_y, j_cpu_y);
+                b_a_outdatedOnCpu = false;
+                b_a_outdatedOnGpu = true;
               }
 
-              i = cpu_dv11->size[0] * cpu_dv11->size[1];
+              j = cpu_dv11->size[0] * cpu_dv11->size[1];
               cpu_dv11->size[0] = 1;
               cpu_dv11->size[1] = b_cpu_a->size[1];
-              emxEnsureCapacity_real_T(cpu_dv11, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv11, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv11, &gpu_dv11);
               bcoef = b_cpu_a->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                if (b_a_dirtyOnCpu) {
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                if (b_a_outdatedOnGpu) {
                   gpuEmxMemcpyCpuToGpu_real_T(&gpu_a, b_cpu_a);
                 }
 
-                b_a_dirtyOnCpu = false;
-                ec_cwt_kernel46<<<grid, block>>>(gpu_a, bcoef, gpu_dv11);
-                dv11_dirtyOnGpu = true;
+                b_a_outdatedOnGpu = false;
+                ec_cwt_kernel44<<<grid, block>>>(gpu_a, bcoef, gpu_dv11);
+                dv11_outdatedOnCpu = true;
               }
 
-              i = k_cpu_y->size[0] * k_cpu_y->size[1];
+              j = k_cpu_y->size[0] * k_cpu_y->size[1];
               k_cpu_y->size[0] = 1;
               k_cpu_y->size[1] = g_cpu_x->size[1];
-              emxEnsureCapacity_real_T(k_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(k_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(k_cpu_y, &i_gpu_y);
               bcoef = g_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel47<<<grid, block>>>(g_gpu_x, bcoef, i_gpu_y);
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel45<<<grid, block>>>(g_gpu_x, bcoef, i_gpu_y);
               }
 
-              i = cpu_dv13->size[0] * cpu_dv13->size[1];
+              j = cpu_dv13->size[0] * cpu_dv13->size[1];
               cpu_dv13->size[0] = 1;
               cpu_dv13->size[1] = k_cpu_y->size[1];
-              emxEnsureCapacity_real_T(cpu_dv13, i, &w_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv13, j, &u_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv13, &gpu_dv13);
               bcoef = k_cpu_y->size[1] - 1;
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef +
-                1L), &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel48<<<grid, block>>>(i_gpu_y, bcoef, gpu_dv13);
-                dv13_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef + 1L), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel46<<<grid, block>>>(i_gpu_y, bcoef, gpu_dv13);
+                dv13_outdatedOnCpu = true;
               }
 
               if (cpu_dv11->size[1] == cpu_dv13->size[1]) {
-                i = c_cpu_fx->size[0] * c_cpu_fx->size[1];
+                j = c_cpu_fx->size[0] * c_cpu_fx->size[1];
                 c_cpu_fx->size[0] = 1;
                 c_cpu_fx->size[1] = cpu_dv11->size[1];
-                emxEnsureCapacity_real_T(c_cpu_fx, i, &bb_emlrtRTEI);
-                if (!c_fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(c_cpu_fx, j, &ab_emlrtRTEI);
+                if (!c_fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(c_cpu_fx, &b_gpu_fx);
                 }
 
                 bcoef = cpu_dv11->size[1] - 1;
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef
-                  + 1L), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (c_fx_dirtyOnCpu) {
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                  (bcoef + 1L), &grid, &block, 1024U, 65535U);
+                if (validLaunchParams) {
+                  if (c_fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&b_gpu_fx, c_cpu_fx);
                   }
 
-                  ec_cwt_kernel49<<<grid, block>>>(b_gpu_xt, gpu_dv13, gpu_dv11,
+                  ec_cwt_kernel47<<<grid, block>>>(b_gpu_xt, gpu_dv13, gpu_dv11,
                     bcoef, b_gpu_fx);
-                  c_fx_dirtyOnGpu = true;
-                  c_fx_dirtyOnCpu = false;
+                  c_fx_outdatedOnGpu = false;
+                  c_fx_outdatedOnCpu = true;
                 }
               } else {
-                if (c_fx_dirtyOnGpu) {
+                if (c_fx_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(c_cpu_fx, &b_gpu_fx);
                 }
 
-                if (dv11_dirtyOnGpu) {
+                if (dv11_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv11, &gpu_dv11);
                 }
 
-                dv11_dirtyOnGpu = false;
-                if (dv13_dirtyOnGpu) {
+                dv11_outdatedOnCpu = false;
+                if (dv13_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv13, &gpu_dv13);
                 }
 
-                dv13_dirtyOnGpu = false;
-                if (c_xt_dirtyOnGpu) {
+                dv13_outdatedOnCpu = false;
+                if (c_xt_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(c_cpu_xt, &b_gpu_xt);
                 }
 
-                c_xt_dirtyOnGpu = false;
-                binary_expand_op(c_cpu_fx, cpu_dv11, cpu_dv13, c_cpu_xt);
-                c_fx_dirtyOnCpu = true;
-                c_fx_dirtyOnGpu = false;
+                c_xt_outdatedOnCpu = false;
+                binary_expand_op_2(c_cpu_fx, cpu_dv11, cpu_dv13, c_cpu_xt);
+                c_fx_outdatedOnCpu = false;
+                c_fx_outdatedOnGpu = true;
               }
 
-              b_r = 0.0;
+              c_r = 0.0;
               nbytes = -1;
               for (k = 0; k < nsubs; k++) {
                 maxScale = 0.0;
                 r = 0.0;
                 for (j = 0; j < 15; j++) {
-                  if (c_fx_dirtyOnGpu) {
+                  if (c_fx_outdatedOnCpu) {
                     gpuEmxMemcpyGpuToCpu_real_T(c_cpu_fx, &b_gpu_fx);
                   }
 
                   maxScale += dv4[j] * c_cpu_fx->data[(nbytes + j) + 1];
-                  c_fx_dirtyOnGpu = false;
+                  c_fx_outdatedOnCpu = false;
                   r += dv5[j] * c_cpu_fx->data[(nbytes + j) + 1];
                 }
 
                 nbytes += 15;
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
+                subs_outdatedOnCpu = false;
                 halfh = (cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) / 2.0;
                 maxScale *= halfh;
                 qsub[k] = maxScale;
-                b_r += maxScale;
+                c_r += maxScale;
                 errsub[k] = r * halfh;
               }
 
-              intDsq = b_r + q_ok;
+              intDsq = c_r + q_ok;
               tol = std::fmax(1.0E-10, 1.0E-6 * std::abs(intDsq));
-              b_r = 2.0 * tol;
+              c_r = 2.0 * tol;
               r = 0.0;
               nbytes = 0;
               for (k = 0; k < nsubs; k++) {
                 maxScale = errsub[k];
                 halfh = std::abs(maxScale);
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
-                if (halfh <= b_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
+                subs_outdatedOnCpu = false;
+                if (halfh <= c_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
                                     2.0)) {
                   err_ok += maxScale;
                   q_ok += qsub[k];
@@ -5715,20 +5907,20 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                   nbytes++;
                   cpu_subs[(nbytes - 1) << 1] = cpu_subs[k << 1];
                   cpu_subs[((nbytes - 1) << 1) + 1] = cpu_subs[(k << 1) + 1];
-                  subs_dirtyOnCpu = true;
+                  subs_outdatedOnGpu = true;
                 }
               }
 
-              b_r = std::abs(err_ok) + r;
+              c_r = std::abs(err_ok) + r;
               if ((!std::isinf(intDsq)) && (!std::isnan(intDsq)) && ((!std::
-                    isinf(b_r)) && (!std::isnan(b_r))) && (nbytes != 0) &&
-                  (!(b_r <= tol))) {
+                    isinf(c_r)) && (!std::isnan(c_r))) && (nbytes != 0) &&
+                  (!(c_r <= tol))) {
                 nsubs = nbytes << 1;
                 if (nsubs > 650) {
                   exitg1 = 1;
                 } else {
                   for (k = 0; k < nbytes; k++) {
-                    if (subs_dirtyOnGpu) {
+                    if (subs_outdatedOnCpu) {
                       cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                                  cudaMemcpyDeviceToHost);
                     }
@@ -5742,8 +5934,8 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                       [(((nbytes - k) << 1) - 1) << 1];
                     cpu_subs[(((nbytes - k) << 1) - 2) << 1] = cpu_subs[((nbytes
                       - k) - 1) << 1];
-                    subs_dirtyOnCpu = true;
-                    subs_dirtyOnGpu = false;
+                    subs_outdatedOnCpu = false;
+                    subs_outdatedOnGpu = true;
                   }
                 }
               } else {
@@ -5764,26 +5956,26 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           emxFree_real_T(&f_cpu_x);
         }
 
-        if (interval_dirtyOnCpu) {
+        if (interval_outdatedOnGpu) {
           cudaMemcpy(*gpu_interval, cpu_interval, 5200UL, cudaMemcpyHostToDevice);
         }
 
-        ec_cwt_kernel51<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
-        ec_cwt_kernel52<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
-        interval_dirtyOnCpu = false;
+        ec_cwt_kernel49<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_interval);
+        ec_cwt_kernel50<<<dim3(2U, 1U, 1U), dim3(512U, 1U, 1U)>>>(*gpu_interval);
+        interval_outdatedOnGpu = false;
         intFsq = 0.0;
         bcoef = 1;
         cudaMemcpy(cpu_interval, *gpu_interval, 5200UL, cudaMemcpyDeviceToHost);
-        k = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
+        i = static_cast<int32_T>(cpu_interval[1]) - static_cast<int32_T>
           (cpu_interval[0]);
-        if (k > 0) {
+        if (i > 0) {
           n_idx_0 = static_cast<int8_T>(static_cast<int32_T>(std::abs
             (cpu_interval[1] - cpu_interval[0])) * 10 - 1);
           nsubs = n_idx_0 + 1;
           if (n_idx_0 + 2 > 2) {
             bcoef = n_idx_0;
             cpu_interval[n_idx_0 + 1] = cpu_interval[1];
-            interval_dirtyOnCpu = true;
+            interval_outdatedOnGpu = true;
             r = (cpu_interval[1] - cpu_interval[0]) / (static_cast<real_T>
               (n_idx_0) + 1.0);
             for (j = 0; j < bcoef; j++) {
@@ -5798,125 +5990,125 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         }
 
         nbytes = 0;
-        for (j = 0; j < bcoef; j++) {
-          if (std::abs(cpu_interval[j + 1] - cpu_interval[nbytes]) > 0.0) {
+        for (k = 0; k < bcoef; k++) {
+          if (std::abs(cpu_interval[k + 1] - cpu_interval[nbytes]) > 0.0) {
             nbytes++;
-            cpu_interval[nbytes] = cpu_interval[j + 1];
-            interval_dirtyOnCpu = true;
+            cpu_interval[nbytes] = cpu_interval[k + 1];
+            interval_outdatedOnGpu = true;
           } else {
             nsubs--;
           }
         }
 
         if (nsubs + 1 < 2) {
-          if (interval_dirtyOnCpu) {
+          if (interval_outdatedOnGpu) {
             cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                        cudaMemcpyHostToDevice);
           }
 
-          ec_cwt_kernel53<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
+          ec_cwt_kernel51<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(bcoef,
             *gpu_interval);
-          interval_dirtyOnCpu = false;
+          interval_outdatedOnGpu = false;
           nsubs = 1;
         }
 
-        if (k <= 0) {
+        if (i <= 0) {
           intFsq = rtNaN;
         } else {
-          b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
+          validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nsubs),
             &grid, &block, 1024U, 65535U);
-          if (b_dirtyOnGpu) {
-            if (interval_dirtyOnCpu) {
+          if (validLaunchParams) {
+            if (interval_outdatedOnGpu) {
               cudaMemcpy(*gpu_interval, cpu_interval, 5200UL,
                          cudaMemcpyHostToDevice);
             }
 
-            if (subs_dirtyOnCpu) {
+            if (subs_outdatedOnGpu) {
               cudaMemcpy(*gpu_subs, cpu_subs, 10384UL, cudaMemcpyHostToDevice);
             }
 
-            ec_cwt_kernel54<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
-            subs_dirtyOnGpu = true;
+            ec_cwt_kernel52<<<grid, block>>>(*gpu_interval, nsubs, *gpu_subs);
+            subs_outdatedOnCpu = true;
           }
 
           q_ok = 0.0;
           err_ok = 0.0;
           first_iteration = true;
-          emxInit_real_T(&h_cpu_x, 2, &f_emlrtRTEI, true);
-          emxInit_real_T(&i_cpu_x, 2, &ac_emlrtRTEI, true);
-          emxInit_real_T(&d_cpu_xt, 2, &bc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv15, 2, &ic_emlrtRTEI, true);
-          emxInit_real_T(&d_cpu_fx, 2, &sb_emlrtRTEI, true);
-          emxInit_real_T(&l_cpu_y, 2, &jc_emlrtRTEI, true);
-          emxInit_real_T(&cpu_dv16, 2, &ic_emlrtRTEI, true);
+          emxInit_real_T(&h_cpu_x, 2, &e_emlrtRTEI, true);
+          emxInit_real_T(&i_cpu_x, 2, &yb_emlrtRTEI, true);
+          emxInit_real_T(&d_cpu_xt, 2, &ac_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv15, 2, &hc_emlrtRTEI, true);
+          emxInit_real_T(&d_cpu_fx, 2, &rb_emlrtRTEI, true);
+          emxInit_real_T(&l_cpu_y, 2, &ic_emlrtRTEI, true);
+          emxInit_real_T(&cpu_dv16, 2, &hc_emlrtRTEI, true);
           do {
             exitg1 = 0;
-            i = h_cpu_x->size[0] * h_cpu_x->size[1];
+            j = h_cpu_x->size[0] * h_cpu_x->size[1];
             h_cpu_x->size[0] = 1;
             h_cpu_x->size[1] = 15 * nsubs;
-            emxEnsureCapacity_real_T(h_cpu_x, i, &f_emlrtRTEI);
-            if (!e_x_dirtyOnCpu) {
+            emxEnsureCapacity_real_T(h_cpu_x, j, &e_emlrtRTEI);
+            if (!e_x_outdatedOnGpu) {
               gpuEmxEnsureCapacity_real_T(h_cpu_x, &d_gpu_x);
             }
 
             nbytes = -1;
             for (k = 0; k < nsubs; k++) {
-              if (subs_dirtyOnGpu) {
+              if (subs_outdatedOnCpu) {
                 cudaMemcpy(cpu_subs, *gpu_subs, 10384UL, cudaMemcpyDeviceToHost);
               }
 
               maxScale = cpu_subs[k << 1];
-              subs_dirtyOnGpu = false;
+              subs_outdatedOnCpu = false;
               r = cpu_subs[(k << 1) + 1];
-              b_r = (maxScale + r) / 2.0;
+              c_r = (maxScale + r) / 2.0;
               halfh = (r - maxScale) / 2.0;
               for (j = 0; j < 15; j++) {
-                h_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + b_r;
-                e_x_dirtyOnCpu = true;
+                h_cpu_x->data[(nbytes + j) + 1] = NODES[j] * halfh + c_r;
+                e_x_outdatedOnGpu = true;
               }
 
               nbytes += 15;
             }
 
-            i = i_cpu_x->size[0] * i_cpu_x->size[1];
+            j = i_cpu_x->size[0] * i_cpu_x->size[1];
             i_cpu_x->size[0] = 1;
             i_cpu_x->size[1] = h_cpu_x->size[1];
-            emxEnsureCapacity_real_T(i_cpu_x, i, &g_emlrtRTEI);
+            emxEnsureCapacity_real_T(i_cpu_x, j, &f_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(i_cpu_x, &e_gpu_x);
-            i = d_cpu_xt->size[0] * d_cpu_xt->size[1];
+            j = d_cpu_xt->size[0] * d_cpu_xt->size[1];
             d_cpu_xt->size[0] = 1;
             d_cpu_xt->size[1] = h_cpu_x->size[1];
-            emxEnsureCapacity_real_T(d_cpu_xt, i, &h_emlrtRTEI);
+            emxEnsureCapacity_real_T(d_cpu_xt, j, &g_emlrtRTEI);
             gpuEmxEnsureCapacity_real_T(d_cpu_xt, &gpu_xt);
             nbytes = h_cpu_x->size[1];
-            b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(nbytes),
-              &grid, &block, 1024U, 65535U);
-            if (b_dirtyOnGpu) {
-              if (e_x_dirtyOnCpu) {
+            validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+              (nbytes), &grid, &block, 1024U, 65535U);
+            if (validLaunchParams) {
+              if (e_x_outdatedOnGpu) {
                 gpuEmxMemcpyCpuToGpu_real_T(&d_gpu_x, h_cpu_x);
               }
 
-              e_x_dirtyOnCpu = false;
-              ec_cwt_kernel55<<<grid, block>>>(d_gpu_x, nbytes, gpu_xt, e_gpu_x);
-              d_x_dirtyOnGpu = true;
-              d_xt_dirtyOnGpu = true;
+              e_x_outdatedOnGpu = false;
+              ec_cwt_kernel53<<<grid, block>>>(d_gpu_x, nbytes, gpu_xt, e_gpu_x);
+              d_x_outdatedOnCpu = true;
+              d_xt_outdatedOnCpu = true;
             }
 
-            b_guard1 = false;
+            guard1 = false;
             if (!first_iteration) {
-              if (d_x_dirtyOnGpu) {
+              if (d_x_outdatedOnCpu) {
                 gpuEmxMemcpyGpuToCpu_real_T(i_cpu_x, &e_gpu_x);
               }
 
-              d_x_dirtyOnGpu = false;
-              b_r = std::abs(i_cpu_x->data[0]);
+              d_x_outdatedOnCpu = false;
+              c_r = std::abs(i_cpu_x->data[0]);
               k = 0;
               exitg2 = false;
               while ((!exitg2) && (k <= i_cpu_x->size[1] - 2)) {
-                tol = b_r;
-                b_r = std::abs(i_cpu_x->data[k + 1]);
+                tol = c_r;
+                c_r = std::abs(i_cpu_x->data[k + 1]);
                 if (std::abs(i_cpu_x->data[k + 1] - i_cpu_x->data[k]) <=
-                    2.2204460492503131E-14 * std::fmax(tol, b_r)) {
+                    2.2204460492503131E-14 * std::fmax(tol, c_r)) {
                   first_iteration = true;
                   exitg2 = true;
                 } else {
@@ -5926,163 +6118,163 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
 
               if (first_iteration) {
                 dv2_idx_1 = static_cast<int16_T>(h_cpu_x->size[1]);
-                i = d_cpu_fx->size[0] * d_cpu_fx->size[1];
+                j = d_cpu_fx->size[0] * d_cpu_fx->size[1];
                 d_cpu_fx->size[0] = 1;
                 d_cpu_fx->size[1] = h_cpu_x->size[1];
-                emxEnsureCapacity_real_T(d_cpu_fx, i, &l_emlrtRTEI);
-                if (!d_fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(d_cpu_fx, j, &k_emlrtRTEI);
+                if (!d_fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(d_cpu_fx, &gpu_fx);
                 }
 
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
                   (dv2_idx_1), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (d_fx_dirtyOnCpu) {
+                if (validLaunchParams) {
+                  if (d_fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&gpu_fx, d_cpu_fx);
                   }
 
-                  ec_cwt_kernel60<<<grid, block>>>(dv2_idx_1, gpu_fx);
+                  ec_cwt_kernel58<<<grid, block>>>(dv2_idx_1, gpu_fx);
                 }
 
                 exitg1 = 1;
               } else {
-                b_guard1 = true;
+                guard1 = true;
               }
             } else {
-              b_guard1 = true;
+              guard1 = true;
             }
 
-            if (b_guard1) {
+            if (guard1) {
               first_iteration = false;
-              i = cpu_dv15->size[0] * cpu_dv15->size[1];
+              j = cpu_dv15->size[0] * cpu_dv15->size[1];
               cpu_dv15->size[0] = 1;
               cpu_dv15->size[1] = i_cpu_x->size[1];
-              emxEnsureCapacity_real_T(cpu_dv15, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv15, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv15, &gpu_dv15);
               bcoef = i_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel56<<<grid, block>>>(e_gpu_x, bcoef, gpu_dv15);
-                dv15_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel54<<<grid, block>>>(e_gpu_x, bcoef, gpu_dv15);
+                dv15_outdatedOnCpu = true;
               }
 
-              i = l_cpu_y->size[0] * l_cpu_y->size[1];
+              j = l_cpu_y->size[0] * l_cpu_y->size[1];
               l_cpu_y->size[0] = 1;
               l_cpu_y->size[1] = i_cpu_x->size[1];
-              emxEnsureCapacity_real_T(l_cpu_y, i, &j_emlrtRTEI);
+              emxEnsureCapacity_real_T(l_cpu_y, j, &i_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(l_cpu_y, &f_gpu_y);
               bcoef = i_cpu_x->size[1];
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
-                &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel57<<<grid, block>>>(e_gpu_x, bcoef, f_gpu_y);
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel55<<<grid, block>>>(e_gpu_x, bcoef, f_gpu_y);
               }
 
-              i = cpu_dv16->size[0] * cpu_dv16->size[1];
+              j = cpu_dv16->size[0] * cpu_dv16->size[1];
               cpu_dv16->size[0] = 1;
               cpu_dv16->size[1] = l_cpu_y->size[1];
-              emxEnsureCapacity_real_T(cpu_dv16, i, &x_emlrtRTEI);
+              emxEnsureCapacity_real_T(cpu_dv16, j, &v_emlrtRTEI);
               gpuEmxEnsureCapacity_real_T(cpu_dv16, &gpu_dv16);
               bcoef = l_cpu_y->size[1] - 1;
-              b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef +
-                1L), &grid, &block, 1024U, 65535U);
-              if (b_dirtyOnGpu) {
-                ec_cwt_kernel58<<<grid, block>>>(f_gpu_y, bcoef, gpu_dv16);
-                dv16_dirtyOnGpu = true;
+              validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                (bcoef + 1L), &grid, &block, 1024U, 65535U);
+              if (validLaunchParams) {
+                ec_cwt_kernel56<<<grid, block>>>(f_gpu_y, bcoef, gpu_dv16);
+                dv16_outdatedOnCpu = true;
               }
 
               if (cpu_dv15->size[1] == cpu_dv16->size[1]) {
-                i = d_cpu_fx->size[0] * d_cpu_fx->size[1];
+                j = d_cpu_fx->size[0] * d_cpu_fx->size[1];
                 d_cpu_fx->size[0] = 1;
                 d_cpu_fx->size[1] = cpu_dv15->size[1];
-                emxEnsureCapacity_real_T(d_cpu_fx, i, &bb_emlrtRTEI);
-                if (!d_fx_dirtyOnCpu) {
+                emxEnsureCapacity_real_T(d_cpu_fx, j, &ab_emlrtRTEI);
+                if (!d_fx_outdatedOnGpu) {
                   gpuEmxEnsureCapacity_real_T(d_cpu_fx, &gpu_fx);
                 }
 
-                k = cpu_dv15->size[1] - 1;
-                b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k +
-                  1L), &grid, &block, 1024U, 65535U);
-                if (b_dirtyOnGpu) {
-                  if (d_fx_dirtyOnCpu) {
+                i = cpu_dv15->size[1] - 1;
+                validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+                  (i + 1L), &grid, &block, 1024U, 65535U);
+                if (validLaunchParams) {
+                  if (d_fx_outdatedOnGpu) {
                     gpuEmxMemcpyCpuToGpu_real_T(&gpu_fx, d_cpu_fx);
                   }
 
-                  ec_cwt_kernel59<<<grid, block>>>(gpu_xt, gpu_dv16, gpu_dv15, k,
+                  ec_cwt_kernel57<<<grid, block>>>(gpu_xt, gpu_dv16, gpu_dv15, i,
                     gpu_fx);
-                  d_fx_dirtyOnGpu = true;
-                  d_fx_dirtyOnCpu = false;
+                  d_fx_outdatedOnGpu = false;
+                  d_fx_outdatedOnCpu = true;
                 }
               } else {
-                if (d_fx_dirtyOnGpu) {
+                if (d_fx_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(d_cpu_fx, &gpu_fx);
                 }
 
-                if (dv15_dirtyOnGpu) {
+                if (dv15_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv15, &gpu_dv15);
                 }
 
-                dv15_dirtyOnGpu = false;
-                if (dv16_dirtyOnGpu) {
+                dv15_outdatedOnCpu = false;
+                if (dv16_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(cpu_dv16, &gpu_dv16);
                 }
 
-                dv16_dirtyOnGpu = false;
-                if (d_xt_dirtyOnGpu) {
+                dv16_outdatedOnCpu = false;
+                if (d_xt_outdatedOnCpu) {
                   gpuEmxMemcpyGpuToCpu_real_T(d_cpu_xt, &gpu_xt);
                 }
 
-                d_xt_dirtyOnGpu = false;
-                binary_expand_op(d_cpu_fx, cpu_dv15, cpu_dv16, d_cpu_xt);
-                d_fx_dirtyOnCpu = true;
-                d_fx_dirtyOnGpu = false;
+                d_xt_outdatedOnCpu = false;
+                binary_expand_op_2(d_cpu_fx, cpu_dv15, cpu_dv16, d_cpu_xt);
+                d_fx_outdatedOnCpu = false;
+                d_fx_outdatedOnGpu = true;
               }
 
-              b_r = 0.0;
+              c_r = 0.0;
               nbytes = -1;
               for (k = 0; k < nsubs; k++) {
                 maxScale = 0.0;
                 r = 0.0;
                 for (j = 0; j < 15; j++) {
-                  if (d_fx_dirtyOnGpu) {
+                  if (d_fx_outdatedOnCpu) {
                     gpuEmxMemcpyGpuToCpu_real_T(d_cpu_fx, &gpu_fx);
                   }
 
                   maxScale += dv4[j] * d_cpu_fx->data[(nbytes + j) + 1];
-                  d_fx_dirtyOnGpu = false;
+                  d_fx_outdatedOnCpu = false;
                   r += dv5[j] * d_cpu_fx->data[(nbytes + j) + 1];
                 }
 
                 nbytes += 15;
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
+                subs_outdatedOnCpu = false;
                 halfh = (cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) / 2.0;
                 maxScale *= halfh;
                 qsub[k] = maxScale;
-                b_r += maxScale;
+                c_r += maxScale;
                 errsub[k] = r * halfh;
               }
 
-              intFsq = b_r + q_ok;
+              intFsq = c_r + q_ok;
               tol = std::fmax(1.0E-10, 1.0E-6 * std::abs(intFsq));
-              b_r = 2.0 * tol;
+              c_r = 2.0 * tol;
               r = 0.0;
               nbytes = 0;
               for (k = 0; k < nsubs; k++) {
                 maxScale = errsub[k];
                 halfh = std::abs(maxScale);
-                if (subs_dirtyOnGpu) {
+                if (subs_outdatedOnCpu) {
                   cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                              cudaMemcpyDeviceToHost);
                 }
 
-                subs_dirtyOnGpu = false;
-                if (halfh <= b_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
+                subs_outdatedOnCpu = false;
+                if (halfh <= c_r * ((cpu_subs[(k << 1) + 1] - cpu_subs[k << 1]) /
                                     2.0)) {
                   err_ok += maxScale;
                   q_ok += qsub[k];
@@ -6094,16 +6286,16 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                 }
               }
 
-              b_r = std::abs(err_ok) + r;
+              c_r = std::abs(err_ok) + r;
               if ((!std::isinf(intFsq)) && (!std::isnan(intFsq)) && ((!std::
-                    isinf(b_r)) && (!std::isnan(b_r))) && (nbytes != 0) &&
-                  (!(b_r <= tol))) {
+                    isinf(c_r)) && (!std::isnan(c_r))) && (nbytes != 0) &&
+                  (!(c_r <= tol))) {
                 nsubs = nbytes << 1;
                 if (nsubs > 650) {
                   exitg1 = 1;
                 } else {
                   for (k = 0; k < nbytes; k++) {
-                    if (subs_dirtyOnGpu) {
+                    if (subs_outdatedOnCpu) {
                       cudaMemcpy(cpu_subs, *gpu_subs, 10384UL,
                                  cudaMemcpyDeviceToHost);
                     }
@@ -6117,7 +6309,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
                       [(((nbytes - k) << 1) - 1) << 1];
                     cpu_subs[(((nbytes - k) << 1) - 2) << 1] = cpu_subs[((nbytes
                       - k) - 1) << 1];
-                    subs_dirtyOnGpu = false;
+                    subs_outdatedOnCpu = false;
                   }
                 }
               } else {
@@ -6135,28 +6327,28 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           emxFree_real_T(&h_cpu_x);
         }
 
-        b_r = std::sqrt(3.5421952306087032 * (intDsq / intFsq));
+        c_r = std::sqrt(3.5421952306087032 * (intDsq / intFsq));
       }
-      break;
-
-     case 1:
+    } else if (cpu_wav[0] == 'a') {
       a = 6.0;
-      b_r = 1.4142135623730951;
-      break;
-
-     case 2:
+      c_r = 1.4142135623730951;
+    } else {
       a = 5.0;
-      b_r = 5.847705;
-      break;
+      c_r = 5.847705;
     }
 
-    maxScale = static_cast<real_T>(cpu_x->size[0]) / (b_r * 2.0);
+    maxScale = static_cast<real_T>(cpu_x->size[0]) / (c_r * 2.0);
     first_iteration = false;
     bcoef = 0;
     do {
       exitg1 = 0;
       if (bcoef + 1 < 6) {
-        if (cpu_wav[bcoef] != cv4[bcoef]) {
+        if (b_outdatedOnCpu) {
+          cudaMemcpy(cpu_wname, *gpu_wname, 5UL, cudaMemcpyDeviceToHost);
+        }
+
+        b_outdatedOnCpu = false;
+        if (cv4[bcoef] != cpu_wname[bcoef]) {
           exitg1 = 1;
         } else {
           bcoef++;
@@ -6168,12 +6360,12 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     } while (exitg1 == 0);
 
     if (first_iteration) {
-      k = 0;
+      i = 0;
     } else {
-      k = -1;
+      i = -1;
     }
 
-    if (k == 0) {
+    if (i == 0) {
       r = 2.0 * (static_cast<real_T>(fb_CutOff) / 100.0);
       if (r - 0.0050536085896138528 * rt_powd_snf(a, 20.0) * std::exp
           (-rt_powd_snf(a, 3.0)) >= 0.0) {
@@ -6185,10 +6377,10 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         }
       } else {
         omegac = 9.0856029641606977;
-        b_r = r - 0.0050536085896138528 * rt_powd_snf(a, 20.0) * std::exp
+        c_r = r - 0.0050536085896138528 * rt_powd_snf(a, 20.0) * std::exp
           (-rt_powd_snf(a, 3.0));
         q_ok = r;
-        if (b_r == 0.0) {
+        if (c_r == 0.0) {
           omegac = a;
         } else {
           err_ok = r;
@@ -6199,7 +6391,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           while ((!exitg2) && ((q_ok != 0.0) && (a != omegac))) {
             if ((q_ok > 0.0) == (err_ok > 0.0)) {
               intFsq = a;
-              err_ok = b_r;
+              err_ok = c_r;
               d = omegac - a;
               intDsq = d;
             }
@@ -6208,9 +6400,9 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
               a = omegac;
               omegac = intFsq;
               intFsq = a;
-              b_r = q_ok;
+              c_r = q_ok;
               q_ok = err_ok;
-              err_ok = b_r;
+              err_ok = c_r;
             }
 
             m = 0.5 * (intFsq - omegac);
@@ -6218,33 +6410,33 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
             if ((std::abs(m) <= toler) || (q_ok == 0.0)) {
               exitg2 = true;
             } else {
-              if ((std::abs(intDsq) < toler) || (std::abs(b_r) <= std::abs(q_ok)))
+              if ((std::abs(intDsq) < toler) || (std::abs(c_r) <= std::abs(q_ok)))
               {
                 d = m;
                 intDsq = m;
               } else {
-                s = q_ok / b_r;
+                s = q_ok / c_r;
                 if (a == intFsq) {
-                  b_r = 2.0 * m * s;
+                  c_r = 2.0 * m * s;
                   tol = 1.0 - s;
                 } else {
-                  tol = b_r / err_ok;
-                  c_r = q_ok / err_ok;
-                  b_r = s * (2.0 * m * tol * (tol - c_r) - (omegac - a) * (c_r -
+                  tol = c_r / err_ok;
+                  b_r = q_ok / err_ok;
+                  c_r = s * (2.0 * m * tol * (tol - b_r) - (omegac - a) * (b_r -
                               1.0));
-                  tol = (tol - 1.0) * (c_r - 1.0) * (s - 1.0);
+                  tol = (tol - 1.0) * (b_r - 1.0) * (s - 1.0);
                 }
 
-                if (b_r > 0.0) {
+                if (c_r > 0.0) {
                   tol = -tol;
                 } else {
-                  b_r = -b_r;
+                  c_r = -c_r;
                 }
 
-                if ((2.0 * b_r < 3.0 * m * tol - std::abs(toler * tol)) && (b_r <
+                if ((2.0 * c_r < 3.0 * m * tol - std::abs(toler * tol)) && (c_r <
                      std::abs(0.5 * intDsq * tol))) {
                   intDsq = d;
-                  d = b_r / tol;
+                  d = c_r / tol;
                 } else {
                   d = m;
                   intDsq = m;
@@ -6252,7 +6444,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
               }
 
               a = omegac;
-              b_r = q_ok;
+              c_r = q_ok;
               if (std::abs(d) > toler) {
                 omegac += d;
               } else if (omegac > intFsq) {
@@ -6290,62 +6482,57 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
       }
     }
 
-    emxInit_real_T(&g_cpu_y, 2, &vb_emlrtRTEI, true);
+    emxInit_real_T(&g_cpu_y, 2, &wb_emlrtRTEI, true);
     r = std::fmax(tol, 1.0 / fb_VoicesPerOctave) * fb_VoicesPerOctave;
     if (std::isnan(r)) {
-      i = g_cpu_y->size[0] * g_cpu_y->size[1];
+      j = g_cpu_y->size[0] * g_cpu_y->size[1];
       g_cpu_y->size[0] = 1;
       g_cpu_y->size[1] = 1;
-      emxEnsureCapacity_real_T(g_cpu_y, i, &i_emlrtRTEI);
+      emxEnsureCapacity_real_T(g_cpu_y, j, &h_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(g_cpu_y, &d_gpu_y);
-      g_cpu_y->data[0] = rtNaN;
-      b_y_dirtyOnCpu = true;
+      ec_cwt_kernel60<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(d_gpu_y);
     } else if (r < 0.0) {
       g_cpu_y->size[0] = 1;
       g_cpu_y->size[1] = 0;
     } else {
-      i = g_cpu_y->size[0] * g_cpu_y->size[1];
+      j = g_cpu_y->size[0] * g_cpu_y->size[1];
       g_cpu_y->size[0] = 1;
       g_cpu_y->size[1] = static_cast<int32_T>(r) + 1;
-      emxEnsureCapacity_real_T(g_cpu_y, i, &i_emlrtRTEI);
+      emxEnsureCapacity_real_T(g_cpu_y, j, &h_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(g_cpu_y, &d_gpu_y);
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>
-        (static_cast<int64_T>(r) + 1L), &grid, &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        ec_cwt_kernel61<<<grid, block>>>(r, d_gpu_y);
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(
+        static_cast<int64_T>(r) + 1L), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_cwt_kernel59<<<grid, block>>>(r, d_gpu_y);
       }
     }
 
     emxInit_real_T(&h_cpu_y, 2, &xb_emlrtRTEI, true);
-    i = h_cpu_y->size[0] * h_cpu_y->size[1];
+    j = h_cpu_y->size[0] * h_cpu_y->size[1];
     h_cpu_y->size[0] = 1;
     h_cpu_y->size[1] = g_cpu_y->size[1];
-    emxEnsureCapacity_real_T(h_cpu_y, i, &j_emlrtRTEI);
+    emxEnsureCapacity_real_T(h_cpu_y, j, &i_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(h_cpu_y, &e_gpu_y);
     bcoef = g_cpu_y->size[1];
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (b_y_dirtyOnCpu) {
-        gpuEmxMemcpyCpuToGpu_real_T(&d_gpu_y, g_cpu_y);
-      }
-
-      ec_cwt_kernel62<<<grid, block>>>(d_gpu_y, rt_powd_snf(2.0, 1.0 /
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel61<<<grid, block>>>(d_gpu_y, rt_powd_snf(2.0, 1.0 /
         fb_VoicesPerOctave), bcoef, e_gpu_y);
     }
 
     emxFree_real_T(&g_cpu_y);
-    i = cpu_fb_Scales->size[0] * cpu_fb_Scales->size[1];
+    j = cpu_fb_Scales->size[0] * cpu_fb_Scales->size[1];
     cpu_fb_Scales->size[0] = 1;
     cpu_fb_Scales->size[1] = h_cpu_y->size[1];
-    emxEnsureCapacity_real_T(cpu_fb_Scales, i, &k_emlrtRTEI);
+    emxEnsureCapacity_real_T(cpu_fb_Scales, j, &j_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_fb_Scales, &gpu_fb_Scales);
     bcoef = h_cpu_y->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef + 1L),
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef + 1L),
       &grid, &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel63<<<grid, block>>>(e_gpu_y, halfh, bcoef, gpu_fb_Scales);
-      fb_Scales_dirtyOnGpu = true;
+    if (validLaunchParams) {
+      ec_cwt_kernel62<<<grid, block>>>(e_gpu_y, halfh, bcoef, gpu_fb_Scales);
+      fb_Scales_outdatedOnCpu = true;
     }
 
     emxFree_real_T(&h_cpu_y);
@@ -6356,7 +6543,7 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   do {
     exitg1 = 0;
     if (bcoef + 1 < 6) {
-      if (cpu_cv[static_cast<int32_T>(b[bcoef])] != cpu_cv[static_cast<int32_T>
+      if (cpu_cv[static_cast<int32_T>(b_b[bcoef])] != cpu_cv[static_cast<int32_T>
           (cv3[bcoef])]) {
         exitg1 = 1;
       } else {
@@ -6368,346 +6555,345 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     }
   } while (exitg1 == 0);
 
-  emxInit_real_T(&cpu_psidft, 2, &sb_emlrtRTEI, true);
-  emxInit_real_T(&cpu_f, 2, &tb_emlrtRTEI, true);
+  emxInit_real_T(&cpu_psidft, 2, &rb_emlrtRTEI, true);
+  emxInit_real_T(&cpu_f, 2, &sb_emlrtRTEI, true);
   if (first_iteration) {
-    emxInit_real_T(&cpu_somega, 2, &ub_emlrtRTEI, true);
+    emxInit_real_T(&cpu_somega, 2, &tb_emlrtRTEI, true);
     if (cpu_fb_Scales->size[1] == 1) {
-      i = cpu_somega->size[0] * cpu_somega->size[1];
+      j = cpu_somega->size[0] * cpu_somega->size[1];
       cpu_somega->size[0] = 1;
-      if (cpu_omega->size[1] == 1) {
+      if (cpu_fb_Omega->size[1] == 1) {
         cpu_somega->size[1] = 1;
       } else {
-        cpu_somega->size[1] = cpu_omega->size[1];
+        cpu_somega->size[1] = cpu_fb_Omega->size[1];
       }
 
-      emxEnsureCapacity_real_T(cpu_somega, i, &o_emlrtRTEI);
+      emxEnsureCapacity_real_T(cpu_somega, j, &n_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(cpu_somega, &gpu_somega);
-      bcoef = (cpu_omega->size[1] != 1);
+      bcoef = (cpu_fb_Omega->size[1] != 1);
       nbytes = cpu_somega->size[1] - 1;
       for (k = 0; k <= nbytes; k++) {
-        if (fb_Scales_dirtyOnGpu) {
+        if (fb_Scales_outdatedOnCpu) {
           gpuEmxMemcpyGpuToCpu_real_T(cpu_fb_Scales, &gpu_fb_Scales);
         }
 
-        fb_Scales_dirtyOnGpu = false;
-        if (omega_dirtyOnGpu) {
-          gpuEmxMemcpyGpuToCpu_real_T(cpu_omega, &gpu_omega);
+        fb_Scales_outdatedOnCpu = false;
+        if (wav_outdatedOnCpu) {
+          gpuEmxMemcpyGpuToCpu_real_T(cpu_fb_Omega, &gpu_fb_Omega);
         }
 
-        omega_dirtyOnGpu = false;
-        cpu_somega->data[k] = cpu_fb_Scales->data[0] * cpu_omega->data[bcoef * k];
-        somega_dirtyOnCpu = true;
+        wav_outdatedOnCpu = false;
+        cpu_somega->data[k] = cpu_fb_Scales->data[0] * cpu_fb_Omega->data[bcoef *
+          k];
+        somega_outdatedOnGpu = true;
       }
     } else {
-      i = cpu_somega->size[0] * cpu_somega->size[1];
+      j = cpu_somega->size[0] * cpu_somega->size[1];
       cpu_somega->size[0] = cpu_fb_Scales->size[1];
-      cpu_somega->size[1] = cpu_omega->size[1];
-      emxEnsureCapacity_real_T(cpu_somega, i, &n_emlrtRTEI);
+      cpu_somega->size[1] = cpu_fb_Omega->size[1];
+      emxEnsureCapacity_real_T(cpu_somega, j, &m_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(cpu_somega, &gpu_somega);
-      j = cpu_omega->size[1];
-      k = cpu_fb_Scales->size[1] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>((k + 1L) * j),
-        &grid, &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        ec_cwt_kernel70<<<grid, block>>>(gpu_omega, gpu_fb_Scales, k, j,
+      k = cpu_fb_Omega->size[1];
+      i = cpu_fb_Scales->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L) *
+        k), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_cwt_kernel71<<<grid, block>>>(gpu_fb_Omega, gpu_fb_Scales, i, k,
           gpu_somega, cpu_somega->size[0U]);
-        somega_dirtyOnGpu = true;
+        somega_outdatedOnCpu = true;
       }
     }
 
     bcoef = cpu_somega->size[0] * cpu_somega->size[1];
     for (k = 0; k < 2; k++) {
       cpu_xSize[k] = static_cast<uint32_T>(cpu_somega->size[k]);
-      xSize_dirtyOnCpu = true;
+      xSize_outdatedOnGpu = true;
     }
 
-    emxInit_real_T(&cpu_absomega, 2, &wb_emlrtRTEI, true);
-    i = cpu_absomega->size[0] * cpu_absomega->size[1];
+    emxInit_real_T(&cpu_absomega, 2, &ub_emlrtRTEI, true);
+    j = cpu_absomega->size[0] * cpu_absomega->size[1];
     cpu_absomega->size[0] = static_cast<int32_T>(cpu_xSize[0]);
     cpu_absomega->size[1] = static_cast<int32_T>(cpu_xSize[1]);
-    emxEnsureCapacity_real_T(cpu_absomega, i, &s_emlrtRTEI);
+    emxEnsureCapacity_real_T(cpu_absomega, j, &r_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_absomega, &gpu_absomega);
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (somega_dirtyOnCpu) {
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      if (somega_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_somega, cpu_somega);
       }
 
-      somega_dirtyOnCpu = false;
-      ec_cwt_kernel71<<<grid, block>>>(gpu_somega, bcoef, gpu_absomega);
-      absomega_dirtyOnGpu = true;
+      somega_outdatedOnGpu = false;
+      ec_cwt_kernel72<<<grid, block>>>(gpu_somega, bcoef, gpu_absomega);
+      absomega_outdatedOnCpu = true;
     }
 
-    emxInit_real_T(&cpu_powscales, 2, &u_emlrtRTEI, true);
-    i = cpu_powscales->size[0] * cpu_powscales->size[1];
+    emxInit_real_T(&cpu_powscales, 2, &t_emlrtRTEI, true);
+    j = cpu_powscales->size[0] * cpu_powscales->size[1];
     cpu_powscales->size[0] = cpu_absomega->size[0];
     cpu_powscales->size[1] = cpu_absomega->size[1];
-    emxEnsureCapacity_real_T(cpu_powscales, i, &u_emlrtRTEI);
+    emxEnsureCapacity_real_T(cpu_powscales, j, &t_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_powscales, &gpu_powscales);
-    k = cpu_absomega->size[0] * cpu_absomega->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel72<<<grid, block>>>(gpu_absomega, k, gpu_powscales);
-      powscales_dirtyOnGpu = true;
+    i = cpu_absomega->size[0] * cpu_absomega->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel73<<<grid, block>>>(gpu_absomega, i, gpu_powscales);
+      powscales_outdatedOnCpu = true;
     }
 
     bcoef = cpu_absomega->size[0] * cpu_absomega->size[1];
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel73<<<grid, block>>>(bcoef, gpu_absomega);
-      absomega_dirtyOnGpu = true;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel74<<<grid, block>>>(bcoef, gpu_absomega);
+      absomega_outdatedOnCpu = true;
     }
 
-    emxInit_real_T(&j_cpu_x, 2, &y_emlrtRTEI, true);
+    emxInit_real_T(&j_cpu_x, 2, &x_emlrtRTEI, true);
     if ((cpu_absomega->size[0] == cpu_powscales->size[0]) && (cpu_absomega->
          size[1] == cpu_powscales->size[1])) {
-      i = j_cpu_x->size[0] * j_cpu_x->size[1];
+      j = j_cpu_x->size[0] * j_cpu_x->size[1];
       j_cpu_x->size[0] = cpu_absomega->size[0];
       j_cpu_x->size[1] = cpu_absomega->size[1];
-      emxEnsureCapacity_real_T(j_cpu_x, i, &y_emlrtRTEI);
+      emxEnsureCapacity_real_T(j_cpu_x, j, &x_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(j_cpu_x, &gpu_x);
-      k = cpu_absomega->size[0] * cpu_absomega->size[1] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-        &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        ec_cwt_kernel74<<<grid, block>>>(gpu_powscales, gpu_absomega, k, gpu_x);
-        e_x_dirtyOnGpu = true;
+      i = cpu_absomega->size[0] * cpu_absomega->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_cwt_kernel75<<<grid, block>>>(gpu_powscales, gpu_absomega, i, gpu_x);
+        e_x_outdatedOnCpu = true;
       }
     } else {
-      if (absomega_dirtyOnGpu) {
+      if (absomega_outdatedOnCpu) {
         gpuEmxMemcpyGpuToCpu_real_T(cpu_absomega, &gpu_absomega);
       }
 
-      if (powscales_dirtyOnGpu) {
+      if (powscales_outdatedOnCpu) {
         gpuEmxMemcpyGpuToCpu_real_T(cpu_powscales, &gpu_powscales);
       }
 
-      b_binary_expand_op(j_cpu_x, cpu_absomega, cpu_powscales);
-      f_x_dirtyOnCpu = true;
+      binary_expand_op_1(j_cpu_x, cpu_absomega, cpu_powscales);
+      f_x_outdatedOnGpu = true;
     }
 
     emxFree_real_T(&cpu_powscales);
     emxFree_real_T(&cpu_absomega);
     bcoef = j_cpu_x->size[0] * j_cpu_x->size[1];
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (f_x_dirtyOnCpu) {
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      if (f_x_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_x, j_cpu_x);
       }
 
-      ec_cwt_kernel75<<<grid, block>>>(bcoef, gpu_x);
-      e_x_dirtyOnGpu = true;
-      f_x_dirtyOnCpu = false;
+      ec_cwt_kernel76<<<grid, block>>>(bcoef, gpu_x);
+      f_x_outdatedOnGpu = false;
+      e_x_outdatedOnCpu = true;
     }
 
     if ((j_cpu_x->size[0] == cpu_somega->size[0]) && (j_cpu_x->size[1] ==
          cpu_somega->size[1])) {
-      i = cpu_psidft->size[0] * cpu_psidft->size[1];
+      j = cpu_psidft->size[0] * cpu_psidft->size[1];
       cpu_psidft->size[0] = j_cpu_x->size[0];
       cpu_psidft->size[1] = j_cpu_x->size[1];
-      emxEnsureCapacity_real_T(cpu_psidft, i, &cb_emlrtRTEI);
+      emxEnsureCapacity_real_T(cpu_psidft, j, &bb_emlrtRTEI);
       gpuEmxEnsureCapacity_real_T(cpu_psidft, &gpu_psidft);
-      k = j_cpu_x->size[0] * j_cpu_x->size[1] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-        &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (somega_dirtyOnCpu) {
+      i = j_cpu_x->size[0] * j_cpu_x->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (somega_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_somega, cpu_somega);
         }
 
-        if (f_x_dirtyOnCpu) {
+        if (f_x_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_real_T(&gpu_x, j_cpu_x);
         }
 
-        ec_cwt_kernel76<<<grid, block>>>(gpu_somega, gpu_x, k, gpu_psidft);
+        ec_cwt_kernel77<<<grid, block>>>(gpu_somega, gpu_x, i, gpu_psidft);
       }
     } else {
-      if (e_x_dirtyOnGpu) {
+      if (e_x_outdatedOnCpu) {
         gpuEmxMemcpyGpuToCpu_real_T(j_cpu_x, &gpu_x);
       }
 
-      if (somega_dirtyOnGpu) {
+      if (somega_outdatedOnCpu) {
         gpuEmxMemcpyGpuToCpu_real_T(cpu_somega, &gpu_somega);
       }
 
       binary_expand_op(cpu_psidft, j_cpu_x, cpu_somega);
-      psidft_dirtyOnCpu = true;
+      psidft_outdatedOnGpu = true;
     }
 
     emxFree_real_T(&j_cpu_x);
     emxFree_real_T(&cpu_somega);
-    i = cpu_f->size[0] * cpu_f->size[1];
+    j = cpu_f->size[0] * cpu_f->size[1];
     cpu_f->size[0] = 1;
     cpu_f->size[1] = cpu_fb_Scales->size[1];
-    emxEnsureCapacity_real_T(cpu_f, i, &db_emlrtRTEI);
+    emxEnsureCapacity_real_T(cpu_f, j, &cb_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_f, &gpu_f);
-    k = cpu_fb_Scales->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel77<<<grid, block>>>(gpu_fb_Scales, k, gpu_f);
+    i = cpu_fb_Scales->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel78<<<grid, block>>>(gpu_fb_Scales, i, gpu_f);
     }
   } else {
-    i = cpu_psidft->size[0] * cpu_psidft->size[1];
+    j = cpu_psidft->size[0] * cpu_psidft->size[1];
     cpu_psidft->size[0] = cpu_fb_Scales->size[1];
-    cpu_psidft->size[1] = cpu_omega->size[1];
-    emxEnsureCapacity_real_T(cpu_psidft, i, &m_emlrtRTEI);
+    cpu_psidft->size[1] = cpu_fb_Omega->size[1];
+    emxEnsureCapacity_real_T(cpu_psidft, j, &l_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_psidft, &gpu_psidft);
-    k = cpu_fb_Scales->size[1] * cpu_omega->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel68<<<grid, block>>>(k, gpu_psidft);
+    i = cpu_fb_Scales->size[1] * cpu_fb_Omega->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel69<<<grid, block>>>(i, gpu_psidft);
     }
 
-    i = cpu_f->size[0] * cpu_f->size[1];
+    j = cpu_f->size[0] * cpu_f->size[1];
     cpu_f->size[0] = 1;
     cpu_f->size[1] = cpu_fb_Scales->size[1];
-    emxEnsureCapacity_real_T(cpu_f, i, &q_emlrtRTEI);
+    emxEnsureCapacity_real_T(cpu_f, j, &p_emlrtRTEI);
     gpuEmxEnsureCapacity_real_T(cpu_f, &gpu_f);
-    k = cpu_fb_Scales->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel69<<<grid, block>>>(gpu_fb_Scales, k, gpu_f);
+    i = cpu_fb_Scales->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel70<<<grid, block>>>(gpu_fb_Scales, i, gpu_f);
     }
   }
 
-  emxFree_real_T(&cpu_omega);
+  emxFree_real_T(&cpu_fb_Omega);
   emxFree_real_T(&cpu_fb_Scales);
-  i = cpu_f->size[0] * cpu_f->size[1];
+  j = cpu_f->size[0] * cpu_f->size[1];
   cpu_f->size[0] = 1;
-  emxEnsureCapacity_real_T(cpu_f, i, &r_emlrtRTEI);
+  emxEnsureCapacity_real_T(cpu_f, j, &q_emlrtRTEI);
   gpuEmxEnsureCapacity_real_T(cpu_f, &gpu_f);
-  i = cpu_f->size[1] - 1;
-  b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L), &grid,
+  j = cpu_f->size[1] - 1;
+  validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(j + 1L), &grid,
     &block, 1024U, 65535U);
-  if (b_dirtyOnGpu) {
-    ec_cwt_kernel78<<<grid, block>>>(fs, i, gpu_f);
+  if (validLaunchParams) {
+    ec_cwt_kernel79<<<grid, block>>>(fs, j, gpu_f);
   }
 
   // 'ec_cwt:30' freqs = centerFrequencies(fb);
-  i = cpu_freqs->size[0];
+  j = cpu_freqs->size[0];
   cpu_freqs->size[0] = cpu_f->size[1];
-  emxEnsureCapacity_real_T(cpu_freqs, i, &t_emlrtRTEI);
-  k = cpu_f->size[1] - 1;
-  b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
+  emxEnsureCapacity_real_T(cpu_freqs, j, &s_emlrtRTEI);
+  i = cpu_f->size[1] - 1;
+  validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L), &grid,
     &block, 1024U, 65535U);
-  if (b_dirtyOnGpu) {
+  if (validLaunchParams) {
     gpuEmxMemcpyCpuToGpu_real_T(&gpu_freqs, cpu_freqs);
-    ec_cwt_kernel79<<<grid, block>>>(gpu_f, k, gpu_freqs);
-    freqs_dirtyOnGpu = true;
+    ec_cwt_kernel80<<<grid, block>>>(gpu_f, i, gpu_freqs);
+    freqs_outdatedOnCpu = true;
   }
 
   // 'ec_cwt:31' nFreqs = uint32(numel(freqs));
   // 'ec_cwt:32' nFrames = uint32(numel(1:ds2:nFrames));
-  emxInit_real32_T(&cpu_fv, 2, &yb_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_fv, 2, &vb_emlrtRTEI, true);
   if (std::isnan(ds2)) {
-    i = cpu_fv->size[0] * cpu_fv->size[1];
+    j = cpu_fv->size[0] * cpu_fv->size[1];
     cpu_fv->size[1] = 1;
-    emxEnsureCapacity_real32_T(cpu_fv, i, &v_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_fv, j, &w_emlrtRTEI);
     gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv);
   } else if ((ds2 == 0.0F) || ((cpu_x->size[0] > 1) && (ds2 < 0.0F)) ||
              ((cpu_x->size[0] < 1) && (ds2 > 0.0F))) {
     cpu_fv->size[1] = 0;
   } else if (std::isinf(ds2)) {
-    i = cpu_fv->size[0] * cpu_fv->size[1];
+    j = cpu_fv->size[0] * cpu_fv->size[1];
     cpu_fv->size[1] = 1;
-    emxEnsureCapacity_real32_T(cpu_fv, i, &v_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_fv, j, &w_emlrtRTEI);
     gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv);
   } else {
-    i = cpu_x->size[0];
+    j = cpu_x->size[0];
     nsubs = cpu_fv->size[0] * cpu_fv->size[1];
     cpu_fv->size[0] = 1;
     cpu_fv->size[1] = static_cast<int32_T>((static_cast<real_T>(cpu_x->size[0])
       - 1.0) / ds2) + 1;
-    emxEnsureCapacity_real32_T(cpu_fv, nsubs, &v_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_fv, nsubs, &w_emlrtRTEI);
     gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv);
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>
-      (static_cast<int64_T>((static_cast<real_T>(i) - 1.0) / ds2) + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel80<<<grid, block>>>(ds2, i, gpu_fv);
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(static_cast<
+      int64_T>((static_cast<real_T>(j) - 1.0) / ds2) + 1L), &grid, &block, 1024U,
+      65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel81<<<grid, block>>>(ds2, j, gpu_fv);
     }
   }
 
   //  Preallocate
   // 'ec_cwt:35' xx = coder.nullcopy(zeros([nFrames nChs nFreqs],like=x));
-  i = cpu_xx->size[0] * cpu_xx->size[1] * cpu_xx->size[2];
+  j = cpu_xx->size[0] * cpu_xx->size[1] * cpu_xx->size[2];
   cpu_xx->size[0] = cpu_fv->size[1];
   emxFree_real32_T(&cpu_fv);
-  cpu_xx->size[1] = static_cast<int32_T>(nChs);
+  cpu_xx->size[1] = cpu_x->size[1];
   cpu_xx->size[2] = cpu_f->size[1];
   emxFree_real_T(&cpu_f);
-  emxEnsureCapacity_real32_T(cpu_xx, i, &ab_emlrtRTEI);
+  emxEnsureCapacity_real32_T(cpu_xx, j, &y_emlrtRTEI);
 
   //  Preallocate output
   //  xx = cell(1,nChs);
   //  CWT per channel
   // 'ec_cwt:39' coder.gpu.kernel(nChs,-1)
   // 'ec_cwt:40' for ch = 1:nChs
-  emxInit_creal32_T(&cpu_cfspos, 2, &kb_emlrtRTEI, true);
-  emxInit_real32_T(&cpu_psihat, 2, &eb_emlrtRTEI, true);
-  emxInit_real32_T(&cpu_xv, 2, &fb_emlrtRTEI, true);
-  emxInit_creal32_T(&cpu_xposdft, 2, &gb_emlrtRTEI, true);
-  emxInit_real32_T(&k_cpu_x, 2, &ib_emlrtRTEI, true);
-  emxInit_creal32_T(&cpu_cfsposdft, 2, &ec_emlrtRTEI, true);
-  emxInit_real32_T(&m_cpu_y, 2, &hc_emlrtRTEI, true);
-  emxInit_real32_T(&cpu_xCh, 2, &mb_emlrtRTEI, true);
-  emxInit_real32_T(&b_cpu_xCh, 2, &nb_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_cfspos, 2, &jb_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_psihat, 2, &db_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_xv, 2, &eb_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_xposdft, 2, &fb_emlrtRTEI, true);
+  emxInit_real32_T(&k_cpu_x, 2, &hb_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_cfsposdft, 2, &dc_emlrtRTEI, true);
+  emxInit_real32_T(&m_cpu_y, 2, &gc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_xCh, 2, &lb_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_xCh, 2, &mb_emlrtRTEI, true);
   e = computeEndIdx(1L, static_cast<int64_T>(nChs), 1L);
   for (int64_T ch{0L}; ch <= e; ch++) {
-    real32_T xtmp;
-
     // 'ec_cwt:41' coder.gpu.constantMemory(xx);
     // 'ec_cwt:42' xCh = abs(wt(fb,x(:,ch)))';
-    i = cpu_psihat->size[0] * cpu_psihat->size[1];
+    j = cpu_psihat->size[0] * cpu_psihat->size[1];
     cpu_psihat->size[0] = cpu_psidft->size[0];
     cpu_psihat->size[1] = cpu_psidft->size[1];
-    emxEnsureCapacity_real32_T(cpu_psihat, i, &eb_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_psihat, j, &db_emlrtRTEI);
     gpuEmxEnsureCapacity_real32_T(cpu_psihat, &gpu_psihat);
-    k = cpu_psidft->size[0] * cpu_psidft->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (psidft_dirtyOnCpu) {
+    i = cpu_psidft->size[0] * cpu_psidft->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      if (psidft_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real_T(&gpu_psidft, cpu_psidft);
       }
 
-      psidft_dirtyOnCpu = false;
-      ec_cwt_kernel81<<<grid, block>>>(gpu_psidft, k, gpu_psihat);
+      psidft_outdatedOnGpu = false;
+      ec_cwt_kernel82<<<grid, block>>>(gpu_psidft, i, gpu_psihat);
     }
 
-    i = cpu_xv->size[0] * cpu_xv->size[1];
+    j = cpu_xv->size[0] * cpu_xv->size[1];
     cpu_xv->size[0] = 1;
     cpu_xv->size[1] = cpu_x->size[0];
-    emxEnsureCapacity_real32_T(cpu_xv, i, &fb_emlrtRTEI);
-    if (!xv_dirtyOnCpu) {
+    emxEnsureCapacity_real32_T(cpu_xv, j, &eb_emlrtRTEI);
+    if (!xv_outdatedOnGpu) {
       gpuEmxEnsureCapacity_real32_T(cpu_xv, &gpu_xv);
     }
 
-    k = cpu_x->size[0] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (x_dirtyOnCpu) {
+    i = cpu_x->size[0] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      if (x_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real32_T(&b_gpu_x, cpu_x);
       }
 
-      x_dirtyOnCpu = false;
-      if (xv_dirtyOnCpu) {
+      x_outdatedOnGpu = false;
+      if (xv_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real32_T(&gpu_xv, cpu_xv);
       }
 
-      ec_cwt_kernel82<<<grid, block>>>(static_cast<int32_T>(ch + 1L), b_gpu_x, k,
+      ec_cwt_kernel83<<<grid, block>>>(static_cast<int32_T>(ch + 1L), b_gpu_x, i,
         gpu_xv, cpu_x->size[0U]);
-      xv_dirtyOnGpu = true;
-      xv_dirtyOnCpu = false;
+      xv_outdatedOnGpu = false;
+      xv_outdatedOnCpu = true;
     }
 
     if (fb_SignalPad > 0) {
@@ -6721,96 +6907,75 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         b_eint = -1;
       }
 
-      i = k_cpu_x->size[0] * k_cpu_x->size[1];
+      j = k_cpu_x->size[0] * k_cpu_x->size[1];
       k_cpu_x->size[0] = 1;
       k_cpu_x->size[1] = fb_SignalPad;
-      emxEnsureCapacity_real32_T(k_cpu_x, i, &ib_emlrtRTEI);
-      if (!g_x_dirtyOnCpu) {
-        gpuEmxEnsureCapacity_real32_T(k_cpu_x, &c_gpu_x);
-      }
-
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(fb_SignalPad),
-        &grid, &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (x_dirtyOnCpu) {
+      emxEnsureCapacity_real32_T(k_cpu_x, j, &hb_emlrtRTEI);
+      gpuEmxEnsureCapacity_real32_T(k_cpu_x, &c_gpu_x);
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>
+        (fb_SignalPad), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (x_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_real32_T(&b_gpu_x, cpu_x);
         }
 
-        x_dirtyOnCpu = false;
-        if (g_x_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_real32_T(&c_gpu_x, k_cpu_x);
-        }
-
-        ec_cwt_kernel83<<<grid, block>>>(static_cast<int32_T>(ch + 1L), b_gpu_x,
+        x_outdatedOnGpu = false;
+        ec_cwt_kernel84<<<grid, block>>>(static_cast<int32_T>(ch + 1L), b_gpu_x,
           fb_SignalPad, c_gpu_x, cpu_x->size[0U]);
-        f_x_dirtyOnGpu = true;
-        g_x_dirtyOnCpu = false;
       }
 
       bcoef = fb_SignalPad >> 1;
-      for (k = 0; k < bcoef; k++) {
-        nbytes = (fb_SignalPad - k) - 1;
-        if (f_x_dirtyOnGpu) {
-          gpuEmxMemcpyGpuToCpu_real32_T(k_cpu_x, &c_gpu_x);
-        }
-
-        xtmp = k_cpu_x->data[k];
-        k_cpu_x->data[k] = k_cpu_x->data[nbytes];
-        k_cpu_x->data[nbytes] = xtmp;
-        g_x_dirtyOnCpu = true;
-        f_x_dirtyOnGpu = false;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_cwt_kernel85<<<grid, block>>>(fb_SignalPad, bcoef, c_gpu_x);
       }
 
-      i = cpu_xv->size[0] * cpu_xv->size[1];
+      j = cpu_xv->size[0] * cpu_xv->size[1];
       cpu_xv->size[0] = 1;
       cpu_xv->size[1] = ((cpu_x->size[0] + k_cpu_x->size[1]) + div_s32(nsubs -
         eint, b_eint)) + 1;
-      emxEnsureCapacity_real32_T(cpu_xv, i, &jb_emlrtRTEI);
-      if (!xv_dirtyOnCpu) {
+      emxEnsureCapacity_real32_T(cpu_xv, j, &ib_emlrtRTEI);
+      if (!xv_outdatedOnGpu) {
         gpuEmxEnsureCapacity_real32_T(cpu_xv, &gpu_xv);
       }
 
-      j = k_cpu_x->size[1];
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(j), &grid,
+      k = k_cpu_x->size[1];
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(k), &grid,
         &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (g_x_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_real32_T(&c_gpu_x, k_cpu_x);
-        }
-
-        g_x_dirtyOnCpu = false;
-        if (xv_dirtyOnCpu) {
+      if (validLaunchParams) {
+        if (xv_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_real32_T(&gpu_xv, cpu_xv);
         }
 
-        ec_cwt_kernel84<<<grid, block>>>(c_gpu_x, j, gpu_xv);
-        xv_dirtyOnGpu = true;
-        xv_dirtyOnCpu = false;
+        ec_cwt_kernel86<<<grid, block>>>(c_gpu_x, k, gpu_xv);
+        xv_outdatedOnGpu = false;
+        xv_outdatedOnCpu = true;
       }
 
-      j = cpu_x->size[0];
-      for (i = 0; i < j; i++) {
-        if (xv_dirtyOnGpu) {
+      k = cpu_x->size[0];
+      for (j = 0; j < k; j++) {
+        if (xv_outdatedOnCpu) {
           gpuEmxMemcpyGpuToCpu_real32_T(cpu_xv, &gpu_xv);
         }
 
-        cpu_xv->data[i + k_cpu_x->size[1]] = cpu_x->data[i + cpu_x->size[0] * (
+        cpu_xv->data[j + k_cpu_x->size[1]] = cpu_x->data[j + cpu_x->size[0] * (
           static_cast<int32_T>(ch + 1L) - 1)];
-        xv_dirtyOnCpu = true;
-        xv_dirtyOnGpu = false;
+        xv_outdatedOnCpu = false;
+        xv_outdatedOnGpu = true;
       }
 
-      j = div_s32(nsubs - eint, b_eint);
-      for (i = 0; i <= j; i++) {
-        if (xv_dirtyOnGpu) {
+      k = div_s32(nsubs - eint, b_eint);
+      for (j = 0; j <= k; j++) {
+        if (xv_outdatedOnCpu) {
           gpuEmxMemcpyGpuToCpu_real32_T(cpu_xv, &gpu_xv);
         }
 
-        cpu_xv->data[(i + cpu_x->size[0]) + k_cpu_x->size[1]] = cpu_x->data
-          [(eint + b_eint * i) + cpu_x->size[0] * (static_cast<int32_T>(ch + 1L)
+        cpu_xv->data[(j + cpu_x->size[0]) + k_cpu_x->size[1]] = cpu_x->data
+          [(eint + b_eint * j) + cpu_x->size[0] * (static_cast<int32_T>(ch + 1L)
           - 1)];
-        xv_dirtyOnCpu = true;
-        xv_dirtyOnGpu = false;
+        xv_outdatedOnCpu = false;
+        xv_outdatedOnGpu = true;
       }
     }
 
@@ -6819,87 +6984,63 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
       cufftHandle b_fftPlanHandle;
       cufftType b_fftType;
       int fftDirection;
-      i = cpu_xposdft->size[0] * cpu_xposdft->size[1];
+      j = cpu_xposdft->size[0] * cpu_xposdft->size[1];
       cpu_xposdft->size[0] = 1;
       cpu_xposdft->size[1] = cpu_xv->size[1];
-      emxEnsureCapacity_creal32_T(cpu_xposdft, i, &gb_emlrtRTEI);
-      if (!xposdft_dirtyOnCpu) {
-        gpuEmxEnsureCapacity_creal32_T(cpu_xposdft, &gpu_xposdft);
-      }
-
-      k = cpu_xv->size[1] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-        &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (xv_dirtyOnCpu) {
+      emxEnsureCapacity_creal32_T(cpu_xposdft, j, &fb_emlrtRTEI);
+      gpuEmxEnsureCapacity_creal32_T(cpu_xposdft, &gpu_xposdft);
+      i = cpu_xv->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (xv_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_real32_T(&gpu_xv, cpu_xv);
         }
 
-        xv_dirtyOnCpu = false;
-        if (xposdft_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_xposdft, cpu_xposdft);
-        }
-
-        ec_cwt_kernel85<<<grid, block>>>(gpu_xv, k, gpu_xposdft);
-        xposdft_dirtyOnCpu = false;
+        xv_outdatedOnGpu = false;
+        ec_cwt_kernel88<<<grid, block>>>(gpu_xv, i, gpu_xposdft);
       }
 
       nbytes = cpu_xposdft->size[1];
       fftDirection = CUFFT_FORWARD;
       b_fftType = CUFFT_C2C;
       b_fftPlanHandle = acquireCUFFTPlan(1, &nbytes, &nbytes, 1, 1, b_fftType, 1);
-      if (xposdft_dirtyOnCpu) {
-        gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_xposdft, cpu_xposdft);
-      }
-
       cufftExecC2C(b_fftPlanHandle, (cufftComplex *)&gpu_xposdft.data[0],
                    (cufftComplex *)&gpu_xposdft.data[0], fftDirection);
-      xposdft_dirtyOnCpu = false;
     } else {
       cufftHandle fftPlanHandle;
-      cufftType fftType;
       nbytes = cpu_xv->size[1];
       for (k = 0; k < 2; k++) {
         cpu_xSize[k] = static_cast<uint32_T>(cpu_xv->size[k]);
-        xSize_dirtyOnCpu = true;
+        xSize_outdatedOnGpu = true;
       }
 
-      i = cpu_xposdft->size[0] * cpu_xposdft->size[1];
+      cufftType fftType;
+      j = cpu_xposdft->size[0] * cpu_xposdft->size[1];
       cpu_xposdft->size[0] = 1;
       cpu_xposdft->size[1] = static_cast<int32_T>(cpu_xSize[1]);
-      emxEnsureCapacity_creal32_T(cpu_xposdft, i, &hb_emlrtRTEI);
-      if (!xposdft_dirtyOnCpu) {
-        gpuEmxEnsureCapacity_creal32_T(cpu_xposdft, &gpu_xposdft);
-      }
-
+      emxEnsureCapacity_creal32_T(cpu_xposdft, j, &gb_emlrtRTEI);
+      gpuEmxEnsureCapacity_creal32_T(cpu_xposdft, &gpu_xposdft);
       fftType = CUFFT_R2C;
       fftPlanHandle = acquireCUFFTPlan(1, &nbytes, &nbytes, 1, 1, fftType, 1);
-      if (xv_dirtyOnCpu) {
+      if (xv_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real32_T(&gpu_xv, cpu_xv);
       }
 
-      xv_dirtyOnCpu = false;
-      if (xposdft_dirtyOnCpu) {
-        gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_xposdft, cpu_xposdft);
-      }
-
+      xv_outdatedOnGpu = false;
       cufftExecR2C(fftPlanHandle, (cufftReal *)&gpu_xv.data[0], (cufftComplex *)
                    &gpu_xposdft.data[0]);
-      b_dirtyOnGpu = true;
-      xposdft_dirtyOnCpu = false;
       nbytes = static_cast<int32_T>(static_cast<real_T>(static_cast<int32_T>
         (cpu_xSize[1]) + 1) / 2.0);
-      for (nsubs = 0; nsubs <= nbytes - 2; nsubs++) {
-        if (b_dirtyOnGpu) {
-          gpuEmxMemcpyGpuToCpu_creal32_T(cpu_xposdft, &gpu_xposdft);
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(nbytes -
+        1L), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (xSize_outdatedOnGpu) {
+          cudaMemcpy(*gpu_xSize, cpu_xSize, 8UL, cudaMemcpyHostToDevice);
         }
 
-        cpu_xposdft->data[(static_cast<int32_T>(cpu_xSize[1]) - nsubs) - 1].re =
-          cpu_xposdft->data[nsubs + 1].re;
-        cpu_xposdft->data[(static_cast<int32_T>(cpu_xSize[1]) - nsubs) - 1].im =
-          -cpu_xposdft->data[nsubs + 1].im;
-        xposdft_dirtyOnCpu = true;
-        b_dirtyOnGpu = false;
+        xSize_outdatedOnGpu = false;
+        ec_cwt_kernel87<<<grid, block>>>(*gpu_xSize, nbytes, gpu_xposdft);
       }
     }
 
@@ -6910,11 +7051,11 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     }
 
     if (cpu_psihat->size[1] == 1) {
-      i = cpu_xposdft->size[1];
+      j = cpu_xposdft->size[1];
     } else if (cpu_xposdft->size[1] == cpu_psihat->size[1]) {
-      i = cpu_xposdft->size[1];
+      j = cpu_xposdft->size[1];
     } else {
-      i = bcoef;
+      j = bcoef;
     }
 
     nsubs = cpu_cfsposdft->size[0] * cpu_cfsposdft->size[1];
@@ -6933,21 +7074,16 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
       cpu_cfsposdft->size[1] = bcoef;
     }
 
-    emxEnsureCapacity_creal32_T(cpu_cfsposdft, nsubs, &o_emlrtRTEI);
+    emxEnsureCapacity_creal32_T(cpu_cfsposdft, nsubs, &n_emlrtRTEI);
     gpuEmxEnsureCapacity_creal32_T(cpu_cfsposdft, &gpu_cfsposdft);
-    if ((cpu_psihat->size[0] != 0) && (i != 0)) {
+    if ((cpu_psihat->size[0] != 0) && (j != 0)) {
       bcoef = (cpu_psihat->size[1] != 1);
-      nbytes = i - 1;
-      k = cpu_cfsposdft->size[0] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>((k + 1L) *
+      nbytes = j - 1;
+      i = cpu_cfsposdft->size[0] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L) *
         (nbytes + 1L)), &grid, &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (xposdft_dirtyOnCpu) {
-          gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_xposdft, cpu_xposdft);
-        }
-
-        xposdft_dirtyOnCpu = false;
-        ec_cwt_kernel86<<<grid, block>>>(gpu_xposdft, gpu_psihat, bcoef, k, i -
+      if (validLaunchParams) {
+        ec_cwt_kernel89<<<grid, block>>>(gpu_xposdft, gpu_psihat, bcoef, i, j -
           1, gpu_cfsposdft, cpu_psihat->size[0U], cpu_cfsposdft->size[0U]);
       }
     }
@@ -6955,42 +7091,43 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     if ((cpu_cfsposdft->size[0] == 0) || (cpu_cfsposdft->size[1] == 0)) {
       for (k = 0; k < 2; k++) {
         cpu_xSize[k] = static_cast<uint32_T>(cpu_cfsposdft->size[k]);
-        xSize_dirtyOnCpu = true;
+        xSize_outdatedOnGpu = true;
       }
 
-      if (xSize_dirtyOnCpu) {
+      if (xSize_outdatedOnGpu) {
         cudaMemcpy(*gpu_xSize, cpu_xSize, 8UL, cudaMemcpyHostToDevice);
       }
 
-      ec_cwt_kernel88<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_xSize,
+      ec_cwt_kernel91<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(*gpu_xSize,
         cpu_cfsposdft->size[1U]);
-      xSize_dirtyOnCpu = false;
-      i = cpu_cfspos->size[0] * cpu_cfspos->size[1];
+      xSize_outdatedOnGpu = false;
+      j = cpu_cfspos->size[0] * cpu_cfspos->size[1];
       cudaMemcpy(cpu_xSize, *gpu_xSize, 8UL, cudaMemcpyDeviceToHost);
       cpu_cfspos->size[0] = static_cast<int32_T>(cpu_xSize[0]);
       cpu_cfspos->size[1] = cpu_cfsposdft->size[1];
-      emxEnsureCapacity_creal32_T(cpu_cfspos, i, &kb_emlrtRTEI);
-      if (!cfspos_dirtyOnCpu) {
+      emxEnsureCapacity_creal32_T(cpu_cfspos, j, &jb_emlrtRTEI);
+      if (!cfspos_outdatedOnGpu) {
         gpuEmxEnsureCapacity_creal32_T(cpu_cfspos, &gpu_cfspos);
       }
 
-      k = static_cast<int32_T>(cpu_xSize[0]) * static_cast<int32_T>(cpu_xSize[1])
+      i = static_cast<int32_T>(cpu_xSize[0]) * static_cast<int32_T>(cpu_xSize[1])
         - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-        &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (cfspos_dirtyOnCpu) {
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (cfspos_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_cfspos, cpu_cfspos);
         }
 
-        ec_cwt_kernel89<<<grid, block>>>(k, gpu_cfspos);
-        cfspos_dirtyOnGpu = true;
-        cfspos_dirtyOnCpu = false;
+        ec_cwt_kernel92<<<grid, block>>>(i, gpu_cfspos);
+        cfspos_outdatedOnGpu = false;
+        cfspos_outdatedOnCpu = true;
       }
     } else {
       cufftHandle c_fftPlanHandle;
       cufftType c_fftType;
       int b_fftDirection;
+      real32_T cfsposdft_re;
       nbytes = cpu_cfsposdft->size[1];
       b_fftDirection = CUFFT_INVERSE;
       c_fftType = CUFFT_C2C;
@@ -6998,26 +7135,27 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         cpu_cfsposdft->size[0], 1, c_fftType, cpu_cfsposdft->size[0]);
       cufftExecC2C(c_fftPlanHandle, (cufftComplex *)&gpu_cfsposdft.data[0],
                    (cufftComplex *)&gpu_cfsposdft.data[0], b_fftDirection);
-      i = cpu_cfspos->size[0] * cpu_cfspos->size[1];
+      j = cpu_cfspos->size[0] * cpu_cfspos->size[1];
       cpu_cfspos->size[0] = cpu_cfsposdft->size[0];
       cpu_cfspos->size[1] = cpu_cfsposdft->size[1];
-      emxEnsureCapacity_creal32_T(cpu_cfspos, i, &kb_emlrtRTEI);
-      if (!cfspos_dirtyOnCpu) {
+      emxEnsureCapacity_creal32_T(cpu_cfspos, j, &jb_emlrtRTEI);
+      if (!cfspos_outdatedOnGpu) {
         gpuEmxEnsureCapacity_creal32_T(cpu_cfspos, &gpu_cfspos);
       }
 
-      xtmp = static_cast<real32_T>(cpu_cfsposdft->size[1]);
-      k = cpu_cfsposdft->size[0] * cpu_cfsposdft->size[1] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-        &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        if (cfspos_dirtyOnCpu) {
+      cfsposdft_re = static_cast<real32_T>(cpu_cfsposdft->size[1]);
+      i = cpu_cfsposdft->size[0] * cpu_cfsposdft->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        if (cfspos_outdatedOnGpu) {
           gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_cfspos, cpu_cfspos);
         }
 
-        ec_cwt_kernel87<<<grid, block>>>(xtmp, gpu_cfsposdft, k, gpu_cfspos);
-        cfspos_dirtyOnGpu = true;
-        cfspos_dirtyOnCpu = false;
+        ec_cwt_kernel90<<<grid, block>>>(cfsposdft_re, gpu_cfsposdft, i,
+          gpu_cfspos);
+        cfspos_outdatedOnGpu = false;
+        cfspos_outdatedOnCpu = true;
       }
     }
 
@@ -7032,25 +7170,25 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
         bcoef = static_cast<int32_T>(nChs);
       }
 
-      k = cpu_cfspos->size[0];
-      j = bcoef - nbytes;
-      for (i = 0; i < j; i++) {
-        for (nsubs = 0; nsubs < k; nsubs++) {
-          if (cfspos_dirtyOnGpu) {
+      i = cpu_cfspos->size[0];
+      k = bcoef - nbytes;
+      for (j = 0; j < k; j++) {
+        for (nsubs = 0; nsubs < i; nsubs++) {
+          if (cfspos_outdatedOnCpu) {
             gpuEmxMemcpyGpuToCpu_creal32_T(cpu_cfspos, &gpu_cfspos);
           }
 
-          cpu_cfspos->data[nsubs + k * i] = cpu_cfspos->data[nsubs +
-            cpu_cfspos->size[0] * (nbytes + i)];
-          cfspos_dirtyOnCpu = true;
-          cfspos_dirtyOnGpu = false;
+          cpu_cfspos->data[nsubs + i * j] = cpu_cfspos->data[nsubs +
+            cpu_cfspos->size[0] * (nbytes + j)];
+          cfspos_outdatedOnCpu = false;
+          cfspos_outdatedOnGpu = true;
         }
       }
 
-      i = cpu_cfspos->size[0] * cpu_cfspos->size[1];
+      j = cpu_cfspos->size[0] * cpu_cfspos->size[1];
       cpu_cfspos->size[1] = bcoef - nbytes;
-      emxEnsureCapacity_creal32_T(cpu_cfspos, i, &lb_emlrtRTEI);
-      if (!cfspos_dirtyOnCpu) {
+      emxEnsureCapacity_creal32_T(cpu_cfspos, j, &kb_emlrtRTEI);
+      if (!cfspos_outdatedOnGpu) {
         gpuEmxEnsureCapacity_creal32_T(cpu_cfspos, &gpu_cfspos);
       }
     }
@@ -7058,36 +7196,36 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     bcoef = cpu_cfspos->size[0] * cpu_cfspos->size[1];
     for (k = 0; k < 2; k++) {
       cpu_xSize[k] = static_cast<uint32_T>(cpu_cfspos->size[k]);
-      xSize_dirtyOnCpu = true;
+      xSize_outdatedOnGpu = true;
     }
 
-    i = m_cpu_y->size[0] * m_cpu_y->size[1];
+    j = m_cpu_y->size[0] * m_cpu_y->size[1];
     m_cpu_y->size[0] = static_cast<int32_T>(cpu_xSize[0]);
     m_cpu_y->size[1] = static_cast<int32_T>(cpu_xSize[1]);
-    emxEnsureCapacity_real32_T(m_cpu_y, i, &s_emlrtRTEI);
+    emxEnsureCapacity_real32_T(m_cpu_y, j, &r_emlrtRTEI);
     gpuEmxEnsureCapacity_real32_T(m_cpu_y, &c_gpu_y);
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(bcoef), &grid,
-      &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (cfspos_dirtyOnCpu) {
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(bcoef),
+      &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      if (cfspos_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_cfspos, cpu_cfspos);
       }
 
-      cfspos_dirtyOnCpu = false;
-      ec_cwt_kernel90<<<grid, block>>>(gpu_cfspos, bcoef, c_gpu_y);
+      cfspos_outdatedOnGpu = false;
+      ec_cwt_kernel93<<<grid, block>>>(gpu_cfspos, bcoef, c_gpu_y);
     }
 
-    i = cpu_xCh->size[0] * cpu_xCh->size[1];
+    j = cpu_xCh->size[0] * cpu_xCh->size[1];
     cpu_xCh->size[0] = m_cpu_y->size[1];
     cpu_xCh->size[1] = m_cpu_y->size[0];
-    emxEnsureCapacity_real32_T(cpu_xCh, i, &mb_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_xCh, j, &lb_emlrtRTEI);
     gpuEmxEnsureCapacity_real32_T(cpu_xCh, &gpu_xCh);
     bcoef = m_cpu_y->size[0] - 1;
-    k = m_cpu_y->size[1] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>((k + 1L) * (bcoef
-      + 1L)), &grid, &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      ec_cwt_kernel91<<<grid, block>>>(c_gpu_y, k, bcoef, gpu_xCh, cpu_xCh->
+    i = m_cpu_y->size[1] - 1;
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((i + 1L) *
+      (bcoef + 1L)), &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      ec_cwt_kernel94<<<grid, block>>>(c_gpu_y, i, bcoef, gpu_xCh, cpu_xCh->
         size[0U], m_cpu_y->size[0U]);
     }
 
@@ -7104,29 +7242,29 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
           1;
       }
 
-      k = cpu_xCh->size[1];
-      i = b_cpu_xCh->size[0] * b_cpu_xCh->size[1];
+      i = cpu_xCh->size[1];
+      j = b_cpu_xCh->size[0] * b_cpu_xCh->size[1];
       b_cpu_xCh->size[0] = div_s32(bcoef, nbytes) + 1;
       b_cpu_xCh->size[1] = cpu_xCh->size[1];
-      emxEnsureCapacity_real32_T(b_cpu_xCh, i, &nb_emlrtRTEI);
+      emxEnsureCapacity_real32_T(b_cpu_xCh, j, &mb_emlrtRTEI);
       gpuEmxEnsureCapacity_real32_T(b_cpu_xCh, &b_gpu_xCh);
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>((bcoef / nbytes
-        + 1L) * k), &grid, &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        ec_cwt_kernel92<<<grid, block>>>(gpu_xCh, nbytes, bcoef, k, b_gpu_xCh,
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((bcoef /
+        nbytes + 1L) * i), &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_cwt_kernel95<<<grid, block>>>(gpu_xCh, nbytes, bcoef, i, b_gpu_xCh,
           b_cpu_xCh->size[0U], cpu_xCh->size[0U]);
       }
 
-      i = cpu_xCh->size[0] * cpu_xCh->size[1];
+      j = cpu_xCh->size[0] * cpu_xCh->size[1];
       cpu_xCh->size[0] = b_cpu_xCh->size[0];
       cpu_xCh->size[1] = b_cpu_xCh->size[1];
-      emxEnsureCapacity_real32_T(cpu_xCh, i, &ob_emlrtRTEI);
+      emxEnsureCapacity_real32_T(cpu_xCh, j, &nb_emlrtRTEI);
       gpuEmxEnsureCapacity_real32_T(cpu_xCh, &gpu_xCh);
-      k = b_cpu_xCh->size[0] * b_cpu_xCh->size[1] - 1;
-      b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>(k + 1L), &grid,
-        &block, 1024U, 65535U);
-      if (b_dirtyOnGpu) {
-        ec_cwt_kernel93<<<grid, block>>>(b_gpu_xCh, k, gpu_xCh);
+      i = b_cpu_xCh->size[0] * b_cpu_xCh->size[1] - 1;
+      validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>(i + 1L),
+        &grid, &block, 1024U, 65535U);
+      if (validLaunchParams) {
+        ec_cwt_kernel96<<<grid, block>>>(b_gpu_xCh, i, gpu_xCh);
       }
 
       //  Downsample
@@ -7135,19 +7273,19 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
     // 'ec_cwt:46' xx(:,ch,:) = xCh;
     xx[0] = cpu_xx->size[0];
     xx[2] = cpu_xx->size[2];
-    k = xx[2] - 1;
+    i = xx[2] - 1;
     bcoef = xx[0] - 1;
-    b_dirtyOnGpu = mwGetLaunchParameters1D(static_cast<real_T>((bcoef + 1L) * (k
-      + 1L)), &grid, &block, 1024U, 65535U);
-    if (b_dirtyOnGpu) {
-      if (xx_dirtyOnCpu) {
+    validLaunchParams = mwGetLaunchParameters1D(static_cast<real_T>((bcoef + 1L)
+      * (i + 1L)), &grid, &block, 1024U, 65535U);
+    if (validLaunchParams) {
+      if (xx_outdatedOnGpu) {
         gpuEmxMemcpyCpuToGpu_real32_T(&gpu_xx, cpu_xx);
       }
 
-      ec_cwt_kernel94<<<grid, block>>>(gpu_xCh, xx[0], static_cast<int32_T>(ch +
+      ec_cwt_kernel97<<<grid, block>>>(gpu_xCh, xx[0], static_cast<int32_T>(ch +
         1L), xx[0] - 1, xx[2] - 1, gpu_xx, cpu_xx->size[0U], cpu_xx->size[1U]);
-      xx_dirtyOnGpu = true;
-      xx_dirtyOnCpu = false;
+      xx_outdatedOnGpu = false;
+      xx_outdatedOnCpu = true;
     }
 
     //  Copy to output matrix
@@ -7164,11 +7302,11 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   emxFree_creal32_T(&cpu_cfspos);
   emxFree_real_T(&cpu_psidft);
   emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
-  if (xx_dirtyOnGpu) {
+  if (xx_outdatedOnCpu) {
     gpuEmxMemcpyGpuToCpu_real32_T(cpu_xx, &gpu_xx);
   }
 
-  if (freqs_dirtyOnGpu) {
+  if (freqs_outdatedOnCpu) {
     gpuEmxMemcpyGpuToCpu_real_T(cpu_freqs, &gpu_freqs);
   }
 
@@ -7180,9 +7318,11 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   mwCudaFree(*gpu_freqrange);
   mwCudaFree(*gpu_NyquistRange);
   mwCudaFree(*gpu_wav);
-  gpuEmxFree_real_T(&gpu_omega);
-  gpuEmxFree_real_T(&gpu_r);
+  gpuEmxFree_int32_T(&gpu_omega_tmp1);
+  mwCudaFree(*gpu_wname);
+  gpuEmxFree_real_T(&gpu_omega_tmp2);
   mwCudaFree(*gpu_interval);
+  gpuEmxFree_real_T(&gpu_fb_Omega);
   mwCudaFree(*gpu_subs);
   gpuEmxFree_real_T(&gpu_fb_Scales);
   gpuEmxFree_real_T(&j_gpu_x);
@@ -7197,25 +7337,25 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   gpuEmxFree_real_T(&gpu_dv6);
   gpuEmxFree_real_T(&gpu_y);
   gpuEmxFree_real_T(&h_gpu_x);
-  gpuEmxFree_real_T(&b_gpu_y);
   gpuEmxFree_real_T(&i_gpu_x);
+  gpuEmxFree_real_T(&b_gpu_y);
   gpuEmxFree_real_T(&c_gpu_xt);
   gpuEmxFree_real_T(&gpu_dv10);
   gpuEmxFree_real_T(&c_gpu_fx);
   gpuEmxFree_real_T(&j_gpu_y);
-  gpuEmxFree_real_T(&d_gpu_y);
   gpuEmxFree_real_T(&gpu_dv12);
+  gpuEmxFree_real_T(&d_gpu_y);
   gpuEmxFree_real_T(&e_gpu_y);
   gpuEmxFree_real_T(&f_gpu_x);
-  gpuEmxFree_real_T(&gpu_psidft);
   gpuEmxFree_real_T(&g_gpu_x);
-  gpuEmxFree_real_T(&gpu_f);
   gpuEmxFree_real_T(&b_gpu_xt);
   gpuEmxFree_real_T(&g_gpu_y);
-  gpuEmxFree_real_T(&gpu_somega);
+  gpuEmxFree_real_T(&gpu_psidft);
   gpuEmxFree_real_T(&b_gpu_fx);
+  gpuEmxFree_real_T(&gpu_f);
   gpuEmxFree_real_T(&h_gpu_y);
   gpuEmxFree_real_T(&gpu_a);
+  gpuEmxFree_real_T(&gpu_somega);
   gpuEmxFree_real_T(&gpu_dv11);
   gpuEmxFree_real_T(&i_gpu_y);
   gpuEmxFree_real_T(&gpu_dv13);
@@ -7224,10 +7364,10 @@ void ec_cwt(const emxArray_real32_T *cpu_x, real_T fs, real_T cpu_fLims[2],
   gpuEmxFree_real_T(&d_gpu_x);
   gpuEmxFree_real_T(&e_gpu_x);
   gpuEmxFree_real_T(&gpu_xt);
-  gpuEmxFree_real_T(&gpu_powscales);
   gpuEmxFree_real_T(&gpu_dv15);
   gpuEmxFree_real_T(&gpu_fx);
   gpuEmxFree_real_T(&f_gpu_y);
+  gpuEmxFree_real_T(&gpu_powscales);
   gpuEmxFree_real_T(&gpu_dv16);
   gpuEmxFree_real32_T(&gpu_fv);
   gpuEmxFree_real_T(&gpu_x);
@@ -7257,7 +7397,7 @@ void ec_cwt_api(const mxArray * const prhs[5], int32_T nlhs, const mxArray *
   prhs_copy_idx_2 = emlrtProtectR2012b(prhs[2], 2, false, -1);
 
   // Marshall function inputs
-  emxInit_real32_T(&x, 2, &kc_emlrtRTEI, true);
+  emxInit_real32_T(&x, 2, &jc_emlrtRTEI, true);
   x->canFreeData = false;
   emlrt_marshallIn(emlrtAlias(prhs[0]), "x", x);
   fs = emlrt_marshallIn(emlrtAliasP(prhs[1]), "fs");
@@ -7266,8 +7406,8 @@ void ec_cwt_api(const mxArray * const prhs[5], int32_T nlhs, const mxArray *
   ds2 = c_emlrt_marshallIn(emlrtAliasP(prhs[4]), "ds2");
 
   // Invoke the target function
-  emxInit_real32_T(&xx, 3, &kc_emlrtRTEI, true);
-  emxInit_real_T(&freqs, 1, &kc_emlrtRTEI, true);
+  emxInit_real32_T(&xx, 3, &jc_emlrtRTEI, true);
+  emxInit_real_T(&freqs, 1, &jc_emlrtRTEI, true);
   ec_cwt(x, fs, *fLims, fOctave, ds2, xx, freqs);
   emxFree_real32_T(&x);
 
@@ -7290,12 +7430,11 @@ void ec_cwt_atexit()
   emlrtEnterRtStackR2012b(emlrtRootTLSGlobal);
   emlrtDestroyRootTLS(&emlrtRootTLSGlobal);
   emlrtExitTimeCleanup(&emlrtContextGlobal);
-  mwCudaFree(*cpu_cv_gpu_clone);
+  mwCudaFree(*global_gpu_cv);
 }
 
 void ec_cwt_initialize()
 {
-  mex_InitInfAndNan();
   mexFunctionCreateRootTLS();
   emlrtClearAllocCountR2012b(emlrtRootTLSGlobal, false, 0U, nullptr);
   emlrtEnterRtStackR2012b(emlrtRootTLSGlobal);

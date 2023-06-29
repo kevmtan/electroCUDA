@@ -19,7 +19,7 @@ arguments
     o.data string = ""                      % Path of libsvm-formatted data
     o.mdl string = ""                       % Path of thundersvm model
     o.pred string = ""                      % Path of predictions
-    o.binary string = ec_paths().thundersvm % thundersvm-train executable
+    o.binary string = ecu_paths().thundersvm % thundersvm-train executable
     o.rmData (1,1) logical = false          % Remove libsvm-formatted data from disk
 
     % Input output from "ec_thundersvm_train"

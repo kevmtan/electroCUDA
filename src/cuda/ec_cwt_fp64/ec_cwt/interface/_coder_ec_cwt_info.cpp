@@ -1,7 +1,6 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// Prerelease License - for engineering feedback and testing purposes
+// only. Not for sale.
 //
 // _coder_ec_cwt_info.cpp
 //
@@ -14,10 +13,10 @@
 #include "tmwtypes.h"
 
 // Function Declarations
-static const mxArray *emlrtMexFcnResolvedFunctionsInfo();
+static const mxArray *c_emlrtMexFcnResolvedFunctionsI();
 
 // Function Definitions
-static const mxArray *emlrtMexFcnResolvedFunctionsInfo()
+static const mxArray *c_emlrtMexFcnResolvedFunctionsI()
 {
   static const int32_T iv[2]{0, 1};
   const mxArray *m;
@@ -33,14 +32,20 @@ mxArray *emlrtMexFcnProperties()
   mxArray *xEntryPoints;
   mxArray *xInputs;
   mxArray *xResult;
-  const char_T *propFieldName[7]{
-      "Version",      "ResolvedFunctions", "Checksum",    "EntryPoints",
-      "CoverageInfo", "IsPolymorphic",     "PropertyList"};
-  const char_T *epFieldName[6]{
-      "Name",           "NumberOfInputs", "NumberOfOutputs",
-      "ConstantInputs", "FullPath",       "TimeStamp"};
+  const char_T *propFieldName[9]{"Version",
+                                 "ResolvedFunctions",
+                                 "Checksum",
+                                 "EntryPoints",
+                                 "CoverageInfo",
+                                 "IsPolymorphic",
+                                 "PropertyList",
+                                 "UUID",
+                                 "ClassEntryPointIsHandle"};
+  const char_T *epFieldName[8]{
+      "Name",     "NumberOfInputs", "NumberOfOutputs", "ConstantInputs",
+      "FullPath", "TimeStamp",      "Constructor",     "Visible"};
   xEntryPoints =
-      emlrtCreateStructMatrix(1, 1, 6, (const char_T **)&epFieldName[0]);
+      emlrtCreateStructMatrix(1, 1, 8, (const char_T **)&epFieldName[0]);
   xInputs = emlrtCreateLogicalMatrix(1, 5);
   emlrtSetField(xEntryPoints, 0, "Name", emlrtMxCreateString("ec_cwt"));
   emlrtSetField(xEntryPoints, 0, "NumberOfInputs",
@@ -53,12 +58,16 @@ mxArray *emlrtMexFcnProperties()
       emlrtMxCreateString("/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
                 emlrtMxCreateDoubleScalar(738984.66931712965));
+  emlrtSetField(xEntryPoints, 0, "Constructor",
+                emlrtMxCreateLogicalScalar(false));
+  emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));
   xResult =
-      emlrtCreateStructMatrix(1, 1, 7, (const char_T **)&propFieldName[0]);
-  emlrtSetField(xResult, 0, "Version",
-                emlrtMxCreateString("9.14.0.2206163 (R2023a)"));
+      emlrtCreateStructMatrix(1, 1, 9, (const char_T **)&propFieldName[0]);
+  emlrtSetField(
+      xResult, 0, "Version",
+      emlrtMxCreateString("23.2.0.2289345 (R2023b) Prerelease Update 1"));
   emlrtSetField(xResult, 0, "ResolvedFunctions",
-                (mxArray *)emlrtMexFcnResolvedFunctionsInfo());
+                (mxArray *)c_emlrtMexFcnResolvedFunctionsI());
   emlrtSetField(xResult, 0, "Checksum",
                 emlrtMxCreateString("UZNV6GSDjNHqUjgyPa3PcG"));
   emlrtSetField(xResult, 0, "EntryPoints", xEntryPoints);

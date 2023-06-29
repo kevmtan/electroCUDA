@@ -40,7 +40,7 @@ arguments
     o.std (1,1) logical = false    % Z-score predictors
     o.data string = ""             % Path of existing libsvm-formatted data
     o.mdl string = ""              % Path of existing thundersvm model
-    o.binary string = ec_paths().thundersvm + "thundersvm-train" % thundersvm-train executable
+    o.binary string = ecu_paths().thundersvm + "thundersvm-train" % thundersvm-train executable
     o.rmData (1,1) logical = false % Remove libsvm-formatted data from disk
 end
 

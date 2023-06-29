@@ -1,4 +1,4 @@
-function makeTrialNfo(sbj,bn,dirs,prompts)
+function ec_makeTrialNfo(sbj,bn,dirs,prompts)
 if 0
     %%
     sbj = 'S12_38_LK'; %#ok<UNRCH>

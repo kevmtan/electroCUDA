@@ -1,7 +1,6 @@
 //
-// Academic License - for use in teaching, academic research, and meeting
-// course requirements at degree granting institutions only.  Not for
-// government, commercial, or other organizational use.
+// Prerelease License - for engineering feedback and testing purposes
+// only. Not for sale.
 //
 // ec_cwt_types.h
 //

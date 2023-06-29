@@ -266,7 +266,7 @@ lgd = legend(conds2,"FontSize",oP.textsize+4,"Location","southeast","AutoUpdate"
 title(lgd,"Condition"); axis off; hold off;
 
 % Z-score colorbar
-colormap(flip(cbrewer2('RdBu'))); clim(oP.clim);
+colormap(oP.cmap); clim(oP.clim);
 lgd = colorbar(gca,"west","FontSize",oP.textsize+2); lgd.Label.String = "z-score";
 
 %% Total average spectral magnitude

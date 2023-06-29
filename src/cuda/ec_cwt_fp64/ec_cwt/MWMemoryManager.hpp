@@ -1,4 +1,4 @@
-// Copyright 2021 The MathWorks, Inc.
+// Copyright 2021-2023 The MathWorks, Inc.
 
 #ifndef MW_MEMORY_MANAGER_HPP
 #define MW_MEMORY_MANAGER_HPP
@@ -54,7 +54,7 @@ struct Action {
 class MemoryConfig {
   public:
     /**
-     * Describes the possible strategies for freeing GPU memory. 
+     * Describes the possible strategies for freeing GPU memory.
      */
     enum FreeMode {
         /**
@@ -86,18 +86,18 @@ class MemoryConfig {
                  FreeMode freeMode,
                  size_t minPoolSize,
                  size_t maxPoolSize);
-    
+
     MemoryConfig(size_t blockAlignment,
                  FreeMode freeMode,
                  const std::vector<size_t>& sizeLevels = DEFAULT_SIZE_LEVELS);
-    
+
     /**
      * Returns the memory block size required to contain memory of the given size.
      * @param size The size in bytes of the memory that must be contained.
      * @return A value greater than or equal to size.
      */
     size_t calculateBlockSize(size_t size) const;
-    
+
     /**
      * Returns the memory pool size required to contain memory of the given size.
      * @param size The size in bytes of the memory that must be contained.
@@ -106,7 +106,7 @@ class MemoryConfig {
     size_t calculatePoolSize(size_t size, MallocMode mode) const;
 
     /*
-     * Returns whether a block must be split to avod wasted space.
+     * Returns whether a block must be split to avoid wasted space.
      * @param blockSize The size of the existing free block in bytes.
      * @param requestedSize The size required
      */
@@ -114,7 +114,7 @@ class MemoryConfig {
 
     /**
      * Returns true if the memory manager should free GPU memory in empty pools
-     * after each cal to allocate. 
+     * after each cal to allocate.
      */
     bool mustFreeEmptyPoolsAfterAllocate() const;
 
@@ -125,20 +125,20 @@ class MemoryConfig {
     bool mustFreeEmptyPoolsAtTerminate() const;
 
     /**
-     * Updates the current size level of the config baed on values received from
+     * Updates the current size level of the config based on values received from
      * a call to #calculatePoolSize.
      */
     void update(size_t lastPoolSize, MallocMode lastMode);
-    
+
   protected:
     static const std::vector<size_t> DEFAULT_SIZE_LEVELS;
-    
+
     size_t roundUpPoolSizeWithLevel(size_t size, MallocMode mode) const;
 
     const size_t fBlockAlignment;
     const FreeMode fFreeMode;
     std::vector<size_t> fSizeLevels;
-    
+
     size_t fDiscreteSizeLevelIndex = 0;
     size_t fUnifiedSizeLevelIndex = 0;
 };
@@ -154,12 +154,12 @@ class Allocator {
      * @param mode The kind of GPU memory to allocate.
      */
     virtual cudaError_t rawMalloc(void** devPtr, size_t size, MallocMode mode) = 0;
-    
+
     /**
      * Deallocates the memory pointed to by devPtr.
      */
     virtual cudaError_t rawFree(void* devPtr) = 0;
-    
+
     /**
      * Populates freeMemory and totalMemory with the available memory and total memory
      * of the system, respectively. Both measurements are in bytes.
@@ -188,14 +188,14 @@ class ActionLogger {
     void logPreAllocate(size_t size, MallocMode mode);
     void logPostAllocate(void* devPtr);
     void logDeallocate(void* devPtr);
-    
+
   protected:
      void logAction(Action action);
      static const std::string& getMallocModeString(MallocMode mode);
-    
+
   private:
     void writeFileHeader();
-    
+
     const std::string fLogFileName;
     std::unordered_map<void*, int> fLogVarMap;
     int fCurrentLogVar = 0;
@@ -239,7 +239,7 @@ class MemoryBlock {
     /**
      * Splits this block into two.
      * Creates a new block with the specified size. Shrinks this block to
-     * accomidate the new block. The new block may be inserted before or
+     * accommodate the new block. The new block may be inserted before or
      * after this block, depending on the specified size.
      * @return The newly created block.
      */
@@ -256,19 +256,19 @@ class MemoryBlock {
     /**
      * Merges this block with the block after it.
      * This block will be resized to occupy the space taken up by both this
-     * block and the block after it. This bloc will take the next block's 
+     * block and the block after it. This bloc will take the next block's
      * place in order. The next block will not be changed.
      */
     void mergeWithNext();
 
   protected:
     /**
-     * Inserts this block before the specfied block. 
+     * Inserts this block before the specified block.
      */
     void insertBefore(MemoryBlock* block);
 
     /**
-     * Inserts this block after the specfied block. 
+     * Inserts this block after the specified block.
      */
     void insertAfter(MemoryBlock* block);
 
@@ -276,7 +276,7 @@ class MemoryBlock {
      * Resizes this block by either setting the block size or shifting the data pointer.
      */
     void resize(size_t size, ResizeMode mode);
-    
+
   private:
     MemoryPool* const fPool;
     void* fData;
@@ -291,11 +291,11 @@ class MemoryPool {
   public:
     typedef std::set<MemoryBlock*, MemoryBlock::PointerCompare> MemoryBlockSet;
     typedef MemoryBlockSet::iterator MemoryBlockIter;
-    
+
     MemoryPool(void* data, size_t size, Allocator& allocator,
                const MemoryConfig&, bool loggingEnabled = false);
     ~MemoryPool();
-    
+
     size_t getLargestFreeBlockSize() const;
 
     /**
@@ -304,7 +304,7 @@ class MemoryPool {
     bool hasAllocatedBlocks() const;
 
     /**
-     * Alocates a block of at least size bytes.
+     * Allocates a block of at least size bytes.
      */
     MemoryBlock* allocateBlock(size_t size);
 
@@ -313,7 +313,7 @@ class MemoryPool {
      * unallocated adjacent blocks.
      */
     void deallocateBlock(MemoryBlock* block);
-    
+
     /**
      * Returns the first block in the pool. The first block may change.
      */
@@ -328,7 +328,7 @@ class MemoryPool {
      *
      */
     void mergeBlock(MemoryBlock* memoryBlock);
-    
+
   private:
     void* const fData;
     const size_t fSize;
@@ -343,17 +343,21 @@ class MemoryManager {
   public:
     typedef std::unordered_map<void*, MemoryBlock*> BlockMap;
     typedef std::list<MemoryPool*> PoolList;
-    
+
     MemoryManager(Allocator& allocator,
                   const MemoryConfig& config,
                   const bool loggingEnabled,
                   const std::string& logFile = DEFAULT_LOG_FILE);
     ~MemoryManager();
-    
+
     // Logging methods
     void printMemoryMap();
     void printMemoryPools(std::ostream& os, const PoolList& pools);
     void printMemoryPoolBlocks(std::ostream& os, const MemoryPool* memoryPool);
+
+    size_t bytesAllocated() const;
+    size_t bytesUsed() const;
+    void freeEmptyPools();
 
     template<typename T>
     cudaError_t allocate(T** devPtr, size_t size, MallocMode mode) {
@@ -365,13 +369,12 @@ class MemoryManager {
     }
 
     cudaError_t  handleTerminate();
-    
+
   protected:
     cudaError_t allocateImpl(void** devPtr, const size_t size, const MallocMode mode);
     cudaError_t deallocateImpl(void* devPtr);
-    
+
     void deletePools();
-    void freeEmptyPools();
     MemoryPool* getFirstSuitableMemoryPool(size_t size, MallocMode mode) const;
 
     cudaError_t allocatePool(size_t size, MallocMode mode, MemoryPool*& pool);
@@ -383,7 +386,7 @@ class MemoryManager {
 
   private:
     static const std::string DEFAULT_LOG_FILE;
-    
+
     BlockMap fDataBlockMap;
     PoolList fDiscretePools;
     PoolList fUnifiedPools;
@@ -396,6 +399,11 @@ class MemoryManager {
 };
 
 MemoryManager& getMemoryManager();
+
+void setGpuRuntimeLog(bool aEnableGpuRuntimeLog);
+
+bool getGpuRuntimeLog();
+
 
 } // namespace gcmemory
 

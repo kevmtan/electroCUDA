@@ -1,4 +1,4 @@
-// Copyright 2021-2022 The MathWorks, Inc.
+// Copyright 2021-2023 The MathWorks, Inc.
 
 #include "MWMemoryManager.hpp"
 
@@ -9,7 +9,11 @@
 #include <iostream>
 #endif
 
-#ifdef MW_GPUCODER_RUNTIME_LOG
+#if defined(MW_GPUCODER_RUNTIME_LOG) || defined(MW_SINGLETON_MEMORY_MANAGER)
+#define MW_GPUCODER_RUNTIME_LOG_ENABLED
+#endif
+
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
 #include "MWRuntimeLogUtility.hpp"
 #include <iomanip>
 #endif
@@ -33,6 +37,12 @@
 
 namespace {
 
+#if defined(MW_GPUCODER_RUNTIME_LOG)
+bool gEnableGpuRuntimeLog = true;
+#else
+bool gEnableGpuRuntimeLog = false;
+#endif
+
 const char* MESSAGE_ID = "gpucoder:gpucoderMexMemoryError";
 const std::string MESSAGE_PREFIX = "GPU Coder Memory Manager: ";
 
@@ -49,7 +59,7 @@ void internalMessage(const std::string& message, const bool isError) {
         mexWarnMsgIdAndTxt(MESSAGE_ID, fullMessage.c_str());
 #else
         std::cout << fullMessage << std::endl;
-#endif    
+#endif
     }
 }
 
@@ -81,7 +91,7 @@ bool isPowerOf2(size_t value) {
 
 namespace gcmemory {
 
-#ifdef MW_GPUCODER_RUNTIME_LOG
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
 namespace {
 std::ostream& operator<<(std::ostream& ss, const MemoryBlock& block);
 std::string getSizeString(const size_t size);
@@ -212,11 +222,11 @@ void ActionLogger::logDeallocate(void* devPtr) {
 
 void ActionLogger::logAction(Action action) {
     writeFileHeader();
-    
+
     std::ofstream logFile;
     logFile.open(fLogFileName, std::ios::app);
     gcassert(logFile.is_open());
-    
+
     const std::string& type = action.type == ALLOCATE ? ALLOCATE_STRING : DEALLOCATE_STRING;
     const std::string& mode = action.type == ALLOCATE ? getMallocModeString(action.mode) : NA_STRING;
     logFile << type << DELIMITER
@@ -230,7 +240,7 @@ void ActionLogger::writeFileHeader() {
         std::ofstream logFile;
         logFile.open(fLogFileName);
         gcassert(logFile.is_open());
-        
+
         // Write header line
         logFile << "Action Type" << DELIMITER
                 << "Variable ID" << DELIMITER
@@ -261,23 +271,27 @@ cudaError_t CudaAllocator::rawMalloc(void** devPtr, size_t size, MallocMode mode
         status = cudaMallocManaged(devPtr, size);
         break;
     }
-#ifdef MW_GPUCODER_RUNTIME_LOG
-    const char* mallocModeStr = mode == DISCRETE ? "discrete" : "unified";
-    std::stringstream ss;
-    ss << "rawMalloc  CudaAllocator:      "
-       << " devPtr: " << std::setw(13) << *devPtr
-       << " size: " << getSizeString(size)
-       << " mode: " << std::setw(10) << mallocModeStr;
-    mwGpuCoderRuntimeLog(ss.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
+        const char* mallocModeStr = mode == DISCRETE ? "discrete" : "unified";
+        std::stringstream ss;
+        ss << "rawMalloc  CudaAllocator:      "
+        << " devPtr: " << std::setw(13) << *devPtr
+        << " size: " << getSizeString(size)
+        << " mode: " << std::setw(10) << mallocModeStr;
+        mwGpuCoderRuntimeLog(ss.str().c_str());
+    }
 #endif
     return status;
 }
 
 cudaError_t CudaAllocator::rawFree(void* devPtr) {
-#ifdef MW_GPUCODER_RUNTIME_LOG
-    std::stringstream ss;
-    ss << "rawFree    CudaAllocator:      " << " devPtr: " << std::setw(13) << devPtr;
-    mwGpuCoderRuntimeLog(ss.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
+        std::stringstream ss;
+        ss << "rawFree    CudaAllocator:      " << " devPtr: " << std::setw(13) << devPtr;
+        mwGpuCoderRuntimeLog(ss.str().c_str());
+    }
 #endif
     return cudaFree(devPtr);
 }
@@ -292,14 +306,16 @@ MemoryBlock::MemoryBlock(MemoryPool* pool, void* data, size_t size, bool logging
     fData(data),
     fSize(size),
     fLoggingEnabled(loggingEnabled) {
-    
+
     gcassert(fPool != nullptr);
     gcassert(fData != nullptr);
     gcassert(fSize > 0);
-#ifdef MW_GPUCODER_RUNTIME_LOG
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
         std::stringstream msgStream2;
         msgStream2 << "new        MemoryBlock:      " << *this;
         mwGpuCoderRuntimeLog(msgStream2.str().c_str());
+    }
 #endif
 }
 
@@ -335,7 +351,7 @@ MemoryBlock* MemoryBlock::split(size_t size) {
     gcassert(size > 0);
     gcassert(fSize > size);
     gcassert(!fAllocated);
-    
+
     const bool insertAfter = size >= (fSize >> 1);
     const ResizeMode mode = insertAfter ? MemoryBlock::SHIFT_END : MemoryBlock::SHIFT_START;
     const size_t thisNewSize = fSize - size;
@@ -344,13 +360,13 @@ MemoryBlock* MemoryBlock::split(size_t size) {
     void* newBlockData = static_cast<char*>(fData) + newBlockDataOffset;
     MemoryBlock* newBlock = new MemoryBlock(fPool, newBlockData, size, fLoggingEnabled);
     resize(thisNewSize, mode);
-    
+
     if (insertAfter) {
         newBlock->insertAfter(this);
     } else {
         newBlock->insertBefore(this);
     }
-    
+
     return newBlock;
 }
 
@@ -434,7 +450,7 @@ bool MemoryBlock::PointerCompare::operator()(const MemoryBlock* lhs, const Memor
     }
 }
 
-#ifdef MW_GPUCODER_RUNTIME_LOG
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
 namespace {
 
 std::ostream& operator<<(std::ostream& ss, const MemoryBlock& block) {
@@ -448,11 +464,11 @@ std::ostream& operator<<(std::ostream& ss, const MemoryBlock& block) {
     return ss;
 }
 
-    std::string getSizeString(const size_t size) {
-        std::stringstream ss;
-        ss << std::setw(14) << size;
-        return ss.str();
-    }
+std::string getSizeString(const size_t size) {
+    std::stringstream ss;
+    ss << std::setw(14) << size;
+    return ss.str();
+}
 
 } // namespace
 #endif
@@ -469,19 +485,23 @@ MemoryPool::MemoryPool(void* data, size_t size, Allocator& allocator,
     MemoryBlock* block = new MemoryBlock(this, fData, size, fLoggingEnabled);
     fFreeBlocks.insert(block);
     fFirstBlock = block;
-#ifdef MW_GPUCODER_RUNTIME_LOG
-    std::stringstream msgStream;
-    msgStream << "new         MemoryPool:      " << data << ":" << getSizeString(size);
-    mwGpuCoderRuntimeLog(msgStream.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
+        std::stringstream msgStream;
+        msgStream << "new         MemoryPool:      " << data << ":" << getSizeString(size);
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
+    }
 #endif
 }
 
 MemoryPool::~MemoryPool() {
     gcassertWarning(!hasAllocatedBlocks());
-#ifdef MW_GPUCODER_RUNTIME_LOG
-    std::stringstream msgStream1;
-    msgStream1 << "delete     MemoryBlock:      " << **(fFreeBlocks.begin());
-    mwGpuCoderRuntimeLog(msgStream1.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
+        std::stringstream msgStream1;
+        msgStream1 << "delete     MemoryBlock:      " << **(fFreeBlocks.begin());
+        mwGpuCoderRuntimeLog(msgStream1.str().c_str());
+    }
 #endif
     delete (*(fFreeBlocks.begin()));
     fAllocator.rawFree(fData);
@@ -534,25 +554,29 @@ MemoryBlock* MemoryPool::allocateBlock(size_t size) {
     }
     block->setAllocated(true);
 
-#ifdef MW_GPUCODER_RUNTIME_LOG
-    std::stringstream msgStream;
-    msgStream << "allocate   MemoryBlock:      " << *block;
-    mwGpuCoderRuntimeLog(msgStream.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
+        std::stringstream msgStream;
+        msgStream << "allocate   MemoryBlock:      " << *block;
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
+    }
 #endif
-    
+
     return block;
 }
 
 void MemoryPool::deallocateBlock(MemoryBlock* memoryBlock) {
     gcassert(memoryBlock->pool() == this);
     memoryBlock->setAllocated(false);
-    
-#ifdef MW_GPUCODER_RUNTIME_LOG
-    std::stringstream msgStream;
-    msgStream << "deallocate MemoryBlock:      " << *memoryBlock;
-    mwGpuCoderRuntimeLog(msgStream.str().c_str());
+
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
+        std::stringstream msgStream;
+        msgStream << "deallocate MemoryBlock:      " << *memoryBlock;
+        mwGpuCoderRuntimeLog(msgStream.str().c_str());
+    }
 #endif
-    
+
     mergeBlock(memoryBlock);
     fFreeBlocks.insert(memoryBlock);
 }
@@ -561,27 +585,31 @@ void MemoryPool::mergeBlock(MemoryBlock* block) {
     gcassert(block->pool() == this);
     gcassert(!block->isAllocated());
 
-    // If the previus block is not allocated, merge them and return
+    // If the previous block is not allocated, merge them and return
     MemoryBlock* prevBlock = block->prev();
     if (prevBlock != nullptr && !prevBlock->isAllocated()) {
         fFreeBlocks.erase(prevBlock);
         block->mergeWithPrev();
-#ifdef MW_GPUCODER_RUNTIME_LOG
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+    if (gEnableGpuRuntimeLog) {
         std::stringstream msgStream;
         msgStream << "merge      MemoryBlock:      " << *prevBlock;
         mwGpuCoderRuntimeLog(msgStream.str().c_str());
+    }
 #endif
         delete prevBlock;
     }
-    // If the next block is not allocated, merge thema nd return
+    // If the next block is not allocated, merge them nd return
     MemoryBlock* nextBlock = block->next();
     if (nextBlock != nullptr && !nextBlock->isAllocated()) {
         fFreeBlocks.erase(nextBlock);
         block->mergeWithNext();
-#ifdef MW_GPUCODER_RUNTIME_LOG
-        std::stringstream msgStream;
-        msgStream << "merge      MemoryBlock:      " << *nextBlock;
-        mwGpuCoderRuntimeLog(msgStream.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+        if (gEnableGpuRuntimeLog) {
+            std::stringstream msgStream;
+            msgStream << "merge      MemoryBlock:      " << *nextBlock;
+            mwGpuCoderRuntimeLog(msgStream.str().c_str());
+        }
 #endif
         delete nextBlock;
     }
@@ -606,15 +634,45 @@ MemoryManager::~MemoryManager() {
     deletePools();
 }
 
+size_t MemoryManager::bytesAllocated() const {
+    size_t bytes = 0;
+    for (PoolList::const_iterator iter = fDiscretePools.begin();
+         iter != fDiscretePools.end(); ++iter) {
+        MemoryPool* pool = *iter;
+        bytes += pool->size();
+    }
+    for (PoolList::const_iterator iter = fUnifiedPools.begin();
+         iter != fUnifiedPools.end(); ++iter) {
+        MemoryPool* pool = *iter;
+        bytes += pool->size();
+    }
+    return bytes;
+}
+
+size_t MemoryManager::bytesUsed() const {
+    size_t bytes = 0;
+
+    for (BlockMap::const_iterator iter = fDataBlockMap.begin();
+         iter != fDataBlockMap.end(); ++iter) {
+        MemoryBlock* block = iter->second;
+        if (block->isAllocated()) {
+            bytes += block->size();
+        }
+    }
+    return bytes;
+}
+
 void MemoryManager::deletePools() {
     for (PoolList::const_iterator iter = fDiscretePools.begin();
          iter != fDiscretePools.end(); ++iter) {
         MemoryPool* pool = *iter;
-#ifdef MW_GPUCODER_RUNTIME_LOG
-        std::stringstream msgStream;
-        msgStream << "delete      MemoryPool:      " << pool->data()
-                  << ":" << getSizeString(pool->size());
-        mwGpuCoderRuntimeLog(msgStream.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+        if (gEnableGpuRuntimeLog) {
+            std::stringstream msgStream;
+            msgStream << "delete      MemoryPool:      " << pool->data()
+                    << ":" << getSizeString(pool->size());
+            mwGpuCoderRuntimeLog(msgStream.str().c_str());
+        }
 #endif
         delete pool;
     }
@@ -622,11 +680,13 @@ void MemoryManager::deletePools() {
     for (PoolList::const_iterator iter = fUnifiedPools.begin();
          iter != fUnifiedPools.end(); ++iter) {
         MemoryPool* pool = *iter;
-#ifdef MW_GPUCODER_RUNTIME_LOG
-        std::stringstream msgStream;
-        msgStream << "delete      MemoryPool:      " << pool->data()
-                  << ":" << getSizeString(pool->size());
-        mwGpuCoderRuntimeLog(msgStream.str().c_str());
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
+        if (gEnableGpuRuntimeLog) {
+            std::stringstream msgStream;
+            msgStream << "delete      MemoryPool:      " << pool->data()
+                    << ":" << getSizeString(pool->size());
+            mwGpuCoderRuntimeLog(msgStream.str().c_str());
+        }
 #endif
         delete pool;
     }
@@ -681,7 +741,7 @@ cudaError_t MemoryManager::allocateImpl(void** devPtr, const size_t size, const 
 
     const size_t blockSize = fConfig.calculateBlockSize(size);
     MemoryPool* suitablePool = getFirstSuitableMemoryPool(blockSize, mode);
-    
+
     if (suitablePool == nullptr) {
         // If no pool could be found, allocate a new pool
         const size_t poolSize = fConfig.calculatePoolSize(blockSize, mode);
@@ -784,7 +844,7 @@ const MemoryManager::PoolList& MemoryManager::unifiedPools() const {
     return fUnifiedPools;
 }
 
-#ifdef MW_GPUCODER_RUNTIME_LOG
+#ifdef MW_GPUCODER_RUNTIME_LOG_ENABLED
 void MemoryManager::printMemoryPoolBlocks(std::ostream& os, MemoryPool const* pool) {
     const std::string indentSpaces(4, ' ');
     MemoryBlock* block = pool->firstBlock();
@@ -825,7 +885,7 @@ void MemoryManager::printMemoryMap() {
         ss << "Unified Memory Pools:" << std::endl;
         printMemoryPools(ss, fUnifiedPools);
     }
-    ss << "////////////////////////////////////////////////////////////////////////////////////////////////////";    
+    ss << "////////////////////////////////////////////////////////////////////////////////////////////////////";
     mwGpuCoderRuntimeLog(ss.str().c_str());
 }
 #endif
@@ -874,6 +934,14 @@ gcmemory::MemoryManager& gcmemory::getMemoryManager() {
     return container.getInstance();
 }
 
+void gcmemory::setGpuRuntimeLog(bool aEnableGpuRuntimeLog) {
+    gEnableGpuRuntimeLog = aEnableGpuRuntimeLog;
+}
+
+bool gcmemory::getGpuRuntimeLog() {
+    return gEnableGpuRuntimeLog;
+}
+
 void mwMemoryManagerInit(size_t blockAlignment,
                          size_t freeMode,
                          size_t minPoolSize,
@@ -887,7 +955,7 @@ void mwMemoryManagerInit(size_t blockAlignment,
         const gcmemory::MemoryConfig config(blockAlignment,
                                             static_cast<gcmemory::MemoryConfig::FreeMode>(freeMode),
                                             minPoolSize * gcmemory::MemoryConfig::MEGA_BYTE,
-                                            maxPoolSize * gcmemory::MemoryConfig::MEGA_BYTE); 
+                                            maxPoolSize * gcmemory::MemoryConfig::MEGA_BYTE);
         container.setInstance(config, logActions);
     }
 }

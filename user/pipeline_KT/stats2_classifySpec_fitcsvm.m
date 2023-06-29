@@ -113,7 +113,7 @@ o.pcaOl = "quartiles";
 o.pcaOlThr = 3;
 
 % Plot options
-o.oP = genPlotParams('MMR','timecourse');
+o.oP = ecu_genPlotParams('MMR','timecourse');
 o.oP.visible = 0;
 o.oP.save = 1;
 o.oP.doGPU = 0;

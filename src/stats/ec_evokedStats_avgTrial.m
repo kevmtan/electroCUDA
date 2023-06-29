@@ -198,7 +198,7 @@ completeStats = 1;
 disp(['Finished cluster correction: ' sbj]); toc;
 
 %% Plot
-plotO = genPlotParams('MMR','timecourse');
+plotO = ecu_genPlotParams('MMR','timecourse');
 plotO.textsize = 14;
 if completeStats
     parfor ch = 1:numChs

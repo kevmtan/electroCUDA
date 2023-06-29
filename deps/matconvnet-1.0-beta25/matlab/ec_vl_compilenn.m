@@ -614,7 +614,7 @@ nvcc_cmd = sprintf('%s -c -O3 "%s" "%s" %s ', ...
     strjoin(horzcat(flags.base,flags.nvcc)));
 fprintf('%s: NVCC CC: %s\n', mfilename, nvcc_cmd) ;
 status = system(nvcc_cmd);
-if status, error('Command %s failed.', nvcc_cmd); end
+% if status, error('Command %s failed.', nvcc_cmd); end
 
 % --------------------------------------------------------------------
 function mex_link(opts, objs, mex_dir, flags)

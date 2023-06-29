@@ -76,7 +76,7 @@ o.svm.custom = "";  % Custom thundersvm-train arguments
 o.svm.mem = floor(gpuDevice(o.svm.gpu+1).AvailableMemory/1e6);
 % o.svm.mem = floor((gpuDevice(o.svm.gpu+1).AvailableMemory/o.svm_par{2})/1e6);
 o.svm.ys = 0:numel(o.svm_cond)-1;     % Class labels (must be integers)
-o.svm.binary = ec_paths().thundersvm; % Directory for ThunderSVM binaries
+o.svm.binary = ecu_paths().thundersvm; % Directory for ThunderSVM binaries
 
 
 % SVM hyperparameter Bayesian optimization (mathworks.com/help/stats/bayesopt.html)
@@ -132,7 +132,7 @@ o.pcaOl = "quartiles";
 o.pcaOlThr = 3;
 
 % Plot options
-o.oP = genPlotParams('MMR','timecourse');
+o.oP = ecu_genPlotParams('MMR','timecourse');
 o.oP.visible = 0;
 o.oP.save = 1;
 o.oP.doGPU = 0;

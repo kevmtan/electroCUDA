@@ -75,6 +75,7 @@ for b = 1:nBlocks
     % Prep timing & indices table fields
     trialNfo.durITI(:) = nan;
     trialNfo.durTrial(:) = nan; % Duration of stimulus + next ITI
+    trialNfo.durRT(:) = nan;
     trialNfo.onsITI(:) = nan;
     trialNfo.onsStim = lockStim;
     trialNfo.onsRT = lockRT;

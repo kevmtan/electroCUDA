@@ -177,7 +177,7 @@ save(['/proj/lbcn/d/Results/stats/' o.fnString '/chs_' o.fnString '.mat'],'chs',
 
 %%
 % %% Concactenate subjects
-% plotO = genPlotParams('MMR','timecourse');
+% plotO = ecu_genPlotParams('MMR','timecourse');
 % avgLat = cell(height(sbjStatus),1);
 % avgPct = cell(height(sbjStatus),1);
 % 

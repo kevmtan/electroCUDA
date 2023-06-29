@@ -34,6 +34,7 @@ psy.latency(:) = nan;
 psy.pct(:) = nan;
 psy.stim(:) = false;
 psy.RT(:) = nan;
+psy.RTog(:) = nan;
 psy.postRT(:) = uint16(0);
 psy.BLpre(:) = uint16(0);
 psy.BLend(:) = uint16(0);
@@ -102,14 +103,22 @@ for t = 1:numTrials
     psy.cond(idxTr) = trialNfo.cond(t);
     psy.latency(idxTr) = times(idxTr) - times(idxStim);
     psy.stim(idxStim:idxRT) = true;
-    psy.RT(idxTr) = trialNfo.RT(t);
+    psy.RTog(idxTr) = trialNfo.RT(t);
     psy.postRT(idxRT+1:idxEnd) = trialNfo.trialA(t);
     psy.BLpre(idxStim+idxBLpre) = trialNfo.trialA(t);
     psy.BLend(idxEnd+idxBLend) = trialNfo.trialA(t);
     psy.pct(idxStim:idxRT) = psy.latency(idxStim:idxRT) ./ psy.latency(idxRT);
     psy.pct(idxITI:idxStim-1) = psy.latency(idxITI:idxStim-1) ./ trialNfo.durITI(t);
     psy.pct(idxITI:idxStim-1) = psy.pct(idxITI:idxStim-1) ./ 10;
+
+    % durRT
+    trialNfo.durRT(t) = psy.latency(trialNfo.idxRT(t));
+    psy.RT(idxTr) = trialNfo.durRT(t);
 end
 psy.frame = int16(psy.latency*fs);
-disp(['Aligned task data to neural data: ' sbj]);
+
+%% Finalize
+if ~isequal(trialNfo.durTrial,trialNfo.durRT)
+    warning("[ec_epochPsy] trialNfo.durTrial ~= trialNfo.durRT: "+n.sbj); end
+disp("[ec_alignNeuroBehav] Finished!!! "+sbj);
 end

@@ -1,5 +1,5 @@
 function dirs = ec_getDirs(proj,sbj,task,sbjID)
-% You must edit 'ec_paths' to match the directorieson your system
+% You must edit 'ecu_paths' to match the directorieson your system
 %% Input validation
 arguments
     proj string = "lbcn"
@@ -22,7 +22,7 @@ end
 if isstruct(proj)
     dirs = proj;
 else
-    dirs = ec_paths(proj);
+    dirs = ecu_paths(proj);
     dirs.orig = dirs.data+"orig"+filesep;
     dirs.psych = dirs.orig;
     dirs.proc = dirs.data+"proc"+filesep;

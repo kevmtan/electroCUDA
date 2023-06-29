@@ -73,6 +73,6 @@ partitionedModel = crossval(trainedClassifier.ClassificationEnsemble,'KFold',5);
 % Compute validation accuracy
 validationAccuracy = 1 - kfoldLoss(partitionedModel, 'LossFun', 'ClassifError');
 
-% % Compute validation predictions and scores
+% Compute validation predictions and scores
 [validationPredictions, validationScores] = kfoldPredict(partitionedModel);
 end

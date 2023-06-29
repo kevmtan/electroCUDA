@@ -1,35 +1,42 @@
-function d = ec_designFilt(x,fs,hz,dType,a)
+function d = ec_designFilt(x,fs,hz,dType,arg)
 % Input validation
 arguments
     x {mustBeFloat}
     fs (1,1) double
     hz (1,:) double
     dType {mustBeMember(dType,["lowpass" "highpass" "bandpass"])} = "highpass"
-    a.steepness {mustBeLessThanOrEqual(a.steepness,1)} = 0.75 % Passband to stopband multiplier
-    a.impulse {mustBeMember(a.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
-    %a.design (1,1) string = ""
+    arg.steepness {mustBeLessThanOrEqual(arg.steepness,1)} = 0.75 % Passband to stopband multiplier
+    arg.impulse {mustBeMember(arg.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
+    arg.coefOut (1,1) logical = true
 end
 if numel(hz)>1; dType = "bandpass"; end
 x = double(x(:,1,1));
 
 %% Make filter object
 if dType=="highpass"
-    if a.impulse=="auto"
-        [~,d] = highpass(x,hz,fs,ImpulseResponse=a.impulse,Steepness=a.steepness);
+    if arg.impulse=="auto"
+        [~,d] = highpass(x,hz,fs,ImpulseResponse=arg.impulse,Steepness=arg.steepness);
     else
-        hz(2) = hz * a.steepness;
-        if a.impulse=="fir"; a.design="kaiserwin"; else; a.design="ellip"; end
-        d = designfilt(dType+a.impulse,StopbandFrequency=hz(2),PassbandFrequency=hz(1),...
-            PassbandRipple=0.1,DesignMethod=a.design,SampleRate=fs);
+        hz(2) = hz * arg.steepness;
+        if arg.impulse=="fir"; arg.design="kaiserwin"; else; arg.design="ellip"; end
+        d = designfilt(dType+arg.impulse,StopbandFrequency=hz(2),PassbandFrequency=hz(1),...
+            PassbandRipple=0.1,DesignMethod=arg.design,SampleRate=fs);
     end
 elseif dType=="lowpass"
-   [~,d] = lowpass(x,hz,fs,ImpulseResponse=a.impulse,Steepness=a.steepness);
+    if arg.impulse=="auto"
+        [~,d] = lowpass(x,hz,fs,ImpulseResponse=arg.impulse,Steepness=arg.steepness);
+    else
+        d = signal.internal.filteringfcns.parseAndValidateInputs(x,char(dType),...
+            {hz,fs,'Steepness',arg.steepness,'ImpulseResponse',arg.impulse});
+        d = designFilter_lpf(d);
+    end
 elseif dType=="bandpass"
-    [~,d] = bandpass(x,hz,fs,ImpulseResponse=a.impulse,Steepness=a.steepness);
-else
-    d = signal.internal.filteringfcns.parseAndValidateInputs(x,char(dType),...
-        {hz,fs,'Steepness',a.steepness,'ImpulseResponse',a.impulse});
-    d = designFilter_lpf(d);
+    [~,d] = bandpass(x,hz,fs,ImpulseResponse=arg.impulse,Steepness=arg.steepness);
+end
+
+% Finalize
+if arg.coefOut
+    d = d.Coefficients;
 end
 
 
