@@ -1,3 +1,15 @@
+%% User-specified paths
+
+% imaGIN classifier save dir
+saveDirClassifier = "/home/kt/matlab/";
+
+% CUDA root dir
+cudaRoot = '/usr/local/cuda/';
+
+% cuDNN root dir (CUDA deep learning)
+cudnnRoot = '/usr/local/cuda-12.0/targets/x86_64-linux/';
+
+
 %% Initialize (run this every compile)
 dirs = ec_getDirs;
 cd(dirs.code+"src"+filesep+"cuda");
@@ -11,8 +23,6 @@ system('rm -rf codegen');
 %% Train imaGIN
 clear all; close all;
 
-saveDir = "/home/kt/matlab/";
-
 % Load the training features
 trainBase = load('ImaGIN_trainBaseFeatures_ec.mat');
 
@@ -21,7 +31,7 @@ trainBase = load('ImaGIN_trainBaseFeatures_ec.mat');
     = ec_trainClassifier_ImaGIN(trainBase.predictors,trainBase.response);
 
 % Save results
-save(saveDir+"ec_trainedClassifier_ImaGIN.mat",'mdl','-v7');
+save(saveDirClassifier+"ec_trainedClassifier_ImaGIN.mat",'mdl','-v7');
 
 %% VLFeat
 clear all; close all; %#ok<*CLALL> 
@@ -38,7 +48,7 @@ reset(gpuDevice());
 
 ec_vl_compilenn('enableGpu',true,'enableDouble',true,'verbose',true,...
     'cudaMethod','nvcc','enableCudnn',true,...
-    'cudaRoot','/usr/local/cuda/','cudnnRoot','/usr/local/cuda-12.0/targets/x86_64-linux/');
+    'cudaRoot',cudaRoot,'cudnnRoot',cudnnRoot);
 
 %% ec_cwt... - multiple wavelet functions (single- & double-precision)
 reset(gpuDevice());
