@@ -14,10 +14,10 @@
 #include "tmwtypes.h"
 
 // Function Declarations
-static const mxArray *emlrtMexFcnResolvedFunctionsInfo();
+static const mxArray *c_emlrtMexFcnResolvedFunctionsI();
 
 // Function Definitions
-static const mxArray *emlrtMexFcnResolvedFunctionsInfo()
+static const mxArray *c_emlrtMexFcnResolvedFunctionsI()
 {
   static const int32_T iv[2]{0, 1};
   const mxArray *m;
@@ -33,14 +33,20 @@ mxArray *emlrtMexFcnProperties()
   mxArray *xEntryPoints;
   mxArray *xInputs;
   mxArray *xResult;
-  const char_T *propFieldName[7]{
-      "Version",      "ResolvedFunctions", "Checksum",    "EntryPoints",
-      "CoverageInfo", "IsPolymorphic",     "PropertyList"};
-  const char_T *epFieldName[6]{
-      "Name",           "NumberOfInputs", "NumberOfOutputs",
-      "ConstantInputs", "FullPath",       "TimeStamp"};
+  const char_T *propFieldName[9]{"Version",
+                                 "ResolvedFunctions",
+                                 "Checksum",
+                                 "EntryPoints",
+                                 "CoverageInfo",
+                                 "IsPolymorphic",
+                                 "PropertyList",
+                                 "UUID",
+                                 "ClassEntryPointIsHandle"};
+  const char_T *epFieldName[8]{
+      "Name",     "NumberOfInputs", "NumberOfOutputs", "ConstantInputs",
+      "FullPath", "TimeStamp",      "Constructor",     "Visible"};
   xEntryPoints =
-      emlrtCreateStructMatrix(1, 1, 6, (const char_T **)&epFieldName[0]);
+      emlrtCreateStructMatrix(1, 1, 8, (const char_T **)&epFieldName[0]);
   xInputs = emlrtCreateLogicalMatrix(1, 4);
   emlrtSetField(xEntryPoints, 0, "Name", emlrtMxCreateString("ec_cwtAvg"));
   emlrtSetField(xEntryPoints, 0, "NumberOfInputs",
@@ -53,12 +59,15 @@ mxArray *emlrtMexFcnProperties()
                     "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwtAvg.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
                 emlrtMxCreateDoubleScalar(738984.66932870366));
+  emlrtSetField(xEntryPoints, 0, "Constructor",
+                emlrtMxCreateLogicalScalar(false));
+  emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));
   xResult =
-      emlrtCreateStructMatrix(1, 1, 7, (const char_T **)&propFieldName[0]);
+      emlrtCreateStructMatrix(1, 1, 9, (const char_T **)&propFieldName[0]);
   emlrtSetField(xResult, 0, "Version",
-                emlrtMxCreateString("9.14.0.2206163 (R2023a)"));
+                emlrtMxCreateString("24.1.0.2537033 (R2024a)"));
   emlrtSetField(xResult, 0, "ResolvedFunctions",
-                (mxArray *)emlrtMexFcnResolvedFunctionsInfo());
+                (mxArray *)c_emlrtMexFcnResolvedFunctionsI());
   emlrtSetField(xResult, 0, "Checksum",
                 emlrtMxCreateString("UZNV6GSDjNHqUjgyPa3PcG"));
   emlrtSetField(xResult, 0, "EntryPoints", xEntryPoints);

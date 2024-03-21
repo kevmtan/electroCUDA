@@ -34,9 +34,9 @@ extern emlrtContext emlrtContextGlobal;
 
 // Function Declarations
 void ec_detr(emxArray_real_T *cpu_x, emxArray_real_T *cpu_w,
-             const real_T cpu_ord_data[], const int32_T ord_size[2],
-             const real_T cpu_thr_data[], const int32_T thr_size[2],
-             const real_T cpu_itr_data[], const int32_T itr_size[2],
+             const real_T ord_data[], const int32_T ord_size[2],
+             const real_T thr_data[], const int32_T thr_size[2],
+             const real_T itr_data[], const int32_T itr_size[2],
              real_T cpu_olPct_data[], int32_T olPct_size[2]);
 
 void ec_detr_api(const mxArray *const prhs[5], int32_T nlhs,

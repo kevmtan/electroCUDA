@@ -29,4 +29,15 @@ struct emxArray_real_T {
   boolean_T canFreeData;
 };
 
+struct b_ec_cwtAvg {
+  real_T cpu_x_data[9735];
+  real_T cpu_xt_data[9735];
+  real_T cpu_fx_data[9735];
+  real_T cpu_dv4_data[9735];
+};
+
+struct ec_cwtAvgStackData {
+  b_ec_cwtAvg f0;
+};
+
 // End of code generation (ec_cwtAvg_types.h)

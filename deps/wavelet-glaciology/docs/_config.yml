@@ -1,0 +1,17 @@
+#site settings
+title: Wavelet coherence
+email: ag+wtc@glaciology.net
+description: A matlab toolbox for cross-wavelet and wavelet coherence analysis
+baseurl: /wavelet-coherence
+url: http://grinsted.github.io
+twitter_username: agrinsted
+github_username: grinsted
+permalink: /:collection/:title/
+theme: jekyll-theme-dinky
+collections:
+  faq:
+    output: true
+    permalink: /:collection/:name
+  demo:
+    output: true
+    permalink: /:collection/:name

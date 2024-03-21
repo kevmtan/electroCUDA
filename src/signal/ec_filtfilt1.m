@@ -91,18 +91,16 @@ if ~lfn
     validateattributes(b,{'double','single'},{'2d','finite','nonempty'},'filtfilt');
     validateattributes(a,{'double','single'},{'2d','finite','vector','nonempty'},'filtfilt');
     validateattributes(x,{'double','single'},{'2d','finite','nonempty'},'filtfilt');
+else
+    coder.gpu.kernelfun; % Add kernelfun pragma to trigger kernel creation
 end
-coder.gpu.kernelfun; % Add kernelfun pragma to trigger kernel creation
 
 %% Run
 nChs = cast(width(x),"uint16");
 y = coder.nullcopy(x);
 
 % Loop across chans
-coder.gpu.kernel(nChs,-1); % Add kernelfun pragma to trigger kernel creation
-for ch = 1:nChs
-    coder.gpu.constantMemory(x);  
-    coder.gpu.constantMemory(y);  
+for ch = 1:nChs 
     y(:,ch) = filtfilt_lfn(x(:,ch),b,a,z,nf,L);
 end
 
@@ -132,10 +130,6 @@ function x = filtfilt_lfn(x,b,a,z,nf,L)
 
 % Loop by L
 for ii = 1:L
-    coder.gpu.constantMemory(x);
-    coder.gpu.constantMemory(b);
-    coder.gpu.constantMemory(a);
-    coder.gpu.constantMemory(z);
     xt = bsxfun(@minus, 2*x(1,:),x(nf(1,1)+1:-1:2,:));
     [~,zo] = filter(b(:,ii),a(:,ii),xt,z(:,ii)*xt(1,:),1); % outer product
     [yc2,zo] = filter(b(:,ii),a(:,ii),x,zo,1);
@@ -147,7 +141,6 @@ for ii = 1:L
 
     x = yc5(end:-1:1,:);
 end
-
 
 % LocalWords:  x b a nf L
 % LocalWords:  Lx th zi nfilt xc yc IIR nfact xt unreversed nullcopy Npts nb na yout

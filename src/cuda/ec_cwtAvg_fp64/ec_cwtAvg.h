@@ -26,6 +26,8 @@
 #endif
 
 // Type Declarations
+struct ec_cwtAvgStackData;
+
 struct emxArray_real_T;
 
 // Variable Declarations
@@ -33,11 +35,11 @@ extern emlrtCTX emlrtRootTLSGlobal;
 extern emlrtContext emlrtContextGlobal;
 
 // Function Declarations
-void ec_cwtAvg(const emxArray_real_T *cpu_x, real_T fs, real_T cpu_fLims[2],
-               real_T fOctave, emxArray_real_T *cpu_freqs);
+void ec_cwtAvg(ec_cwtAvgStackData *SD, const emxArray_real_T *cpu_x, real_T fs,
+               real_T fLims[2], real_T fOctave, emxArray_real_T *cpu_freqs);
 
-void ec_cwtAvg_api(const mxArray *const prhs[4], int32_T nlhs,
-                   const mxArray *plhs[2]);
+void ec_cwtAvg_api(ec_cwtAvgStackData *SD, const mxArray *const prhs[4],
+                   int32_T nlhs, const mxArray *plhs[2]);
 
 void ec_cwtAvg_atexit();
 
