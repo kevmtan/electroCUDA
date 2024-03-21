@@ -30,6 +30,8 @@ struct ec_cwtStackData;
 
 struct emxArray_real32_T;
 
+struct cell_wrap_0;
+
 struct emxArray_real_T;
 
 // Variable Declarations
@@ -37,12 +39,13 @@ extern emlrtCTX emlrtRootTLSGlobal;
 extern emlrtContext emlrtContextGlobal;
 
 // Function Declarations
-void ec_cwt(ec_cwtStackData *SD, const emxArray_real32_T *cpu_x, real_T fs,
-            real_T fLims[2], real_T fOctave, real32_T ds2,
-            emxArray_real32_T *cpu_xx, emxArray_real_T *cpu_freqs);
+void b_ec_cwt_api(ec_cwtStackData *SD, const mxArray *const prhs[5],
+                  int32_T nlhs, const mxArray *plhs[2]);
 
-void ec_cwt_api(ec_cwtStackData *SD, const mxArray *const prhs[5], int32_T nlhs,
-                const mxArray *plhs[2]);
+void ec_cwt(ec_cwtStackData *SD, const emxArray_real32_T *cpu_x, real_T fs,
+            const real_T fLims[2], real_T fOctave, const real32_T ds[2],
+            cell_wrap_0 y_data[], int32_T y_size[2],
+            emxArray_real_T *cpu_freqs);
 
 void ec_cwt_atexit();
 

@@ -33,6 +33,11 @@ struct cell_wrap_0 {
   emxArray_real32_T *f1;
 };
 
+struct emxArray_cell_wrap_0_1x65534 {
+  cell_wrap_0 data[65534];
+  int32_T size[2];
+};
+
 struct b_ec_wtcc {
   real_T cpu_x_data[9735];
   real_T cpu_xt_data[9735];
@@ -41,8 +46,14 @@ struct b_ec_wtcc {
   real_T b_cpu_fx_data[9735];
 };
 
+struct ec_wtcc_api {
+  emxArray_cell_wrap_0_1x65534 xx;
+  emxArray_cell_wrap_0_1x65534 yy;
+};
+
 struct ec_wtccStackData {
   b_ec_wtcc f0;
+  ec_wtcc_api f1;
 };
 
 // End of code generation (ec_wtcc_types.h)

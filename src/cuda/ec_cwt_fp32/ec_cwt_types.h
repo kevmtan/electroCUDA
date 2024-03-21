@@ -29,6 +29,15 @@ struct emxArray_real32_T {
   boolean_T canFreeData;
 };
 
+struct cell_wrap_0 {
+  emxArray_real32_T *f1;
+};
+
+struct emxArray_cell_wrap_0_1x65534 {
+  cell_wrap_0 data[65534];
+  int32_T size[2];
+};
+
 struct emxArray_real_T {
   real_T *data;
   int32_T *size;
@@ -44,8 +53,13 @@ struct b_ec_cwt {
   real_T cpu_dv4_data[9735];
 };
 
+struct ec_cwt_api {
+  emxArray_cell_wrap_0_1x65534 y;
+};
+
 struct ec_cwtStackData {
   b_ec_cwt f0;
+  ec_cwt_api f1;
 };
 
 // End of code generation (ec_cwt_types.h)

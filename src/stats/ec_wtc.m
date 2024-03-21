@@ -68,10 +68,10 @@ if ~isfield(o,'fVoices');     o.fVoices=12; end       % Voices per octave (defau
 if ~isfield(o,'dsTarg');      o.dsTarg=[]; end        % Downsample target in Hz (default=[]: no downsample)
 if ~isfield(o,'single');      o.single=true; end      % Run & save as single (single much faster on GPU)
 if ~isfield(o,'singleOut');   o.halfOut=true; end     % Save as half-precision float (16-bit) to save memory
-if ~isfield(o,'doGPU');       o.doGPU=false; end      % Run on GPU, see MATLAB gpuArray requirements (default=false)
-% if ~isfield(o,'GPUmex');      o.GPUmex=false; end
+if ~isfield(o,'doCUDA');      o.doCUDA=false; end     % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+if ~isfield(o,'doGPU');       o.doGPU=false; end      % Run on MATLAB gpuArray (superseded by CUDA)
 % if ~isfield(o,'norm');        o.norm=false; end         % Convert absolute values (log-normal) to normal distribution
-
+if o.doCUDA; o.doGPU=false; end % CUDA supersedes gpuArray
 
 %% Setup & initialize
 tic; errors={};
@@ -91,17 +91,15 @@ sbjID = n.sbjID;
 nRuns = n.nRuns;
 n.task = task;
 n.suffix = o.suffix;
-fsOg = floor(n.fs);
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
 
 % Get downsampling factor & anti-aliasing filter
+ds = [1 1];
 if ~isempty(o.dsTarg)
-    [ds(1),ds(2)] = rat(o.dsTarg/fsOg);
+    [ds(1),ds(2)] = rat(o.dsTarg/n.fs);
     if ds(1)>ds(2); error(sbj+" downsampling target > iEEG sampling rate"); end
-else
-    ds(1)=1; ds(2)=1;
 end
 
 % Only keep good channels (ICA chans rn)
@@ -131,13 +129,14 @@ if o.doGPU
     memMax = gpuDevice().AvailableMemory; % see available vram
 else
     try ppool = parpool('process'); catch;end %#ok<NASGU>
+    memMax = ec_ramAvail;
 end
 
 % Reshape per run
 x = mat2cell(x,n.runIdxOg(:,2));
 y = cell(nRuns,1);
 cwtHz = cell(nRuns,1);
-disp("[ec_wtc] Starting WTC: s"+n.sbjID+"_r"+run+" time="+toc);
+disp("[ec_wtc] Starting WTC: s"+n.sbjID+" time="+toc);
 
 
 %% Wavelet coherence (within-run to avoid edge artifacts)
@@ -148,20 +147,8 @@ for r = 1:nRuns
     cwtHz{r} = cwtHz{r}.centerFrequencies';
     nFrqs = numel(cwtHz{r});
 
-    % Run wavelet coherence
-    if o.doGPU
-        [x{r},y{r}] = gpu_lfn2(x{r},cc,n,o,ds(1),ds(2),run);
-        [x{r},y{r}] = gpu_lfn(x{r},cc,n,o,ds(1),ds(2),nFrqs,run,memMax);
-    else
-        [x{r},y{r}] = cpu_lfn(x{r},cc,ds(1),ds(2),n.fs,o.fLims,o.fVoices,n.sbjID,run);
-    end
-
-    %% Reshape & concactenate
-
-
-    x{r} = permute(cat(3,x{r}{:}),[1 3 2]);
-    y{r} = permute(cat(3,y{r}{:}),[1 3 2]);
-    disp("[ec_wtc] Finished WTC: s"+n.sbjID+"_r"+run+" time="+toc);
+    % Do wavelet coherence
+    [x{r},y{r}] = withinRun_lfn(x{r},cc,n,o,ds,nFrqs,run,memMax);
 end
 
 
@@ -175,8 +162,6 @@ n.xChs = nChs;
 n.nFreqs = size(x,3);
 n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
-
-
 
 
 %% Finalize
@@ -214,8 +199,37 @@ end
 
 
 
-function [xx,yy] = gpu_lfn(xr,cc,n,o,ds,nFrqs,run,memMax)
-%% Wavelet coherence within-run (GPU)
+%%% Wavelet coherence within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [xr,yr] = withinRun_lfn(xr,cc,n,o,ds,nFrqs,run,memMax)
+tic;
+if o.doCUDA
+    % CUDA GPU binaries (fastest)
+    disp("[ec_wtc] CUDA GPU binary start: s"+sbj+"_r"+run+" time="+toc);
+    if o.single
+         % Single-precision
+        [xr,yr] = ec_wtcc_fp32(xr,cc{:,1:2},n.fs,o.fLims,o.fVoices,ds); 
+    else % Double-precision
+        [xr,yr] = ec_wtcc_fp64(xr,cc{:,1:2},n.fs,o.fLims,o.fVoices,ds); % Double-precision
+    end
+    disp("[ec_wtc] CUDA GPU binary finished: s"+sbj+"_r"+run+" time="+toc);
+
+elseif o.doGPU
+    % gpuArrays (fast)
+    [xr,yr] = gpuArrayWT_lfn(xr,cc,n,o,ds,nFrqs,run,memMax);
+else
+    % CPU parfor loop (slower)
+    [xr,yr] = cpuParforWT_lfn(xr,cc,ds,n.fs,o.fLims,o.fVoices,n.sbjID,run);
+end
+
+%% Reshape & concactenate
+xr = permute(cat(3,xr{:}),[1 3 2]);
+yr = permute(cat(3,yr{:}),[1 3 2]);
+disp("[ec_wtc] Finished WTC: s"+n.sbjID+"_r"+run+" time="+toc);
+
+
+
+%%% gpuArrayFun WT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [xx,yy] = gpuArrayWT_lfn(xr,cc,n,o,ds,nFrqs,run,memMax)
 tic; 
 % Get vars
 nPairs=height(cc); c1=cc.i1; c2=cc.i2; xx=cell(1,nPairs); yy=xx;
@@ -231,39 +245,45 @@ mPairs = ceil(nPairs/mItr);
 xr=gpuArray(xr); pFin=gpuArray(false(nPairs,1)); mItr=gpuArray(mItr);
 disp("[ec_wtc] gpu_lfn start: s"+n.sbjID+"_r"+run+" pairs="+mPairs+"/"+nPairs+" time="+toc);
 
-% Loop across gpuArrayFun iterations
+%% Loop across gpuArrayFun iterations
 for v = 1:mItr
+    % Find unfinished pairs to do simultaneously
     idx = find(~pFin,mPairs);
+
+    % Run wavelet coherence - vectorized (arrayfun)
     [xx(idx),yy(idx)] = arrayfun(@(i1,i2) wtc_lfn(xr(:,i1),xr(:,i2),n.fs,...
         o.fLims,o.fVoices,ds(1),ds(2)), c1(idx),c2(idx),UniformOutput=false);
+
+    % Move to CPU
     xx(idx) = cellfun(@gather,xx(idx),UniformOutput=false);
     yy(idx) = cellfun(@gather,yy(idx),UniformOutput=false);
     pFin(idx) = true;
 end
 
+% Make sure moved to CPU
+xx = cellfun(@gather,xx(idx),UniformOutput=false);
+yy = cellfun(@gather,yy(idx),UniformOutput=false);
 disp("[ec_wtc] gpu_lfn end: s"+n.sbjID+"_r"+run+" time="+toc);
 
 
 
-function [xx,yy] = cpu_lfn(xr,cc,ds,fs,fLims,fVoices,sbj,run)
-%% Wavelet coherence within-run (GPU)
+%%% CPU parallel loop WT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [xx,yy] = cpuParforWT_lfn(xr,cc,ds,fs,fLims,fVoices,sbj,run)
 tic; 
-
-% Get vars
 nPairs=height(cc); c1=cc.i1; c2=cc.i2; xx=cell(1,nPairs); yy=xx;
-disp("[ec_wtc] cpu_lfn start: s"+sbj+"_r"+run+" time="+toc);
 
+% Run wavelet coherence - parallel loop
+disp("[ec_wtc] CPU parfor start: s"+sbj+"_r"+run+" time="+toc);
 parfor p = 1:nPairs
     [xx{p},yy{p}] = wtc_lfn(xr(:,c1(p)),xr(:,c2(p)),fs,fLims,...
         fVoices,ds); %#ok<PFBNS>
 end
-disp("[ec_wtc] cpu_lfn end: s"+sbj+"_r"+run+" time="+toc);
+disp("[ec_wtc] CPU parfor end: s"+sbj+"_r"+run+" time="+toc);
 
 
 
+%%% Wavelet coherence - local function %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [x,y] = wtc_lfn(x,y,fs,fLims,fVoices,ds)
-%% Wavelet coherence - local function
-
 % Calculate wavelet coherence
 [x,y] = wcoherence(x,y,fs,FrequencyLimits=fLims,VoicesPerOctave=fVoices);
 

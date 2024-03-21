@@ -2,7 +2,7 @@ function [xx,yy] = ec_wtcc(x,c,fs,fLims,fVoices,ds)
 %% Wavelet coherence & resample
 arguments
     x (:,:){mustBeFloat}
-    c (:,2){uint16}
+    c (:,2) uint16
     fs (1,1){mustBeFloat}
     fLims (1,2){mustBeFloat}
     fVoices (1,1){mustBeFloat} = 12

@@ -47,10 +47,10 @@ mxArray *emlrtMexFcnProperties()
       "FullPath", "TimeStamp",      "Constructor",     "Visible"};
   xEntryPoints =
       emlrtCreateStructMatrix(1, 1, 8, (const char_T **)&epFieldName[0]);
-  xInputs = emlrtCreateLogicalMatrix(1, 4);
+  xInputs = emlrtCreateLogicalMatrix(1, 5);
   emlrtSetField(xEntryPoints, 0, "Name", emlrtMxCreateString("ec_cwtAvg"));
   emlrtSetField(xEntryPoints, 0, "NumberOfInputs",
-                emlrtMxCreateDoubleScalar(4.0));
+                emlrtMxCreateDoubleScalar(5.0));
   emlrtSetField(xEntryPoints, 0, "NumberOfOutputs",
                 emlrtMxCreateDoubleScalar(2.0));
   emlrtSetField(xEntryPoints, 0, "ConstantInputs", xInputs);
@@ -58,7 +58,7 @@ mxArray *emlrtMexFcnProperties()
                 emlrtMxCreateString(
                     "/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwtAvg.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
-                emlrtMxCreateDoubleScalar(738984.66932870366));
+                emlrtMxCreateDoubleScalar(739332.571875));
   emlrtSetField(xEntryPoints, 0, "Constructor",
                 emlrtMxCreateLogicalScalar(false));
   emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));

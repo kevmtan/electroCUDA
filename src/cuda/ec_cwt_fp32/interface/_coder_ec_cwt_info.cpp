@@ -58,7 +58,7 @@ mxArray *emlrtMexFcnProperties()
       xEntryPoints, 0, "FullPath",
       emlrtMxCreateString("/home/kt/Gdrive/Git/electroCUDA/src/cuda/ec_cwt.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
-                emlrtMxCreateDoubleScalar(738984.66931712965));
+                emlrtMxCreateDoubleScalar(739332.57175925921));
   emlrtSetField(xEntryPoints, 0, "Constructor",
                 emlrtMxCreateLogicalScalar(false));
   emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));

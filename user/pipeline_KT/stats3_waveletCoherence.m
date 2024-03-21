@@ -25,8 +25,9 @@ o.name = string(datetime("now","TimeZone","local","Format","yyMMdd"))+"_"+nameSt
 
 % Basic options
 o.suffix = ""; % Input data suffix (default = "")
-o.save = true; %% save summary stats data %%%%
-o.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
+o.save = true; % save summary stats data
+o.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+o.doGPU = true; % Run on MATLAB gpuArray (superseded by CUDA)
 o.single = true; % Run & save as single (single much faster on GPU)
 o.halfOut = true; % Run as double (accuracy) & save as single (small filesize)
 

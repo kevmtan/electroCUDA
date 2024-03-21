@@ -81,7 +81,7 @@ funs = ["ec_wtcc","ec_wtcc"];
 funz = ["ec_wtcc_fp32","ec_wtcc_fp64"];
 
 %ec_wtcCUDA(x,c,fs,fLims,fVoices,ds)
-arg2 = coder.newtype('uint16',[1 2],[0 0]);
+arg2 = coder.newtype('uint16',[65535-1 2],[1 0]);
 
 % Compile loop
 for v = 1:2
@@ -165,16 +165,12 @@ for v = 1:4
 
     if v==1 || v==3
         arg1 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % x
-        arg5 = coder.newtype('single',[1 1],[0 0]); % ds2
+        arg5 = coder.newtype('single',[1 2],[0 0]); % ds2
     else
         arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]);
-        arg5 = coder.newtype('double',[1 1],[0 0]); % ds2
+        arg5 = coder.newtype('double',[1 2],[0 0]); % ds2
     end
-    if v <= 2
-        argz = {arg1,arg2,arg3,arg4,arg5};
-    else
-        argz = {arg1,arg2,arg3,arg4};
-    end
+    argz = {arg1,arg2,arg3,arg4,arg5};
 
     codegen(funs(v),"-o",funz(v),"-config","cfg","-args",argz);
 

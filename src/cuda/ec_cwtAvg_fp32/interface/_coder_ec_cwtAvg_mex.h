@@ -36,6 +36,6 @@ emlrtCTX mexFunctionCreateRootTLS();
 
 void unsafe_ec_cwtAvg_mexFunction(ec_cwtAvgStackData *SD, int32_T nlhs,
                                   mxArray *plhs[2], int32_T nrhs,
-                                  const mxArray *prhs[4]);
+                                  const mxArray *prhs[5]);
 
 // End of code generation (_coder_ec_cwtAvg_mex.h)

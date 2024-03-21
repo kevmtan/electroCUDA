@@ -55,8 +55,9 @@ void unsafe_ec_cwt_mexFunction(ec_cwtStackData *SD, int32_T nlhs,
   int32_T b;
   // Check for proper number of arguments.
   if (nrhs != 5) {
-    emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal, "EMLRT:runTime:WrongNumberOfInputs",
-                        5, 12, 5, 4, 6, "ec_cwt");
+    emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,
+                        "EMLRT:runTime:WrongNumberOfInputsFAVDefaultValues", 5,
+                        12, 5, 4, 6, "ec_cwt");
   }
   if (nlhs > 2) {
     emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,
@@ -64,7 +65,7 @@ void unsafe_ec_cwt_mexFunction(ec_cwtStackData *SD, int32_T nlhs,
                         "ec_cwt");
   }
   // Call the function.
-  ec_cwt_api(SD, prhs, nlhs, outputs);
+  b_ec_cwt_api(SD, prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
     b = 1;

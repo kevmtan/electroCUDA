@@ -62,9 +62,12 @@ doICAhfb = 0;
 
 isTest=0;
 
-%% Options struct (can be modified for each function below)
+%% Options struct (more options in the loop below)
 % NOTE: see individual functions for all inputs, descriptions & defaults
 o = struct;
+o.doCUDA = false; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+o.doGPU = true; % Run on MATLAB gpuArray (superseded by CUDA)
+o.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
 
 % Bad channel identification
 o.doBadCh = true;
@@ -130,6 +133,12 @@ o.asr.blockSz = []; % Cut robust estimation by this factor (default=10)
 o.asr.filtHz =  [0  4 12 16 36 50 200 500]; % default=[]
 o.asr.filtMag = [2 .5 .5 1  1  2  1.5 2];   % default=[];
 o.asr.dimsPCA = 3/4; % Maximum dimensionality to reconstruct (default: 2/3)
+
+% Time-freq decomposition
+o.fName = "spec"; % Name of frequency analysis
+o.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
+o.fMean = false; % Collapse across frequency bands (for 1d vector output)
+o.fVoices = 10; % Voices per octave (default=10, HFB=18)
 
 % % log2norm CWT output
 % o.norm = false;
@@ -254,10 +263,6 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
         oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
-        oSpec.single = false; % Run & save as single (single much faster on GPU)
-        oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-        oSpec.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oSpec.doBadFrames = false;
         oSpec.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oSpec.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -265,6 +270,11 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oSpec.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oSpec.hiPassGPU = false; % GPU slower than CPU??
+        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.single = false; % Run & save as single (single much faster on GPU)
+        oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
+        oSpec.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+        oSpec.doGPU = false; % Run on MATLAB gpuArray (superseded by CUDA)
 
         % Run
         try disp("Starting spec: "+sbj);
@@ -294,10 +304,6 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
         oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
-        oSpec.single = false; % Run & save as single (single much faster on GPU)
-        oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-        oSpec.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oSpec.doBadFrames = false;
         oSpec.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oSpec.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -305,6 +311,11 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oSpec.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oSpec.hiPassGPU = false; % GPU slower than CPU??
+        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.single = false; % Run & save as single (single much faster on GPU)
+        oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
+        oSpec.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+        oSpec.doGPU = false; % Run on MATLAB gpuArray (superseded by CUDA)
 
         % Run
         try disp("Starting spec: "+sbj);
@@ -334,10 +345,6 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.fLims = [60 200]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
-        oHFB.single = false; % Convert to double to single (single much faster on GPU)
-        oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
-        oHFB.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oHFB.doBadFrames = true;
         oHFB.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oHFB.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -345,6 +352,11 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oHFB.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oHFB.hiPassGPU = false; % GPU slower than CPU??
+        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.single = false; % Run & save as single (single much faster on GPU)
+        oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
+        oHFB.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+        oHFB.doGPU = false; % Run on MATLAB gpuArray (superseded by CUDA)
 
         % Run
         try disp("Starting HFB: "+sbj);
@@ -375,10 +387,6 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.fLims = [60 200]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
-        oHFB.single = false; % Convert to double to single (single much faster on GPU)
-        oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
-        oHFB.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oHFB.doBadFrames = true;
         oHFB.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
         oHFB.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
@@ -386,6 +394,11 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oHFB.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oHFB.hiPassGPU = false; % GPU slower than CPU??
+        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.single = false; % Run & save as single (single much faster on GPU)
+        oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
+        oHFB.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
+        oHFB.doGPU = false; % Run on MATLAB gpuArray (superseded by CUDA)
 
         % Run
         try disp("Starting HFB: "+sbj);

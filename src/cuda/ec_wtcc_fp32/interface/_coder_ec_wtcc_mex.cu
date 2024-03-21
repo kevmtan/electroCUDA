@@ -66,7 +66,7 @@ void unsafe_ec_wtcc_mexFunction(ec_wtccStackData *SD, int32_T nlhs,
                         "ec_wtcc");
   }
   // Call the function.
-  ec_wtcc_api(SD, prhs, nlhs, outputs);
+  b_ec_wtcc_api(SD, prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
     b = 1;
