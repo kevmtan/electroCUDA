@@ -8,7 +8,8 @@ arguments
     args.user {ischar,isstring} = 'Kevin_DMN'; 
     args.dsTarg {isnumeric} = []
 end
-dsTarg=args.dsTarg; if ~isempty(dsTarg) && dsTarg>0; doDS=true; else; doDS=false; end
+dsTarg=args.dsTarg;
+if ~isempty(dsTarg) && dsTarg>0; doDS=true; else; doDS=false; end
 if isempty(dirs); dirs = ec_getDirs(args.user,sbj,proj); end
 
 % Preallocate

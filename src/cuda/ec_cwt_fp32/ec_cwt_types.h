@@ -37,4 +37,15 @@ struct emxArray_real_T {
   boolean_T canFreeData;
 };
 
+struct b_ec_cwt {
+  real_T cpu_x_data[9735];
+  real_T cpu_xt_data[9735];
+  real_T cpu_fx_data[9735];
+  real_T cpu_dv4_data[9735];
+};
+
+struct ec_cwtStackData {
+  b_ec_cwt f0;
+};
+
 // End of code generation (ec_cwt_types.h)

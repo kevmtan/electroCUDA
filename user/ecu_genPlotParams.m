@@ -20,7 +20,7 @@ switch plotType
         od.ylabel = "Magnitude (z-score)";
     case "ERSP"
         od.textsize = 14;
-        od.cmap = flip(cbrewer2("RdBu"));
+        od.cmap = flip(ec_cbrewer2("RdBu"));
         od.clim = [-4 4];
         od.xlabel = "Latency (ms)";
         od.ylabel = "Frequency (Hz)";

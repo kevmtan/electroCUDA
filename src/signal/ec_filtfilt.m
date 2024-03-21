@@ -29,9 +29,9 @@ end
 if o.gpu && ~isgpuarray(x)
     try
         if isa(x,"single")
-            x = ec_filtfilt1_FP32(x,b,a,z,nf,L);
+            x = ec_filtfilt1_fp32(x,b,a,z,nf,L);
         else
-            x = ec_filtfilt1_FP64(x,b,a,z,nf,L);
+            x = ec_filtfilt1_fp64(x,b,a,z,nf,L);
         end
         fin = 1;
     catch ME; getReport(ME)

@@ -26,8 +26,7 @@ void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
   mexAtExit(&ec_detr_atexit);
   // Module initialization.
   ec_detr_initialize();
-  try {
-    // Dispatch the entry-point.
+  try { // Dispatch the entry-point.
     unsafe_ec_detr_mexFunction(nlhs, plhs, nrhs, prhs);
     // Module termination.
     ec_detr_terminate();

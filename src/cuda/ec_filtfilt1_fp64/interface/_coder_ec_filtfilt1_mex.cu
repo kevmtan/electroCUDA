@@ -26,8 +26,7 @@ void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
   mexAtExit(&ec_filtfilt1_atexit);
   // Module initialization.
   ec_filtfilt1_initialize();
-  try {
-    // Dispatch the entry-point.
+  try { // Dispatch the entry-point.
     unsafe_ec_filtfilt1_mexFunction(nlhs, plhs, nrhs, prhs);
     // Module termination.
     ec_filtfilt1_terminate();

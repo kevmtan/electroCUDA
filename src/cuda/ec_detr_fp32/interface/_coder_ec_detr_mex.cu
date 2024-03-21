@@ -26,8 +26,7 @@ void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
   mexAtExit(&ec_detr_atexit);
   // Module initialization.
   ec_detr_initialize();
-  try {
-    // Dispatch the entry-point.
+  try { // Dispatch the entry-point.
     unsafe_ec_detr_mexFunction(nlhs, plhs, nrhs, prhs);
     // Module termination.
     ec_detr_terminate();
@@ -47,6 +46,7 @@ emlrtCTX mexFunctionCreateRootTLS()
 void unsafe_ec_detr_mexFunction(int32_T nlhs, mxArray *plhs[3], int32_T nrhs,
                                 const mxArray *prhs[5])
 {
+  const mxArray *b_prhs[5];
   const mxArray *outputs[3];
   int32_T b;
   // Check for proper number of arguments.
@@ -60,7 +60,10 @@ void unsafe_ec_detr_mexFunction(int32_T nlhs, mxArray *plhs[3], int32_T nrhs,
                         "ec_detr");
   }
   // Call the function.
-  ec_detr_api(prhs, nlhs, outputs);
+  for (int32_T c{0}; c < 5; c++) {
+    b_prhs[c] = prhs[c];
+  }
+  ec_detr_api(b_prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
     b = 1;

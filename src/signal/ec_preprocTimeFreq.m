@@ -289,7 +289,7 @@ else
 end
 
 % Downsample
-if ds2
+if ds2 > ds1
     xx = resample(xx,ds1,ds2);
 end
 
