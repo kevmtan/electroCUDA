@@ -5,7 +5,7 @@
 //
 // rt_nonfinite.h
 //
-// Code generation for function 'ec_detr'
+// Code generation for function 'ec_detr_fp'
 //
 
 #pragma once

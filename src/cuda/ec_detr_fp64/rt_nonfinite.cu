@@ -5,7 +5,7 @@
 //
 // rt_nonfinite.cu
 //
-// Code generation for function 'ec_detr'
+// Code generation for function 'ec_detr_fp'
 //
 
 // Include files

@@ -18,7 +18,7 @@ cflags =  -fexceptions -fPIC -fno-omit-frame-pointer -pthread -fwrapv -D_GNU_SOU
 
 cxxflags =  -fexceptions -fPIC -fno-omit-frame-pointer -pthread -fwrapv -D_GNU_SOURCE -DMATLAB_MEX_FILE  -O2 -DNDEBUG -fvisibility=hidden -fno-gnu-unique -std=c++11 -I "$root" -I "$startdir" -I "$matlabdir/toolbox/gpucoder/src/gpucoderrt/export/include/gpucoderrt" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "$root/interface" -I "$matlabdir/extern/include" -I "." -DHAVE_LAPACK_CONFIG_H -DLAPACK_COMPLEX_STRUCTURE -DMW_HAVE_LAPACK_DECLS -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_detr_fp64 -DMW_NEEDS_VERSION_H -c 
 
-ldflags =  -Xlinker --no-undefined  -shared -lstdc++ -Xlinker --as-needed -Xlinker -rpath-link,$matlabdir/bin/glnxa64 -L"$matlabdir/bin/glnxa64" -Xlinker -rpath-link,$matlabdir/extern/bin/glnxa64 -L"$matlabdir/extern/bin/glnxa64" -lMatlabDataArray -lmx -lmex -lm -lmat  -Xlinker -Bsymbolic -o ec_detr_fp64.mexa64 -Xlinker --exclude-libs,ALL -L"$matlabdir/bin/glnxa64" -L"$matlabdir/sys/cuda/glnxa64/cuda/lib64" -lmwlapack -lmwgpucoderrt -lemlrt -lcovrt -lut -lmwmathutil -arch sm_86 --fmad=true -O3 --extra-device-vectorization -I"$matlabdir/sys/cuda/glnxa64/cuda/include" -l:libcudart.so.12 -l:libcublas.so.12 -l:libcusolver.so.11 -l:libcufft.so.11 -l:libcurand.so.10 -l:libcusparse.so.12 -Xnvlink -w  -Wno-deprecated-gpu-targets
+ldflags =  -Xlinker --no-undefined  -shared -lstdc++ -Xlinker --as-needed -Xlinker -rpath-link,$matlabdir/bin/glnxa64 -L"$matlabdir/bin/glnxa64" -Xlinker -rpath-link,$matlabdir/extern/bin/glnxa64 -L"$matlabdir/extern/bin/glnxa64" -lMatlabDataArray -lmx -lmex -lm -lmat  -Xlinker -Bsymbolic -o ec_detr_fp64.mexa64 -Xlinker --exclude-libs,ALL -L"$matlabdir/bin/glnxa64" -L"$matlabdir/sys/cuda/glnxa64/cuda/lib64" -lmwlapack -lmwgpucoderrt -lemlrt -lcovrt -lut -lmwmathutil -arch sm_86 --fmad=true -O3 --extra-device-vectorization -ccbin g++-12 -I"$matlabdir/sys/cuda/glnxa64/cuda/include" -l:libcudart.so.12 -l:libcublas.so.12 -l:libcusolver.so.11 -l:libcufft.so.11 -l:libcurand.so.10 -l:libcusparse.so.12 -Xnvlink -w  -Wno-deprecated-gpu-targets
 
 linkobjs = 
 
@@ -38,7 +38,7 @@ rule linkxx
 cudac = nvcc
 linkercuda = nvcc
 
-cudaflags =  -rdc=true -Wno-deprecated-gpu-targets -Xcompiler -fPIC,-fexceptions,-fno-omit-frame-pointer,-pthread -Xcudafe "--display_error_number --diag_suppress=2381 --diag_suppress=unsigned_compare_with_zero --diag_suppress=useless_type_qualifier_on_return_type" -D_GNU_SOURCE -DMATLAB_MEX_FILE -noprof -ldir "$matlabdir/bin/glnxa64" -Xcompiler -fvisibility=hidden -std=c++11 -I "$root" -I "$startdir" -I "$matlabdir/toolbox/gpucoder/src/gpucoderrt/export/include/gpucoderrt" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "$root/interface" -I "$matlabdir/extern/include" -I "." -DHAVE_LAPACK_CONFIG_H -DLAPACK_COMPLEX_STRUCTURE -DMW_HAVE_LAPACK_DECLS -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_detr_fp64 -DMW_NEEDS_VERSION_H -c -arch sm_86 --fmad=true -O3 --extra-device-vectorization -I "$matlabdir/simulink/include" -I "$matlabdir/toolbox/shared/simtargets"
+cudaflags =  -rdc=true -Wno-deprecated-gpu-targets -Xcompiler -fPIC,-fexceptions,-fno-omit-frame-pointer,-pthread -Xcudafe "--display_error_number --diag_suppress=2381 --diag_suppress=unsigned_compare_with_zero --diag_suppress=useless_type_qualifier_on_return_type" -D_GNU_SOURCE -DMATLAB_MEX_FILE -noprof -ldir "$matlabdir/bin/glnxa64" -Xcompiler -fvisibility=hidden -std=c++11 -I "$root" -I "$startdir" -I "$matlabdir/toolbox/gpucoder/src/gpucoderrt/export/include/gpucoderrt" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "$root/interface" -I "$matlabdir/extern/include" -I "." -DHAVE_LAPACK_CONFIG_H -DLAPACK_COMPLEX_STRUCTURE -DMW_HAVE_LAPACK_DECLS -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_detr_fp64 -DMW_NEEDS_VERSION_H -c -arch sm_86 --fmad=true -O3 --extra-device-vectorization -ccbin g++-12 -I "$matlabdir/simulink/include" -I "$matlabdir/toolbox/shared/simtargets"
 rule cudac
     command = $cudac $cudaflags $in -o $out
 
@@ -50,21 +50,21 @@ build $builddir/MWLaunchParametersUtilities.o : cudac $root/MWLaunchParametersUt
 build $builddir/MWErrorCodeUtils.o : cudac $root/MWErrorCodeUtils.cpp
 build $builddir/MWCUBLASUtils.o : cudac $root/MWCUBLASUtils.cpp
 build $builddir/MWCUSOLVERUtils.o : cudac $root/MWCUSOLVERUtils.cpp
-build $builddir/ec_detr_data.o : cudac $root/ec_detr_data.cu
+build $builddir/ec_detr_fp_data.o : cudac $root/ec_detr_fp_data.cu
 build $builddir/rt_nonfinite.o : cudac $root/rt_nonfinite.cu
-build $builddir/ec_detr_initialize.o : cudac $root/ec_detr_initialize.cu
-build $builddir/ec_detr_terminate.o : cudac $root/ec_detr_terminate.cu
+build $builddir/ec_detr_fp_initialize.o : cudac $root/ec_detr_fp_initialize.cu
+build $builddir/ec_detr_fp_terminate.o : cudac $root/ec_detr_fp_terminate.cu
 build $builddir/sum.o : cudac $root/sum.cu
 build $builddir/mtimes.o : cudac $root/mtimes.cu
 build $builddir/eig.o : cudac $root/eig.cu
-build $builddir/_coder_ec_detr_api.o : cudac $root/interface/_coder_ec_detr_api.cu
-build $builddir/_coder_ec_detr_mex.o : cudac $root/interface/_coder_ec_detr_mex.cu
-build $builddir/ec_detr.o : cudac $root/ec_detr.cu
+build $builddir/_coder_ec_detr_fp_api.o : cudac $root/interface/_coder_ec_detr_fp_api.cu
+build $builddir/_coder_ec_detr_fp_mex.o : cudac $root/interface/_coder_ec_detr_fp_mex.cu
+build $builddir/ec_detr_fp.o : cudac $root/ec_detr_fp.cu
 build $builddir/mrdivide_helper.o : cudac $root/mrdivide_helper.cu
-build $builddir/ec_detr_emxutil.o : cudac $root/ec_detr_emxutil.cu
-build $builddir/ec_detr_mexutil.o : cudac $root/ec_detr_mexutil.cu
-build $builddir/_coder_ec_detr_info.o : cxx $root/interface/_coder_ec_detr_info.cpp
+build $builddir/ec_detr_fp_emxutil.o : cudac $root/ec_detr_fp_emxutil.cu
+build $builddir/ec_detr_fp_mexutil.o : cudac $root/ec_detr_fp_mexutil.cu
+build $builddir/_coder_ec_detr_fp_info.o : cxx $root/interface/_coder_ec_detr_fp_info.cpp
 build $builddir/cpp_mexapi_version.o : cudac $root/cpp_mexapi_version.cpp
 
 # Link
-build $root/ec_detr_fp64.mexa64 : linkcuda $builddir/MWLaunchParametersUtilities.o $builddir/MWErrorCodeUtils.o $builddir/MWCUBLASUtils.o $builddir/MWCUSOLVERUtils.o $builddir/ec_detr_data.o $builddir/rt_nonfinite.o $builddir/ec_detr_initialize.o $builddir/ec_detr_terminate.o $builddir/sum.o $builddir/mtimes.o $builddir/eig.o $builddir/_coder_ec_detr_api.o $builddir/_coder_ec_detr_mex.o $builddir/ec_detr.o $builddir/mrdivide_helper.o $builddir/ec_detr_emxutil.o $builddir/ec_detr_mexutil.o $builddir/_coder_ec_detr_info.o $builddir/cpp_mexapi_version.o 
+build $root/ec_detr_fp64.mexa64 : linkcuda $builddir/MWLaunchParametersUtilities.o $builddir/MWErrorCodeUtils.o $builddir/MWCUBLASUtils.o $builddir/MWCUSOLVERUtils.o $builddir/ec_detr_fp_data.o $builddir/rt_nonfinite.o $builddir/ec_detr_fp_initialize.o $builddir/ec_detr_fp_terminate.o $builddir/sum.o $builddir/mtimes.o $builddir/eig.o $builddir/_coder_ec_detr_fp_api.o $builddir/_coder_ec_detr_fp_mex.o $builddir/ec_detr_fp.o $builddir/mrdivide_helper.o $builddir/ec_detr_fp_emxutil.o $builddir/ec_detr_fp_mexutil.o $builddir/_coder_ec_detr_fp_info.o $builddir/cpp_mexapi_version.o 

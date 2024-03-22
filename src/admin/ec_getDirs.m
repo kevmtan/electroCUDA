@@ -23,6 +23,8 @@ if isstruct(proj)
     dirs = proj;
 else
     dirs = ecu_paths(proj);
+    dirs.src = dirs.code+"src"+filesep;
+    dirs.srcCUDA = dirs.src+"cuda"+filesep;
     dirs.orig = dirs.data+"orig"+filesep;
     dirs.psych = dirs.orig;
     dirs.proc = dirs.data+"proc"+filesep;
