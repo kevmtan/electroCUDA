@@ -11,6 +11,7 @@
 #pragma once
 
 // Include files
+#include "ec_wtcc_types.h"
 #include "rtwtypes.h"
 #include "emlrt.h"
 #include "mex.h"
@@ -25,31 +26,9 @@
 #undef printf
 #endif
 
-// Type Declarations
-struct ec_wtccStackData;
-
-struct emxArray_real_T;
-
-struct cell_wrap_0;
-
-// Variable Declarations
-extern emlrtCTX emlrtRootTLSGlobal;
-extern emlrtContext emlrtContextGlobal;
-
 // Function Declarations
-void b_ec_wtcc_api(ec_wtccStackData *SD, const mxArray *const prhs[6],
-                   int32_T nlhs, const mxArray *plhs[2]);
-
-void ec_wtcc(ec_wtccStackData *SD, const emxArray_real_T *cpu_x,
-             const uint16_T c_data[], const int32_T c_size[2], real_T fs,
-             const real_T fLims[2], real_T fVoices, const real_T ds[2],
-             cell_wrap_0 xx_data[], int32_T xx_size[2], cell_wrap_0 yy_data[],
-             int32_T yy_size[2]);
-
-void ec_wtcc_atexit();
-
-void ec_wtcc_initialize();
-
-void ec_wtcc_terminate();
+void ec_wtcc(const emxArray_real_T *cpu_x, const emxArray_uint16_T *c,
+             real_T fs, const real_T fLims[2], real_T fVoices, real_T ds[2],
+             emxArray_cell_wrap_0 *xx, emxArray_cell_wrap_0 *yy);
 
 // End of code generation (ec_wtcc.h)

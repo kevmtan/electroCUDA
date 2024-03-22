@@ -25,17 +25,13 @@
 #undef printf
 #endif
 
-// Type Declarations
-struct ec_wtccStackData;
-
 // Function Declarations
 MEXFUNCTION_LINKAGE void mexFunction(int32_T nlhs, mxArray *plhs[],
                                      int32_T nrhs, const mxArray *prhs[]);
 
 emlrtCTX mexFunctionCreateRootTLS();
 
-void unsafe_ec_wtcc_mexFunction(ec_wtccStackData *SD, int32_T nlhs,
-                                mxArray *plhs[2], int32_T nrhs,
+void unsafe_ec_wtcc_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                                 const mxArray *prhs[6]);
 
 // End of code generation (_coder_ec_wtcc_mex.h)

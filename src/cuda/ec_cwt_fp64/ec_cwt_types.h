@@ -13,6 +13,7 @@
 // Include files
 #include "rtwtypes.h"
 #include "emlrt.h"
+#include <cstddef>
 
 // Custom Header Code
 
@@ -33,25 +34,93 @@ struct cell_wrap_0 {
   emxArray_real_T *f1;
 };
 
-struct emxArray_cell_wrap_0_1x65534 {
-  cell_wrap_0 data[65534];
-  int32_T size[2];
+struct emxArray_cell_wrap_0 {
+  cell_wrap_0 *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
 };
 
-struct b_ec_cwt {
-  real_T cpu_x_data[9735];
-  real_T cpu_xt_data[9735];
-  real_T cpu_fx_data[9735];
-  real_T cpu_dv4_data[9735];
+namespace coder {
+struct cwtfilterbank {
+  real_T VoicesPerOctave;
+  char_T Wavelet[5];
+  real_T SamplingFrequency;
+  real_T SignalLength;
+  real_T FrequencyLimits[2];
+  real_T TimeBandwidth;
+  real_T WaveletParameters[2];
+  char_T Boundary[10];
+  emxArray_real_T *Scales;
+  emxArray_real_T *PsiDFT;
+  emxArray_real_T *WaveletCenterFrequencies;
+  real_T Beta;
+  real_T Gamma;
+  real_T SignalPad;
+  emxArray_real_T *Omega;
+  real_T CutOff;
 };
 
-struct ec_cwt_api {
-  emxArray_cell_wrap_0_1x65534 y;
+} // namespace coder
+struct emxArray_creal_T {
+  creal_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
 };
 
-struct ec_cwtStackData {
-  b_ec_cwt f0;
-  ec_cwt_api f1;
+namespace coder {
+namespace b_signal {
+namespace internal {
+namespace resample {
+struct ResampleParser {
+  int32_T dim;
+  real_T p;
+  real_T q;
+  real_T inputSize[2];
+  boolean_T isRowVectorInput;
+  emxArray_real_T *filter;
+  emxArray_real_T *filterWithPadding;
+  real_T filterDelay;
+  emxArray_real_T *x;
+};
+
+} // namespace resample
+} // namespace internal
+} // namespace b_signal
+} // namespace coder
+struct emxArray_uint32_T {
+  uint32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_int32_T {
+  int32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_ptrdiff_t {
+  ptrdiff_t *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_char_T {
+  char_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
 };
 
 // End of code generation (ec_cwt_types.h)

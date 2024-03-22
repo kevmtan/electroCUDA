@@ -59,7 +59,7 @@ mxArray *emlrtMexFcnProperties()
       emlrtMxCreateString(
           "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_filtfilt1.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
-                emlrtMxCreateDoubleScalar(739332.33623842592));
+                emlrtMxCreateDoubleScalar(739332.81372685183));
   emlrtSetField(xEntryPoints, 0, "Constructor",
                 emlrtMxCreateLogicalScalar(false));
   emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));

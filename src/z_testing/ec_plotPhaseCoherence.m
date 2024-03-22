@@ -31,6 +31,12 @@ idx = psy.idx(psy.trialA==66);
 wcoherence(xr(idx,74),xr(idx,61),fsOg,FrequencyLimits=fLims,...
         VoicesPerOctave=fVoices)
 
+%%
+tic;
+[xx,yy] = ec_wtcc_fp32(xr,cc{1:24,1:2},single(n.fs),single(o.fLims),...
+            single(o.fVoices),single(ds)); 
+toc;
+
 
 %%
 function plotcoherenceperiod(wcoh,wcs,period,t,coitmp,nVoices,mc,plotstring)

@@ -10,8 +10,10 @@
 
 // Include files
 #include "_coder_ec_cwtAvg_mex.h"
-#include "ec_cwtAvg.h"
-#include "ec_cwtAvg_types.h"
+#include "_coder_ec_cwtAvg_api.h"
+#include "ec_cwtAvg_data.h"
+#include "ec_cwtAvg_initialize.h"
+#include "ec_cwtAvg_terminate.h"
 #include "rt_nonfinite.h"
 #include <stdexcept>
 
@@ -24,22 +26,17 @@ void emlrtExceptionBridge()
 void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
                  const mxArray *prhs[])
 {
-  ec_cwtAvgStackData *ec_cwtAvgStackDataGlobal{nullptr};
-  ec_cwtAvgStackDataGlobal =
-      static_cast<ec_cwtAvgStackData *>(new ec_cwtAvgStackData);
   mexAtExit(&ec_cwtAvg_atexit);
   // Module initialization.
   ec_cwtAvg_initialize();
   try { // Dispatch the entry-point.
-    unsafe_ec_cwtAvg_mexFunction(ec_cwtAvgStackDataGlobal, nlhs, plhs, nrhs,
-                                 prhs);
+    unsafe_ec_cwtAvg_mexFunction(nlhs, plhs, nrhs, prhs);
     // Module termination.
     ec_cwtAvg_terminate();
   } catch (...) {
     emlrtCleanupOnException((emlrtCTX *)emlrtRootTLSGlobal);
     throw;
   }
-  delete ec_cwtAvgStackDataGlobal;
 }
 
 emlrtCTX mexFunctionCreateRootTLS()
@@ -49,8 +46,7 @@ emlrtCTX mexFunctionCreateRootTLS()
   return emlrtRootTLSGlobal;
 }
 
-void unsafe_ec_cwtAvg_mexFunction(ec_cwtAvgStackData *SD, int32_T nlhs,
-                                  mxArray *plhs[2], int32_T nrhs,
+void unsafe_ec_cwtAvg_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                                   const mxArray *prhs[5])
 {
   const mxArray *outputs[2];
@@ -67,7 +63,7 @@ void unsafe_ec_cwtAvg_mexFunction(ec_cwtAvgStackData *SD, int32_T nlhs,
                         "ec_cwtAvg");
   }
   // Call the function.
-  b_ec_cwtAvg_api(SD, prhs, nlhs, outputs);
+  ec_cwtAvg_api(prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
     b = 1;

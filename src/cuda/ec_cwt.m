@@ -1,4 +1,4 @@
-function [y,freqs] = ec_cwt(x,fs,fLims,fOctave,ds)
+function [y,freqs] = ec_cwt(x,fs,fLims,fVoices,ds)
 %% Continuous wavelet transform - CUDA binary wrapper (double-precision, FP64)
 % CWT uses morse wavelets, as they account for unequal variance-covariance across freqs.
 % L1-norm is applied to mitigate 1/f decay of neuronal field potentials.
@@ -9,10 +9,10 @@ function [y,freqs] = ec_cwt(x,fs,fLims,fOctave,ds)
 %% Input validation
 arguments
     x (:,:){mustBeFloat} % Input data
-    fs (1,1){mustBeFloat} = 1000 % Sampling rate
-    fLims (1,2){mustBeFloat} = [1 300] % Frequency limits
-    fOctave (1,1){mustBeFloat} = 10 % Voices per octave
-    ds (1,2){mustBeFloat} = [1 1] % Frequency limits
+    fs (1,1) double = 1000 % Sampling rate
+    fLims (1,2) double = [1 300] % Frequency limits
+    fVoices (1,1) double = 10 % Voices per octave
+    ds (1,2) double = [1 1] % Frequency limits
 end
 coder.gpu.kernelfun;
 nFrames = height(x);
@@ -21,7 +21,7 @@ doDownsample = ds(2)>ds(1);
 
 %% Prep CWT
 fb = cwtfilterbank(Wavelet="Morse",SignalLength=nFrames,...
-    SamplingFrequency=fs,FrequencyLimits=fLims,VoicesPerOctave=fOctave);
+    SamplingFrequency=fs,FrequencyLimits=fLims,VoicesPerOctave=fVoices);
 freqs = centerFrequencies(fb);
 % nFreqs = uint32(numel(freqs));
 % nFrames = uint32(numel(1:ds:nFrames));

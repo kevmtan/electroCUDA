@@ -29,4 +29,12 @@ struct emxArray_real32_T {
   boolean_T canFreeData;
 };
 
+struct emxArray_int32_T {
+  int32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
 // End of code generation (ec_filtfilt1_types.h)

@@ -18,7 +18,7 @@ cflags =  -fexceptions -fPIC -fno-omit-frame-pointer -pthread -fwrapv -D_GNU_SOU
 
 cxxflags =  -fexceptions -fPIC -fno-omit-frame-pointer -pthread -fwrapv -D_GNU_SOURCE -DMATLAB_MEX_FILE  -O2 -DNDEBUG -fvisibility=hidden -fno-gnu-unique -std=c++11 -I "$root" -I "$startdir" -I "$matlabdir/toolbox/gpucoder/src/gpucoderrt/export/include/gpucoderrt" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "$root/interface" -I "$matlabdir/extern/include" -I "." -DHAVE_LAPACK_CONFIG_H -DLAPACK_COMPLEX_STRUCTURE -DMW_HAVE_LAPACK_DECLS -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_wtcc_fp64 -DMW_NEEDS_VERSION_H -c 
 
-ldflags =  -Xlinker --no-undefined  -shared -lstdc++ -Xlinker --as-needed -Xlinker -rpath-link,$matlabdir/bin/glnxa64 -L"$matlabdir/bin/glnxa64" -Xlinker -rpath-link,$matlabdir/extern/bin/glnxa64 -L"$matlabdir/extern/bin/glnxa64" -lMatlabDataArray -lmx -lmex -lm -lmat  -Xlinker -Bsymbolic -o ec_wtcc_fp64.mexa64 -Xlinker --exclude-libs,ALL -L"$matlabdir/bin/glnxa64" -L"$matlabdir/sys/cuda/glnxa64/cuda/lib64" -lmwlapack -lmwgpucoderrt -lemlrt -lcovrt -lut -lmwmathutil -arch sm_86 --fmad=false --extra-device-vectorization -I"$matlabdir/sys/cuda/glnxa64/cuda/include" -l:libcudart.so.12 -l:libcublas.so.12 -l:libcusolver.so.11 -l:libcufft.so.11 -l:libcurand.so.10 -l:libcusparse.so.12 -Xnvlink -w  -Wno-deprecated-gpu-targets
+ldflags =  -Xlinker --no-undefined  -shared -lstdc++ -Xlinker --as-needed -Xlinker -rpath-link,$matlabdir/bin/glnxa64 -L"$matlabdir/bin/glnxa64" -Xlinker -rpath-link,$matlabdir/extern/bin/glnxa64 -L"$matlabdir/extern/bin/glnxa64" -lMatlabDataArray -lmx -lmex -lm -lmat  -Xlinker -Bsymbolic -o ec_wtcc_fp64.mexa64 -Xlinker --exclude-libs,ALL -L"$matlabdir/bin/glnxa64" -L"$matlabdir/sys/cuda/glnxa64/cuda/lib64" -lmwlapack -lmwgpucoderrt -lemlrt -lcovrt -lut -lmwmathutil -arch sm_86 --fmad=true -O3 --extra-device-vectorization -I"$matlabdir/sys/cuda/glnxa64/cuda/include" -l:libcudart.so.12 -l:libcublas.so.12 -l:libcusolver.so.11 -l:libcufft.so.11 -l:libcurand.so.10 -l:libcusparse.so.12 -Xnvlink -w  -Wno-deprecated-gpu-targets
 
 linkobjs = 
 
@@ -38,7 +38,7 @@ rule linkxx
 cudac = nvcc
 linkercuda = nvcc
 
-cudaflags =  -rdc=true -Wno-deprecated-gpu-targets -Xcompiler -fPIC,-fexceptions,-fno-omit-frame-pointer,-pthread -Xcudafe "--display_error_number --diag_suppress=2381 --diag_suppress=unsigned_compare_with_zero --diag_suppress=useless_type_qualifier_on_return_type" -D_GNU_SOURCE -DMATLAB_MEX_FILE -noprof -ldir "$matlabdir/bin/glnxa64" -Xcompiler -fvisibility=hidden -std=c++11 -I "$root" -I "$startdir" -I "$matlabdir/toolbox/gpucoder/src/gpucoderrt/export/include/gpucoderrt" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "$root/interface" -I "$matlabdir/extern/include" -I "." -DHAVE_LAPACK_CONFIG_H -DLAPACK_COMPLEX_STRUCTURE -DMW_HAVE_LAPACK_DECLS -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_wtcc_fp64 -DMW_NEEDS_VERSION_H -c -arch sm_86 --fmad=false --extra-device-vectorization -I "$matlabdir/simulink/include" -I "$matlabdir/toolbox/shared/simtargets"
+cudaflags =  -rdc=true -Wno-deprecated-gpu-targets -Xcompiler -fPIC,-fexceptions,-fno-omit-frame-pointer,-pthread -Xcudafe "--display_error_number --diag_suppress=2381 --diag_suppress=unsigned_compare_with_zero --diag_suppress=useless_type_qualifier_on_return_type" -D_GNU_SOURCE -DMATLAB_MEX_FILE -noprof -ldir "$matlabdir/bin/glnxa64" -Xcompiler -fvisibility=hidden -std=c++11 -I "$root" -I "$startdir" -I "$matlabdir/toolbox/gpucoder/src/gpucoderrt/export/include/gpucoderrt" -I "$matlabdir/sys/cuda/glnxa64/cuda/include" -I "$root/interface" -I "$matlabdir/extern/include" -I "." -DHAVE_LAPACK_CONFIG_H -DLAPACK_COMPLEX_STRUCTURE -DMW_HAVE_LAPACK_DECLS -DMW_CUDA_ARCH=860 -DMW_GPU_MEMORY_MANAGER -DMODEL=ec_wtcc_fp64 -DMW_NEEDS_VERSION_H -c -arch sm_86 --fmad=true -O3 --extra-device-vectorization -I "$matlabdir/simulink/include" -I "$matlabdir/toolbox/shared/simtargets"
 rule cudac
     command = $cudac $cudaflags $in -o $out
 
@@ -51,11 +51,47 @@ build $builddir/MWErrorCodeUtils.o : cudac $root/MWErrorCodeUtils.cpp
 build $builddir/MWCUFFTPlanManager.o : cudac $root/MWCUFFTPlanManager.cpp
 build $builddir/MWCUBLASUtils.o : cudac $root/MWCUBLASUtils.cpp
 build $builddir/MWCUSOLVERUtils.o : cudac $root/MWCUSOLVERUtils.cpp
+build $builddir/ec_wtcc_data.o : cudac $root/ec_wtcc_data.cu
 build $builddir/rt_nonfinite.o : cudac $root/rt_nonfinite.cu
+build $builddir/ec_wtcc_initialize.o : cudac $root/ec_wtcc_initialize.cu
+build $builddir/ec_wtcc_terminate.o : cudac $root/ec_wtcc_terminate.cu
 build $builddir/ec_wtcc.o : cudac $root/ec_wtcc.cu
+build $builddir/wcoherence.o : cudac $root/wcoherence.cu
+build $builddir/log2.o : cudac $root/log2.cu
+build $builddir/cwtfreqlimits.o : cudac $root/cwtfreqlimits.cu
+build $builddir/cwtfilterbank.o : cudac $root/cwtfilterbank.cu
+build $builddir/wavCFandSD.o : cudac $root/wavCFandSD.cu
+build $builddir/quadgk.o : cudac $root/quadgk.cu
+build $builddir/wt.o : cudac $root/wt.cu
+build $builddir/fft.o : cudac $root/fft.cu
+build $builddir/bsxfun.o : cudac $root/bsxfun.cu
+build $builddir/ifft.o : cudac $root/ifft.cu
+build $builddir/colon.o : cudac $root/colon.cu
+build $builddir/mtimes.o : cudac $root/mtimes.cu
+build $builddir/rat.o : cudac $root/rat.cu
+build $builddir/firls.o : cudac $root/firls.cu
+build $builddir/mldivide.o : cudac $root/mldivide.cu
+build $builddir/kaiser.o : cudac $root/kaiser.cu
+build $builddir/warning.o : cudac $root/warning.cu
+build $builddir/mod.o : cudac $root/mod.cu
+build $builddir/upfirdn.o : cudac $root/upfirdn.cu
+build $builddir/conv2.o : cudac $root/conv2.cu
+build $builddir/resample.o : cudac $root/resample.cu
+build $builddir/_coder_ec_wtcc_api.o : cudac $root/interface/_coder_ec_wtcc_api.cu
 build $builddir/_coder_ec_wtcc_mex.o : cudac $root/interface/_coder_ec_wtcc_mex.cu
+build $builddir/gammaln.o : cudac $root/gammaln.cu
+build $builddir/smoothCFS.o : cudac $root/smoothCFS.cu
+build $builddir/cmlri.o : cudac $root/cmlri.cu
+build $builddir/casyi.o : cudac $root/casyi.cu
+build $builddir/uniformResampleKernel.o : cudac $root/uniformResampleKernel.cu
+build $builddir/circshift.o : cudac $root/circshift.cu
+build $builddir/div.o : cudac $root/div.cu
+build $builddir/wavbpfilters.o : cudac $root/wavbpfilters.cu
+build $builddir/morseproperties.o : cudac $root/morseproperties.cu
+build $builddir/ec_wtcc_emxutil.o : cudac $root/ec_wtcc_emxutil.cu
+build $builddir/ec_wtcc_mexutil.o : cudac $root/ec_wtcc_mexutil.cu
 build $builddir/_coder_ec_wtcc_info.o : cxx $root/interface/_coder_ec_wtcc_info.cpp
 build $builddir/cpp_mexapi_version.o : cudac $root/cpp_mexapi_version.cpp
 
 # Link
-build $root/ec_wtcc_fp64.mexa64 : linkcuda $builddir/MWLaunchParametersUtilities.o $builddir/MWErrorCodeUtils.o $builddir/MWCUFFTPlanManager.o $builddir/MWCUBLASUtils.o $builddir/MWCUSOLVERUtils.o $builddir/rt_nonfinite.o $builddir/ec_wtcc.o $builddir/_coder_ec_wtcc_mex.o $builddir/_coder_ec_wtcc_info.o $builddir/cpp_mexapi_version.o 
+build $root/ec_wtcc_fp64.mexa64 : linkcuda $builddir/MWLaunchParametersUtilities.o $builddir/MWErrorCodeUtils.o $builddir/MWCUFFTPlanManager.o $builddir/MWCUBLASUtils.o $builddir/MWCUSOLVERUtils.o $builddir/ec_wtcc_data.o $builddir/rt_nonfinite.o $builddir/ec_wtcc_initialize.o $builddir/ec_wtcc_terminate.o $builddir/ec_wtcc.o $builddir/wcoherence.o $builddir/log2.o $builddir/cwtfreqlimits.o $builddir/cwtfilterbank.o $builddir/wavCFandSD.o $builddir/quadgk.o $builddir/wt.o $builddir/fft.o $builddir/bsxfun.o $builddir/ifft.o $builddir/colon.o $builddir/mtimes.o $builddir/rat.o $builddir/firls.o $builddir/mldivide.o $builddir/kaiser.o $builddir/warning.o $builddir/mod.o $builddir/upfirdn.o $builddir/conv2.o $builddir/resample.o $builddir/_coder_ec_wtcc_api.o $builddir/_coder_ec_wtcc_mex.o $builddir/gammaln.o $builddir/smoothCFS.o $builddir/cmlri.o $builddir/casyi.o $builddir/uniformResampleKernel.o $builddir/circshift.o $builddir/div.o $builddir/wavbpfilters.o $builddir/morseproperties.o $builddir/ec_wtcc_emxutil.o $builddir/ec_wtcc_mexutil.o $builddir/_coder_ec_wtcc_info.o $builddir/cpp_mexapi_version.o 

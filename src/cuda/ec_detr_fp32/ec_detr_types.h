@@ -13,6 +13,7 @@
 // Include files
 #include "rtwtypes.h"
 #include "emlrt.h"
+#include <cstddef>
 
 // Custom Header Code
 
@@ -23,6 +24,46 @@
 // Type Definitions
 struct emxArray_real32_T {
   real32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_creal32_T {
+  creal32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_real_T {
+  real_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_boolean_T {
+  boolean_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_int32_T {
+  int32_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
+struct emxArray_ptrdiff_t {
+  ptrdiff_t *data;
   int32_T *size;
   int32_T allocatedSize;
   int32_T numDimensions;

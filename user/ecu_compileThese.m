@@ -51,28 +51,33 @@ cd(dirsCuda); system('rm -rf codegen');
 gpu = gpuDevice();
 
 % Config
-cfg = coder.gpuConfig("mex");
-cfg.DeepLearningConfig = coder.DeepLearningConfig(TargetLibrary="tensorrt");
-cfg.TargetLang = "C++";
-%cfg.DynamicMemoryAllocationThreshold = 65535;
-cfg.FilePartitionMethod = "SingleFile";
+cfg = coder.gpuConfig('mex');
+cfg.EnableAutoParallelization = true;
+cfg.DeepLearningConfig = coder.DeepLearningConfig("TargetLibrary","tensorrt");
+cfg.DynamicMemoryAllocationThreshold = 65535;
+%cfg.FilePartitionMethod = "SingleFile";
 cfg.GenerateReport = true;
-cfg.GlobalDataSyncMethod = "SyncAlways";
-cfg.ExtrinsicCalls = true;
+cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits"; % "SyncAlways";
+%cfg.ExtrinsicCalls = true;
 %cfg.EnableJIT = true;
+cfg.InlineBetweenUserFunctions = "Speed";
+cfg.InlineBetweenUserAndMathWorksFunctions = "Speed";
+cfg.InlineBetweenMathWorksFunctions = "Speed";
 cfg.MATLABSourceComments = true;
 %cfg.NumberOfCpuThreads = maxNumCompThreads;
+cfg.OptimizeReductions = true;
 cfg.SIMDAcceleration = "Full";
 % cfg.StackUsageMax = floor(gpu.TotalMemory*.95);
-cfg.GpuConfig.CompilerFlags = "--fmad=false --extra-device-vectorization"; 
+cfg.Verbosity = "Verbose";
+cfg.GpuConfig.CompilerFlags =...
+    "--fmad=true -O3 --extra-device-vectorization"; % --fmad=false --optimize=3 
+cfg.GpuConfig.ComputeCapability = gpu.ComputeCapability;
 cfg.GpuConfig.EnableMemoryManager = true;
-cfg.GpuConfig.ComputeCapability = string(gpu.ComputeCapability);
 %cfg.GpuConfig.CustomComputeCapability = "sm_86";
 %cfg.GpuConfig.FreeMode = "AfterAllocate";
 %cfg.GpuConfig.MaximumBlocksPerKernel = 3584;
 %cfg.GpuConfig.MaxPoolSize = 8192;
 %cfg.GpuConfig.StackLimitPerThread = floor((gpu.TotalMemory*.95)/3584);
-cfg.Verbosity = "Verbose";
 
 % Paths & names
 fn = dirs.code+"bin"+filesep;
@@ -80,8 +85,11 @@ fnc = dirsCuda+"codegen"+filesep+"mex"+filesep;
 funs = ["ec_wtcc","ec_wtcc"];
 funz = ["ec_wtcc_fp32","ec_wtcc_fp64"];
 
-%ec_wtcCUDA(x,c,fs,fLims,fVoices,ds)
-arg2 = coder.newtype('uint16',[65535-1 2],[1 0]);
+arg2 = coder.newtype('uint16',[65535-1 2],[1 0]); % c (list of chan pairs)
+arg3 = coder.newtype('double',[1 1],[0 0]); % fs
+arg4 = coder.newtype('double',[1 2],[0 0]); % fLims
+arg5 = coder.newtype('double',[1 1],[0 0]); % fVoices
+arg6 = coder.newtype('double',[1 2],[0 0]); % ds
 
 % Compile loop
 for v = 1:2
@@ -91,16 +99,8 @@ for v = 1:2
 
     if v==1
         arg1 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % x
-        arg3 = coder.newtype('single',[1 1],[0 0]);
-        arg4 = coder.newtype('single',[1 2],[0 0]);
-        arg5 = coder.newtype('single',[1 1],[0 0]);
-        arg6 = coder.newtype('single',[1 2],[0 0]);
     else
         arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]); % x
-        arg3 = coder.newtype('double',[1 1],[0 0]);
-        arg4 = coder.newtype('double',[1 2],[0 0]);
-        arg5 = coder.newtype('double',[1 1],[0 0]);
-        arg6 = coder.newtype('double',[1 2],[0 0]);
     end
 
     argz = {arg1,arg2,arg3,arg4,arg5,arg6};
@@ -123,28 +123,33 @@ cd(dirsCuda); system('rm -rf codegen');
 gpu = gpuDevice();
 
 % Config
-cfg = coder.gpuConfig("mex");
-cfg.DeepLearningConfig = coder.DeepLearningConfig(TargetLibrary="tensorrt");
-cfg.TargetLang = "C++";
-%cfg.DynamicMemoryAllocationThreshold = 65535;
-cfg.FilePartitionMethod = "SingleFile";
+cfg = coder.gpuConfig('mex');
+cfg.EnableAutoParallelization = true;
+cfg.DeepLearningConfig = coder.DeepLearningConfig("TargetLibrary","tensorrt");
+cfg.DynamicMemoryAllocationThreshold = 65535;
+%cfg.FilePartitionMethod = "SingleFile";
 cfg.GenerateReport = true;
-cfg.GlobalDataSyncMethod = "SyncAlways";
-cfg.ExtrinsicCalls = true;
+cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits"; % "SyncAlways";
+%cfg.ExtrinsicCalls = true;
 %cfg.EnableJIT = true;
+cfg.InlineBetweenUserFunctions = "Speed";
+cfg.InlineBetweenUserAndMathWorksFunctions = "Speed";
+cfg.InlineBetweenMathWorksFunctions = "Speed";
 cfg.MATLABSourceComments = true;
 %cfg.NumberOfCpuThreads = maxNumCompThreads;
+cfg.OptimizeReductions = true;
 cfg.SIMDAcceleration = "Full";
 % cfg.StackUsageMax = floor(gpu.TotalMemory*.95);
-cfg.GpuConfig.CompilerFlags = "--fmad=false --extra-device-vectorization"; 
+cfg.Verbosity = "Verbose";
+cfg.GpuConfig.CompilerFlags =...
+    "--fmad=true -O3 --extra-device-vectorization"; % --fmad=false --optimize=3 
+cfg.GpuConfig.ComputeCapability = gpu.ComputeCapability;
 cfg.GpuConfig.EnableMemoryManager = true;
-cfg.GpuConfig.ComputeCapability = string(gpu.ComputeCapability);
 %cfg.GpuConfig.CustomComputeCapability = "sm_86";
 %cfg.GpuConfig.FreeMode = "AfterAllocate";
 %cfg.GpuConfig.MaximumBlocksPerKernel = 3584;
 %cfg.GpuConfig.MaxPoolSize = 8192;
 %cfg.GpuConfig.StackLimitPerThread = floor((gpu.TotalMemory*.95)/3584);
-cfg.Verbosity = "Verbose";
 
 % Paths & names
 fn = dirs.code+"bin"+filesep;
@@ -153,9 +158,10 @@ funs = ["ec_cwt","ec_cwt","ec_cwtAvg","ec_cwtAvg"];
 funz = ["ec_cwt_fp32","ec_cwt_fp64","ec_cwtAvg_fp32","ec_cwtAvg_fp64"];
 
 % args
-arg2 = coder.newtype('double',[1 1],[0 0]);
-arg3 = coder.newtype('double',[1 2],[0 0]);
-arg4 = coder.newtype('double',[1 1],[0 0]);
+arg2 = coder.newtype('double',[1 1],[0 0]); % fs
+arg3 = coder.newtype('double',[1 2],[0 0]); % fLim
+arg4 = coder.newtype('double',[1 1],[0 0]); % fVoices
+arg5 = coder.newtype('double',[1 2],[0 0]); % ds
 
 % Compile loop
 for v = 1:4
@@ -165,10 +171,8 @@ for v = 1:4
 
     if v==1 || v==3
         arg1 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % x
-        arg5 = coder.newtype('single',[1 2],[0 0]); % ds2
     else
         arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]);
-        arg5 = coder.newtype('double',[1 2],[0 0]); % ds2
     end
     argz = {arg1,arg2,arg3,arg4,arg5};
 
@@ -190,28 +194,33 @@ cd(dirsCuda); system('rm -rf codegen');
 gpu = gpuDevice();
 
 % Config
-cfg = coder.gpuConfig("mex");
-cfg.DeepLearningConfig = coder.DeepLearningConfig(TargetLibrary="tensorrt");
-cfg.TargetLang = "C++";
-%cfg.DynamicMemoryAllocationThreshold = 65535;
-cfg.FilePartitionMethod = "SingleFile";
+cfg = coder.gpuConfig('mex');
+cfg.EnableAutoParallelization = true;
+cfg.DeepLearningConfig = coder.DeepLearningConfig("TargetLibrary","tensorrt");
+cfg.DynamicMemoryAllocationThreshold = 65535;
+%cfg.FilePartitionMethod = "SingleFile";
 cfg.GenerateReport = true;
-cfg.GlobalDataSyncMethod = "SyncAlways";
-cfg.ExtrinsicCalls = true;
+cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits"; % "SyncAlways";
+%cfg.ExtrinsicCalls = true;
 %cfg.EnableJIT = true;
+cfg.InlineBetweenUserFunctions = "Speed";
+cfg.InlineBetweenUserAndMathWorksFunctions = "Speed";
+cfg.InlineBetweenMathWorksFunctions = "Speed";
 cfg.MATLABSourceComments = true;
 %cfg.NumberOfCpuThreads = maxNumCompThreads;
+cfg.OptimizeReductions = true;
 cfg.SIMDAcceleration = "Full";
 % cfg.StackUsageMax = floor(gpu.TotalMemory*.95);
-cfg.GpuConfig.CompilerFlags = "--fmad=false --extra-device-vectorization"; 
+cfg.Verbosity = "Verbose";
+cfg.GpuConfig.CompilerFlags =...
+    "--fmad=true -O3 --extra-device-vectorization"; % --fmad=false --optimize=3 
+cfg.GpuConfig.ComputeCapability = gpu.ComputeCapability;
 cfg.GpuConfig.EnableMemoryManager = true;
-cfg.GpuConfig.ComputeCapability = string(gpu.ComputeCapability);
 %cfg.GpuConfig.CustomComputeCapability = "sm_86";
 %cfg.GpuConfig.FreeMode = "AfterAllocate";
 %cfg.GpuConfig.MaximumBlocksPerKernel = 3584;
 %cfg.GpuConfig.MaxPoolSize = 8192;
 %cfg.GpuConfig.StackLimitPerThread = floor((gpu.TotalMemory*.95)/3584);
-cfg.Verbosity = "Verbose";
 
 % Paths & names
 fn = dirs.code+"bin"+filesep;
@@ -261,28 +270,33 @@ cd(dirsCuda); system('rm -rf codegen');
 gpu = gpuDevice();
 
 % Config
-cfg = coder.gpuConfig("mex");
-cfg.DeepLearningConfig = coder.DeepLearningConfig(TargetLibrary="tensorrt");
-cfg.TargetLang = "C++";
-%cfg.DynamicMemoryAllocationThreshold = 65535;
-cfg.FilePartitionMethod = "SingleFile";
+cfg = coder.gpuConfig('mex');
+cfg.EnableAutoParallelization = true;
+cfg.DeepLearningConfig = coder.DeepLearningConfig("TargetLibrary","tensorrt");
+cfg.DynamicMemoryAllocationThreshold = 65535;
+%cfg.FilePartitionMethod = "SingleFile";
 cfg.GenerateReport = true;
-cfg.GlobalDataSyncMethod = "SyncAlways";
-cfg.ExtrinsicCalls = true;
+cfg.GlobalDataSyncMethod = "SyncAtEntryAndExits"; % "SyncAlways";
+%cfg.ExtrinsicCalls = true;
 %cfg.EnableJIT = true;
+cfg.InlineBetweenUserFunctions = "Speed";
+cfg.InlineBetweenUserAndMathWorksFunctions = "Speed";
+cfg.InlineBetweenMathWorksFunctions = "Speed";
 cfg.MATLABSourceComments = true;
 %cfg.NumberOfCpuThreads = maxNumCompThreads;
+cfg.OptimizeReductions = true;
 cfg.SIMDAcceleration = "Full";
 % cfg.StackUsageMax = floor(gpu.TotalMemory*.95);
-cfg.GpuConfig.CompilerFlags = "--fmad=false --extra-device-vectorization"; 
+cfg.Verbosity = "Verbose";
+cfg.GpuConfig.CompilerFlags =...
+    "--fmad=true -O3 --extra-device-vectorization"; % --fmad=false --optimize=3 
+cfg.GpuConfig.ComputeCapability = gpu.ComputeCapability;
 cfg.GpuConfig.EnableMemoryManager = true;
-cfg.GpuConfig.ComputeCapability = string(gpu.ComputeCapability);
 %cfg.GpuConfig.CustomComputeCapability = "sm_86";
 %cfg.GpuConfig.FreeMode = "AfterAllocate";
 %cfg.GpuConfig.MaximumBlocksPerKernel = 3584;
 %cfg.GpuConfig.MaxPoolSize = 8192;
 %cfg.GpuConfig.StackLimitPerThread = floor((gpu.TotalMemory*.95)/3584);
-cfg.Verbosity = "Verbose";
 
 % Paths & names
 fn = dirs.code+filesep+"bin"+filesep;

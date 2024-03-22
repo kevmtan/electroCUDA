@@ -11,6 +11,7 @@
 #pragma once
 
 // Include files
+#include "ec_cwt_types.h"
 #include "rtwtypes.h"
 #include "emlrt.h"
 #include "mex.h"
@@ -25,30 +26,9 @@
 #undef printf
 #endif
 
-// Type Declarations
-struct ec_cwtStackData;
-
-struct emxArray_real_T;
-
-struct cell_wrap_0;
-
-// Variable Declarations
-extern emlrtCTX emlrtRootTLSGlobal;
-extern emlrtContext emlrtContextGlobal;
-
 // Function Declarations
-void b_ec_cwt_api(ec_cwtStackData *SD, const mxArray *const prhs[5],
-                  int32_T nlhs, const mxArray *plhs[2]);
-
-void ec_cwt(ec_cwtStackData *SD, const emxArray_real_T *cpu_x, real_T fs,
-            const real_T fLims[2], real_T fOctave, const real_T ds[2],
-            cell_wrap_0 y_data[], int32_T y_size[2],
-            emxArray_real_T *cpu_freqs);
-
-void ec_cwt_atexit();
-
-void ec_cwt_initialize();
-
-void ec_cwt_terminate();
+void ec_cwt(const emxArray_real_T *cpu_x, real_T fs, const real_T fLims[2],
+            real_T fVoices, const real_T ds[2], emxArray_cell_wrap_0 *y,
+            emxArray_real_T *freqs);
 
 // End of code generation (ec_cwt.h)

@@ -10,8 +10,10 @@
 
 // Include files
 #include "_coder_ec_cwt_mex.h"
-#include "ec_cwt.h"
-#include "ec_cwt_types.h"
+#include "_coder_ec_cwt_api.h"
+#include "ec_cwt_data.h"
+#include "ec_cwt_initialize.h"
+#include "ec_cwt_terminate.h"
 #include "rt_nonfinite.h"
 #include <stdexcept>
 
@@ -24,20 +26,17 @@ void emlrtExceptionBridge()
 void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
                  const mxArray *prhs[])
 {
-  ec_cwtStackData *ec_cwtStackDataGlobal{nullptr};
-  ec_cwtStackDataGlobal = static_cast<ec_cwtStackData *>(new ec_cwtStackData);
   mexAtExit(&ec_cwt_atexit);
   // Module initialization.
   ec_cwt_initialize();
   try { // Dispatch the entry-point.
-    unsafe_ec_cwt_mexFunction(ec_cwtStackDataGlobal, nlhs, plhs, nrhs, prhs);
+    unsafe_ec_cwt_mexFunction(nlhs, plhs, nrhs, prhs);
     // Module termination.
     ec_cwt_terminate();
   } catch (...) {
     emlrtCleanupOnException((emlrtCTX *)emlrtRootTLSGlobal);
     throw;
   }
-  delete ec_cwtStackDataGlobal;
 }
 
 emlrtCTX mexFunctionCreateRootTLS()
@@ -47,8 +46,7 @@ emlrtCTX mexFunctionCreateRootTLS()
   return emlrtRootTLSGlobal;
 }
 
-void unsafe_ec_cwt_mexFunction(ec_cwtStackData *SD, int32_T nlhs,
-                               mxArray *plhs[2], int32_T nrhs,
+void unsafe_ec_cwt_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                                const mxArray *prhs[5])
 {
   const mxArray *outputs[2];
@@ -65,7 +63,7 @@ void unsafe_ec_cwt_mexFunction(ec_cwtStackData *SD, int32_T nlhs,
                         "ec_cwt");
   }
   // Call the function.
-  b_ec_cwt_api(SD, prhs, nlhs, outputs);
+  ec_cwt_api(prhs, nlhs, outputs);
   // Copy over outputs to the caller.
   if (nlhs < 1) {
     b = 1;

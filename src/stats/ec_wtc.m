@@ -1,10 +1,6 @@
 function [errors,n,x] = ec_wtc(sbj,task,o,n,x,arg)
-%% electroCUDA: time-frequency decomposition
-% This function performs time-frequency decomposition on channel or IC timecourses
-% (output of 'ec_preproc' or 'ec_preprocICA'). Decomposition is performed via
-% continuous wavelet transform (CWT) using Morse wavelets, which account
-% for unequal variance-covariance across frequencies (unlike other wavelets).
-% L1-norm is applied to mitigate the 1/frequency decay of neuronal field potentials.
+%% electroCUDA: wavelet coherence
+%
 %
 % SEE WIKI FOR MORE INFO: github.com/kevmtan/electroCUDA/wiki
 %
@@ -22,11 +18,6 @@ function [errors,n,x] = ec_wtc(sbj,task,o,n,x,arg)
 %   x = Preprocessed EEG data indexed as: x(timeframe,channel)
 %      NOTE: 'n' and 'x' are saved to disk by default
 %
-% ACKNOWLEDGEMENTS:
-%    * Stanford Parvizi Lab (Pedro Pinhiero-Chagas, Amy Daitch, Su Liu, et al.)
-%    * Laboratoire des Systèmes Perceptifs (NoiseTools: Alain de Cheveigné, et al.)
-%    * Full acknowledgements in Wiki (github.com/kevmtan/electroCUDA/wiki)
-%
 % LICENSE: General Public License (GNU GPLv3)
 % DISCLAIMERS:
 %    Use and distribution of this software must comply with GNU GPLv3.
@@ -37,7 +28,7 @@ function [errors,n,x] = ec_wtc(sbj,task,o,n,x,arg)
 %    This code is for research purposes only and NOT INTENDED FOR CLINICAL USE.
 %
 %
-%                 Kevin Tan, 2022 (github.io/kevmtan)
+%                 Kevin Tan, 2024 (github.io/kevmtan)
 
 %% Input validation
 arguments
@@ -114,7 +105,7 @@ cc = combinations(cc,cc);
 cc = renamevars(cc,[1 2],["i1" "i2"]);
 cc = cc(cc.i1~=cc.i2,:); % Remove same-channel pairs
 % Keep unique channel pairs only
-for p = 1:nChs 
+for p = 1:nChs
     idx = cc.i1>p & cc.i2==p;
     cc = cc(~idx,:);
 end
@@ -125,7 +116,7 @@ nPairs = height(cc);
 % Reset GPU, move vars to GPU, get free VRAM
 if o.doGPU
     if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); delete(gcp('nocreate')); end
-	try reset(gpuDevice()); catch; end
+    try reset(gpuDevice()); catch; end
     memMax = gpuDevice().AvailableMemory; % see available vram
 else
     try ppool = parpool('process'); catch;end %#ok<NASGU>
@@ -148,7 +139,7 @@ for r = 1:nRuns
     nFrqs = numel(cwtHz{r});
 
     % Do wavelet coherence
-    [x{r},y{r}] = withinRun_lfn(x{r},cc,n,o,ds,nFrqs,run,memMax);
+    [x{r},y{r}] = withinRun_lfn(x{r},cc,n,o,ds,nFrqs,r,memMax);
 end
 
 
@@ -170,8 +161,8 @@ if singleOut; x = single(x); end
 
 % Reset GPU
 if doGPU
-	if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); end
-	try reset(gpuDevice()); catch; end
+    if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); end
+    try reset(gpuDevice()); catch; end
 end
 
 % Save
@@ -200,19 +191,18 @@ end
 
 
 %%% Wavelet coherence within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [xr,yr] = withinRun_lfn(xr,cc,n,o,ds,nFrqs,run,memMax)
+function [xr,yr] = withinRun_lfn(xr,cc,n,o,ds,nFrqs,r,memMax)
 tic;
+run=n.runs(r); sbj=n.sbjID;
 if o.doCUDA
     % CUDA GPU binaries (fastest)
     disp("[ec_wtc] CUDA GPU binary start: s"+sbj+"_r"+run+" time="+toc);
     if o.single
-         % Single-precision
-        [xr,yr] = ec_wtcc_fp32(xr,cc{:,1:2},n.fs,o.fLims,o.fVoices,ds); 
-    else % Double-precision
+        [xr,yr] = ec_wtcc_fp32(xr,cc{:,1:2},n.fs,o.fLims,o.fVoices,ds); % Single-precision
+    else 
         [xr,yr] = ec_wtcc_fp64(xr,cc{:,1:2},n.fs,o.fLims,o.fVoices,ds); % Double-precision
     end
     disp("[ec_wtc] CUDA GPU binary finished: s"+sbj+"_r"+run+" time="+toc);
-
 elseif o.doGPU
     % gpuArrays (fast)
     [xr,yr] = gpuArrayWT_lfn(xr,cc,n,o,ds,nFrqs,run,memMax);
@@ -230,7 +220,7 @@ disp("[ec_wtc] Finished WTC: s"+n.sbjID+"_r"+run+" time="+toc);
 
 %%% gpuArrayFun WT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [xx,yy] = gpuArrayWT_lfn(xr,cc,n,o,ds,nFrqs,run,memMax)
-tic; 
+tic;
 % Get vars
 nPairs=height(cc); c1=cc.i1; c2=cc.i2; xx=cell(1,nPairs); yy=xx;
 
@@ -269,7 +259,7 @@ disp("[ec_wtc] gpu_lfn end: s"+n.sbjID+"_r"+run+" time="+toc);
 
 %%% CPU parallel loop WT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [xx,yy] = cpuParforWT_lfn(xr,cc,ds,fs,fLims,fVoices,sbj,run)
-tic; 
+tic;
 nPairs=height(cc); c1=cc.i1; c2=cc.i2; xx=cell(1,nPairs); yy=xx;
 
 % Run wavelet coherence - parallel loop

@@ -25,17 +25,13 @@
 #undef printf
 #endif
 
-// Type Declarations
-struct ec_cwtAvgStackData;
-
 // Function Declarations
 MEXFUNCTION_LINKAGE void mexFunction(int32_T nlhs, mxArray *plhs[],
                                      int32_T nrhs, const mxArray *prhs[]);
 
 emlrtCTX mexFunctionCreateRootTLS();
 
-void unsafe_ec_cwtAvg_mexFunction(ec_cwtAvgStackData *SD, int32_T nlhs,
-                                  mxArray *plhs[2], int32_T nrhs,
+void unsafe_ec_cwtAvg_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                                   const mxArray *prhs[5]);
 
 // End of code generation (_coder_ec_cwtAvg_mex.h)

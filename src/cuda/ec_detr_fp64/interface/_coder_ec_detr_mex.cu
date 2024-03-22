@@ -10,7 +10,10 @@
 
 // Include files
 #include "_coder_ec_detr_mex.h"
-#include "ec_detr.h"
+#include "_coder_ec_detr_api.h"
+#include "ec_detr_data.h"
+#include "ec_detr_initialize.h"
+#include "ec_detr_terminate.h"
 #include "rt_nonfinite.h"
 #include <stdexcept>
 

@@ -96,11 +96,10 @@ else
 end
 
 %% Run
-nChs = cast(width(x),"uint16");
 y = coder.nullcopy(x);
 
 % Loop across chans
-for ch = 1:nChs 
+for ch = 1:width(x)
     y(:,ch) = filtfilt_lfn(x(:,ch),b,a,z,nf,L);
 end
 
