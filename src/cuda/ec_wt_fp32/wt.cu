@@ -25,7 +25,7 @@
 #include <cstring>
 
 // Variable Definitions
-static emlrtRTEInfo qd_emlrtRTEI{
+static emlrtRTEInfo ad_emlrtRTEI{
     102,  // lineNo
     5,    // colNo
     "wt", // fName
@@ -33,7 +33,7 @@ static emlrtRTEInfo qd_emlrtRTEI{
 };
 
 static emlrtRTEInfo
-    rd_emlrtRTEI{
+    bd_emlrtRTEI{
         105,      // lineNo
         20,       // colNo
         "varstd", // fName
@@ -41,21 +41,21 @@ static emlrtRTEInfo
         "varstd.m" // pName
     };
 
-static emlrtRTEInfo sd_emlrtRTEI{
+static emlrtRTEInfo cd_emlrtRTEI{
     135,  // lineNo
     1,    // colNo
     "wt", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m" // pName
 };
 
-static emlrtRTEInfo td_emlrtRTEI{
+static emlrtRTEInfo dd_emlrtRTEI{
     143,  // lineNo
     1,    // colNo
     "wt", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m" // pName
 };
 
-static emlrtRTEInfo ud_emlrtRTEI{
+static emlrtRTEInfo ed_emlrtRTEI{
     1,                 // lineNo
     1,                 // colNo
     "cuFFTNDCallback", // fName
@@ -63,35 +63,35 @@ static emlrtRTEInfo ud_emlrtRTEI{
     "cuFFTNDCallback.p" // pName
 };
 
-static emlrtRTEInfo vd_emlrtRTEI{
+static emlrtRTEInfo fd_emlrtRTEI{
     138,  // lineNo
     19,   // colNo
     "wt", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m" // pName
 };
 
-static emlrtRTEInfo wd_emlrtRTEI{
+static emlrtRTEInfo gd_emlrtRTEI{
     138,  // lineNo
     6,    // colNo
     "wt", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m" // pName
 };
 
-static emlrtRTEInfo xd_emlrtRTEI{
+static emlrtRTEInfo hd_emlrtRTEI{
     161,  // lineNo
     1,    // colNo
     "wt", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m" // pName
 };
 
-static emlrtRTEInfo yd_emlrtRTEI{
+static emlrtRTEInfo id_emlrtRTEI{
     180,  // lineNo
     5,    // colNo
     "wt", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/wt.m" // pName
 };
 
-static emlrtRTEInfo ae_emlrtRTEI{
+static emlrtRTEInfo jd_emlrtRTEI{
     151,  // lineNo
     5,    // colNo
     "wt", // fName
@@ -106,6 +106,9 @@ static __global__ void cwtfilterbank_wt_kernel26(const int32_T i,
 static __global__ void cwtfilterbank_wt_kernel27(const uint32_T xSize_dim1,
                                                  const int32_T b,
                                                  emxArray_creal32_T xposdft);
+
+static void gpuEmxMemcpyGpuToCpu_creal32_T(emxArray_creal32_T *cpu,
+                                           emxArray_creal32_T *gpu);
 
 // Function Definitions
 static __global__ __launch_bounds__(1024, 1) void cwtfilterbank_wt_kernel26(
@@ -146,6 +149,31 @@ static __global__ __launch_bounds__(1024, 1) void cwtfilterbank_wt_kernel27(
     xposdft.data[(static_cast<int32_T>(xSize_dim1) - b_j1) - 1].im =
         -xposdft.data[b_j1 + 1].im;
   }
+}
+
+static void gpuEmxMemcpyGpuToCpu_creal32_T(emxArray_creal32_T *cpu,
+                                           emxArray_creal32_T *gpu)
+{
+  int32_T actualSize;
+  int32_T i;
+  nvtxRangePushA("#fcn#gpuEmxMemcpyGpuToCpu_creal32_T#" MW_AT_LOCATION);
+  actualSize = 1;
+  i = 0;
+  nvtxRangePushA(
+      "#loop#gpuEmxMemcpyGpuToCpu_creal32_T_whileloop_0##" MW_AT_LINE);
+  while (i < cpu->numDimensions) {
+    actualSize *= cpu->size[i];
+    i++;
+  }
+  nvtxRangePop();
+  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+  checkCudaError(
+      cudaMemcpy(cpu->data, gpu->data,
+                 static_cast<uint32_T>(actualSize) * sizeof(creal32_T),
+                 cudaMemcpyDeviceToHost),
+      __FILE__, __LINE__);
+  nvtxRangePop();
 }
 
 //
@@ -189,12 +217,12 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
   gpuEmxReset_real32_T(&gpu_xv);
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&psihat, 2, &qd_emlrtRTEI, true);
+  emxInit_real32_T(&psihat, 2, &ad_emlrtRTEI, true);
   bcoef = psihat->size[0] * psihat->size[1];
   psihat->size[0] = self->PsiDFT->size[0];
   psihat->size[1] = self->PsiDFT->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(psihat, bcoef, &qd_emlrtRTEI);
+  emxEnsureCapacity_real32_T(psihat, bcoef, &ad_emlrtRTEI);
   profileLoopStart("cwtfilterbank_wt_loop_0", __LINE__,
                    (self->PsiDFT->size[0] * self->PsiDFT->size[1] - 1) + 1, "");
   for (bcoef = 0; bcoef < self->PsiDFT->size[0] * self->PsiDFT->size[1];
@@ -204,19 +232,19 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
   profileLoopEnd();
   nd2 = x->size[0];
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_x, 1, &rd_emlrtRTEI, true);
+  emxInit_real32_T(&b_x, 1, &bd_emlrtRTEI, true);
   bcoef = b_x->size[0];
   b_x->size[0] = x->size[0];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(b_x, bcoef, &rd_emlrtRTEI);
+  emxEnsureCapacity_real32_T(b_x, bcoef, &bd_emlrtRTEI);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_xv, 2, &sd_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_xv, 2, &cd_emlrtRTEI, true);
   xv_outdatedOnGpu = false;
   bcoef = cpu_xv->size[0] * cpu_xv->size[1];
   cpu_xv->size[0] = 1;
   cpu_xv->size[1] = x->size[0];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(cpu_xv, bcoef, &sd_emlrtRTEI);
+  emxEnsureCapacity_real32_T(cpu_xv, bcoef, &cd_emlrtRTEI);
   profileLoopStart("cwtfilterbank_wt_loop_1", __LINE__, (nd2 - 1) + 1, "");
   for (bcoef = 0; bcoef < nd2; bcoef++) {
     b_x->data[bcoef] = x->data[bcoef];
@@ -246,13 +274,13 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
       i3 = static_cast<int32_T>(d) - 1;
     }
     nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-    emxInit_real32_T(&cpu_x, 2, &vd_emlrtRTEI, true);
+    emxInit_real32_T(&cpu_x, 2, &fd_emlrtRTEI, true);
     xv_outdatedOnGpu = false;
     bcoef = cpu_x->size[0] * cpu_x->size[1];
     cpu_x->size[0] = 1;
     cpu_x->size[1] = i;
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_x, bcoef, &vd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_x, bcoef, &fd_emlrtRTEI);
     profileLoopStart("cwtfilterbank_wt_loop_3", __LINE__, (i - 1) + 1, "");
     for (bcoef = 0; bcoef < i; bcoef++) {
       cpu_x->data[bcoef] = x->data[bcoef];
@@ -281,7 +309,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     cpu_xv->size[1] =
         ((x->size[0] + cpu_x->size[1]) + div_s32(i3 - csz_idx_1, i2)) + 1;
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_xv, bcoef, &wd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_xv, bcoef, &gd_emlrtRTEI);
     acoef = cpu_x->size[1];
     profileLoopStart("cwtfilterbank_wt_loop_5", __LINE__, (acoef - 1) + 1, "");
     for (bcoef = 0; bcoef < acoef; bcoef++) {
@@ -314,7 +342,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     emxFree_real32_T(&cpu_x);
   }
   nvtxMarkA("#emxInit_creal32_T#" MW_AT_LINE);
-  emxInit_creal32_T(&cpu_xposdft, 2, &td_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_xposdft, 2, &dd_emlrtRTEI, true);
   if (cpu_xv->size[1] == 0) {
     xv_outdatedOnGpu = false;
     cpu_xposdft->size[0] = 1;
@@ -329,7 +357,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     cpu_xposdft->size[0] = 1;
     cpu_xposdft->size[1] = cpu_xv->size[1];
     nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-    emxEnsureCapacity_creal32_T(cpu_xposdft, bcoef, &td_emlrtRTEI);
+    emxEnsureCapacity_creal32_T(cpu_xposdft, bcoef, &dd_emlrtRTEI);
     profileLoopStart("cwtfilterbank_wt_loop_2", __LINE__,
                      (cpu_xv->size[1] - 1) + 1, "");
     for (bcoef = 0; bcoef < cpu_xv->size[1]; bcoef++) {
@@ -358,7 +386,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     cpu_xposdft->size[0] = 1;
     cpu_xposdft->size[1] = cpu_xv->size[1];
     nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-    emxEnsureCapacity_creal32_T(cpu_xposdft, bcoef, &ud_emlrtRTEI);
+    emxEnsureCapacity_creal32_T(cpu_xposdft, bcoef, &ed_emlrtRTEI);
     fftPlanHandle = acquireCUFFTPlan(1, &nd2, &nd2, 1, 1, CUFFT_R2C, 1);
     nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
     gpuEmxEnsureCapacity_real32_T(cpu_xv, &gpu_xv, !xv_outdatedOnGpu);
@@ -399,7 +427,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     csz_idx_1 = i;
   }
   nvtxMarkA("#emxInit_creal32_T#" MW_AT_LINE);
-  emxInit_creal32_T(&cpu_cfsposdft, 2, &ae_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_cfsposdft, 2, &jd_emlrtRTEI, true);
   x_outdatedOnCpu = false;
   bcoef = cpu_cfsposdft->size[0] * cpu_cfsposdft->size[1];
   cpu_cfsposdft->size[0] = psihat->size[0];
@@ -418,7 +446,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     cpu_cfsposdft->size[1] = i;
   }
   nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-  emxEnsureCapacity_creal32_T(cpu_cfsposdft, bcoef, &p_emlrtRTEI);
+  emxEnsureCapacity_creal32_T(cpu_cfsposdft, bcoef, &l_emlrtRTEI);
   if ((psihat->size[0] != 0) && (csz_idx_1 != 0)) {
     acoef = (cpu_xposdft->size[1] != 1);
     bcoef = (psihat->size[1] != 1);
@@ -459,7 +487,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     varargout_1->size[0] = cpu_cfsposdft->size[0];
     varargout_1->size[1] = cpu_cfsposdft->size[1];
     nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-    emxEnsureCapacity_creal32_T(varargout_1, bcoef, &xd_emlrtRTEI);
+    emxEnsureCapacity_creal32_T(varargout_1, bcoef, &hd_emlrtRTEI);
     if (static_cast<int32_T>(xSize[0]) * static_cast<int32_T>(xSize[1]) - 1 >=
         0) {
       std::memset(&varargout_1->data[0], 0,
@@ -487,7 +515,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     varargout_1->size[0] = cpu_cfsposdft->size[0];
     varargout_1->size[1] = cpu_cfsposdft->size[1];
     nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-    emxEnsureCapacity_creal32_T(varargout_1, bcoef, &xd_emlrtRTEI);
+    emxEnsureCapacity_creal32_T(varargout_1, bcoef, &hd_emlrtRTEI);
     cfsposdft_re = static_cast<real32_T>(cpu_cfsposdft->size[1]);
     profileLoopStart("cwtfilterbank_wt_loop_9", __LINE__,
                      (cpu_cfsposdft->size[0] * cpu_cfsposdft->size[1] - 1) + 1,
@@ -545,7 +573,7 @@ void cwtfilterbank_wt(cwtfilterbank *self, const emxArray_real32_T *x,
     bcoef = varargout_1->size[0] * varargout_1->size[1];
     varargout_1->size[1] = i - nd2;
     nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-    emxEnsureCapacity_creal32_T(varargout_1, bcoef, &yd_emlrtRTEI);
+    emxEnsureCapacity_creal32_T(varargout_1, bcoef, &id_emlrtRTEI);
   }
   emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
   nvtxMarkA("#gpuEmxFree_real32_T#" MW_AT_LINE);

@@ -26,7 +26,7 @@
 #endif
 
 // Function Declarations
-void ec_wt_fp_api(const mxArray *const prhs[6], int32_T nlhs,
+void ec_wt_fp_api(const mxArray *const prhs[7], int32_T nlhs,
                   const mxArray *plhs[2]);
 
 // End of code generation (_coder_ec_wt_fp_api.h)

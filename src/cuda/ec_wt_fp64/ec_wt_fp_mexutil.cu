@@ -20,22 +20,9 @@
 #include "stdlib.h"
 #include "string.h"
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 
 // Function Definitions
-void b_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier *msgId,
-                        char_T ret[23])
-{
-  static const int32_T dims[2]{1, 23};
-  nvtxRangePushA("#fcn#b_emlrt_marshallIn#" MW_AT_LOCATION);
-  emlrtCheckBuiltInR2012b(emlrtRootTLSGlobal, msgId, src, "char", false, 2U,
-                          (const void *)&dims[0]);
-  emlrtImportCharArrayR2015b(emlrtRootTLSGlobal, src, &ret[0], 23);
-  emlrtDestroyArray(&src);
-  nvtxRangePop();
-}
-
 void b_raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
                       const char_T *errorName, const char_T *errorString)
 {
@@ -70,21 +57,6 @@ void b_raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
   nvtxRangePop();
 }
 
-const mxArray *b_sprintf(const mxArray *m1, const mxArray *m2,
-                         emlrtMCInfo *location)
-{
-  const mxArray *pArrays[2];
-  const mxArray *m;
-  const mxArray *m3;
-  nvtxRangePushA("#fcn#b_sprintf#" MW_AT_LOCATION);
-  pArrays[0] = m1;
-  pArrays[1] = m2;
-  m3 = emlrtCallMATLABR2012b(emlrtRootTLSGlobal, 1, &m, 2, &pArrays[0],
-                             "sprintf", true, location);
-  nvtxRangePop();
-  return m3;
-}
-
 void checkCudaError(cudaError_t errCode, const char_T *file, uint32_T b_line)
 {
   nvtxRangePushA("#fcn#checkCudaError#" MW_AT_LOCATION);
@@ -96,20 +68,6 @@ void checkCudaError(cudaError_t errCode, const char_T *file, uint32_T b_line)
   nvtxRangePop();
 }
 
-int64_T computeEndIdx(int64_T start, int64_T end, int64_T stride)
-{
-  int64_T newEnd;
-  nvtxRangePushA("#fcn#computeEndIdx#" MW_AT_LOCATION);
-  newEnd = -1L;
-  if ((stride > 0L) && (start <= end)) {
-    newEnd = (end - start) / stride;
-  } else if ((stride < 0L) && (end <= start)) {
-    newEnd = (start - end) / -stride;
-  }
-  nvtxRangePop();
-  return newEnd;
-}
-
 uint64_T computeNumIters(int32_T ub)
 {
   uint64_T numIters;
@@ -118,25 +76,6 @@ uint64_T computeNumIters(int32_T ub)
   if (ub >= 0) {
     numIters = static_cast<uint64_T>(ub + 1);
   }
-  nvtxRangePop();
-  return numIters;
-}
-
-uint64_T computeNumIters(int32_T ub, int32_T b_ub)
-{
-  uint64_T n;
-  uint64_T numIters;
-  nvtxRangePushA("#fcn#computeNumIters#" MW_AT_LOCATION);
-  n = 0UL;
-  if (ub >= 0) {
-    n = static_cast<uint64_T>(ub + 1);
-  }
-  numIters = n;
-  n = 0UL;
-  if (b_ub >= 0) {
-    n = static_cast<uint64_T>(b_ub + 1);
-  }
-  numIters *= n;
   nvtxRangePop();
   return numIters;
 }
@@ -193,30 +132,6 @@ real_T emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier *parentId)
   emlrtDestroyArray(&u);
   nvtxRangePop();
   return y;
-}
-
-void emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier *parentId,
-                      char_T y[23])
-{
-  nvtxRangePushA("#fcn#emlrt_marshallIn#" MW_AT_LOCATION);
-  nvtxMarkA("#b_emlrt_marshallIn#" MW_AT_LINE);
-  b_emlrt_marshallIn(emlrtAlias(u), parentId, y);
-  emlrtDestroyArray(&u);
-  nvtxRangePop();
-}
-
-void emlrt_marshallIn(const mxArray *a__output_of_sprintf_,
-                      const char_T *identifier, char_T y[23])
-{
-  emlrtMsgIdentifier thisId;
-  nvtxRangePushA("#fcn#emlrt_marshallIn#" MW_AT_LOCATION);
-  thisId.fIdentifier = const_cast<const char_T *>(identifier);
-  thisId.fParent = nullptr;
-  thisId.bParentIsCell = false;
-  nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
-  emlrt_marshallIn(emlrtAlias(a__output_of_sprintf_), &thisId, y);
-  emlrtDestroyArray(&a__output_of_sprintf_);
-  nvtxRangePop();
 }
 
 real_T emlrt_marshallIn(const mxArray *a__output_of_length_,
@@ -276,62 +191,6 @@ void gpuEmxEnsureCapacity_creal_T(const emxArray_creal_T *cpu,
       checkCudaError(
           cudaMemcpy(newData, gpu->data,
                      static_cast<uint32_T>(totalSizeGpu) * sizeof(creal_T),
-                     cudaMemcpyDeviceToDevice),
-          __FILE__, __LINE__);
-    }
-    if (gpu->canFreeData) {
-      nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-      nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
-      checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
-    }
-    gpu->data = newData;
-    gpu->allocatedSize = i;
-    gpu->canFreeData = true;
-  }
-  nvtxRangePop();
-}
-
-void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
-                                  emxArray_int32_T *gpu, boolean_T needsCopy)
-{
-  int32_T i;
-  int32_T totalSizeCpu;
-  int32_T totalSizeGpu;
-  int32_T *newData;
-  nvtxRangePushA("#fcn#gpuEmxEnsureCapacity_int32_T#" MW_AT_LOCATION);
-  if (gpu->numDimensions == 0) {
-    gpu->numDimensions = cpu->numDimensions;
-    gpu->size = static_cast<int32_T *>(emlrtCallocMex(
-        static_cast<uint32_T>(gpu->numDimensions), sizeof(int32_T)));
-  }
-  totalSizeCpu = 1;
-  totalSizeGpu = 1;
-  i = 0;
-  nvtxRangePushA("#loop#gpuEmxEnsureCapacity_int32_T_whileloop_0##" MW_AT_LINE);
-  while (i < cpu->numDimensions) {
-    totalSizeGpu *= gpu->size[i];
-    totalSizeCpu *= cpu->size[i];
-    gpu->size[i] = cpu->size[i];
-    i++;
-  }
-  nvtxRangePop();
-  if (gpu->allocatedSize < totalSizeCpu) {
-    i = cpu->allocatedSize;
-    if (i < totalSizeCpu) {
-      i = totalSizeCpu;
-    }
-    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-    nvtxMarkA("#mwCudaMalloc#" MW_AT_LINE);
-    checkCudaError(
-        mwCudaMalloc(&newData, static_cast<uint32_T>(i) * sizeof(int32_T)),
-        __FILE__, __LINE__);
-    needsCopy = (needsCopy && gpu->canFreeData);
-    if (needsCopy) {
-      nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-      nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-      checkCudaError(
-          cudaMemcpy(newData, gpu->data,
-                     static_cast<uint32_T>(totalSizeGpu) * sizeof(int32_T),
                      cudaMemcpyDeviceToDevice),
           __FILE__, __LINE__);
     }
@@ -415,18 +274,6 @@ void gpuEmxFree_creal_T(emxArray_creal_T *gpu)
   nvtxRangePop();
 }
 
-void gpuEmxFree_int32_T(emxArray_int32_T *gpu)
-{
-  nvtxRangePushA("#fcn#gpuEmxFree_int32_T#" MW_AT_LOCATION);
-  if (gpu->data != (void *)4207599121UL) {
-    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-    nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
-    checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
-  }
-  emlrtFreeMex(gpu->size);
-  nvtxRangePop();
-}
-
 void gpuEmxFree_real_T(emxArray_real_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxFree_real_T#" MW_AT_LOCATION);
@@ -462,29 +309,6 @@ void gpuEmxMemcpyCpuToGpu_creal_T(emxArray_creal_T *gpu,
   nvtxRangePop();
 }
 
-void gpuEmxMemcpyCpuToGpu_int32_T(emxArray_int32_T *gpu,
-                                  const emxArray_int32_T *cpu)
-{
-  int32_T actualSize;
-  int32_T i;
-  nvtxRangePushA("#fcn#gpuEmxMemcpyCpuToGpu_int32_T#" MW_AT_LOCATION);
-  actualSize = 1;
-  i = 0;
-  nvtxRangePushA("#loop#gpuEmxMemcpyCpuToGpu_int32_T_whileloop_0##" MW_AT_LINE);
-  while (i < cpu->numDimensions) {
-    actualSize *= cpu->size[i];
-    i++;
-  }
-  nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(cudaMemcpy(gpu->data, cpu->data,
-                            static_cast<uint32_T>(actualSize) * sizeof(int32_T),
-                            cudaMemcpyHostToDevice),
-                 __FILE__, __LINE__);
-  nvtxRangePop();
-}
-
 void gpuEmxMemcpyCpuToGpu_real_T(emxArray_real_T *gpu,
                                  const emxArray_real_T *cpu)
 {
@@ -504,28 +328,6 @@ void gpuEmxMemcpyCpuToGpu_real_T(emxArray_real_T *gpu,
   checkCudaError(cudaMemcpy(gpu->data, cpu->data,
                             static_cast<uint32_T>(actualSize) * sizeof(real_T),
                             cudaMemcpyHostToDevice),
-                 __FILE__, __LINE__);
-  nvtxRangePop();
-}
-
-void gpuEmxMemcpyGpuToCpu_creal_T(emxArray_creal_T *cpu, emxArray_creal_T *gpu)
-{
-  int32_T actualSize;
-  int32_T i;
-  nvtxRangePushA("#fcn#gpuEmxMemcpyGpuToCpu_creal_T#" MW_AT_LOCATION);
-  actualSize = 1;
-  i = 0;
-  nvtxRangePushA("#loop#gpuEmxMemcpyGpuToCpu_creal_T_whileloop_0##" MW_AT_LINE);
-  while (i < cpu->numDimensions) {
-    actualSize *= cpu->size[i];
-    i++;
-  }
-  nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(cudaMemcpy(cpu->data, gpu->data,
-                            static_cast<uint32_T>(actualSize) * sizeof(creal_T),
-                            cudaMemcpyDeviceToHost),
                  __FILE__, __LINE__);
   nvtxRangePop();
 }
@@ -559,75 +361,11 @@ void gpuEmxReset_creal_T(emxArray_creal_T *gpu)
   nvtxRangePop();
 }
 
-void gpuEmxReset_int32_T(emxArray_int32_T *gpu)
-{
-  nvtxRangePushA("#fcn#gpuEmxReset_int32_T#" MW_AT_LOCATION);
-  std::memset(gpu, 0, sizeof(emxArray_int32_T));
-  nvtxRangePop();
-}
-
 void gpuEmxReset_real_T(emxArray_real_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxReset_real_T#" MW_AT_LOCATION);
   std::memset(gpu, 0, sizeof(emxArray_real_T));
   nvtxRangePop();
-}
-
-void raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
-                    const char_T *errorName, const char_T *errorString)
-{
-  emlrtRTEInfo rtInfo;
-  uint64_T len;
-  char_T *brk;
-  char_T *fn;
-  char_T *pn;
-  nvtxRangePushA("#fcn#raiseCudaError#" MW_AT_LOCATION);
-  len = strlen(file);
-  pn = static_cast<char_T *>(std::calloc(static_cast<uint32_T>(len + 1UL), 1U));
-  fn = static_cast<char_T *>(std::calloc(static_cast<uint32_T>(len + 1UL), 1U));
-  memcpy(pn, file, len);
-  memcpy(fn, file, len);
-  brk = strrchr(fn, '.');
-  *brk = '\x00';
-  brk = strrchr(fn, '/');
-  if (brk == nullptr) {
-    brk = strrchr(fn, '\\');
-  }
-  if (brk == nullptr) {
-    brk = fn;
-  } else {
-    brk++;
-  }
-  rtInfo.lineNo = static_cast<int32_T>(b_line);
-  rtInfo.colNo = 0;
-  rtInfo.fName = brk;
-  rtInfo.pName = pn;
-  emlrtCUDAError(static_cast<uint32_T>(errCode), (char_T *)errorName,
-                 (char_T *)errorString, &rtInfo, emlrtRootTLSGlobal);
-  nvtxRangePop();
-}
-
-real_T rt_hypotd_snf(real_T u0, real_T u1)
-{
-  real_T a;
-  real_T b;
-  real_T y;
-  nvtxRangePushA("#fcn#rt_hypotd_snf#" MW_AT_LOCATION);
-  a = std::abs(u0);
-  b = std::abs(u1);
-  if (a < b) {
-    a /= b;
-    y = b * std::sqrt(a * a + 1.0);
-  } else if (a > b) {
-    b /= a;
-    y = a * std::sqrt(b * b + 1.0);
-  } else if (std::isnan(b)) {
-    y = rtNaN;
-  } else {
-    y = a * 1.4142135623730951;
-  }
-  nvtxRangePop();
-  return y;
 }
 
 real_T rt_powd_snf(real_T u0, real_T u1)

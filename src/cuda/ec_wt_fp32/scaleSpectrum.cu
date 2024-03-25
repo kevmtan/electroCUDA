@@ -25,32 +25,44 @@
 #include "MWErrorCodeUtils.hpp"
 #include "MWLocationStringifyNvtx3.h"
 #include "nvtx3/nvToolsExt.h"
+#include "stdio.h"
+#include "stdlib.h"
+#include "string.h"
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 // Variable Definitions
-static emlrtRTEInfo ed_emlrtRTEI{
+static emlrtRTEInfo kd_emlrtRTEI{
+    230,             // lineNo
+    1,               // colNo
+    "scaleSpectrum", // fName
+    "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/"
+    "scaleSpectrum.m" // pName
+};
+
+static emlrtRTEInfo ld_emlrtRTEI{
     12,                                                               // lineNo
     5,                                                                // colNo
     "trapz",                                                          // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/trapz.m" // pName
 };
 
-static emlrtRTEInfo fd_emlrtRTEI{
+static emlrtRTEInfo md_emlrtRTEI{
     211,                                                              // lineNo
     24,                                                               // colNo
     "trapz",                                                          // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/trapz.m" // pName
 };
 
-static emlrtRTEInfo gd_emlrtRTEI{
+static emlrtRTEInfo nd_emlrtRTEI{
     96,                                                               // lineNo
     5,                                                                // colNo
     "trapz",                                                          // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/trapz.m" // pName
 };
 
-static emlrtRTEInfo id_emlrtRTEI{
+static emlrtRTEInfo pd_emlrtRTEI{
     298,             // lineNo
     18,              // colNo
     "scaleSpectrum", // fName
@@ -58,7 +70,7 @@ static emlrtRTEInfo id_emlrtRTEI{
     "scaleSpectrum.m" // pName
 };
 
-static emlrtRTEInfo jd_emlrtRTEI{
+static emlrtRTEInfo qd_emlrtRTEI{
     297,             // lineNo
     5,               // colNo
     "scaleSpectrum", // fName
@@ -66,7 +78,7 @@ static emlrtRTEInfo jd_emlrtRTEI{
     "scaleSpectrum.m" // pName
 };
 
-static emlrtRTEInfo kd_emlrtRTEI{
+static emlrtRTEInfo rd_emlrtRTEI{
     12,            // lineNo
     12,            // colNo
     "scNormalize", // fName
@@ -74,7 +86,7 @@ static emlrtRTEInfo kd_emlrtRTEI{
     "scNormalize.m" // pName
 };
 
-static emlrtRTEInfo ld_emlrtRTEI{
+static emlrtRTEInfo sd_emlrtRTEI{
     22,            // lineNo
     32,            // colNo
     "scNormalize", // fName
@@ -82,7 +94,7 @@ static emlrtRTEInfo ld_emlrtRTEI{
     "scNormalize.m" // pName
 };
 
-static emlrtRTEInfo md_emlrtRTEI{
+static emlrtRTEInfo td_emlrtRTEI{
     12,            // lineNo
     1,             // colNo
     "scNormalize", // fName
@@ -90,7 +102,7 @@ static emlrtRTEInfo md_emlrtRTEI{
     "scNormalize.m" // pName
 };
 
-static emlrtRTEInfo nd_emlrtRTEI{
+static emlrtRTEInfo ud_emlrtRTEI{
     26,            // lineNo
     43,            // colNo
     "scNormalize", // fName
@@ -98,7 +110,7 @@ static emlrtRTEInfo nd_emlrtRTEI{
     "scNormalize.m" // pName
 };
 
-static emlrtRTEInfo od_emlrtRTEI{
+static emlrtRTEInfo vd_emlrtRTEI{
     26,            // lineNo
     37,            // colNo
     "scNormalize", // fName
@@ -106,7 +118,7 @@ static emlrtRTEInfo od_emlrtRTEI{
     "scNormalize.m" // pName
 };
 
-static emlrtRTEInfo pd_emlrtRTEI{
+static emlrtRTEInfo wd_emlrtRTEI{
     293,             // lineNo
     14,              // colNo
     "scaleSpectrum", // fName
@@ -117,6 +129,8 @@ static emlrtRTEInfo pd_emlrtRTEI{
 // Function Declarations
 static __global__ void c_cwtfilterbank_scaleSpectrum_k(const real32_T c1,
                                                        emxArray_real32_T c);
+
+static int64_T computeEndIdx(int64_T start, int64_T end, int64_T stride);
 
 static void cublasCheck(cublasStatus_t errCode, const char_T *file,
                         uint32_T b_line);
@@ -131,6 +145,9 @@ static __global__ void f_cwtfilterbank_scaleSpectrum_k(const real32_T c1,
                                                        emxArray_real32_T c,
                                                        int32_T z_dim0);
 
+static void raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
+                           const char_T *errorName, const char_T *errorString);
+
 static real32_T rt_hypotf_snf(real32_T u0, real32_T u1);
 
 // Function Definitions
@@ -142,6 +159,20 @@ static __global__ __launch_bounds__(32, 1) void c_cwtfilterbank_scaleSpectrum_k(
   if (tmpIdx < 1) {
     c.data[0] = c1;
   }
+}
+
+static int64_T computeEndIdx(int64_T start, int64_T end, int64_T stride)
+{
+  int64_T newEnd;
+  nvtxRangePushA("#fcn#computeEndIdx#" MW_AT_LOCATION);
+  newEnd = -1L;
+  if ((stride > 0L) && (start <= end)) {
+    newEnd = (end - start) / stride;
+  } else if ((stride < 0L) && (end <= start)) {
+    newEnd = (start - end) / -stride;
+  }
+  nvtxRangePop();
+  return newEnd;
 }
 
 static void cublasCheck(cublasStatus_t errCode, const char_T *file,
@@ -187,6 +218,40 @@ static __global__ __launch_bounds__(32, 1) void f_cwtfilterbank_scaleSpectrum_k(
   if (tmpIdx < 1) {
     c.data[z_dim0 - 1] = c1;
   }
+}
+
+static void raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
+                           const char_T *errorName, const char_T *errorString)
+{
+  emlrtRTEInfo rtInfo;
+  uint64_T len;
+  char_T *brk;
+  char_T *fn;
+  char_T *pn;
+  nvtxRangePushA("#fcn#raiseCudaError#" MW_AT_LOCATION);
+  len = strlen(file);
+  pn = static_cast<char_T *>(std::calloc(static_cast<uint32_T>(len + 1UL), 1U));
+  fn = static_cast<char_T *>(std::calloc(static_cast<uint32_T>(len + 1UL), 1U));
+  memcpy(pn, file, len);
+  memcpy(fn, file, len);
+  brk = strrchr(fn, '.');
+  *brk = '\x00';
+  brk = strrchr(fn, '/');
+  if (brk == nullptr) {
+    brk = strrchr(fn, '\\');
+  }
+  if (brk == nullptr) {
+    brk = fn;
+  } else {
+    brk++;
+  }
+  rtInfo.lineNo = static_cast<int32_T>(b_line);
+  rtInfo.colNo = 0;
+  rtInfo.fName = brk;
+  rtInfo.pName = pn;
+  emlrtCUDAError(static_cast<uint32_T>(errCode), (char_T *)errorName,
+                 (char_T *)errorString, &rtInfo, emlrtRootTLSGlobal);
+  nvtxRangePop();
 }
 
 static real32_T rt_hypotf_snf(real32_T u0, real32_T u1)
@@ -269,12 +334,12 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   defaultSL_idx_1 = static_cast<uint32_T>(self->Scales->size[1]);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&Scales, 2, &e_emlrtRTEI, true);
+  emxInit_real32_T(&Scales, 2, &kd_emlrtRTEI, true);
   vstride = Scales->size[0] * Scales->size[1];
   Scales->size[0] = 1;
   Scales->size[1] = self->Scales->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(Scales, vstride, &e_emlrtRTEI);
+  emxEnsureCapacity_real32_T(Scales, vstride, &kd_emlrtRTEI);
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_0", __LINE__,
                    (self->Scales->size[1] - 1) + 1, "");
   for (vstride = 0; vstride < self->Scales->size[1]; vstride++) {
@@ -282,19 +347,19 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   }
   profileLoopEnd();
   nvtxMarkA("#emxInit_creal32_T#" MW_AT_LINE);
-  emxInit_creal32_T(&cfs, 2, &ab_emlrtRTEI, true);
+  emxInit_creal32_T(&cfs, 2, &s_emlrtRTEI, true);
   nvtxMarkA("#cwtfilterbank_wt#" MW_AT_LINE);
   cwtfilterbank_wt(self, x, cfs);
   nvtxMarkA("#vvarstd#" MW_AT_LINE);
   normfac = vvarstd(x, x->size[0]);
   nx = cfs->size[0] * cfs->size[1];
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&y, 2, &kd_emlrtRTEI, true);
+  emxInit_real32_T(&y, 2, &rd_emlrtRTEI, true);
   vstride = y->size[0] * y->size[1];
   y->size[0] = cfs->size[0];
   y->size[1] = cfs->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(y, vstride, &j_emlrtRTEI);
+  emxEnsureCapacity_real32_T(y, vstride, &i_emlrtRTEI);
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_1", __LINE__, (nx - 1) + 1,
                    "");
   for (int32_T k{0}; k < nx; k++) {
@@ -303,12 +368,12 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   }
   profileLoopEnd();
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&a, 2, &ld_emlrtRTEI, true);
+  emxInit_real32_T(&a, 2, &sd_emlrtRTEI, true);
   vstride = a->size[0] * a->size[1];
   a->size[0] = y->size[0];
   a->size[1] = y->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(a, vstride, &m_emlrtRTEI);
+  emxEnsureCapacity_real32_T(a, vstride, &j_emlrtRTEI);
   nx = y->size[0] * y->size[1];
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_2", __LINE__, (nx - 1) + 1,
                    "");
@@ -319,7 +384,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   nvtxMarkA("#emxFree_real32_T#" MW_AT_LINE);
   emxFree_real32_T(&y);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&abscfssq, 2, &md_emlrtRTEI, true);
+  emxInit_real32_T(&abscfssq, 2, &td_emlrtRTEI, true);
   vstride = abscfssq->size[0] * abscfssq->size[1];
   nx = Scales->size[1];
   u1 = a->size[0];
@@ -337,7 +402,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   }
   abscfssq->size[1] = a->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(abscfssq, vstride, &p_emlrtRTEI);
+  emxEnsureCapacity_real32_T(abscfssq, vstride, &l_emlrtRTEI);
   nx = Scales->size[1];
   u1 = a->size[0];
   if (nx <= u1) {
@@ -377,7 +442,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   nvtxMarkA("#emxFree_real32_T#" MW_AT_LINE);
   emxFree_real32_T(&a);
   nvtxMarkA("#emxInit_uint32_T#" MW_AT_LINE);
-  emxInit_uint32_T(&b_y, 2, &nd_emlrtRTEI, true);
+  emxInit_uint32_T(&b_y, 2, &ud_emlrtRTEI, true);
   if (abscfssq->size[1] < 1) {
     b_y->size[0] = 1;
     b_y->size[1] = 0;
@@ -388,7 +453,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
     b_y->size[0] = 1;
     b_y->size[1] = abscfssq->size[1];
     nvtxMarkA("#emxEnsureCapacity_uint32_T#" MW_AT_LINE);
-    emxEnsureCapacity_uint32_T(b_y, vstride, &ib_emlrtRTEI);
+    emxEnsureCapacity_uint32_T(b_y, vstride, &eb_emlrtRTEI);
     profileLoopStart("cwtfilterbank_scaleSpectrum_loop_5", __LINE__,
                      (static_cast<int32_T>(u) - 1) + 1, "");
     for (vstride = 0; vstride < static_cast<int32_T>(u); vstride++) {
@@ -397,12 +462,12 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
     profileLoopEnd();
   }
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_z, 1, &od_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_z, 1, &vd_emlrtRTEI, true);
   z_outdatedOnGpu = false;
   vstride = cpu_z->size[0];
   cpu_z->size[0] = abscfssq->size[0];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(cpu_z, vstride, &ed_emlrtRTEI);
+  emxEnsureCapacity_real32_T(cpu_z, vstride, &ld_emlrtRTEI);
   z_needsGpuEnsureCapacity = true;
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_6", __LINE__,
                    (abscfssq->size[0] - 1) + 1, "");
@@ -413,13 +478,13 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   profileLoopEnd();
   if (abscfssq->size[1] > 1) {
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&c, 1, &gd_emlrtRTEI, true);
+    emxInit_real_T(&c, 1, &nd_emlrtRTEI, true);
     if (b_y->size[1] == 1) {
       nx = abscfssq->size[1];
       vstride = c->size[0];
       c->size[0] = abscfssq->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(c, vstride, &gd_emlrtRTEI);
+      emxEnsureCapacity_real_T(c, vstride, &nd_emlrtRTEI);
       profileLoopStart("cwtfilterbank_scaleSpectrum_loop_7", __LINE__,
                        (nx - 1) + 1, "");
       for (vstride = 0; vstride < nx; vstride++) {
@@ -434,7 +499,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
       vstride = c->size[0];
       c->size[0] = abscfssq->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(c, vstride, &fd_emlrtRTEI);
+      emxEnsureCapacity_real_T(c, vstride, &md_emlrtRTEI);
       c->data[0] =
           0.5 * static_cast<real_T>(static_cast<int32_T>(b_y->data[1]) -
                                     static_cast<int32_T>(b_y->data[0]));
@@ -503,14 +568,14 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
     }
   } else {
     nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-    emxInit_real32_T(&cpu_c, 1, &gd_emlrtRTEI, true);
+    emxInit_real32_T(&cpu_c, 1, &nd_emlrtRTEI, true);
     if (Scales->size[1] == 1) {
       nx = cpu_z->size[0];
       c_outdatedOnGpu = false;
       vstride = cpu_c->size[0];
       cpu_c->size[0] = cpu_z->size[0];
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(cpu_c, vstride, &gd_emlrtRTEI);
+      emxEnsureCapacity_real32_T(cpu_c, vstride, &nd_emlrtRTEI);
       profileLoopStart("cwtfilterbank_scaleSpectrum_loop_10", __LINE__,
                        (nx - 1) + 1, "");
       for (vstride = 0; vstride < nx; vstride++) {
@@ -545,7 +610,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
       vstride = cpu_c->size[0];
       cpu_c->size[0] = cpu_z->size[0];
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(cpu_c, vstride, &fd_emlrtRTEI);
+      emxEnsureCapacity_real32_T(cpu_c, vstride, &md_emlrtRTEI);
       cpu_c->data[0] = 0.5F * (Scales->data[1] - Scales->data[0]);
       nx = cpu_z->size[0];
       profileLoopStart("cwtfilterbank_scaleSpectrum_loop_9", __LINE__,
@@ -623,12 +688,12 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   emxFree_real32_T(&abscfssq);
   nx = cfs->size[0] * cfs->size[1];
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&c_y, 2, &pd_emlrtRTEI, true);
+  emxInit_real32_T(&c_y, 2, &wd_emlrtRTEI, true);
   vstride = c_y->size[0] * c_y->size[1];
   c_y->size[0] = cfs->size[0];
   c_y->size[1] = cfs->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(c_y, vstride, &j_emlrtRTEI);
+  emxEnsureCapacity_real32_T(c_y, vstride, &i_emlrtRTEI);
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_12", __LINE__,
                    (nx - 1) + 1, "");
   for (int32_T k{0}; k < nx; k++) {
@@ -639,12 +704,12 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   nvtxMarkA("#emxFree_creal32_T#" MW_AT_LINE);
   emxFree_creal32_T(&cfs);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&d_y, 2, &pd_emlrtRTEI, true);
+  emxInit_real32_T(&d_y, 2, &wd_emlrtRTEI, true);
   vstride = d_y->size[0] * d_y->size[1];
   d_y->size[0] = c_y->size[0];
   d_y->size[1] = c_y->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(d_y, vstride, &m_emlrtRTEI);
+  emxEnsureCapacity_real32_T(d_y, vstride, &j_emlrtRTEI);
   nx = c_y->size[0] * c_y->size[1];
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_15", __LINE__,
                    (nx - 1) + 1, "");
@@ -655,13 +720,13 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   nvtxMarkA("#emxFree_real32_T#" MW_AT_LINE);
   emxFree_real32_T(&c_y);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&abswt2S, 2, &hd_emlrtRTEI, true);
+  emxInit_real32_T(&abswt2S, 2, &od_emlrtRTEI, true);
   if (d_y->size[0] == Scales->size[1]) {
     vstride = abswt2S->size[0] * abswt2S->size[1];
     abswt2S->size[0] = d_y->size[0];
     abswt2S->size[1] = d_y->size[1];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(abswt2S, vstride, &hd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(abswt2S, vstride, &od_emlrtRTEI);
     profileLoopStart("cwtfilterbank_scaleSpectrum_loop_16", __LINE__,
                      (d_y->size[1] - 1) + 1, "");
     for (vstride = 0; vstride < d_y->size[1]; vstride++) {
@@ -682,13 +747,13 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   emxFree_real32_T(&d_y);
   nx = static_cast<int32_T>(defaultSL_idx_1);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_y, 2, &id_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_y, 2, &pd_emlrtRTEI, true);
   b_outdatedOnCpu = false;
   vstride = cpu_y->size[0] * cpu_y->size[1];
   cpu_y->size[0] = static_cast<int32_T>(defaultSL_idx_1);
   cpu_y->size[1] = abswt2S->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(cpu_y, vstride, &id_emlrtRTEI);
+  emxEnsureCapacity_real32_T(cpu_y, vstride, &pd_emlrtRTEI);
   profileLoopStart("cwtfilterbank_scaleSpectrum_loop_18", __LINE__,
                    (abswt2S->size[1] - 1) + 1, "");
   for (vstride = 0; vstride < abswt2S->size[1]; vstride++) {
@@ -703,7 +768,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
   }
   profileLoopEnd();
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_c, 1, &gd_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_c, 1, &nd_emlrtRTEI, true);
   if ((static_cast<int32_T>(defaultSL_idx_1) == 0) && (abswt2S->size[1] == 0)) {
     if (static_cast<int32_T>(defaultSL_idx_1) == 1) {
       b_c1 = Scales->data[0] * 0.0F;
@@ -714,7 +779,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
     cpu_savgp->size[0] = 1;
     cpu_savgp->size[1] = 1;
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_savgp, vstride, &jd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_savgp, vstride, &qd_emlrtRTEI);
     cpu_savgp->data[0] = b_c1;
     *savgp_outdatedOnCpu = false;
     *savgp_outdatedOnGpu = true;
@@ -725,7 +790,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
     cpu_savgp->size[0] = 1;
     cpu_savgp->size[1] = abswt2S->size[1];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_savgp, vstride, &jd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_savgp, vstride, &qd_emlrtRTEI);
     profileLoopStart("cwtfilterbank_scaleSpectrum_loop_20", __LINE__,
                      (abswt2S->size[1] - 1) + 1, "");
     for (vstride = 0; vstride < abswt2S->size[1]; vstride++) {
@@ -741,7 +806,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
         cpu_savgp->size[0] = 1;
         cpu_savgp->size[1] = abswt2S->size[1];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(cpu_savgp, vstride, &jd_emlrtRTEI);
+        emxEnsureCapacity_real32_T(cpu_savgp, vstride, &qd_emlrtRTEI);
         profileLoopStart("cwtfilterbank_scaleSpectrum_loop_23", __LINE__,
                          (abswt2S->size[1] - 1) + 1, "");
         for (vstride = 0; vstride < abswt2S->size[1]; vstride++) {
@@ -756,7 +821,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
         vstride = b_cpu_c->size[0];
         b_cpu_c->size[0] = static_cast<int32_T>(defaultSL_idx_1);
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(b_cpu_c, vstride, &gd_emlrtRTEI);
+        emxEnsureCapacity_real32_T(b_cpu_c, vstride, &nd_emlrtRTEI);
         profileLoopStart("cwtfilterbank_scaleSpectrum_loop_22", __LINE__,
                          (nx - 1) + 1, "");
         for (vstride = 0; vstride < nx; vstride++) {
@@ -784,7 +849,7 @@ void cwtfilterbank_scaleSpectrum(cwtfilterbank *self,
         vstride = b_cpu_c->size[0];
         b_cpu_c->size[0] = static_cast<int32_T>(defaultSL_idx_1);
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(b_cpu_c, vstride, &fd_emlrtRTEI);
+        emxEnsureCapacity_real32_T(b_cpu_c, vstride, &md_emlrtRTEI);
         b_cpu_c->data[0] = 0.5F * (Scales->data[1] - Scales->data[0]);
         profileLoopStart("cwtfilterbank_scaleSpectrum_loop_21", __LINE__,
                          (nx - 3) + 1, "");

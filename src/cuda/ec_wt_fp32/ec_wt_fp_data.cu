@@ -27,23 +27,7 @@ emlrtContext emlrtContextGlobal{
     nullptr                                               // fSigMem
 };
 
-emlrtMCInfo f_emlrtMCI{
-    53,        // lineNo
-    19,        // colNo
-    "flt2str", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/shared/coder/coder/lib/+coder/+internal/"
-    "flt2str.m" // pName
-};
-
-emlrtRTEInfo e_emlrtRTEI{
-    230,             // lineNo
-    1,               // colNo
-    "scaleSpectrum", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/"
-    "scaleSpectrum.m" // pName
-};
-
-emlrtRTEInfo j_emlrtRTEI{
+emlrtRTEInfo i_emlrtRTEI{
     30,                    // lineNo
     21,                    // colNo
     "applyScalarFunction", // fName
@@ -51,7 +35,7 @@ emlrtRTEInfo j_emlrtRTEI{
     "applyScalarFunction.m" // pName
 };
 
-emlrtRTEInfo m_emlrtRTEI{
+emlrtRTEInfo j_emlrtRTEI{
     129,                         // lineNo
     6,                           // colNo
     "applyBinaryScalarFunction", // fName
@@ -59,14 +43,14 @@ emlrtRTEInfo m_emlrtRTEI{
     "applyBinaryScalarFunction.m" // pName
 };
 
-emlrtRTEInfo p_emlrtRTEI{
+emlrtRTEInfo l_emlrtRTEI{
     60,                                                              // lineNo
     20,                                                              // colNo
     "bsxfun",                                                        // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/elmat/bsxfun.m" // pName
 };
 
-emlrtRTEInfo ab_emlrtRTEI{
+emlrtRTEInfo s_emlrtRTEI{
     236,             // lineNo
     5,               // colNo
     "scaleSpectrum", // fName
@@ -74,14 +58,14 @@ emlrtRTEInfo ab_emlrtRTEI{
     "scaleSpectrum.m" // pName
 };
 
-emlrtRTEInfo ib_emlrtRTEI{
+emlrtRTEInfo eb_emlrtRTEI{
     28,                                                           // lineNo
     9,                                                            // colNo
     "colon",                                                      // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/ops/colon.m" // pName
 };
 
-emlrtRTEInfo qb_emlrtRTEI{
+emlrtRTEInfo mb_emlrtRTEI{
     31,               // lineNo
     23,               // colNo
     "morsebpfilters", // fName
@@ -89,7 +73,7 @@ emlrtRTEInfo qb_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-emlrtRTEInfo rb_emlrtRTEI{
+emlrtRTEInfo nb_emlrtRTEI{
     34,             // lineNo
     9,              // colNo
     "wavbpfilters", // fName
@@ -97,7 +81,7 @@ emlrtRTEInfo rb_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-emlrtRTEInfo tb_emlrtRTEI{
+emlrtRTEInfo pb_emlrtRTEI{
     31,               // lineNo
     1,                // colNo
     "morsebpfilters", // fName
@@ -105,56 +89,56 @@ emlrtRTEInfo tb_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-emlrtRTEInfo lc_emlrtRTEI{
+emlrtRTEInfo hc_emlrtRTEI{
     273,                                                              // lineNo
     5,                                                                // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo mc_emlrtRTEI{
+emlrtRTEInfo ic_emlrtRTEI{
     445,                                                              // lineNo
     20,                                                               // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo nc_emlrtRTEI{
+emlrtRTEInfo jc_emlrtRTEI{
     446,                                                              // lineNo
     21,                                                               // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo pc_emlrtRTEI{
+emlrtRTEInfo lc_emlrtRTEI{
     486,                                                              // lineNo
     5,                                                                // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo qc_emlrtRTEI{
+emlrtRTEInfo mc_emlrtRTEI{
     498,                                                              // lineNo
     5,                                                                // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo rc_emlrtRTEI{
+emlrtRTEInfo nc_emlrtRTEI{
     445,                                                              // lineNo
     1,                                                                // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo sc_emlrtRTEI{
+emlrtRTEInfo oc_emlrtRTEI{
     446,                                                              // lineNo
     1,                                                                // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-emlrtRTEInfo xc_emlrtRTEI{
+emlrtRTEInfo tc_emlrtRTEI{
     63,                // lineNo
     17,                // colNo
     "morseproperties", // fName
@@ -162,49 +146,12 @@ emlrtRTEInfo xc_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-emlrtRTEInfo hd_emlrtRTEI{
+emlrtRTEInfo od_emlrtRTEI{
     294,             // lineNo
     5,               // colNo
     "scaleSpectrum", // fName
     "/usr/local/MATLAB/R2024a/toolbox/wavelet/wavelet/@cwtfilterbank/"
     "scaleSpectrum.m" // pName
-};
-
-emlrtRTEInfo ne_emlrtRTEI{
-    91,                                                         // lineNo
-    5,                                                          // colNo
-    "upsample",                                                 // fName
-    "/usr/local/MATLAB/R2024a/toolbox/signal/signal/upsample.m" // pName
-};
-
-emlrtRTEInfo oe_emlrtRTEI{
-    1,                // lineNo
-    1,                // colNo
-    "upfirdnGPUImpl", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/signal/signal/+signal/+internal/"
-    "+codegenable/+gpu/upfirdnGPUImpl.p" // pName
-};
-
-emlrtRTEInfo pe_emlrtRTEI{
-    71,                                                     // lineNo
-    5,                                                      // colNo
-    "upfirdn",                                              // fName
-    "/usr/local/MATLAB/R2024a/toolbox/signal/eml/upfirdn.m" // pName
-};
-
-emlrtRTEInfo qe_emlrtRTEI{
-    88,                                                         // lineNo
-    5,                                                          // colNo
-    "upsample",                                                 // fName
-    "/usr/local/MATLAB/R2024a/toolbox/signal/signal/upsample.m" // pName
-};
-
-emlrtRTEInfo re_emlrtRTEI{
-    22,                        // lineNo
-    23,                        // colNo
-    "uniformScalarVectorCore", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/signal/signal/+signal/+internal/"
-    "+resample/uniformScalarVectorCore.m" // pName
 };
 
 const char_T cv[128]{

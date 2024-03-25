@@ -22,7 +22,7 @@
 #include <cstring>
 
 // Variable Definitions
-static emlrtRTEInfo wc_emlrtRTEI{
+static emlrtRTEInfo sc_emlrtRTEI{
     63,                // lineNo
     57,                // colNo
     "morseproperties", // fName
@@ -30,7 +30,7 @@ static emlrtRTEInfo wc_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-static emlrtRTEInfo yc_emlrtRTEI{
+static emlrtRTEInfo uc_emlrtRTEI{
     63,                // lineNo
     60,                // colNo
     "morseproperties", // fName
@@ -38,14 +38,14 @@ static emlrtRTEInfo yc_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-static emlrtRTEInfo ad_emlrtRTEI{
+static emlrtRTEInfo vc_emlrtRTEI{
     1,                                                                // lineNo
     23,                                                               // colNo
     "quadgk",                                                         // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/funfun/quadgk.m" // pName
 };
 
-static emlrtRTEInfo bd_emlrtRTEI{
+static emlrtRTEInfo wc_emlrtRTEI{
     63,                // lineNo
     16,                // colNo
     "morseproperties", // fName
@@ -53,7 +53,7 @@ static emlrtRTEInfo bd_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-static emlrtRTEInfo cd_emlrtRTEI{
+static emlrtRTEInfo xc_emlrtRTEI{
     63,                // lineNo
     20,                // colNo
     "morseproperties", // fName
@@ -61,7 +61,7 @@ static emlrtRTEInfo cd_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-static emlrtRTEInfo dd_emlrtRTEI{
+static emlrtRTEInfo yc_emlrtRTEI{
     63,                // lineNo
     34,                // colNo
     "morseproperties", // fName
@@ -81,7 +81,7 @@ void binary_expand_op_3(emxArray_real_T *in1, const emxArray_real_T *in2,
   in1->size[0] = 1;
   in1->size[1] = in4->size[1];
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(in1, i, &qc_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &mc_emlrtRTEI);
   stride_0_1 = (in2->size[1] != 1);
   stride_1_1 = (in3->size[1] != 1);
   profileLoopStart("binary_expand_op_3_loop_0", __LINE__,
@@ -105,7 +105,7 @@ void binary_expand_op_7(emxArray_real_T *in1, const emxArray_real_T *in2,
   in1->size[0] = 1;
   in1->size[1] = in4->size[1];
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(in1, i, &qc_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &mc_emlrtRTEI);
   stride_0_1 = (in2->size[1] != 1);
   stride_1_1 = (in3->size[1] != 1);
   profileLoopStart("binary_expand_op_7_loop_0", __LINE__,
@@ -175,25 +175,25 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
     err_ok = 0.0;
     first_iteration = true;
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&x, 2, &lc_emlrtRTEI, true);
+    emxInit_real_T(&x, 2, &hc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&b_x, 2, &rc_emlrtRTEI, true);
+    emxInit_real_T(&b_x, 2, &nc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&xt, 2, &sc_emlrtRTEI, true);
+    emxInit_real_T(&xt, 2, &oc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&y, 2, &yc_emlrtRTEI, true);
+    emxInit_real_T(&y, 2, &uc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&fx, 2, &ad_emlrtRTEI, true);
+    emxInit_real_T(&fx, 2, &vc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&b_dv1, 2, &bd_emlrtRTEI, true);
+    emxInit_real_T(&b_dv1, 2, &wc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&b_y, 2, &cd_emlrtRTEI, true);
+    emxInit_real_T(&b_y, 2, &xc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&c_y, 2, &dd_emlrtRTEI, true);
+    emxInit_real_T(&c_y, 2, &yc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&d_y, 2, &bd_emlrtRTEI, true);
+    emxInit_real_T(&d_y, 2, &wc_emlrtRTEI, true);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&a, 2, &xc_emlrtRTEI, true);
+    emxInit_real_T(&a, 2, &tc_emlrtRTEI, true);
     nvtxRangePushA("#loop#quadgk_whileloop_0##" MW_AT_LINE);
     int32_T exitg1;
     do {
@@ -207,7 +207,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
       x->size[0] = 1;
       x->size[1] = 15 * (nsubs + 1);
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(x, ix, &lc_emlrtRTEI);
+      emxEnsureCapacity_real_T(x, ix, &hc_emlrtRTEI);
       ix = -1;
       profileLoopStart("quadgk_loop_1", __LINE__, nsubs + 1, "");
       for (k = 0; k <= nsubs; k++) {
@@ -227,12 +227,12 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
       b_x->size[0] = 1;
       b_x->size[1] = x->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(b_x, ix, &mc_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_x, ix, &ic_emlrtRTEI);
       ix = xt->size[0] * xt->size[1];
       xt->size[0] = 1;
       xt->size[1] = x->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(xt, ix, &nc_emlrtRTEI);
+      emxEnsureCapacity_real_T(xt, ix, &jc_emlrtRTEI);
       ix = x->size[1];
       profileLoopStart("quadgk_loop_3", __LINE__, (ix - 1) + 1, "");
       for (k = 0; k < ix; k++) {
@@ -268,7 +268,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
           fx->size[0] = 1;
           fx->size[1] = x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(fx, ix, &pc_emlrtRTEI);
+          emxEnsureCapacity_real_T(fx, ix, &lc_emlrtRTEI);
           profileLoopStart("quadgk_loop_7", __LINE__, (dv_idx_1 - 1) + 1, "");
           for (ix = 0; ix < dv_idx_1; ix++) {
             fx->data[ix] = 0.0;
@@ -286,7 +286,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
         y->size[0] = 1;
         y->size[1] = b_x->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(y, ix, &m_emlrtRTEI);
+        emxEnsureCapacity_real_T(y, ix, &j_emlrtRTEI);
         ix = b_x->size[1];
         profileLoopStart("quadgk_loop_5", __LINE__, (ix - 1) + 1, "");
         for (k = 0; k < ix; k++) {
@@ -298,7 +298,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
         b_dv1->size[0] = 1;
         b_dv1->size[1] = y->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(b_dv1, ix, &wc_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_dv1, ix, &sc_emlrtRTEI);
         profileLoopStart("quadgk_loop_9", __LINE__, (y->size[1] - 1) + 1, "");
         for (ix = 0; ix < y->size[1]; ix++) {
           b_dv1->data[ix] = -2.0 * y->data[ix];
@@ -314,7 +314,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
         b_y->size[0] = 1;
         b_y->size[1] = b_x->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(b_y, ix, &m_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_y, ix, &j_emlrtRTEI);
         ix = b_x->size[1];
         profileLoopStart("quadgk_loop_12", __LINE__, (ix - 1) + 1, "");
         for (k = 0; k < ix; k++) {
@@ -327,7 +327,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
         c_y->size[0] = 1;
         c_y->size[1] = b_x->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(c_y, ix, &m_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_y, ix, &j_emlrtRTEI);
         ix = b_x->size[1];
         profileLoopStart("quadgk_loop_13", __LINE__, (ix - 1) + 1, "");
         for (k = 0; k < ix; k++) {
@@ -340,7 +340,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
           a->size[0] = 1;
           a->size[1] = b_y->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(a, ix, &xc_emlrtRTEI);
+          emxEnsureCapacity_real_T(a, ix, &tc_emlrtRTEI);
           profileLoopStart("quadgk_loop_14", __LINE__, (b_y->size[1] - 1) + 1,
                            "");
           for (ix = 0; ix < b_y->size[1]; ix++) {
@@ -356,7 +356,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
         d_y->size[0] = 1;
         d_y->size[1] = a->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(d_y, ix, &m_emlrtRTEI);
+        emxEnsureCapacity_real_T(d_y, ix, &j_emlrtRTEI);
         ix = a->size[1];
         profileLoopStart("quadgk_loop_15", __LINE__, (ix - 1) + 1, "");
         for (k = 0; k < ix; k++) {
@@ -369,7 +369,7 @@ real_T quadgk(real_T fun_workspace_be, real_T fun_workspace_ga)
           fx->size[0] = 1;
           fx->size[1] = d_y->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(fx, ix, &qc_emlrtRTEI);
+          emxEnsureCapacity_real_T(fx, ix, &mc_emlrtRTEI);
           profileLoopStart("quadgk_loop_16", __LINE__, (d_y->size[1] - 1) + 1,
                            "");
           for (ix = 0; ix < d_y->size[1]; ix++) {

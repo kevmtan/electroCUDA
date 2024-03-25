@@ -26,21 +26,21 @@
 #include <cmath>
 
 // Variable Definitions
-static emlrtMCInfo b_emlrtMCI{
+static emlrtMCInfo emlrtMCI{
     53,                                                                // lineNo
     14,                                                                // colNo
     "nonConstPrint",                                                   // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/strfun/sprintf.m" // pName
 };
 
-static emlrtMCInfo c_emlrtMCI{
+static emlrtMCInfo b_emlrtMCI{
     55,                                                                // lineNo
     15,                                                                // colNo
     "nonConstPrint",                                                   // fName
     "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/strfun/sprintf.m" // pName
 };
 
-static emlrtRTEInfo fb_emlrtRTEI{
+static emlrtRTEInfo bb_emlrtRTEI{
     999,             // lineNo
     17,              // colNo
     "cwtfilterbank", // fName
@@ -48,7 +48,7 @@ static emlrtRTEInfo fb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo gb_emlrtRTEI{
+static emlrtRTEInfo cb_emlrtRTEI{
     1000,            // lineNo
     17,              // colNo
     "cwtfilterbank", // fName
@@ -56,7 +56,7 @@ static emlrtRTEInfo gb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo hb_emlrtRTEI{
+static emlrtRTEInfo db_emlrtRTEI{
     1009,            // lineNo
     13,              // colNo
     "cwtfilterbank", // fName
@@ -64,7 +64,7 @@ static emlrtRTEInfo hb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo jb_emlrtRTEI{
+static emlrtRTEInfo fb_emlrtRTEI{
     1278,            // lineNo
     13,              // colNo
     "cwtfilterbank", // fName
@@ -72,7 +72,7 @@ static emlrtRTEInfo jb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo kb_emlrtRTEI{
+static emlrtRTEInfo gb_emlrtRTEI{
     217,             // lineNo
     21,              // colNo
     "cwtfilterbank", // fName
@@ -80,7 +80,7 @@ static emlrtRTEInfo kb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo lb_emlrtRTEI{
+static emlrtRTEInfo hb_emlrtRTEI{
     18,             // lineNo
     5,              // colNo
     "wavbpfilters", // fName
@@ -88,7 +88,7 @@ static emlrtRTEInfo lb_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo mb_emlrtRTEI{
+static emlrtRTEInfo ib_emlrtRTEI{
     31,             // lineNo
     9,              // colNo
     "wavbpfilters", // fName
@@ -96,7 +96,7 @@ static emlrtRTEInfo mb_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo nb_emlrtRTEI{
+static emlrtRTEInfo jb_emlrtRTEI{
     18,               // lineNo
     5,                // colNo
     "morsebpfilters", // fName
@@ -104,7 +104,7 @@ static emlrtRTEInfo nb_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-static emlrtRTEInfo ob_emlrtRTEI{
+static emlrtRTEInfo kb_emlrtRTEI{
     33,             // lineNo
     9,              // colNo
     "wavbpfilters", // fName
@@ -112,7 +112,7 @@ static emlrtRTEInfo ob_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo pb_emlrtRTEI{
+static emlrtRTEInfo lb_emlrtRTEI{
     25,               // lineNo
     5,                // colNo
     "morsebpfilters", // fName
@@ -120,7 +120,7 @@ static emlrtRTEInfo pb_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-static emlrtRTEInfo sb_emlrtRTEI{
+static emlrtRTEInfo ob_emlrtRTEI{
     41,             // lineNo
     1,              // colNo
     "wavbpfilters", // fName
@@ -128,7 +128,7 @@ static emlrtRTEInfo sb_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo ub_emlrtRTEI{
+static emlrtRTEInfo qb_emlrtRTEI{
     33,               // lineNo
     1,                // colNo
     "morsebpfilters", // fName
@@ -136,7 +136,7 @@ static emlrtRTEInfo ub_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-static emlrtRTEInfo vb_emlrtRTEI{
+static emlrtRTEInfo rb_emlrtRTEI{
     956,             // lineNo
     13,              // colNo
     "cwtfilterbank", // fName
@@ -144,7 +144,7 @@ static emlrtRTEInfo vb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo wb_emlrtRTEI{
+static emlrtRTEInfo sb_emlrtRTEI{
     227,             // lineNo
     13,              // colNo
     "cwtfilterbank", // fName
@@ -152,7 +152,7 @@ static emlrtRTEInfo wb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo xb_emlrtRTEI{
+static emlrtRTEInfo tb_emlrtRTEI{
     228,             // lineNo
     13,              // colNo
     "cwtfilterbank", // fName
@@ -160,7 +160,7 @@ static emlrtRTEInfo xb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo yb_emlrtRTEI{
+static emlrtRTEInfo ub_emlrtRTEI{
     1276,            // lineNo
     30,              // colNo
     "cwtfilterbank", // fName
@@ -168,7 +168,7 @@ static emlrtRTEInfo yb_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo ac_emlrtRTEI{
+static emlrtRTEInfo vb_emlrtRTEI{
     1276,            // lineNo
     25,              // colNo
     "cwtfilterbank", // fName
@@ -176,7 +176,7 @@ static emlrtRTEInfo ac_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo bc_emlrtRTEI{
+static emlrtRTEInfo wb_emlrtRTEI{
     16,             // lineNo
     5,              // colNo
     "wavbpfilters", // fName
@@ -184,7 +184,7 @@ static emlrtRTEInfo bc_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo cc_emlrtRTEI{
+static emlrtRTEInfo xb_emlrtRTEI{
     32,             // lineNo
     18,             // colNo
     "getCWTScales", // fName
@@ -192,7 +192,7 @@ static emlrtRTEInfo cc_emlrtRTEI{
     "getCWTScales.m" // pName
 };
 
-static emlrtRTEInfo dc_emlrtRTEI{
+static emlrtRTEInfo yb_emlrtRTEI{
     16,               // lineNo
     5,                // colNo
     "morsebpfilters", // fName
@@ -200,7 +200,7 @@ static emlrtRTEInfo dc_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-static emlrtRTEInfo ec_emlrtRTEI{
+static emlrtRTEInfo ac_emlrtRTEI{
     26,             // lineNo
     9,              // colNo
     "wavbpfilters", // fName
@@ -208,7 +208,7 @@ static emlrtRTEInfo ec_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo fc_emlrtRTEI{
+static emlrtRTEInfo bc_emlrtRTEI{
     32,             // lineNo
     13,             // colNo
     "getCWTScales", // fName
@@ -216,7 +216,7 @@ static emlrtRTEInfo fc_emlrtRTEI{
     "getCWTScales.m" // pName
 };
 
-static emlrtRTEInfo gc_emlrtRTEI{
+static emlrtRTEInfo cc_emlrtRTEI{
     21,               // lineNo
     1,                // colNo
     "morsebpfilters", // fName
@@ -224,7 +224,7 @@ static emlrtRTEInfo gc_emlrtRTEI{
     "morsebpfilters.m" // pName
 };
 
-static emlrtRTEInfo hc_emlrtRTEI{
+static emlrtRTEInfo dc_emlrtRTEI{
     34,             // lineNo
     42,             // colNo
     "wavbpfilters", // fName
@@ -232,7 +232,7 @@ static emlrtRTEInfo hc_emlrtRTEI{
     "wavbpfilters.m" // pName
 };
 
-static emlrtRTEInfo ic_emlrtRTEI{
+static emlrtRTEInfo ec_emlrtRTEI{
     175,             // lineNo
     25,              // colNo
     "cwtfilterbank", // fName
@@ -240,7 +240,7 @@ static emlrtRTEInfo ic_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo jc_emlrtRTEI{
+static emlrtRTEInfo fc_emlrtRTEI{
     934,             // lineNo
     26,              // colNo
     "cwtfilterbank", // fName
@@ -248,7 +248,7 @@ static emlrtRTEInfo jc_emlrtRTEI{
     "cwtfilterbank.m" // pName
 };
 
-static emlrtRTEInfo kc_emlrtRTEI{
+static emlrtRTEInfo gc_emlrtRTEI{
     816,             // lineNo
     25,              // colNo
     "cwtfilterbank", // fName
@@ -505,7 +505,7 @@ static cwtfilterbank *cwtfilterbank_setProperties(cwtfilterbank *self,
     freqrange_idx_1 = b_self->FrequencyLimits[1];
     NyquistRange_idx_1 = b_self->SamplingFrequency / 2.0;
     nvtxMarkA("#emxInit_char_T#" MW_AT_LINE);
-    emxInit_char_T(&tmpStr, 2, &kc_emlrtRTEI, true);
+    emxInit_char_T(&tmpStr, 2, &gc_emlrtRTEI, true);
     if ((freqrange_idx_1 <= 0.0) || (freqrange_idx_0 >= NyquistRange_idx_1)) {
       b_tmpStr = nullptr;
       y = nullptr;
@@ -520,10 +520,10 @@ static cwtfilterbank *cwtfilterbank_setProperties(cwtfilterbank *self,
       m2 = emlrtCreateDoubleScalar(NyquistRange_idx_1);
       emlrtAssign(&c_y, m2);
       nvtxMarkA("#feval#" MW_AT_LINE);
-      emlrtAssign(&b_tmpStr, feval(y, b_y, c_y, &b_emlrtMCI));
+      emlrtAssign(&b_tmpStr, feval(y, b_y, c_y, &emlrtMCI));
       nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
       nvtxMarkA("#length#" MW_AT_LINE);
-      emlrt_marshallIn(length(emlrtAlias(b_tmpStr), &c_emlrtMCI),
+      emlrt_marshallIn(length(emlrtAlias(b_tmpStr), &b_emlrtMCI),
                        "<output of length>");
       nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
       emlrt_marshallIn(emlrtAlias(b_tmpStr), "tmpStr", tmpStr);
@@ -617,13 +617,13 @@ static cwtfilterbank *cwtfilterbank_setProperties(cwtfilterbank *self,
       m5 = emlrtCreateDoubleScalar(varargin_1);
       emlrtAssign(&f_y, m5);
       nvtxMarkA("#feval#" MW_AT_LINE);
-      emlrtAssign(&c_tmpStr, feval(d_y, e_y, f_y, &b_emlrtMCI));
+      emlrtAssign(&c_tmpStr, feval(d_y, e_y, f_y, &emlrtMCI));
       nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
       nvtxMarkA("#length#" MW_AT_LINE);
-      emlrt_marshallIn(length(emlrtAlias(c_tmpStr), &c_emlrtMCI),
+      emlrt_marshallIn(length(emlrtAlias(c_tmpStr), &b_emlrtMCI),
                        "<output of length>");
       nvtxMarkA("#emxInit_char_T#" MW_AT_LINE);
-      emxInit_char_T(&d_tmpStr, 2, &kc_emlrtRTEI, true);
+      emxInit_char_T(&d_tmpStr, 2, &gc_emlrtRTEI, true);
       nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
       emlrt_marshallIn(emlrtAlias(c_tmpStr), "tmpStr", d_tmpStr);
       nvtxMarkA("#emxFree_char_T#" MW_AT_LINE);
@@ -770,13 +770,13 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
   N = b_self->SignalLength + 2.0 * b_self->SignalPad;
   b = std::trunc(N / 2.0);
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&omega_tmp1, 2, &fb_emlrtRTEI, true);
+  emxInit_real_T(&omega_tmp1, 2, &bb_emlrtRTEI, true);
   if (std::isnan(b)) {
     i = omega_tmp1->size[0] * omega_tmp1->size[1];
     omega_tmp1->size[0] = 1;
     omega_tmp1->size[1] = 1;
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(omega_tmp1, i, &fb_emlrtRTEI);
+    emxEnsureCapacity_real_T(omega_tmp1, i, &bb_emlrtRTEI);
     omega_tmp1->data[0] = rtNaN;
   } else if (b < 1.0) {
     omega_tmp1->size[0] = 1;
@@ -786,7 +786,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     omega_tmp1->size[0] = 1;
     omega_tmp1->size[1] = static_cast<int32_T>(b - 1.0) + 1;
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(omega_tmp1, i, &fb_emlrtRTEI);
+    emxEnsureCapacity_real_T(omega_tmp1, i, &bb_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_0", __LINE__,
                      static_cast<int32_T>(b - 1.0) + 1, "");
     for (i = 0; i <= static_cast<int32_T>(b - 1.0); i++) {
@@ -795,12 +795,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     profileLoopEnd();
   }
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&omega_tmp2, 2, &gb_emlrtRTEI, true);
+  emxInit_real_T(&omega_tmp2, 2, &cb_emlrtRTEI, true);
   i = omega_tmp2->size[0] * omega_tmp2->size[1];
   omega_tmp2->size[0] = 1;
   omega_tmp2->size[1] = omega_tmp1->size[1];
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(omega_tmp2, i, &gb_emlrtRTEI);
+  emxEnsureCapacity_real_T(omega_tmp2, i, &cb_emlrtRTEI);
   cutoff = 6.2831853071795862 / N;
   profileLoopStart("cwtfilterbank_cwtfilterbank_loop_1", __LINE__,
                    (omega_tmp1->size[1] - 1) + 1, "");
@@ -825,7 +825,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
   nvtxMarkA("#div_s32#" MW_AT_LINE);
   b_self->Omega->size[1] = (omega_tmp2->size[1] + div_s32(i2 - b_i, nx)) + 2;
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(b_self->Omega, i, &hb_emlrtRTEI);
+  emxEnsureCapacity_real_T(b_self->Omega, i, &db_emlrtRTEI);
   b_self->Omega->data[0] = 0.0;
   loop_ub = omega_tmp2->size[1];
   profileLoopStart("cwtfilterbank_cwtfilterbank_loop_2", __LINE__,
@@ -886,7 +886,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
                                        &cf);
     fo = cf / cutoff;
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&b_y, 2, &yb_emlrtRTEI, true);
+    emxInit_real_T(&b_y, 2, &ub_emlrtRTEI, true);
     nvtxMarkA("#b_log2#" MW_AT_LINE);
     b = nv * b_log2(cf / omegac / fo);
     if (std::isnan(b)) {
@@ -894,7 +894,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       b_y->size[0] = 1;
       b_y->size[1] = 1;
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(b_y, i, &ib_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_y, i, &eb_emlrtRTEI);
       b_y->data[0] = rtNaN;
     } else if (b < 0.0) {
       b_y->size[0] = 1;
@@ -904,7 +904,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       b_y->size[0] = 1;
       b_y->size[1] = static_cast<int32_T>(b) + 1;
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(b_y, i, &ib_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_y, i, &eb_emlrtRTEI);
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_7", __LINE__,
                        static_cast<int32_T>(b) + 1, "");
       for (i = 0; i <= static_cast<int32_T>(b); i++) {
@@ -913,12 +913,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       profileLoopEnd();
     }
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&c_b, 2, &ac_emlrtRTEI, true);
+    emxInit_real_T(&c_b, 2, &vb_emlrtRTEI, true);
     i = c_b->size[0] * c_b->size[1];
     c_b->size[0] = 1;
     c_b->size[1] = b_y->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(c_b, i, &m_emlrtRTEI);
+    emxEnsureCapacity_real_T(c_b, i, &j_emlrtRTEI);
     nx = b_y->size[1];
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_8", __LINE__,
                      (nx - 1) + 1, "");
@@ -933,7 +933,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     b_self->Scales->size[0] = 1;
     b_self->Scales->size[1] = c_b->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(b_self->Scales, i, &jb_emlrtRTEI);
+    emxEnsureCapacity_real_T(b_self->Scales, i, &fb_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_9", __LINE__,
                      (c_b->size[1] - 1) + 1, "");
     for (i = 0; i < c_b->size[1]; i++) {
@@ -1005,7 +1005,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     nvtxMarkA("#rt_powd_snf#" MW_AT_LINE);
     N = rt_powd_snf(2.0, 1.0 / nv);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&c_y, 2, &cc_emlrtRTEI, true);
+    emxInit_real_T(&c_y, 2, &xb_emlrtRTEI, true);
     nvtxMarkA("#b_log2#" MW_AT_LINE);
     b = std::fmax(b_log2(b / fo), 1.0 / nv) * nv;
     if (std::isnan(b)) {
@@ -1013,7 +1013,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       c_y->size[0] = 1;
       c_y->size[1] = 1;
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(c_y, i, &ib_emlrtRTEI);
+      emxEnsureCapacity_real_T(c_y, i, &eb_emlrtRTEI);
       c_y->data[0] = rtNaN;
     } else if (b < 0.0) {
       c_y->size[0] = 1;
@@ -1023,7 +1023,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       c_y->size[0] = 1;
       c_y->size[1] = static_cast<int32_T>(b) + 1;
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(c_y, i, &ib_emlrtRTEI);
+      emxEnsureCapacity_real_T(c_y, i, &eb_emlrtRTEI);
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_11", __LINE__,
                        static_cast<int32_T>(b) + 1, "");
       for (i = 0; i <= static_cast<int32_T>(b); i++) {
@@ -1032,12 +1032,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       profileLoopEnd();
     }
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&d_b, 2, &fc_emlrtRTEI, true);
+    emxInit_real_T(&d_b, 2, &bc_emlrtRTEI, true);
     i = d_b->size[0] * d_b->size[1];
     d_b->size[0] = 1;
     d_b->size[1] = c_y->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(d_b, i, &m_emlrtRTEI);
+    emxEnsureCapacity_real_T(d_b, i, &j_emlrtRTEI);
     nx = c_y->size[1];
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_12", __LINE__,
                      (nx - 1) + 1, "");
@@ -1052,7 +1052,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     b_self->Scales->size[0] = 1;
     b_self->Scales->size[1] = d_b->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(b_self->Scales, i, &kb_emlrtRTEI);
+    emxEnsureCapacity_real_T(b_self->Scales, i, &gb_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_13", __LINE__,
                      (d_b->size[1] - 1) + 1, "");
     for (i = 0; i < d_b->size[1]; i++) {
@@ -1086,14 +1086,14 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
   } while (exitg2 == 0);
   nvtxRangePop();
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&psidft, 2, &ic_emlrtRTEI, true);
+  emxInit_real_T(&psidft, 2, &ec_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&f, 2, &jc_emlrtRTEI, true);
+  emxInit_real_T(&f, 2, &fc_emlrtRTEI, true);
   if (y) {
     ga = b_self->Gamma;
     be = b_self->Beta;
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&b_somega, 2, &dc_emlrtRTEI, true);
+    emxInit_real_T(&b_somega, 2, &yb_emlrtRTEI, true);
     if (b_self->Scales->size[1] == 1) {
       nvtxMarkA("#bsxfun#" MW_AT_LINE);
       bsxfun(b_self->Scales, b_self->Omega, b_somega);
@@ -1102,7 +1102,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       b_somega->size[0] = b_self->Scales->size[1];
       b_somega->size[1] = b_self->Omega->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(b_somega, i, &nb_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_somega, i, &jb_emlrtRTEI);
       loop_ub = b_self->Omega->size[1];
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_16", __LINE__,
                        (loop_ub - 1) + 1, "");
@@ -1121,12 +1121,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     fo = std::exp(1.0 / ga * (std::log(be) - std::log(ga)));
     nx = b_somega->size[0] * b_somega->size[1];
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&absomega, 2, &gc_emlrtRTEI, true);
+    emxInit_real_T(&absomega, 2, &cc_emlrtRTEI, true);
     i = absomega->size[0] * absomega->size[1];
     absomega->size[0] = b_somega->size[0];
     absomega->size[1] = b_somega->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(absomega, i, &j_emlrtRTEI);
+    emxEnsureCapacity_real_T(absomega, i, &i_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_19", __LINE__,
                      (nx - 1) + 1, "");
     for (i2 = 0; i2 < nx; i2++) {
@@ -1134,13 +1134,13 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     }
     profileLoopEnd();
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&powscales, 2, &pb_emlrtRTEI, true);
+    emxInit_real_T(&powscales, 2, &lb_emlrtRTEI, true);
     if (ga == 3.0) {
       i = powscales->size[0] * powscales->size[1];
       powscales->size[0] = absomega->size[0];
       powscales->size[1] = absomega->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(powscales, i, &pb_emlrtRTEI);
+      emxEnsureCapacity_real_T(powscales, i, &lb_emlrtRTEI);
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_22", __LINE__,
                        (absomega->size[0] * absomega->size[1] - 1) + 1, "");
       for (i = 0; i < absomega->size[0] * absomega->size[1]; i++) {
@@ -1153,7 +1153,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       powscales->size[0] = absomega->size[0];
       powscales->size[1] = absomega->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(powscales, i, &m_emlrtRTEI);
+      emxEnsureCapacity_real_T(powscales, i, &j_emlrtRTEI);
       nx = absomega->size[0] * absomega->size[1];
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_23", __LINE__,
                        (nx - 1) + 1, "");
@@ -1173,14 +1173,14 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     nvtxMarkA("#rt_powd_snf#" MW_AT_LINE);
     b = 2.0 * std::exp(-be * std::log(fo) + rt_powd_snf(fo, ga));
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&b_x, 2, &qb_emlrtRTEI, true);
+    emxInit_real_T(&b_x, 2, &mb_emlrtRTEI, true);
     if ((absomega->size[0] == powscales->size[0]) &&
         (absomega->size[1] == powscales->size[1])) {
       i = b_x->size[0] * b_x->size[1];
       b_x->size[0] = absomega->size[0];
       b_x->size[1] = absomega->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(b_x, i, &qb_emlrtRTEI);
+      emxEnsureCapacity_real_T(b_x, i, &mb_emlrtRTEI);
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_26", __LINE__,
                        (absomega->size[0] * absomega->size[1] - 1) + 1, "");
       for (i = 0; i < absomega->size[0] * absomega->size[1]; i++) {
@@ -1208,7 +1208,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       psidft->size[0] = b_x->size[0];
       psidft->size[1] = b_x->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(psidft, i, &tb_emlrtRTEI);
+      emxEnsureCapacity_real_T(psidft, i, &pb_emlrtRTEI);
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_30", __LINE__,
                        (b_x->size[0] * b_x->size[1] - 1) + 1, "");
       for (i = 0; i < b_x->size[0] * b_x->size[1]; i++) {
@@ -1228,7 +1228,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     f->size[0] = 1;
     f->size[1] = b_self->Scales->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(f, i, &ub_emlrtRTEI);
+    emxEnsureCapacity_real_T(f, i, &qb_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_32", __LINE__,
                      (b_self->Scales->size[1] - 1) + 1, "");
     for (i = 0; i < b_self->Scales->size[1]; i++) {
@@ -1237,7 +1237,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     profileLoopEnd();
   } else {
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&somega, 2, &bc_emlrtRTEI, true);
+    emxInit_real_T(&somega, 2, &wb_emlrtRTEI, true);
     if (b_self->Scales->size[1] == 1) {
       nvtxMarkA("#bsxfun#" MW_AT_LINE);
       bsxfun(b_self->Scales, b_self->Omega, somega);
@@ -1246,7 +1246,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       somega->size[0] = b_self->Scales->size[1];
       somega->size[1] = b_self->Omega->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(somega, i, &lb_emlrtRTEI);
+      emxEnsureCapacity_real_T(somega, i, &hb_emlrtRTEI);
       loop_ub = b_self->Omega->size[1];
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_14", __LINE__,
                        (loop_ub - 1) + 1, "");
@@ -1263,12 +1263,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       profileLoopEnd();
     }
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&w, 2, &mb_emlrtRTEI, true);
+    emxInit_real_T(&w, 2, &ib_emlrtRTEI, true);
     i = w->size[0] * w->size[1];
     w->size[0] = somega->size[0];
     w->size[1] = somega->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(w, i, &mb_emlrtRTEI);
+    emxEnsureCapacity_real_T(w, i, &ib_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_15", __LINE__,
                      (somega->size[0] * somega->size[1] - 1) + 1, "");
     for (i = 0; i < somega->size[0] * somega->size[1]; i++) {
@@ -1278,12 +1278,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     nvtxMarkA("#emxFree_real_T#" MW_AT_LINE);
     emxFree_real_T(&somega);
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&expnt, 2, &ec_emlrtRTEI, true);
+    emxInit_real_T(&expnt, 2, &ac_emlrtRTEI, true);
     i = expnt->size[0] * expnt->size[1];
     expnt->size[0] = w->size[0];
     expnt->size[1] = w->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(expnt, i, &ob_emlrtRTEI);
+    emxEnsureCapacity_real_T(expnt, i, &kb_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_20", __LINE__,
                      (w->size[0] * w->size[1] - 1) + 1, "");
     for (i = 0; i < w->size[0] * w->size[1]; i++) {
@@ -1299,12 +1299,12 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     profileLoopEnd();
     nx = w->size[0] * w->size[1];
     nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-    emxInit_real_T(&d_y, 2, &hc_emlrtRTEI, true);
+    emxInit_real_T(&d_y, 2, &dc_emlrtRTEI, true);
     i = d_y->size[0] * d_y->size[1];
     d_y->size[0] = w->size[0];
     d_y->size[1] = w->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(d_y, i, &j_emlrtRTEI);
+    emxEnsureCapacity_real_T(d_y, i, &i_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_25", __LINE__,
                      (nx - 1) + 1, "");
     for (i2 = 0; i2 < nx; i2++) {
@@ -1318,7 +1318,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
       psidft->size[0] = expnt->size[0];
       psidft->size[1] = expnt->size[1];
       nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-      emxEnsureCapacity_real_T(psidft, i, &rb_emlrtRTEI);
+      emxEnsureCapacity_real_T(psidft, i, &nb_emlrtRTEI);
       profileLoopStart("cwtfilterbank_cwtfilterbank_loop_28", __LINE__,
                        (expnt->size[0] * expnt->size[1] - 1) + 1, "");
       for (i = 0; i < expnt->size[0] * expnt->size[1]; i++) {
@@ -1348,7 +1348,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
     f->size[0] = 1;
     f->size[1] = b_self->Scales->size[1];
     nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(f, i, &sb_emlrtRTEI);
+    emxEnsureCapacity_real_T(f, i, &ob_emlrtRTEI);
     profileLoopStart("cwtfilterbank_cwtfilterbank_loop_31", __LINE__,
                      (b_self->Scales->size[1] - 1) + 1, "");
     for (i = 0; i < b_self->Scales->size[1]; i++) {
@@ -1359,7 +1359,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
   i = f->size[0] * f->size[1];
   f->size[0] = 1;
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(f, i, &vb_emlrtRTEI);
+  emxEnsureCapacity_real_T(f, i, &rb_emlrtRTEI);
   i = f->size[1] - 1;
   profileLoopStart("cwtfilterbank_cwtfilterbank_loop_33", __LINE__, i + 1, "");
   for (i2 = 0; i2 <= i; i2++) {
@@ -1370,7 +1370,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
   b_self->PsiDFT->size[0] = psidft->size[0];
   b_self->PsiDFT->size[1] = psidft->size[1];
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(b_self->PsiDFT, i, &wb_emlrtRTEI);
+  emxEnsureCapacity_real_T(b_self->PsiDFT, i, &sb_emlrtRTEI);
   profileLoopStart("cwtfilterbank_cwtfilterbank_loop_34", __LINE__,
                    (psidft->size[0] * psidft->size[1] - 1) + 1, "");
   for (i = 0; i < psidft->size[0] * psidft->size[1]; i++) {
@@ -1382,7 +1382,7 @@ cwtfilterbank *cwtfilterbank_cwtfilterbank(cwtfilterbank *self,
   i = b_self->WaveletCenterFrequencies->size[0];
   b_self->WaveletCenterFrequencies->size[0] = f->size[1];
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(b_self->WaveletCenterFrequencies, i, &xb_emlrtRTEI);
+  emxEnsureCapacity_real_T(b_self->WaveletCenterFrequencies, i, &tb_emlrtRTEI);
   profileLoopStart("cwtfilterbank_cwtfilterbank_loop_35", __LINE__,
                    (f->size[1] - 1) + 1, "");
   for (i = 0; i < f->size[1]; i++) {

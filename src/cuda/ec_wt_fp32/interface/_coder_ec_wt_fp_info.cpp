@@ -47,10 +47,10 @@ mxArray *emlrtMexFcnProperties()
       "FullPath", "TimeStamp",      "Constructor",     "Visible"};
   xEntryPoints =
       emlrtCreateStructMatrix(1, 1, 8, (const char_T **)&epFieldName[0]);
-  xInputs = emlrtCreateLogicalMatrix(1, 6);
+  xInputs = emlrtCreateLogicalMatrix(1, 7);
   emlrtSetField(xEntryPoints, 0, "Name", emlrtMxCreateString("ec_wt_fp"));
   emlrtSetField(xEntryPoints, 0, "NumberOfInputs",
-                emlrtMxCreateDoubleScalar(6.0));
+                emlrtMxCreateDoubleScalar(7.0));
   emlrtSetField(xEntryPoints, 0, "NumberOfOutputs",
                 emlrtMxCreateDoubleScalar(2.0));
   emlrtSetField(xEntryPoints, 0, "ConstantInputs", xInputs);
@@ -58,7 +58,7 @@ mxArray *emlrtMexFcnProperties()
                 emlrtMxCreateString(
                     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_wt_fp.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
-                emlrtMxCreateDoubleScalar(739333.42712962965));
+                emlrtMxCreateDoubleScalar(739335.86607638886));
   emlrtSetField(xEntryPoints, 0, "Constructor",
                 emlrtMxCreateLogicalScalar(false));
   emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));

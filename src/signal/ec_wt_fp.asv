@@ -44,7 +44,7 @@ end
 %% Processing loop across channels
 for ch = 1:nChs
     if doAvg
-        y(:,ch) = awt_lfn(fb,x(:,ch),ds,doPwr);
+        y(:,ch,:) = awt_lfn(fb,x(:,ch),ds,doPwr);
     else
         y(:,ch,:) = cwt_lfn(fb,x(:,ch),ds,doPwr);
     end
@@ -56,7 +56,7 @@ end
 %% Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function yc = cwt_lfn(fb,xc,ds,doPwr)
 
-% Run transform
+% Run CWT
 if doPwr
     yc = abs(wt(fb,xc)').^2; % Power
 else
@@ -68,14 +68,14 @@ if ds
     yc = downsample(yc,ds);
 end
 
-%% Scale-averaged wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function yc = awt_lfn(fb,xc,ds,doPwr)
 
-% Run transform
+% Run CWT
 if doPwr
     yc = scaleSpectrum(fb,xc)'; % Power
 else
-    yc = scaleSpectrum(fb,xc,SpectrumType="density")'; % Magnitude
+    yc = scaleSpectrum(fb,xc,SpectrumType="density"); % Magnitude
 end
 
 % Downsample

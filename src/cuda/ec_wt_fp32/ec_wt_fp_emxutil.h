@@ -26,15 +26,11 @@
 #endif
 
 // Type Declarations
-struct emxArray_creal32_T;
-
-struct cell_wrap_0;
-
-struct emxArray_cell_wrap_0;
-
 struct emxArray_real_T;
 
 struct emxArray_real32_T;
+
+struct emxArray_creal32_T;
 
 namespace coder {
 struct cwtfilterbank;
@@ -44,37 +40,11 @@ struct emxArray_char_T;
 
 struct emxArray_uint32_T;
 
-namespace coder {
-namespace b_signal {
-namespace internal {
-namespace resample {
-struct ResampleParser;
-
-}
-} // namespace internal
-} // namespace b_signal
-} // namespace coder
-struct emxArray_int32_T;
-
-struct emxArray_ptrdiff_t;
-
 // Function Declarations
-int64_T b_computeEndIdx(int64_T start, int64_T end, int64_T stride);
-
-void emxEnsureCapacity_cell_wrap_0(emxArray_cell_wrap_0 *emxArray,
-                                   int32_T oldNumel,
-                                   const emlrtRTEInfo *srcLocation);
-
 void emxEnsureCapacity_char_T(emxArray_char_T *emxArray, int32_T oldNumel,
                               const emlrtRTEInfo *srcLocation);
 
 void emxEnsureCapacity_creal32_T(emxArray_creal32_T *emxArray, int32_T oldNumel,
-                                 const emlrtRTEInfo *srcLocation);
-
-void emxEnsureCapacity_int32_T(emxArray_int32_T *emxArray, int32_T oldNumel,
-                               const emlrtRTEInfo *srcLocation);
-
-void emxEnsureCapacity_ptrdiff_t(emxArray_ptrdiff_t *emxArray, int32_T oldNumel,
                                  const emlrtRTEInfo *srcLocation);
 
 void emxEnsureCapacity_real32_T(emxArray_real32_T *emxArray, int32_T oldNumel,
@@ -86,25 +56,11 @@ void emxEnsureCapacity_real_T(emxArray_real_T *emxArray, int32_T oldNumel,
 void emxEnsureCapacity_uint32_T(emxArray_uint32_T *emxArray, int32_T oldNumel,
                                 const emlrtRTEInfo *srcLocation);
 
-void emxExpand_cell_wrap_0(emxArray_cell_wrap_0 *emxArray, int32_T fromIndex,
-                           int32_T toIndex, const emlrtRTEInfo *srcLocation);
-
-void emxFreeStruct_ResampleParser(
-    coder::b_signal::internal::resample::ResampleParser *pStruct);
-
-void emxFreeStruct_cell_wrap_0(cell_wrap_0 *pStruct);
-
 void emxFreeStruct_cwtfilterbank(coder::cwtfilterbank *pStruct);
-
-void emxFree_cell_wrap_0(emxArray_cell_wrap_0 **pEmxArray);
 
 void emxFree_char_T(emxArray_char_T **pEmxArray);
 
 void emxFree_creal32_T(emxArray_creal32_T **pEmxArray);
-
-void emxFree_int32_T(emxArray_int32_T **pEmxArray);
-
-void emxFree_ptrdiff_t(emxArray_ptrdiff_t **pEmxArray);
 
 void emxFree_real32_T(emxArray_real32_T **pEmxArray);
 
@@ -112,32 +68,14 @@ void emxFree_real_T(emxArray_real_T **pEmxArray);
 
 void emxFree_uint32_T(emxArray_uint32_T **pEmxArray);
 
-void emxInitStruct_ResampleParser(
-    coder::b_signal::internal::resample::ResampleParser *pStruct,
-    const emlrtRTEInfo *srcLocation, boolean_T doPush);
-
-void emxInitStruct_cell_wrap_0(cell_wrap_0 *pStruct,
-                               const emlrtRTEInfo *srcLocation,
-                               boolean_T doPush);
-
 void emxInitStruct_cwtfilterbank(coder::cwtfilterbank *pStruct,
                                  const emlrtRTEInfo *srcLocation,
                                  boolean_T doPush);
-
-void emxInit_cell_wrap_0(emxArray_cell_wrap_0 **pEmxArray,
-                         int32_T numDimensions, const emlrtRTEInfo *srcLocation,
-                         boolean_T doPush);
 
 void emxInit_char_T(emxArray_char_T **pEmxArray, int32_T numDimensions,
                     const emlrtRTEInfo *srcLocation, boolean_T doPush);
 
 void emxInit_creal32_T(emxArray_creal32_T **pEmxArray, int32_T numDimensions,
-                       const emlrtRTEInfo *srcLocation, boolean_T doPush);
-
-void emxInit_int32_T(emxArray_int32_T **pEmxArray, int32_T numDimensions,
-                     const emlrtRTEInfo *srcLocation, boolean_T doPush);
-
-void emxInit_ptrdiff_t(emxArray_ptrdiff_t **pEmxArray, int32_T numDimensions,
                        const emlrtRTEInfo *srcLocation, boolean_T doPush);
 
 void emxInit_real32_T(emxArray_real32_T **pEmxArray, int32_T numDimensions,
@@ -148,8 +86,5 @@ void emxInit_real_T(emxArray_real_T **pEmxArray, int32_T numDimensions,
 
 void emxInit_uint32_T(emxArray_uint32_T **pEmxArray, int32_T numDimensions,
                       const emlrtRTEInfo *srcLocation, boolean_T doPush);
-
-void emxTrim_cell_wrap_0(emxArray_cell_wrap_0 *emxArray, int32_T fromIndex,
-                         int32_T toIndex);
 
 // End of code generation (ec_wt_fp_emxutil.h)

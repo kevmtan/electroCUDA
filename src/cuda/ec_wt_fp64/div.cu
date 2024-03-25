@@ -35,7 +35,7 @@ void binary_expand_op_6(emxArray_real_T *in1, const emxArray_real_T *in2,
   }
   in1->size[1] = in2->size[1];
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(in1, i, &hd_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &md_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_1_0 = (in3_idx_0 != 1);
   profileLoopStart("binary_expand_op_6_loop_0", __LINE__,

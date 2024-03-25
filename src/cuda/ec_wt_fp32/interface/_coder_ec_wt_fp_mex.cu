@@ -28,7 +28,7 @@ void emlrtExceptionBridge()
 void mexFunction(int32_T nlhs, mxArray *plhs[], int32_T nrhs,
                  const mxArray *prhs[])
 {
-  nvtxRangePushA("#fcn#mexFunction#" MW_AT_LOCATION "#M100,100");
+  nvtxRangePushA("#fcn#mexFunction#" MW_AT_LOCATION);
   nvtxMarkA("#mexAtExit#" MW_AT_LINE);
   mexAtExit(&ec_wt_fp_atexit);
   // Module initialization.
@@ -59,17 +59,16 @@ emlrtCTX mexFunctionCreateRootTLS()
 }
 
 void unsafe_ec_wt_fp_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
-                                 const mxArray *prhs[6])
+                                 const mxArray *prhs[7])
 {
   const mxArray *outputs[2];
   int32_T b;
-  nvtxRangePushA("#fcn#unsafe_ec_wt_fp_mexFunction#" MW_AT_LOCATION
-                 "#M100,100");
+  nvtxRangePushA("#fcn#unsafe_ec_wt_fp_mexFunction#" MW_AT_LOCATION);
   // Check for proper number of arguments.
-  if (nrhs != 6) {
+  if (nrhs != 7) {
     emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,
                         "EMLRT:runTime:WrongNumberOfInputsFAVDefaultValues", 5,
-                        12, 6, 4, 8, "ec_wt_fp");
+                        12, 7, 4, 8, "ec_wt_fp");
   }
   if (nlhs > 2) {
     emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,

@@ -23,7 +23,7 @@
 #include <cstring>
 
 // Variable Definitions
-static emlrtRTEInfo oc_emlrtRTEI{
+static emlrtRTEInfo kc_emlrtRTEI{
     64,                // lineNo
     28,                // colNo
     "morseproperties", // fName
@@ -31,7 +31,7 @@ static emlrtRTEInfo oc_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-static emlrtRTEInfo tc_emlrtRTEI{
+static emlrtRTEInfo pc_emlrtRTEI{
     64,                // lineNo
     31,                // colNo
     "morseproperties", // fName
@@ -39,7 +39,7 @@ static emlrtRTEInfo tc_emlrtRTEI{
     "morseproperties.m" // pName
 };
 
-static emlrtRTEInfo uc_emlrtRTEI{
+static emlrtRTEInfo qc_emlrtRTEI{
     1,            // lineNo
     39,           // colNo
     "wavCFandSD", // fName
@@ -47,7 +47,7 @@ static emlrtRTEInfo uc_emlrtRTEI{
     "wavCFandSD.m" // pName
 };
 
-static emlrtRTEInfo vc_emlrtRTEI{
+static emlrtRTEInfo rc_emlrtRTEI{
     64,                // lineNo
     12,                // colNo
     "morseproperties", // fName
@@ -202,19 +202,19 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
         err_ok = 0.0;
         first_iteration = true;
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&x, 2, &lc_emlrtRTEI, true);
+        emxInit_real_T(&x, 2, &hc_emlrtRTEI, true);
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&b_x, 2, &rc_emlrtRTEI, true);
+        emxInit_real_T(&b_x, 2, &nc_emlrtRTEI, true);
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&xt, 2, &sc_emlrtRTEI, true);
+        emxInit_real_T(&xt, 2, &oc_emlrtRTEI, true);
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&y, 2, &tc_emlrtRTEI, true);
+        emxInit_real_T(&y, 2, &pc_emlrtRTEI, true);
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&fx, 2, &uc_emlrtRTEI, true);
+        emxInit_real_T(&fx, 2, &qc_emlrtRTEI, true);
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&b_dv1, 2, &vc_emlrtRTEI, true);
+        emxInit_real_T(&b_dv1, 2, &rc_emlrtRTEI, true);
         nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-        emxInit_real_T(&b_y, 2, &vc_emlrtRTEI, true);
+        emxInit_real_T(&b_y, 2, &rc_emlrtRTEI, true);
         nvtxRangePushA("#loop#wavCFandSD_whileloop_0##" MW_AT_LINE);
         int32_T exitg1;
         do {
@@ -224,7 +224,7 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
           x->size[0] = 1;
           x->size[1] = 15 * (nsubs + 1);
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(x, ix, &lc_emlrtRTEI);
+          emxEnsureCapacity_real_T(x, ix, &hc_emlrtRTEI);
           ix = -1;
           profileLoopStart("wavCFandSD_loop_2", __LINE__, nsubs + 1, "");
           for (k = 0; k <= nsubs; k++) {
@@ -244,12 +244,12 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
           b_x->size[0] = 1;
           b_x->size[1] = x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(b_x, ix, &mc_emlrtRTEI);
+          emxEnsureCapacity_real_T(b_x, ix, &ic_emlrtRTEI);
           ix = xt->size[0] * xt->size[1];
           xt->size[0] = 1;
           xt->size[1] = x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(xt, ix, &nc_emlrtRTEI);
+          emxEnsureCapacity_real_T(xt, ix, &jc_emlrtRTEI);
           ix = x->size[1];
           profileLoopStart("wavCFandSD_loop_4", __LINE__, (ix - 1) + 1, "");
           for (k = 0; k < ix; k++) {
@@ -285,7 +285,7 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
               fx->size[0] = 1;
               fx->size[1] = x->size[1];
               nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-              emxEnsureCapacity_real_T(fx, ix, &pc_emlrtRTEI);
+              emxEnsureCapacity_real_T(fx, ix, &lc_emlrtRTEI);
               profileLoopStart("wavCFandSD_loop_8", __LINE__,
                                (dv_idx_1 - 1) + 1, "");
               for (ix = 0; ix < dv_idx_1; ix++) {
@@ -304,7 +304,7 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
             y->size[0] = 1;
             y->size[1] = b_x->size[1];
             nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-            emxEnsureCapacity_real_T(y, ix, &m_emlrtRTEI);
+            emxEnsureCapacity_real_T(y, ix, &j_emlrtRTEI);
             ix = b_x->size[1];
             profileLoopStart("wavCFandSD_loop_6", __LINE__, (ix - 1) + 1, "");
             for (k = 0; k < ix; k++) {
@@ -316,7 +316,7 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
             b_dv1->size[0] = 1;
             b_dv1->size[1] = y->size[1];
             nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-            emxEnsureCapacity_real_T(b_dv1, ix, &oc_emlrtRTEI);
+            emxEnsureCapacity_real_T(b_dv1, ix, &kc_emlrtRTEI);
             profileLoopStart("wavCFandSD_loop_10", __LINE__,
                              (y->size[1] - 1) + 1, "");
             for (ix = 0; ix < y->size[1]; ix++) {
@@ -334,7 +334,7 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
             b_y->size[0] = 1;
             b_y->size[1] = b_x->size[1];
             nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-            emxEnsureCapacity_real_T(b_y, ix, &m_emlrtRTEI);
+            emxEnsureCapacity_real_T(b_y, ix, &j_emlrtRTEI);
             ix = b_x->size[1];
             profileLoopStart("wavCFandSD_loop_13", __LINE__, (ix - 1) + 1, "");
             for (k = 0; k < ix; k++) {
@@ -347,7 +347,7 @@ real_T wavCFandSD(char_T wname[5], real_T varargin_1, real_T varargin_2,
               fx->size[0] = 1;
               fx->size[1] = b_y->size[1];
               nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-              emxEnsureCapacity_real_T(fx, ix, &qc_emlrtRTEI);
+              emxEnsureCapacity_real_T(fx, ix, &mc_emlrtRTEI);
               profileLoopStart("wavCFandSD_loop_14", __LINE__,
                                (b_y->size[1] - 1) + 1, "");
               for (ix = 0; ix < b_y->size[1]; ix++) {

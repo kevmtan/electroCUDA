@@ -42,7 +42,7 @@ void binary_expand_op_2(emxArray_real_T *in1, const emxArray_real_T *in2,
     in1->size[1] = in3->size[1];
   }
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(in1, i, &rb_emlrtRTEI);
+  emxEnsureCapacity_real_T(in1, i, &nb_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_0_1 = (in2->size[1] != 1);
   stride_1_0 = (in3->size[0] != 1);

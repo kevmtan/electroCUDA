@@ -13,7 +13,6 @@
 // Include files
 #include "rtwtypes.h"
 #include "emlrt.h"
-#include <cstddef>
 
 // Custom Header Code
 
@@ -24,26 +23,6 @@
 // Type Definitions
 struct emxArray_real_T {
   real_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_creal_T {
-  creal_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct cell_wrap_0 {
-  emxArray_creal_T *f1;
-};
-
-struct emxArray_cell_wrap_0 {
-  cell_wrap_0 *data;
   int32_T *size;
   int32_T allocatedSize;
   int32_T numDimensions;
@@ -72,44 +51,16 @@ struct cwtfilterbank {
 };
 
 } // namespace coder
+struct emxArray_creal_T {
+  creal_T *data;
+  int32_T *size;
+  int32_T allocatedSize;
+  int32_T numDimensions;
+  boolean_T canFreeData;
+};
+
 struct emxArray_uint32_T {
   uint32_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-namespace coder {
-namespace b_signal {
-namespace internal {
-namespace resample {
-struct ResampleParser {
-  int32_T dim;
-  real_T p;
-  real_T q;
-  real_T inputSize[2];
-  boolean_T isRowVectorInput;
-  emxArray_real_T *filter;
-  emxArray_real_T *filterWithPadding;
-  real_T filterDelay;
-  emxArray_creal_T *x;
-};
-
-} // namespace resample
-} // namespace internal
-} // namespace b_signal
-} // namespace coder
-struct emxArray_int32_T {
-  int32_T *data;
-  int32_T *size;
-  int32_T allocatedSize;
-  int32_T numDimensions;
-  boolean_T canFreeData;
-};
-
-struct emxArray_ptrdiff_t {
-  ptrdiff_t *data;
   int32_T *size;
   int32_T allocatedSize;
   int32_T numDimensions;

@@ -115,7 +115,7 @@ for v = 1:2
     else
         arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]);
     end
-    argz = {arg1,arg2,arg3,arg4,arg5,arg6,arg7};
+    argz = {arg1,arg2,arg3,arg4,arg5,arg6};
 
     codegen(funs,"-o",funz(v),"-config",cfg,"-args",argz,"-gpuprofile");
 

@@ -14,7 +14,6 @@
 #include "ec_wt_fp_data.h"
 #include "rt_nonfinite.h"
 #include "MWCUBLASUtils.hpp"
-#include "MWCUSOLVERUtils.hpp"
 #include "MWLocationStringifyNvtx3.h"
 #include "nvtx3/nvToolsExt.h"
 
@@ -45,8 +44,6 @@ void ec_wt_fp_atexit()
     emlrtCleanupOnException((emlrtCTX *)emlrtRootTLSGlobal);
     throw;
   }
-  cusolverDestroyWorkspace();
-  cusolverEnsureDestruction();
   nvtxRangePop();
 }
 

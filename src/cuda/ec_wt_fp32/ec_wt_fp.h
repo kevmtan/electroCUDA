@@ -28,7 +28,7 @@
 
 // Function Declarations
 void ec_wt_fp(const emxArray_real32_T *cpu_x, real_T fs, const real_T fLims[2],
-              real_T fVoices, real_T ds[2], uint8_T yType,
-              emxArray_cell_wrap_0 *y, emxArray_real_T *freqs);
+              real_T fVoices, real_T ds, boolean_T doAvg, boolean_T doPwr,
+              emxArray_real32_T *cpu_y, emxArray_real_T *freqs);
 
 // End of code generation (ec_wt_fp.h)

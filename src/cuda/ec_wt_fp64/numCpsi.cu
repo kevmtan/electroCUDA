@@ -10,7 +10,6 @@
 
 // Include files
 #include "numCpsi.h"
-#include "cospiAndSinpi.h"
 #include "ec_wt_fp_data.h"
 #include "ec_wt_fp_emxutil.h"
 #include "ec_wt_fp_mexutil.h"
@@ -23,7 +22,7 @@
 #include <cstring>
 
 // Variable Definitions
-static emlrtRTEInfo ae_emlrtRTEI{
+static emlrtRTEInfo vd_emlrtRTEI{
     28,        // lineNo
     47,        // colNo
     "numCpsi", // fName
@@ -31,7 +30,7 @@ static emlrtRTEInfo ae_emlrtRTEI{
     "numCpsi.m" // pName
 };
 
-static emlrtRTEInfo be_emlrtRTEI{
+static emlrtRTEInfo wd_emlrtRTEI{
     28,        // lineNo
     36,        // colNo
     "numCpsi", // fName
@@ -39,7 +38,7 @@ static emlrtRTEInfo be_emlrtRTEI{
     "numCpsi.m" // pName
 };
 
-static emlrtRTEInfo ce_emlrtRTEI{
+static emlrtRTEInfo xd_emlrtRTEI{
     28,        // lineNo
     23,        // colNo
     "numCpsi", // fName
@@ -47,7 +46,7 @@ static emlrtRTEInfo ce_emlrtRTEI{
     "numCpsi.m" // pName
 };
 
-static emlrtRTEInfo de_emlrtRTEI{
+static emlrtRTEInfo yd_emlrtRTEI{
     28,        // lineNo
     46,        // colNo
     "numCpsi", // fName
@@ -55,7 +54,7 @@ static emlrtRTEInfo de_emlrtRTEI{
     "numCpsi.m" // pName
 };
 
-static emlrtRTEInfo ee_emlrtRTEI{
+static emlrtRTEInfo ae_emlrtRTEI{
     1,         // lineNo
     17,        // colNo
     "numCpsi", // fName
@@ -63,7 +62,7 @@ static emlrtRTEInfo ee_emlrtRTEI{
     "numCpsi.m" // pName
 };
 
-static emlrtRTEInfo fe_emlrtRTEI{
+static emlrtRTEInfo be_emlrtRTEI{
     28,        // lineNo
     19,        // colNo
     "numCpsi", // fName
@@ -124,10 +123,8 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
   emxArray_real_T *xt;
   emxArray_real_T *y;
   real_T interval[650];
-  real_T absxk;
   real_T anorm;
   real_T cpsi;
-  real_T pathlen;
   int32_T exitg1;
   int32_T ix;
   int32_T nx;
@@ -207,21 +204,51 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
       if (std::isinf(x)) {
         x = rtInf;
       } else {
+        real_T fact;
         real_T midpt;
-        real_T tol;
-        tol = 1.0;
+        fact = 1.0;
         nx = 1;
         first_iteration = false;
         if (x <= 0.0) {
+          boolean_T negateSinpi;
           midpt = std::floor(-x);
           first_iteration = (midpt != std::floor(-x / 2.0) * 2.0);
-          nvtxMarkA("#cospiAndSinpi#" MW_AT_LINE);
-          ::coder::internal::scalar::cospiAndSinpi(-x - midpt, &absxk);
-          tol = -3.1415926535897931 / absxk;
+          midpt = -x - midpt;
+          if (midpt < 0.0) {
+            midpt = -midpt;
+            negateSinpi = true;
+          } else {
+            negateSinpi = false;
+          }
+          if (midpt < 0.25) {
+            midpt = std::sin(midpt * 3.1415926535897931);
+          } else {
+            midpt -= 2.0 * std::floor(midpt / 2.0);
+            if (midpt < 0.25) {
+              midpt = std::sin(midpt * 3.1415926535897931);
+            } else if (midpt < 0.75) {
+              midpt = 0.5 - midpt;
+              midpt = std::cos(midpt * 3.1415926535897931);
+            } else if (midpt < 1.25) {
+              midpt = 1.0 - midpt;
+              midpt = std::sin(midpt * 3.1415926535897931);
+            } else if (midpt < 1.75) {
+              midpt -= 1.5;
+              midpt = -std::cos(midpt * 3.1415926535897931);
+            } else {
+              midpt -= 2.0;
+              midpt = std::sin(midpt * 3.1415926535897931);
+            }
+          }
+          if (negateSinpi) {
+            midpt = -midpt;
+          }
+          fact = -3.1415926535897931 / midpt;
           x = -x + 1.0;
         }
         if (x < 12.0) {
           real_T abserrsubk;
+          real_T absxk;
           real_T halfh;
           abserrsubk = x;
           if (x < 1.0) {
@@ -252,23 +279,23 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
             profileLoopEnd();
           }
         } else {
-          real_T halfh;
+          real_T absxk;
           midpt = x * x;
-          halfh = 0.0057083835261;
+          absxk = 0.0057083835261;
           profileLoopStart("numCpsi_loop_4", __LINE__, 5 + 1, "");
           for (ix = 0; ix < 6; ix++) {
-            halfh = halfh / midpt + dv3[ix];
+            absxk = absxk / midpt + dv3[ix];
           }
           profileLoopEnd();
-          halfh = (halfh / x - x) + 0.91893853320467278;
-          halfh += (x - 0.5) * std::log(x);
-          midpt = std::exp(halfh);
+          absxk = (absxk / x - x) + 0.91893853320467278;
+          absxk += (x - 0.5) * std::log(x);
+          midpt = std::exp(absxk);
         }
         if (first_iteration) {
           midpt = -midpt;
         }
-        if (tol != 1.0) {
-          midpt = tol / midpt;
+        if (fact != 1.0) {
+          midpt = fact / midpt;
         }
         x = midpt;
       }
@@ -285,8 +312,8 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
     std::memset(&interval[2], 0, 648U * sizeof(real_T));
     cpsi = 0.0;
     nvtxMarkA("#split#" MW_AT_LINE);
-    ix = split(interval, 2, &pathlen);
-    if (!(pathlen > 0.0)) {
+    ix = split(interval, 2, &anorm);
+    if (!(anorm > 0.0)) {
       cpsi = 0.47999999999999976;
     } else {
       real_T err_ok;
@@ -304,27 +331,29 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
       err_ok = 0.0;
       first_iteration = true;
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&b_x, 2, &lc_emlrtRTEI, true);
+      emxInit_real_T(&b_x, 2, &hc_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&c_x, 2, &rc_emlrtRTEI, true);
+      emxInit_real_T(&c_x, 2, &nc_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&xt, 2, &sc_emlrtRTEI, true);
+      emxInit_real_T(&xt, 2, &oc_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&y, 2, &de_emlrtRTEI, true);
+      emxInit_real_T(&y, 2, &yd_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&a, 2, &ae_emlrtRTEI, true);
+      emxInit_real_T(&a, 2, &vd_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&fx, 2, &ee_emlrtRTEI, true);
+      emxInit_real_T(&fx, 2, &ae_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&d_x, 2, &be_emlrtRTEI, true);
+      emxInit_real_T(&d_x, 2, &wd_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&b_a, 2, &ae_emlrtRTEI, true);
+      emxInit_real_T(&b_a, 2, &vd_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&e_x, 2, &ce_emlrtRTEI, true);
+      emxInit_real_T(&e_x, 2, &xd_emlrtRTEI, true);
       nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-      emxInit_real_T(&f_x, 2, &fe_emlrtRTEI, true);
+      emxInit_real_T(&f_x, 2, &be_emlrtRTEI, true);
       nvtxRangePushA("#loop#numCpsi_whileloop_0##" MW_AT_LINE);
       do {
+        real_T absxk;
+        real_T fact;
         real_T halfh;
         real_T midpt;
         boolean_T guard1;
@@ -333,14 +362,14 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
         b_x->size[0] = 1;
         b_x->size[1] = 15 * (nsubs + 1);
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(b_x, ix, &lc_emlrtRTEI);
+        emxEnsureCapacity_real_T(b_x, ix, &hc_emlrtRTEI);
         ix = -1;
         profileLoopStart("numCpsi_loop_7", __LINE__, nsubs + 1, "");
         for (k = 0; k <= nsubs; k++) {
-          anorm = subs[k << 1];
+          fact = subs[k << 1];
           absxk = subs[(k << 1) + 1];
-          midpt = (anorm + absxk) / 2.0;
-          halfh = (absxk - anorm) / 2.0;
+          midpt = (fact + absxk) / 2.0;
+          halfh = (absxk - fact) / 2.0;
           profileLoopStart("numCpsi_loop_8", __LINE__, 14 + 1, "");
           for (int32_T j{0}; j < 15; j++) {
             b_x->data[(ix + j) + 1] = dv[j] * halfh + midpt;
@@ -353,18 +382,18 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
         c_x->size[0] = 1;
         c_x->size[1] = b_x->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(c_x, ix, &mc_emlrtRTEI);
+        emxEnsureCapacity_real_T(c_x, ix, &ic_emlrtRTEI);
         ix = xt->size[0] * xt->size[1];
         xt->size[0] = 1;
         xt->size[1] = b_x->size[1];
         nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-        emxEnsureCapacity_real_T(xt, ix, &nc_emlrtRTEI);
+        emxEnsureCapacity_real_T(xt, ix, &jc_emlrtRTEI);
         ix = b_x->size[1];
         profileLoopStart("numCpsi_loop_9", __LINE__, (ix - 1) + 1, "");
         for (k = 0; k < ix; k++) {
-          anorm = b_x->data[k];
-          midpt = anorm * anorm;
-          c_x->data[k] = 0.29999999999999982 * anorm * (3.0 - midpt) + 5.0;
+          fact = b_x->data[k];
+          midpt = fact * fact;
+          c_x->data[k] = 0.29999999999999982 * fact * (3.0 - midpt) + 5.0;
           xt->data[k] = 0.89999999999999947 * (1.0 - midpt);
         }
         profileLoopEnd();
@@ -395,7 +424,7 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
             fx->size[0] = 1;
             fx->size[1] = b_x->size[1];
             nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-            emxEnsureCapacity_real_T(fx, ix, &pc_emlrtRTEI);
+            emxEnsureCapacity_real_T(fx, ix, &lc_emlrtRTEI);
             profileLoopStart("numCpsi_loop_13", __LINE__, (dv_idx_1 - 1) + 1,
                              "");
             for (ix = 0; ix < dv_idx_1; ix++) {
@@ -414,7 +443,7 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
           a->size[0] = 1;
           a->size[1] = c_x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(a, ix, &ae_emlrtRTEI);
+          emxEnsureCapacity_real_T(a, ix, &vd_emlrtRTEI);
           profileLoopStart("numCpsi_loop_11", __LINE__, (c_x->size[1] - 1) + 1,
                            "");
           for (ix = 0; ix < c_x->size[1]; ix++) {
@@ -425,19 +454,19 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
           y->size[0] = 1;
           y->size[1] = a->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(y, ix, &m_emlrtRTEI);
+          emxEnsureCapacity_real_T(y, ix, &j_emlrtRTEI);
           nx = a->size[1];
           profileLoopStart("numCpsi_loop_15", __LINE__, (nx - 1) + 1, "");
           for (k = 0; k < nx; k++) {
-            anorm = a->data[k];
-            y->data[k] = anorm * anorm;
+            fact = a->data[k];
+            y->data[k] = fact * fact;
           }
           profileLoopEnd();
           ix = d_x->size[0] * d_x->size[1];
           d_x->size[0] = 1;
           d_x->size[1] = y->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(d_x, ix, &be_emlrtRTEI);
+          emxEnsureCapacity_real_T(d_x, ix, &wd_emlrtRTEI);
           profileLoopStart("numCpsi_loop_17", __LINE__, (y->size[1] - 1) + 1,
                            "");
           for (ix = 0; ix < y->size[1]; ix++) {
@@ -448,7 +477,7 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
           b_a->size[0] = 1;
           b_a->size[1] = c_x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(b_a, ix, &ae_emlrtRTEI);
+          emxEnsureCapacity_real_T(b_a, ix, &vd_emlrtRTEI);
           profileLoopStart("numCpsi_loop_18", __LINE__, (c_x->size[1] - 1) + 1,
                            "");
           for (ix = 0; ix < c_x->size[1]; ix++) {
@@ -465,7 +494,7 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
           e_x->size[0] = 1;
           e_x->size[1] = d_x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(e_x, ix, &ce_emlrtRTEI);
+          emxEnsureCapacity_real_T(e_x, ix, &xd_emlrtRTEI);
           profileLoopStart("numCpsi_loop_20", __LINE__, (d_x->size[1] - 1) + 1,
                            "");
           for (ix = 0; ix < d_x->size[1]; ix++) {
@@ -477,7 +506,7 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
           f_x->size[0] = 1;
           f_x->size[1] = e_x->size[1];
           nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-          emxEnsureCapacity_real_T(f_x, ix, &j_emlrtRTEI);
+          emxEnsureCapacity_real_T(f_x, ix, &i_emlrtRTEI);
           profileLoopStart("numCpsi_loop_21", __LINE__, (nx - 1) + 1, "");
           for (k = 0; k < nx; k++) {
             f_x->data[k] = std::abs(e_x->data[k]);
@@ -488,7 +517,7 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
             fx->size[0] = 1;
             fx->size[1] = f_x->size[1];
             nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-            emxEnsureCapacity_real_T(fx, ix, &qc_emlrtRTEI);
+            emxEnsureCapacity_real_T(fx, ix, &mc_emlrtRTEI);
             profileLoopStart("numCpsi_loop_22", __LINE__,
                              (f_x->size[1] - 1) + 1, "");
             for (ix = 0; ix < f_x->size[1]; ix++) {
@@ -503,40 +532,39 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
         if (first_iteration) {
           exitg1 = 1;
         } else {
-          real_T tol;
           midpt = 0.0;
           ix = -1;
           profileLoopStart("numCpsi_loop_10", __LINE__, nsubs + 1, "");
           for (k = 0; k <= nsubs; k++) {
-            anorm = 0.0;
+            fact = 0.0;
             absxk = 0.0;
             profileLoopStart("numCpsi_loop_12", __LINE__, 14 + 1, "");
             for (int32_T j{0}; j < 15; j++) {
-              anorm += dv1[j] * fx->data[(ix + j) + 1];
+              fact += dv1[j] * fx->data[(ix + j) + 1];
               absxk += dv2[j] * fx->data[(ix + j) + 1];
             }
             profileLoopEnd();
             ix += 15;
             halfh = (subs[(k << 1) + 1] - subs[k << 1]) / 2.0;
-            anorm *= halfh;
-            qsub[k] = anorm;
-            midpt += anorm;
+            fact *= halfh;
+            qsub[k] = fact;
+            midpt += fact;
             errsub[k] = absxk * halfh;
           }
           profileLoopEnd();
           cpsi = midpt + q_ok;
-          tol = std::fmax(1.0E-10, 1.0E-6 * std::abs(cpsi));
-          absxk = 2.0 * tol / pathlen;
+          halfh = std::fmax(1.0E-10, 1.0E-6 * std::abs(cpsi));
+          absxk = 2.0 * halfh / anorm;
           midpt = 0.0;
           ix = 0;
           profileLoopStart("numCpsi_loop_14", __LINE__, nsubs + 1, "");
           for (k = 0; k <= nsubs; k++) {
             real_T abserrsubk;
-            anorm = errsub[k];
-            abserrsubk = std::abs(anorm);
+            fact = errsub[k];
+            abserrsubk = std::abs(fact);
             if (abserrsubk <=
                 absxk * ((subs[(k << 1) + 1] - subs[k << 1]) / 2.0)) {
-              err_ok += anorm;
+              err_ok += fact;
               q_ok += qsub[k];
             } else {
               midpt += abserrsubk;
@@ -546,10 +574,10 @@ real_T numCpsi(const char_T wname[5], real_T varargin_1, real_T varargin_2)
             }
           }
           profileLoopEnd();
-          halfh = std::abs(err_ok) + midpt;
+          midpt += std::abs(err_ok);
           if ((!std::isinf(cpsi)) && (!std::isnan(cpsi)) &&
-              ((!std::isinf(halfh)) && (!std::isnan(halfh))) && (ix != 0) &&
-              (!(halfh <= tol))) {
+              ((!std::isinf(midpt)) && (!std::isnan(midpt))) && (ix != 0) &&
+              (!(midpt <= halfh))) {
             nsubs = (ix << 1) - 1;
             if (nsubs + 1 > 650) {
               exitg1 = 1;

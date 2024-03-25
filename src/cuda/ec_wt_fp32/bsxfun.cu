@@ -60,7 +60,7 @@ void bsxfun(const emxArray_real_T *a, const emxArray_real_T *b,
     c->size[1] = acoef;
   }
   nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-  emxEnsureCapacity_real_T(c, bcoef, &p_emlrtRTEI);
+  emxEnsureCapacity_real_T(c, bcoef, &l_emlrtRTEI);
   if (csz_idx_1 != 0) {
     acoef = (a->size[1] != 1);
     bcoef = (b->size[1] != 1);
