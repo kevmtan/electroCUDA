@@ -11,9 +11,9 @@
 // Include files
 #include "ec_wt_fp_initialize.h"
 #include "_coder_ec_wt_fp_mex.h"
+#include "cwt.h"
 #include "ec_wt_fp_data.h"
 #include "rt_nonfinite.h"
-#include "MWCUBLASUtils.hpp"
 #include "MWLocationStringifyNvtx3.h"
 #include "nvtx3/nvToolsExt.h"
 
@@ -28,6 +28,10 @@ static void ec_wt_fp_once()
   // Initialize GPU by calling cudaFree(nullptr)
   nvtxMarkA("#cudaFree#" MW_AT_LINE);
   cudaFree(nullptr);
+  nvtxMarkA("#cwt_emx_init#" MW_AT_LINE);
+  cwt_emx_init();
+  nvtxMarkA("#cwt_init#" MW_AT_LINE);
+  cwt_init();
   nvtxRangePop();
 }
 
@@ -49,7 +53,6 @@ void ec_wt_fp_initialize()
   emlrtLicenseCheckR2022a(emlrtRootTLSGlobal,
                           "EMLRT:runTime:MexFunctionNeedsLicense",
                           "signal_toolbox", 2);
-  cublasEnsureInitialization(CUBLAS_POINTER_MODE_HOST);
   if (emlrtFirstTimeR2012b(emlrtRootTLSGlobal)) {
     nvtxMarkA("#ec_wt_fp_once#" MW_AT_LINE);
     ec_wt_fp_once();

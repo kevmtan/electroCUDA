@@ -1,6 +1,6 @@
 function od = ecu_genPlotParams(plotType,task,od)
 arguments
-    plotType {mustBeMember(plotType,["ERP" "ERFP" "ERSP" "ITPC" ""])}
+    plotType string {mustBeMember(plotType,["ERP" "ERFP" "ERSP" "ITPC" ""])}
     task string = ""
     od struct = struct
 end

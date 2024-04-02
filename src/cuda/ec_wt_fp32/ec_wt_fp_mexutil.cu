@@ -19,53 +19,37 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
-#include <cmath>
 #include <cstring>
 
 // Function Definitions
-void b_raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
-                      const char_T *errorName, const char_T *errorString)
-{
-  emlrtRTEInfo rtInfo;
-  uint64_T len;
-  char_T *brk;
-  char_T *fn;
-  char_T *pn;
-  nvtxRangePushA("#fcn#b_raiseCudaError#" MW_AT_LOCATION);
-  len = strlen(file);
-  pn = static_cast<char_T *>(calloc(len + 1UL, 1UL));
-  fn = static_cast<char_T *>(calloc(len + 1UL, 1UL));
-  memcpy(pn, file, len);
-  memcpy(fn, file, len);
-  brk = strrchr(fn, '.');
-  *brk = '\x00';
-  brk = strrchr(fn, '/');
-  if (brk == nullptr) {
-    brk = strrchr(fn, '\\');
-  }
-  if (brk == nullptr) {
-    brk = fn;
-  } else {
-    brk++;
-  }
-  rtInfo.lineNo = static_cast<int32_T>(b_line);
-  rtInfo.colNo = 0;
-  rtInfo.fName = brk;
-  rtInfo.pName = pn;
-  emlrtCUDAError(static_cast<uint32_T>(errCode), (char_T *)errorName,
-                 (char_T *)errorString, &rtInfo, emlrtRootTLSGlobal);
-  nvtxRangePop();
-}
-
 void checkCudaError(cudaError_t errCode, const char_T *file, uint32_T b_line)
 {
   nvtxRangePushA("#fcn#checkCudaError#" MW_AT_LOCATION);
   if (errCode != cudaSuccess) {
-    nvtxMarkA("#b_raiseCudaError#" MW_AT_LINE);
-    b_raiseCudaError(errCode, file, b_line, cudaGetErrorName(errCode),
-                     cudaGetErrorString(errCode));
+    nvtxMarkA("#raiseCudaError#" MW_AT_LINE);
+    raiseCudaError(errCode, file, b_line, cudaGetErrorName(errCode),
+                   cudaGetErrorString(errCode));
   }
   nvtxRangePop();
+}
+
+uint64_T computeNumIters(int32_T ub, int32_T b_ub)
+{
+  uint64_T n;
+  uint64_T numIters;
+  nvtxRangePushA("#fcn#computeNumIters#" MW_AT_LOCATION);
+  n = 0UL;
+  if (ub >= 0) {
+    n = static_cast<uint64_T>(ub + 1);
+  }
+  numIters = n;
+  n = 0UL;
+  if (b_ub >= 0) {
+    n = static_cast<uint64_T>(b_ub + 1);
+  }
+  numIters *= n;
+  nvtxRangePop();
+  return numIters;
 }
 
 uint64_T computeNumIters(int32_T ub)
@@ -93,47 +77,6 @@ real_T d_emlrt_marshallIn(const mxArray *src, const emlrtMsgIdentifier *msgId)
   return ret;
 }
 
-int32_T div_s32(int32_T numerator, int32_T denominator)
-{
-  int32_T quotient;
-  nvtxRangePushA("#fcn#div_s32#" MW_AT_LOCATION);
-  if (denominator == 0) {
-    emlrtDivisionByZeroErrorR2012b(nullptr, emlrtRootTLSGlobal);
-  } else {
-    uint32_T b;
-    uint32_T tempAbsQuotient;
-    if (numerator < 0) {
-      tempAbsQuotient = ~static_cast<uint32_T>(numerator) + 1U;
-    } else {
-      tempAbsQuotient = static_cast<uint32_T>(numerator);
-    }
-    if (denominator < 0) {
-      b = ~static_cast<uint32_T>(denominator) + 1U;
-    } else {
-      b = static_cast<uint32_T>(denominator);
-    }
-    tempAbsQuotient /= b;
-    if ((numerator < 0) != (denominator < 0)) {
-      quotient = -static_cast<int32_T>(tempAbsQuotient);
-    } else {
-      quotient = static_cast<int32_T>(tempAbsQuotient);
-    }
-  }
-  nvtxRangePop();
-  return quotient;
-}
-
-real_T emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier *parentId)
-{
-  real_T y;
-  nvtxRangePushA("#fcn#emlrt_marshallIn#" MW_AT_LOCATION);
-  nvtxMarkA("#d_emlrt_marshallIn#" MW_AT_LINE);
-  y = d_emlrt_marshallIn(emlrtAlias(u), parentId);
-  emlrtDestroyArray(&u);
-  nvtxRangePop();
-  return y;
-}
-
 real_T emlrt_marshallIn(const mxArray *a__output_of_length_,
                         const char_T *identifier)
 {
@@ -146,6 +89,17 @@ real_T emlrt_marshallIn(const mxArray *a__output_of_length_,
   nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
   y = emlrt_marshallIn(emlrtAlias(a__output_of_length_), &thisId);
   emlrtDestroyArray(&a__output_of_length_);
+  nvtxRangePop();
+  return y;
+}
+
+real_T emlrt_marshallIn(const mxArray *u, const emlrtMsgIdentifier *parentId)
+{
+  real_T y;
+  nvtxRangePushA("#fcn#emlrt_marshallIn#" MW_AT_LOCATION);
+  nvtxMarkA("#d_emlrt_marshallIn#" MW_AT_LINE);
+  y = d_emlrt_marshallIn(emlrtAlias(u), parentId);
+  emlrtDestroyArray(&u);
   nvtxRangePop();
   return y;
 }
@@ -289,31 +243,6 @@ void gpuEmxFree_real32_T(emxArray_real32_T *gpu)
   nvtxRangePop();
 }
 
-void gpuEmxMemcpyCpuToGpu_creal32_T(emxArray_creal32_T *gpu,
-                                    const emxArray_creal32_T *cpu)
-{
-  int32_T actualSize;
-  int32_T i;
-  nvtxRangePushA("#fcn#gpuEmxMemcpyCpuToGpu_creal32_T#" MW_AT_LOCATION);
-  actualSize = 1;
-  i = 0;
-  nvtxRangePushA(
-      "#loop#gpuEmxMemcpyCpuToGpu_creal32_T_whileloop_0##" MW_AT_LINE);
-  while (i < cpu->numDimensions) {
-    actualSize *= cpu->size[i];
-    i++;
-  }
-  nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(
-      cudaMemcpy(gpu->data, cpu->data,
-                 static_cast<uint32_T>(actualSize) * sizeof(creal32_T),
-                 cudaMemcpyHostToDevice),
-      __FILE__, __LINE__);
-  nvtxRangePop();
-}
-
 void gpuEmxMemcpyCpuToGpu_real32_T(emxArray_real32_T *gpu,
                                    const emxArray_real32_T *cpu)
 {
@@ -378,51 +307,38 @@ void gpuEmxReset_real32_T(emxArray_real32_T *gpu)
   nvtxRangePop();
 }
 
-real_T rt_powd_snf(real_T u0, real_T u1)
+void raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
+                    const char_T *errorName, const char_T *errorString)
 {
-  real_T y;
-  nvtxRangePushA("#fcn#rt_powd_snf#" MW_AT_LOCATION);
-  if (std::isnan(u0) || std::isnan(u1)) {
-    y = rtNaN;
-  } else {
-    real_T b;
-    real_T c;
-    b = std::abs(u0);
-    c = std::abs(u1);
-    if (std::isinf(u1)) {
-      if (b == 1.0) {
-        y = 1.0;
-      } else if (b > 1.0) {
-        if (u1 > 0.0) {
-          y = rtInf;
-        } else {
-          y = 0.0;
-        }
-      } else if (u1 > 0.0) {
-        y = 0.0;
-      } else {
-        y = rtInf;
-      }
-    } else if (c == 0.0) {
-      y = 1.0;
-    } else if (c == 1.0) {
-      if (u1 > 0.0) {
-        y = u0;
-      } else {
-        y = 1.0 / u0;
-      }
-    } else if (u1 == 2.0) {
-      y = u0 * u0;
-    } else if ((u1 == 0.5) && (u0 >= 0.0)) {
-      y = std::sqrt(u0);
-    } else if ((u0 < 0.0) && (u1 > std::floor(u1))) {
-      y = rtNaN;
-    } else {
-      y = std::pow(u0, u1);
-    }
+  emlrtRTEInfo rtInfo;
+  uint64_T len;
+  char_T *brk;
+  char_T *fn;
+  char_T *pn;
+  nvtxRangePushA("#fcn#raiseCudaError#" MW_AT_LOCATION);
+  len = strlen(file);
+  pn = static_cast<char_T *>(calloc(len + 1UL, 1UL));
+  fn = static_cast<char_T *>(calloc(len + 1UL, 1UL));
+  memcpy(pn, file, len);
+  memcpy(fn, file, len);
+  brk = strrchr(fn, '.');
+  *brk = '\x00';
+  brk = strrchr(fn, '/');
+  if (brk == nullptr) {
+    brk = strrchr(fn, '\\');
   }
+  if (brk == nullptr) {
+    brk = fn;
+  } else {
+    brk++;
+  }
+  rtInfo.lineNo = static_cast<int32_T>(b_line);
+  rtInfo.colNo = 0;
+  rtInfo.fName = brk;
+  rtInfo.pName = pn;
+  emlrtCUDAError(static_cast<uint32_T>(errCode), (char_T *)errorName,
+                 (char_T *)errorString, &rtInfo, emlrtRootTLSGlobal);
   nvtxRangePop();
-  return y;
 }
 
 // End of code generation (ec_wt_fp_mexutil.cu)

@@ -59,23 +59,20 @@ dirs=arg.dirs;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
 if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
-if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
-if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
-if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
-if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
-if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
-if ~isfield(o,'single');      o.single=true; end      % Run & save as single (single much faster on GPU)
-if ~isfield(o,'singleOut');   o.halfOut=true; end     % Save as half-precision float (16-bit) to save memory
-if ~isfield(o,'doCUDA');      o.doCUDA=false; end     % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
-if ~isfield(o,'doGPU');       o.doGPU=false; end      % Run on MATLAB gpuArray (superseded by CUDA)
-% if ~isfield(o,'norm');        o.norm=false; end         % Convert absolute values (log-normal) to normal distribution
-if o.doCUDA; o.doGPU=false; end % CUDA supersedes gpuArray
+% if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
+% if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
+% if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
+% if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
+% if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
+% if ~isfield(o,'single');      o.single=true; end      % Run & save as single (single much faster on GPU)
+% if ~isfield(o,'singleOut');   o.halfOut=true; end     % Save as half-precision float (16-bit) to save memory
+% if o.doCUDA; o.doGPU=false; end % CUDA supersedes gpuArray
 
 %% Setup & initialize
-tic; errors={};
+tt=tic; errors={};
 
 % Make workspace vars
-fMean=logical(o.fMean); dsTarg=o.dsTarg;
+fMean=logical(o.fMean);
 
 % Load EEG data
 if isempty(x)
@@ -96,17 +93,23 @@ n.suffix = o.suffix;
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
-
 % Get downsampling factor & anti-aliasing filter
-ds = [1 1];
-if ~isempty(dsTarg)
-    [ds(1),ds(2)] = rat(dsTarg/fsOg);
-    if ds(1)>ds(2); error(sbj+" downsampling target > iEEG sampling rate"); end
+ds = 0;
+if isany(o.dsTarg)
+    [ds(1),ds(2)] = rat(o.dsTarg/n.fs);
+    % Errors
+    if ds(1) > ds(2) 
+        errors{end+1} = "[ec_preprocTimeFreq] "+sbj+" downsampling target > sampling rate";
+        error(errors{end});
+    elseif ds(1) ~= 1
+        errors{end+1} = "[ec_preprocTimeFreq] "+sbj+" downsampling target must be wholly divisible by sampling rate";
+        error(errors{end});
+    end
+    ds = ds(2);
 end
 
 % Reset GPU & get free VRAM
 if o.doGPU || o.doCUDA
-    if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); delete(gcp('nocreate')); end
 	try reset(gpuDevice()); catch; end
     memMax = ec_ramAvail(true);
 else
@@ -118,13 +121,13 @@ end
 x = mat2cell(x,n.runIdxOg(:,2));
 
 
-%% Continuous Wavelet Transform with L1-norm for 1/freq decay
+%% Continuous Wavelet Transform (within-run to avoid edge artifacts)
 cwtHz = cell(nRuns,1);
 for r = 1:nRuns
-    % CWT within-run (avoid edge artifacts at run transitions)
-    run = blocks(r);
-    [x{r},cwtHz{r}] = withinRun_lfn(x{r},n,o,ds,run,memMax);
-    disp("[preprocTimeFreq] Finished CWT loop: "+sbj+" "+run+" time="+toc);
+    [x{r},cwtHz{r}] = ec_wt(xr,fs=fsOg,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
+    wavelet=o.wavelet,ds=ds,single=o.single,singleOut=o.singleOut,mem=memMax,...
+    gpu=o.gpu,tic=tt);
+    disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+blocks(r)+" time="+toc(tt));
 end
 
 %% Organize & clear memory
@@ -172,10 +175,10 @@ if o.doBadFrames && ~arg.ica
     [chNfo.bad,x_bad] = ec_findBadFrames(x,chNfo.bad,x_bad,sfx,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     n.xBad = x_bad;
-    disp("[preprocTimeFreq] Identified bad frames per chan: "+sbj+" time="+toc);
+    disp("[ec_preprocTimeFreq] Identified bad frames per chan: "+sbj+" time="+toc(tt));
 elseif o.doBadFrames
     [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,sfx,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    disp("[preprocTimeFreq] Identified bad frames per IC: "+sbj+" time="+toc);
+    disp("[ec_preprocTimeFreq] Identified bad frames per IC: "+sbj+" time="+toc(tt));
 end
 
 %% Covariance
@@ -217,7 +220,7 @@ if arg.save
 
     % Save processed iEEG data
     fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
-    savefast(fn,'x'); disp("SAVED: "+fn+" time="+toc);
+    savefast(fn,'x'); disp("SAVED: "+fn+" time="+toc(tt));
 end
 
 
@@ -280,7 +283,7 @@ else
         parfor ch = 1:nChs
             xr{ch} = cwt_lfn(fb,xr{ch},fMean,ds,singleOut);
         end
-        disp("[ec_preprocTimeFreq] CPU wavelet transformed: "+sbj+" "+run+" time="+toc);
+        disp("[ec_preprocTimeFreq] CPU wavelet transformed: "+sbj+" "+run+" time="+toc(tt));
     end
 end
 
@@ -309,7 +312,7 @@ memIn = whos("xr").bytes/nChs;
 if o.fMean; memIn=memIn*nFrqs*.25; else; memIn=memIn*nFrqs; end
 if ds(2)>ds(1); memIn = memIn*(ds(1)/ds(2))*(ds(2)/4); end
 memChs=floor(memMax/memIn); memItr=ceil(nChs/memChs); memChs=ceil(nChs/memItr);
-disp("[ec_preprocTimeFreq] gpuArrayFun start: "+sbj+" "+run+" memChs="+gather(memChs)+"/"+nChs+" time="+toc);
+disp("[ec_preprocTimeFreq] gpuArrayFun start: "+sbj+" "+run+" memChs="+gather(memChs)+"/"+nChs+" time="+toc(tt));
 
 % Move to GPU
 ds=gpuArray(ds); fMean=gpuArray(o.fMean); singleOut=gpuArray(o.singleOut);
@@ -332,7 +335,7 @@ for v = 1:memItr
     chFin(idx) = true;
 end
 xr = cellfun(@gather,xr,UniformOutput=false);
-disp("[preprocTimeFreq] gpuArrayFun finished: "+sbj+" "+run+" time="+toc);
+disp("[preprocTimeFreq] gpuArrayFun finished: "+sbj+" "+run+" time="+toc(tt));
 
 
 
@@ -364,5 +367,5 @@ end
 %     if isa(xr{1},'single'); xr=cellfun(@double,xr,UniformOutput=false); end
 %     xr = arrayfun(@(xx) resample(xx{:},ds(1),ds(2)),xr,UniformOutput=false);
 %     if singleIn||singleOut; xr=cellfun(@single,xr,UniformOutput=false); end
-%     disp("Downsampled (CPU): "+sbj+" "+run+" time="+toc);
+%     disp("Downsampled (CPU): "+sbj+" "+run+" time="+toc(tt));
 % end

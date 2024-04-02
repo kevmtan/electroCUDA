@@ -65,8 +65,9 @@ isTest=0;
 %% Options struct (more options in the loop below)
 % NOTE: see individual functions for all inputs, descriptions & defaults
 o = struct;
-o.doCUDA = false; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
-o.doGPU = true; % Run on MATLAB gpuArray (superseded by CUDA)
+o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
+o.single = false; % Run & save as single (single much faster on GPU)
+o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 o.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
 
 % Bad channel identification
@@ -135,10 +136,12 @@ o.asr.filtMag = [2 .5 .5 1  1  2  1.5 2];   % default=[];
 o.asr.dimsPCA = 3/4; % Maximum dimensionality to reconstruct (default: 2/3)
 
 % Time-freq decomposition
+o.wavelet = "morse"; % Wavelet type ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
 o.fName = "spec"; % Name of frequency analysis
 o.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
 o.fMean = false; % Collapse across frequency bands (for 1d vector output)
 o.fVoices = 10; % Voices per octave (default=10, HFB=18)
+o.fOut = "magnitude"; % Output coefficient type ["magnitude"|"power"|"complex"]
 
 % % log2norm CWT output
 % o.norm = false;

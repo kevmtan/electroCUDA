@@ -25,14 +25,13 @@ o.name = string(datetime("now","TimeZone","local","Format","yyMMdd"))+"_"+nameSt
 
 % Basic options
 o.suffix = ""; % Input data suffix (default = "")
-o.save = true; %% save summary stats data %%%%
-o.doCUDA = true; % Run as MATLAB gpuArray (default=false)
-o.doGPU = true; % Run as MATLAB gpuArray (default=false)
-o.single = true; % Run & save as single (single much faster on GPU)
-o.halfOut = true; % Run as double (accuracy) & save as single (small filesize)
+o.save = true; % save summary stats data
+o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
+o.single = false; % Run & save as single (single much faster on GPU)
+o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 
 % Timing (in seconds)
-o.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+o.dsTarg = 20; % Downsample target in Hz (default=[]: no downsample)
 o.BLpre = [-0.2 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
 o.BLend = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
 o.bin = 0.02; % Latency bin width (seconds)
@@ -61,6 +60,7 @@ o.thrOL = 5; %[5 5]; % Lower and upper quantiles for outlier
 o.thrOLbl = 2.5;
 
 % Wavelet coherence
+o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
 o.fName = "spec"; % Name of frequency analysis
 o.fLims = [4 200]; % frequency limits in hz; HFB=[70 200]
 o.fVoices = 10; % Voices per octave (default=12)
@@ -117,6 +117,7 @@ for s = 1:height(statusSum)
         dirs = ec_getDirs(proj,sbj,task);
         os = o;
         os.sbj = sbj;
+        os.sbjID = 
         os.task = task;
         os.dirIn = dirs.procSbj; %
         os.dirFS = dirs.fsSbj; % Freesurfer subjects dir
@@ -126,7 +127,7 @@ for s = 1:height(statusSum)
         %%
         try
             disp("STARTING SUMMARY PLOTS: "+sbj);
-            ec_summaryStats_sbjCh(sbj,proj,os,dirs,stats=1,plot=0,sfx=sfx,...
+            ec_summo.oParyStats_sbjCh(sbj,proj,os,dirs,stats=1,plot=0,sfx=sfx,...
                 type=plotType,ICA=doICA,test=isTest);
             statusSum.stats(s,ii) = 1;
         catch ME; getReport(ME)

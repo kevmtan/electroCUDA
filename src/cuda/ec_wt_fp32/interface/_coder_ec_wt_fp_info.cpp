@@ -52,13 +52,13 @@ mxArray *emlrtMexFcnProperties()
   emlrtSetField(xEntryPoints, 0, "NumberOfInputs",
                 emlrtMxCreateDoubleScalar(7.0));
   emlrtSetField(xEntryPoints, 0, "NumberOfOutputs",
-                emlrtMxCreateDoubleScalar(2.0));
+                emlrtMxCreateDoubleScalar(1.0));
   emlrtSetField(xEntryPoints, 0, "ConstantInputs", xInputs);
   emlrtSetField(xEntryPoints, 0, "FullPath",
                 emlrtMxCreateString(
                     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_wt_fp.m"));
   emlrtSetField(xEntryPoints, 0, "TimeStamp",
-                emlrtMxCreateDoubleScalar(739335.86607638886));
+                emlrtMxCreateDoubleScalar(739336.20447916666));
   emlrtSetField(xEntryPoints, 0, "Constructor",
                 emlrtMxCreateLogicalScalar(false));
   emlrtSetField(xEntryPoints, 0, "Visible", emlrtMxCreateLogicalScalar(true));

@@ -47,35 +47,21 @@ rule linkcuda
 
 # Build
 build $builddir/MWLaunchParametersUtilities.o : cudac $root/MWLaunchParametersUtilities.cpp
-build $builddir/MWErrorCodeUtils.o : cudac $root/MWErrorCodeUtils.cpp
 build $builddir/MWCUFFTPlanManager.o : cudac $root/MWCUFFTPlanManager.cpp
-build $builddir/MWCUBLASUtils.o : cudac $root/MWCUBLASUtils.cpp
 build $builddir/ec_wt_fp_data.o : cudac $root/ec_wt_fp_data.cu
 build $builddir/rt_nonfinite.o : cudac $root/rt_nonfinite.cu
 build $builddir/ec_wt_fp_initialize.o : cudac $root/ec_wt_fp_initialize.cu
 build $builddir/ec_wt_fp_terminate.o : cudac $root/ec_wt_fp_terminate.cu
 build $builddir/ec_wt_fp.o : cudac $root/ec_wt_fp.cu
-build $builddir/cwtfilterbank.o : cudac $root/cwtfilterbank.cu
+build $builddir/cwt.o : cudac $root/cwt.cu
 build $builddir/log2.o : cudac $root/log2.cu
-build $builddir/wavCFandSD.o : cudac $root/wavCFandSD.cu
-build $builddir/quadgk.o : cudac $root/quadgk.cu
-build $builddir/cwtfreqlimits.o : cudac $root/cwtfreqlimits.cu
-build $builddir/bsxfun.o : cudac $root/bsxfun.cu
-build $builddir/vvarstd.o : cudac $root/vvarstd.cu
-build $builddir/wt.o : cudac $root/wt.cu
-build $builddir/scaleSpectrum.o : cudac $root/scaleSpectrum.cu
-build $builddir/numCpsi.o : cudac $root/numCpsi.cu
 build $builddir/_coder_ec_wt_fp_api.o : cudac $root/interface/_coder_ec_wt_fp_api.cu
 build $builddir/_coder_ec_wt_fp_mex.o : cudac $root/interface/_coder_ec_wt_fp_mex.cu
-build $builddir/gammaln.o : cudac $root/gammaln.cu
-build $builddir/morsebpfilters.o : cudac $root/morsebpfilters.cu
-build $builddir/wavbpfilters.o : cudac $root/wavbpfilters.cu
-build $builddir/morseproperties.o : cudac $root/morseproperties.cu
-build $builddir/div.o : cudac $root/div.cu
+build $builddir/circshift.o : cudac $root/circshift.cu
 build $builddir/ec_wt_fp_emxutil.o : cudac $root/ec_wt_fp_emxutil.cu
 build $builddir/ec_wt_fp_mexutil.o : cudac $root/ec_wt_fp_mexutil.cu
 build $builddir/_coder_ec_wt_fp_info.o : cxx $root/interface/_coder_ec_wt_fp_info.cpp
 build $builddir/cpp_mexapi_version.o : cudac $root/cpp_mexapi_version.cpp
 
 # Link
-build $root/ec_wt_fp32.mexa64 : linkcuda $builddir/MWLaunchParametersUtilities.o $builddir/MWErrorCodeUtils.o $builddir/MWCUFFTPlanManager.o $builddir/MWCUBLASUtils.o $builddir/ec_wt_fp_data.o $builddir/rt_nonfinite.o $builddir/ec_wt_fp_initialize.o $builddir/ec_wt_fp_terminate.o $builddir/ec_wt_fp.o $builddir/cwtfilterbank.o $builddir/log2.o $builddir/wavCFandSD.o $builddir/quadgk.o $builddir/cwtfreqlimits.o $builddir/bsxfun.o $builddir/vvarstd.o $builddir/wt.o $builddir/scaleSpectrum.o $builddir/numCpsi.o $builddir/_coder_ec_wt_fp_api.o $builddir/_coder_ec_wt_fp_mex.o $builddir/gammaln.o $builddir/morsebpfilters.o $builddir/wavbpfilters.o $builddir/morseproperties.o $builddir/div.o $builddir/ec_wt_fp_emxutil.o $builddir/ec_wt_fp_mexutil.o $builddir/_coder_ec_wt_fp_info.o $builddir/cpp_mexapi_version.o 
+build $root/ec_wt_fp32.mexa64 : linkcuda $builddir/MWLaunchParametersUtilities.o $builddir/MWCUFFTPlanManager.o $builddir/ec_wt_fp_data.o $builddir/rt_nonfinite.o $builddir/ec_wt_fp_initialize.o $builddir/ec_wt_fp_terminate.o $builddir/ec_wt_fp.o $builddir/cwt.o $builddir/log2.o $builddir/_coder_ec_wt_fp_api.o $builddir/_coder_ec_wt_fp_mex.o $builddir/circshift.o $builddir/ec_wt_fp_emxutil.o $builddir/ec_wt_fp_mexutil.o $builddir/_coder_ec_wt_fp_info.o $builddir/cpp_mexapi_version.o 

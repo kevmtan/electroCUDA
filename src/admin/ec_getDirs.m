@@ -2,7 +2,7 @@ function dirs = ec_getDirs(proj,sbj,task,sbjID)
 % You must edit 'ecu_paths' to match the directorieson your system
 %% Input validation
 arguments
-    proj string = "lbcn"
+    proj {istext,isstruct} = "lbcn"
     sbj {istext,isnumeric} = []
     task string = "MMR";
     sbjID uint16 = []

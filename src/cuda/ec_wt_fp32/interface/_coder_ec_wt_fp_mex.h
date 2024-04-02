@@ -31,7 +31,7 @@ MEXFUNCTION_LINKAGE void mexFunction(int32_T nlhs, mxArray *plhs[],
 
 emlrtCTX mexFunctionCreateRootTLS();
 
-void unsafe_ec_wt_fp_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
+void unsafe_ec_wt_fp_mexFunction(int32_T nlhs, mxArray *plhs[1], int32_T nrhs,
                                  const mxArray *prhs[7]);
 
 // End of code generation (_coder_ec_wt_fp_mex.h)

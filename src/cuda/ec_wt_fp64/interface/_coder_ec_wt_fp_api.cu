@@ -20,7 +20,7 @@
 #include "nvtx3/nvToolsExt.h"
 
 // Variable Definitions
-static emlrtRTEInfo ce_emlrtRTEI{
+static emlrtRTEInfo eb_emlrtRTEI{
     1,                     // lineNo
     1,                     // colNo
     "_coder_ec_wt_fp_api", // fName
@@ -38,8 +38,6 @@ static real_T (*b_emlrt_marshallIn(const mxArray *b_nullptr,
 static real_T (*b_emlrt_marshallIn(const mxArray *u,
                                    const emlrtMsgIdentifier *parentId))[2];
 
-static const mxArray *b_emlrt_marshallOut(const emxArray_real_T *u);
-
 static boolean_T c_emlrt_marshallIn(const mxArray *b_nullptr,
                                     const char_T *identifier);
 
@@ -56,7 +54,7 @@ static void emlrt_marshallIn(const mxArray *u,
                              const emlrtMsgIdentifier *parentId,
                              emxArray_real_T *y);
 
-static const mxArray *emlrt_marshallOut(const emxArray_real_T *u);
+static const mxArray *emlrt_marshallOut(const emxArray_cell_wrap_0 *u);
 
 static boolean_T f_emlrt_marshallIn(const mxArray *src,
                                     const emlrtMsgIdentifier *msgId);
@@ -109,21 +107,6 @@ static real_T (*b_emlrt_marshallIn(const mxArray *u,
   nvtxMarkA("#e_emlrt_marshallIn#" MW_AT_LINE);
   y = e_emlrt_marshallIn(emlrtAlias(u), parentId);
   emlrtDestroyArray(&u);
-  nvtxRangePop();
-  return y;
-}
-
-static const mxArray *b_emlrt_marshallOut(const emxArray_real_T *u)
-{
-  static const int32_T iv[1]{0};
-  const mxArray *m;
-  const mxArray *y;
-  nvtxRangePushA("#fcn#b_emlrt_marshallOut#" MW_AT_LOCATION);
-  y = nullptr;
-  m = emlrtCreateNumericArray(1, (const void *)&iv[0], mxDOUBLE_CLASS, mxREAL);
-  emlrtMxSetData((mxArray *)m, &u->data[0]);
-  emlrtSetDimensions((mxArray *)m, &u->size[0], 1);
-  emlrtAssign(&y, m);
   nvtxRangePop();
   return y;
 }
@@ -197,17 +180,29 @@ static void emlrt_marshallIn(const mxArray *u,
   nvtxRangePop();
 }
 
-static const mxArray *emlrt_marshallOut(const emxArray_real_T *u)
+static const mxArray *emlrt_marshallOut(const emxArray_cell_wrap_0 *u)
 {
-  static const int32_T iv[3]{0, 0, 0};
+  const mxArray *b_y;
   const mxArray *m;
   const mxArray *y;
+  int32_T iv[2];
+  int32_T n;
   nvtxRangePushA("#fcn#emlrt_marshallOut#" MW_AT_LOCATION);
   y = nullptr;
-  m = emlrtCreateNumericArray(3, (const void *)&iv[0], mxDOUBLE_CLASS, mxREAL);
-  emlrtMxSetData((mxArray *)m, &u->data[0]);
-  emlrtSetDimensions((mxArray *)m, &u->size[0], 3);
-  emlrtAssign(&y, m);
+  emlrtAssign(&y, emlrtCreateCellArrayR2014a(2, &u->size[0]));
+  n = u->size[1];
+  profileLoopStart("emlrt_marshallOut_loop_0", __LINE__, (n - 1) + 1, "");
+  for (int32_T i{0}; i < n; i++) {
+    b_y = nullptr;
+    iv[0] = u->data[i].f1->size[0];
+    iv[1] = u->data[i].f1->size[1];
+    m = emlrtCreateNumericArray(2, &iv[0], mxDOUBLE_CLASS, mxCOMPLEX);
+    emlrtExportNumericArrayR2013b(emlrtRootTLSGlobal, m,
+                                  &u->data[i].f1->data[0], 8);
+    emlrtAssign(&b_y, m);
+    emlrtSetCell(y, i, b_y);
+  }
+  profileLoopEnd();
   nvtxRangePop();
   return y;
 }
@@ -226,62 +221,50 @@ static boolean_T f_emlrt_marshallIn(const mxArray *src,
   return ret;
 }
 
-void ec_wt_fp_api(const mxArray *const prhs[7], int32_T nlhs,
-                  const mxArray *plhs[2])
+void ec_wt_fp_api(const mxArray *const prhs[7], const mxArray *plhs[1])
 {
-  emxArray_real_T *freqs;
+  emxArray_cell_wrap_0 *y;
   emxArray_real_T *x;
-  emxArray_real_T *y;
   const mxArray *prhs_copy_idx_2;
-  real_T(*fLims)[2];
+  real_T(*lims)[2];
   real_T ds;
-  real_T fVoices;
   real_T fs;
-  boolean_T doAvg;
+  real_T voices;
   boolean_T doPwr;
+  boolean_T doReal;
   nvtxRangePushA("#fcn#ec_wt_fp_api#" MW_AT_LOCATION);
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   prhs_copy_idx_2 = emlrtProtectR2012b(prhs[2], 2, false, -1);
   // Marshall function inputs
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&x, 2, &ce_emlrtRTEI, true);
+  emxInit_real_T(&x, 2, &eb_emlrtRTEI, true);
   x->canFreeData = false;
   nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
   emlrt_marshallIn(emlrtAlias(prhs[0]), "x", x);
   nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
   fs = emlrt_marshallIn(emlrtAliasP(prhs[1]), "fs");
   nvtxMarkA("#b_emlrt_marshallIn#" MW_AT_LINE);
-  fLims = b_emlrt_marshallIn(emlrtAlias(prhs_copy_idx_2), "fLims");
+  lims = b_emlrt_marshallIn(emlrtAlias(prhs_copy_idx_2), "lims");
   nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
-  fVoices = emlrt_marshallIn(emlrtAliasP(prhs[3]), "fVoices");
+  voices = emlrt_marshallIn(emlrtAliasP(prhs[3]), "voices");
   nvtxMarkA("#emlrt_marshallIn#" MW_AT_LINE);
   ds = emlrt_marshallIn(emlrtAliasP(prhs[4]), "ds");
   nvtxMarkA("#c_emlrt_marshallIn#" MW_AT_LINE);
-  doAvg = c_emlrt_marshallIn(emlrtAliasP(prhs[5]), "doAvg");
+  doReal = c_emlrt_marshallIn(emlrtAliasP(prhs[5]), "doReal");
   nvtxMarkA("#c_emlrt_marshallIn#" MW_AT_LINE);
   doPwr = c_emlrt_marshallIn(emlrtAliasP(prhs[6]), "doPwr");
   // Invoke the target function
-  nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&y, 3, &ce_emlrtRTEI, true);
-  nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&freqs, 1, &ce_emlrtRTEI, true);
+  nvtxMarkA("#emxInit_cell_wrap_0#" MW_AT_LINE);
+  emxInit_cell_wrap_0(&y, 2, &eb_emlrtRTEI, true);
   nvtxMarkA("#ec_wt_fp#" MW_AT_LINE);
-  ec_wt_fp(x, fs, *fLims, fVoices, ds, doAvg, doPwr, y, freqs);
+  ec_wt_fp(x, fs, *lims, voices, ds, doReal, doPwr, y);
   nvtxMarkA("#emxFree_real_T#" MW_AT_LINE);
   emxFree_real_T(&x);
   // Marshall function outputs
-  y->canFreeData = false;
   nvtxMarkA("#emlrt_marshallOut#" MW_AT_LINE);
   plhs[0] = emlrt_marshallOut(y);
-  nvtxMarkA("#emxFree_real_T#" MW_AT_LINE);
-  emxFree_real_T(&y);
-  if (nlhs > 1) {
-    freqs->canFreeData = false;
-    nvtxMarkA("#b_emlrt_marshallOut#" MW_AT_LINE);
-    plhs[1] = b_emlrt_marshallOut(freqs);
-  }
-  nvtxMarkA("#emxFree_real_T#" MW_AT_LINE);
-  emxFree_real_T(&freqs);
+  nvtxMarkA("#emxFree_cell_wrap_0#" MW_AT_LINE);
+  emxFree_cell_wrap_0(&y);
   emlrtHeapReferenceStackLeaveFcnR2012b(emlrtRootTLSGlobal);
   nvtxRangePop();
 }

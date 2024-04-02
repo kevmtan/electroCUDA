@@ -58,11 +58,10 @@ emlrtCTX mexFunctionCreateRootTLS()
   return p;
 }
 
-void unsafe_ec_wt_fp_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
+void unsafe_ec_wt_fp_mexFunction(int32_T nlhs, mxArray *plhs[1], int32_T nrhs,
                                  const mxArray *prhs[7])
 {
-  const mxArray *outputs[2];
-  int32_T b;
+  const mxArray *outputs[1];
   nvtxRangePushA("#fcn#unsafe_ec_wt_fp_mexFunction#" MW_AT_LOCATION);
   // Check for proper number of arguments.
   if (nrhs != 7) {
@@ -70,21 +69,16 @@ void unsafe_ec_wt_fp_mexFunction(int32_T nlhs, mxArray *plhs[2], int32_T nrhs,
                         "EMLRT:runTime:WrongNumberOfInputsFAVDefaultValues", 5,
                         12, 7, 4, 8, "ec_wt_fp");
   }
-  if (nlhs > 2) {
+  if (nlhs > 1) {
     emlrtErrMsgIdAndTxt(emlrtRootTLSGlobal,
                         "EMLRT:runTime:TooManyOutputArguments", 3, 4, 8,
                         "ec_wt_fp");
   }
   // Call the function.
   nvtxMarkA("#ec_wt_fp_api#" MW_AT_LINE);
-  ec_wt_fp_api(prhs, nlhs, outputs);
+  ec_wt_fp_api(prhs, outputs);
   // Copy over outputs to the caller.
-  if (nlhs < 1) {
-    b = 1;
-  } else {
-    b = nlhs;
-  }
-  emlrtReturnArrays(b, &plhs[0], &outputs[0]);
+  emlrtReturnArrays(1, &plhs[0], &outputs[0]);
   nvtxRangePop();
 }
 

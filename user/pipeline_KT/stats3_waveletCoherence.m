@@ -5,14 +5,13 @@ sbjs = {'S12_38_LK','S12_42_NC',...
     'S13_51_MTL','S13_52_FVV','S13_53_KS2','S13_54_KDH','S13_56_THS','S13_57_TVD',...
     'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
     'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR',...
-    'S15_87_RL','S16_95_JOB','S16_96_LF'}';
+    'S16_95_JOB','S16_96_LF'}';
 %sbjs = {'S12_42_NC'}';
 
 %% Options
 proj = 'lbcn';
 task = 'MMR';
 usrStr = "Kevin_DMN";
-plotType = "spec"; % "hfb-lfp"; % "spec";
 nameStr = "chCoherence";
 isTest = false;
 
@@ -25,14 +24,13 @@ o.name = string(datetime("now","TimeZone","local","Format","yyMMdd"))+"_"+nameSt
 
 % Basic options
 o.suffix = ""; % Input data suffix (default = "")
-o.save = true; % save summary stats data
-o.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
-o.doGPU = false; % Run on MATLAB gpuArray (superseded by CUDA)
-o.single = true; % Run & save as single (single much faster on GPU)
-o.halfOut = true; % Run as double (accuracy) & save as single (small filesize)
+o.save = true; % save summary fin data
+o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
+o.single = false; % Run & save as single (single much faster on GPU)
+o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 
 % Timing (in seconds)
-o.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+o.dsTarg = 20; % Downsample target in Hz (default=[]: no downsample)
 o.BLpre = [-0.2 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
 o.BLend = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
 o.bin = 0.02; % Latency bin width (seconds)
@@ -61,6 +59,7 @@ o.thrOL = 5; %[5 5]; % Lower and upper quantiles for outlier
 o.thrOLbl = 2.5;
 
 % Wavelet coherence
+o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
 o.fName = "spec"; % Name of frequency analysis
 o.fLims = [4 200]; % frequency limits in hz; HFB=[70 200]
 o.fVoices = 10; % Voices per octave (default=12)
@@ -89,13 +88,7 @@ for c = 1:numel(o.conds)
     o.oP.o1D.col{c} = o.oP.col(c,:);
 end
 o.oP.textcol = [.8 .8 .8];
-if plotType=="hfb"
-    o.oP.textsize = 14;
-elseif plotType=="hfb-lfp"
-    o.oP.textsize = 14;
-else
-    o.oP.textsize = 8;
-end
+o.oP.textsize = 8;
 
 %%
 sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/summary/summarySbj_'...
@@ -104,19 +97,20 @@ if ~exist('statusSum','var')
     statusSum = table;
     statusSum.sbj = string(sbjs);
     statusSum.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
-    statusSum.stats(:,1) = nan;
+    statusSum.fin(:,1) = nan;
     statusSum.plot(:,1) = nan;
     statusSum.time(:,1) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
     statusSum.error = cell(numel(sbjs),1);
 end
 
-%% Run sum stats %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Run sum fin %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for s = 1:height(statusSum)
-    if statusSum.stats(s)~=1  % s=2;
+    if statusSum.fin(s)~=1  % s=2;
         sbj = statusSum.sbj(s);
         dirs = ec_getDirs(proj,sbj,task);
         os = o;
         os.sbj = sbj;
+        os.sbjID = dirs.sbjID;
         os.task = task;
         os.dirIn = dirs.procSbj; %
         os.dirFS = dirs.fsSbj; % Freesurfer subjects dir
@@ -125,13 +119,13 @@ for s = 1:height(statusSum)
 
         %%
         try
-            disp("STARTING SUMMARY PLOTS: "+sbj);
-            ec_summaryStats_sbjCh(sbj,proj,os,dirs,stats=1,plot=0,sfx=sfx,...
+            disp("STARTING WAVELET COHERENCE: "+sbj);
+            ec_summo.oParyfin_sbjCh(sbj,proj,os,dirs,fin=1,plot=0,sfx=sfx,...
                 type=plotType,ICA=doICA,test=isTest);
-            statusSum.stats(s,ii) = 1;
+            statusSum.fin(s,ii) = 1;
         catch ME; getReport(ME)
             statusSum.error{s,ii} = ME;
-            statusSum.stats(s,ii) = 0;
+            statusSum.fin(s,ii) = 0;
             % try parfevalOnAll(@gpuDevice,0,[]); catch;end
             % try reset(gpuDevice(1)); catch;end
             % try delete(gcp('nocreate')); catch;end

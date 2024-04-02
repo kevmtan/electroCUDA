@@ -1,19 +1,17 @@
-function [y,freqs] = ec_wt_fp(x,fs,fLims,fVoices,ds,doAvg,doPwr)
-%% electroCUDA - run Continuous WAvelet Transform
+function y = ec_wt_fp(x,fs,lims,voices,ds,doReal,doPwr,wvlt)
+%% [electroCUDA] CWT - CUDA mex source
+%   Called by function 'ec_wt' (see for details) 
 %   Intended to be compiled into a CUDA mex binary
 %   Kevin Tan, 2024 (github.com/kevmtan/electroCUDA)
-%
-% OUTPUTS:
-%   y = transformed data
-%   freqs = CWT frequencies
 arguments
     x (:,:){mustBeFloat}        % Input data
     fs (1,1) double             % Sampling rate
-    fLims (1,2) double          % Frequency limits
-    fVoices (1,1) double = 10   % Voices per octave
+    lims (1,2) double          % Frequency limits
+    voices (1,1) double = 10   % Voices per octave
     ds (1,1) double = 0         % Downsampling factor
-    doAvg (1,1) logical = false % Transform [0=continuous|1=averaged]
-    doPwr (1,1) logical = false % Output [0=magnitude|1=output]
+    doReal (1,1) logical = true % Real output? (complex otherwise)
+    doPwr (1,1) logical = false % Power output? (magnitude otherwise)
+    wvlt char {mustBeMember(wvlt,{'morse','amor'})} = 'morse'
 end
 if ds<=1; ds=0; end
 
@@ -21,64 +19,48 @@ if ds<=1; ds=0; end
 coder.gpu.kernelfun; % Trigger CUDA kernel creation
 
 % Sizes
-nFrames = height(x);
 nChs = width(x);
 
-% Make CWT filter
-fb = cwtfilterbank(Wavelet="Morse",SignalLength=nFrames,...
-    SamplingFrequency=fs,FrequencyLimits=fLims,VoicesPerOctave=fVoices);
-freqs = centerFrequencies(fb);
-
-% Find output frames
-if ds
-    nFrames = floor(nFrames/ds);
-end
-
 % Preallocate output
-if doAvg
-    y = coder.nullcopy(nan(nFrames,nChs,like=x));
-else
-    y = coder.nullcopy(nan(nFrames,nChs,numel(freqs),like=x));
-end
+y = coder.nullcopy(cell(1,nChs));
+
 
 %% Processing loop across channels
 for ch = 1:nChs
-    if doAvg
-        y(:,ch) = awt_lfn(fb,x(:,ch),ds,doPwr);
+    if doReal
+        y{ch} = cwtR_lfn(x(:,ch),fs,lims,voices,wvlt,ds,doPwr);
     else
-        y(:,ch,:) = cwt_lfn(fb,x(:,ch),ds,doPwr);
+        y{ch} = cwt_lfn(x(:,ch),fs,lims,voices,wvlt,ds);
     end
 end
 
 
 
 
-%% Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function yc = cwt_lfn(fb,xc,ds,doPwr)
+%% Run CWT (complex) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function yc = cwt_lfn(xc,fs,lims,voices,wvlt,ds)
 
-% Run transform
+% CWT
+yc = cwt(xc,wvlt,fs,FrequencyLimits=lims,VoicesPerOctave=voices)';
+
+% Downsample
+if ds
+    yc = resample(yc,1,ds);
+end
+
+
+%% Run CWT (magnitude/power) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function yc = cwtR_lfn(xc,fs,lims,voices,wvlt,ds,doPwr)
+
+% CWT - magnitude out
+yc = abs(cwt(xc,wvlt,fs,FrequencyLimits=lims,VoicesPerOctave=voices)');
+
+% Convert to power
 if doPwr
-    yc = abs(wt(fb,xc)').^2; % Power
-else
-    yc = abs(wt(fb,xc)'); % Magnitude
+    yc = yc.^2;
 end
 
 % Downsample
 if ds
-    yc = downsample(yc,ds);
-end
-
-%% Scale-averaged wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function yc = awt_lfn(fb,xc,ds,doPwr)
-
-% Run transform
-if doPwr
-    yc = scaleSpectrum(fb,xc)'; % Power
-else
-    yc = scaleSpectrum(fb,xc,SpectrumType="density")'; % Magnitude
-end
-
-% Downsample
-if ds
-    yc = downsample(yc,ds);
+    yc = resample(yc,1,ds);
 end
