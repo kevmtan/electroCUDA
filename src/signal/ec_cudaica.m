@@ -43,25 +43,30 @@ arguments
     % CUDAICA flags
     arg.sphering {mustBeMember(arg.sphering,["on" "off"])} = "on" % Sphering of data (on/off)   {default: on}
     arg.bias {mustBeMember(arg.bias,["on" "off"])} = "on"         % Perform bias adjustment (on/off) {default: on}
-    arg.extended {isnumeric} = 1                                  % Perform "extended-ICA" using tnah() with kurtosis estimation every N training blocks. If N < 0, fix number of sub-Gaussian components to -N 
-    arg.lrate {isfloat} = 1e-4                                    % Start learning rate (0<float<<1) {default: 1e-4}
-    arg.blocksize {isnumeric} = 0                                 % int>=0        [0 default: heuristic, from data size]
-    arg.stop {isfloat} = ""                                       % Stop learning rate {default: 1e-7, heuristic} 
-    arg.maxsteps {isnumeric} = 512                                % int>0         {default: 512}
-    arg.posact {mustBeMember(arg.posact,["on" "off"])} = "off"    % Make maximum value for each comp positive.
-    arg.annealstep {isfloat} = 0.98                               % (0<float<1)   {default: 0.98}
-    arg.annealdeg {isfloat} = 60                                  % (0<n<360)     {default: 60} 
-    arg.momentum {isfloat} = 0                                    % (0<float<1)   {default: 0 = off]
+    arg.extended {mustBeInteger} = 1                              % Perform "extended-ICA" using tnah() with kurtosis estimation every N training blocks. If N < 0, fix number of sub-Gaussian components to -N 
+    arg.lrate double = 1e-4                                       % Start learning rate (0<float<<1) {default: heuristic ~5e-4}
+    arg.stop double = 1e-6                                        % Stop learning rate {default: heuristic ~1e6} 
+    arg.maxsteps uint32 {mustBeInteger} = 128                     % int>0         {default: 128}
+    arg.blocksize uint32 {mustBeInteger} = 0                      % int>=0        [0 default: heuristic, from data size]
+    arg.posact {mustBeMember(arg.posact,["on" "off"])} = "on"     % Make maximum value for each comp positive. {default: on}
+    arg.annealstep double = 0.98                                  % (0<float<1)   {default: 0.98}
+    arg.annealdeg double = 60                                     % (0<n<360)     {default: 60} 
+    arg.momentum double = 0                                       % (0<float<1)   {default: 0 = off]
     arg.verbose {mustBeMember(arg.verbose,["on" "off" "matlab"])} = "off"  % Verbose terminal output
 end
+
+% Format CUDAICA opts
 nFrames = size(x,1);
 nChs = size(x,2);
-if isempty(arg.lrate); arg.lrate=1e-4; end
+if isempty(arg.pca)||arg.pca<=0; nComps=nChs; else; nComps=arg.pca; end
+if isempty(arg.lrate); arg.lrate=""; end
 if isempty(arg.stop); arg.stop=""; end
 if ~isempty(arg.sfx) && arg.sfx~=""; sfx="_"+arg.sfx; else; sfx=""; end
-if isempty(arg.pca)||arg.pca<=0; nComps=nChs; else; nComps=arg.pca; end
-doFlip=true;
-if size(x,2)>size(x,1); x=x'; doFlip=0; warning("data has more channels than frames, flipping..."); end
+if size(x,2)>size(x,1)
+    x=x'; doFlip=false; warning("data has more channels than frames, flipping...");
+else
+    doFlip=true;
+end
 
 %% Prep
 

@@ -230,8 +230,6 @@ function y = geometricMedian_lfn(X,tol,max_iter)
 % Out:
 %   g : geometric median over X
 
-if isempty(tol); tol=1e-5; end
-if isempty(max_iter); max_iter=500; end
 y = median(X,"omitnan");
 
 for ii = 1:max_iter

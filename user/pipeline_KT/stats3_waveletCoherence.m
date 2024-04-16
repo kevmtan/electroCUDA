@@ -94,47 +94,44 @@ o.oP.textsize = 8;
 sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/summary/summarySbj_'...
     char(datetime('now','TimeZone','local','Format','yyMMdd_HHmm')) '_errors.mat'];
 if ~exist('statusSum','var')
-    statusSum = table;
-    statusSum.sbj = string(sbjs);
-    statusSum.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
-    statusSum.fin(:,1) = nan;
-    statusSum.plot(:,1) = nan;
-    statusSum.time(:,1) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-    statusSum.error = cell(numel(sbjs),1);
+    status = table;
+    status.sbj = string(sbjs);
+    status.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
+    status.fin(:,1) = nan;
+    status.plot(:,1) = nan;
+    status.time(:,1) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+    status.error = cell(numel(sbjs),1);
 end
 
 %% Run sum fin %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for s = 1:height(statusSum)
-    if statusSum.fin(s)~=1  % s=2;
-        sbj = statusSum.sbj(s);
-        dirs = ec_getDirs(proj,sbj,task);
-        os = o;
-        os.sbj = sbj;
-        os.sbjID = dirs.sbjID;
-        os.task = task;
-        os.dirIn = dirs.procSbj; %
-        os.dirFS = dirs.fsSbj; % Freesurfer subjects dir
-        os.dirOut = dirs.anal+"connectivity/"+os.name+"/";
-        os.dirOutSbj = dirs.anal+"connectivity/"+os.name+"/s"+statusSum.sbjID(s)+"/";
+for s = 1:height(status)
+    if status.fin(s); continue; end% s=2;
+    sbj = status.sbj(s);
+    dirs = ec_getDirs(proj,sbj,task);
+    os = o;
+    os.sbj = sbj;
+    os.sbjID = dirs.sbjID;
+    os.task = task;
+    os.dirIn = dirs.procSbj; %
+    os.dirFS = dirs.fsSbj; % Freesurfer subjects dir
+    os.dirOut = dirs.anal+"connectivity/"+os.name+"/";
+    os.dirOutSbj = dirs.anal+"connectivity/"+os.name+"/s"+status.sbjID(s)+"/";
 
-        %%
-        try
-            disp("STARTING WAVELET COHERENCE: "+sbj);
-            ec_summo.oParyfin_sbjCh(sbj,proj,os,dirs,fin=1,plot=0,sfx=sfx,...
-                type=plotType,ICA=doICA,test=isTest);
-            statusSum.fin(s,ii) = 1;
-        catch ME; getReport(ME)
-            statusSum.error{s,ii} = ME;
-            statusSum.fin(s,ii) = 0;
-            % try parfevalOnAll(@gpuDevice,0,[]); catch;end
-            % try reset(gpuDevice(1)); catch;end
-            % try delete(gcp('nocreate')); catch;end
-        end
-
-        %%
-        statusSum.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-        save(sbjFinFn,'statusSum','-v7');
-    else
-        disp("SKIPPING: "+o.name);
+    %%
+    try
+        disp("STARTING WAVELET COHERENCE: "+sbj);
+        ec_summo.oParyfin_sbjCh(sbj,proj,os,dirs,fin=1,plot=0,sfx=sfx,...
+            type=plotType,ICA=doICA,test=isTest);
+        status.fin(s,ii) = 1;
+    catch ME; getReport(ME)
+        status.error{s,ii} = ME;
+        status.fin(s,ii) = 0;
+        % try parfevalOnAll(@gpuDevice,0,[]); catch;end
+        % try reset(gpuDevice(1)); catch;end
+        % try delete(gcp('nocreate')); catch;end
     end
+
+    %%
+    status.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+    save(sbjFinFn,'status','-v7');
 end

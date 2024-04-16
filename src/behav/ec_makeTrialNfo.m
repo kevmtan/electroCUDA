@@ -1,16 +1,16 @@
 function ec_makeTrialNfo(sbj,bn,dirs,prompts)
-if 0
-    %%
-    sbj = 'S12_38_LK'; %#ok<UNRCH>
-    pathsDMN('lbcn');
-    [dirServer, dirComp, dirCode, dirFS] = AddPaths('Kevin_DMN');
-    dirs = ec_getDirs('MMR',sbj,dirServer,dirComp,dirCode,dirFS);
-    bn = BlockBySubj(sbj,'MMR'); bn = bn{1};
-    load('/home/kt/Gdrive/UCLA/Studies/MMR/anal/beh/prompts_220524.mat','prompts');
-end
+% if 0
+%     %%
+%     sbj = 'S12_38_LK'; %#ok<UNRCH>
+%     pathsDMN('lbcn');
+%     [dirServer, dirComp, dirCode, dirFS] = AddPaths('Kevin_DMN');
+%     dirs = ec_getDirs('MMR',sbj,dirServer,dirComp,dirCode,dirFS);
+%     bn = BlockBySubj(sbj,'MMR'); bn = bn{1};
+%     load('/home/kt/Gdrive/UCLA/Studies/MMR/anal/beh/prompts_220524.mat','prompts');
+% end
 
 % Load trialinfo, get event timing locks
-load([dirs.psych,filesep,sbj,filesep,bn,filesep,'trialinfo_',bn,'.mat'], 'trialinfo');
+load(dirs.psychSbj+bn+filesep+"trialinfo_"+bn+".mat", "trialinfo");
 nTrials = height(trialinfo);
 
 % Get sbjID and block name
@@ -116,7 +116,7 @@ trialNfo.Properties.VariableNames{'RT_lock'} = 'lockRT';
 disp(['Made trialNfo: ' sbj ' ' bn]);
 
 %% Save
-save([dirs.psych,filesep,sbj,filesep,bn,filesep,'trialNfo_',sbj,'_',bn,'.mat'], 'trialNfo');
+save(dirs.psychSbj+bn+filesep+"trialNfo_"+sbj+"_"+bn+".mat", "trialNfo");
 disp(['Saved trialNfo: ' sbj ' ' bn]);
 end
 

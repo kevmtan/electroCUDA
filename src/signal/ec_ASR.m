@@ -30,7 +30,7 @@ if isany(chIgnore)
 end
 
 %% Run ASR
-[EEG,state] = asrMain_lfn(EEG,o.doGPU,o.maxMem,o.refBurst,o.refTols,o.refMaxBadChs,...
+[EEG,state] = asrMain_lfn(EEG,o.gpu,o.maxMem,o.refBurst,o.refTols,o.refMaxBadChs,...
     o.refWinSz,o.winSz,o.winOverlap,o.stepSz,o.blockSz,o.filtHz,o.filtMag,o.dimsPCA,...
     o.refMaxDropout,o.refMinClean,o.truncQuant,o.stepSizes,o.shapeRange);
 
@@ -234,7 +234,7 @@ if isempty(maxMem)
         reset(gpuDevice()); maxMem=gpuDevice();
         maxMem = maxMem.AvailableMemory/2^20;
     else
-        maxMem = ec_ramAvail/2^20;
+        maxMem = ec_ramAvail/2^21;
     end
 end
 [C,S] = size(EEG.data);

@@ -1,4 +1,4 @@
-function ptd = getPtdIndex_KT(fs_subj,offset)
+function ptd = ec_getPtdIndex(fs_subj,fs_dir,offset)
 % function PTD_idx = getPtdIndex(fs_subj)
 %
 % Compute Proximal Tissue Density (PTD) for each electrode as described in
@@ -75,12 +75,12 @@ function ptd = getPtdIndex_KT(fs_subj,offset)
 %			--Kevin Tan
 
 arguments
-    fs_subj {mustBeText}
-    offset {mustBeNumeric} = 2
+    fs_subj char
+    fs_dir char
+    offset double = 2
 end
 
 %% Load
-fs_dir = getFsurfSubDir();
 recon_folder = fullfile(fs_dir,fs_subj,'elec_recon');
 parc_file = fullfile(fs_dir,fs_subj,'mri','aparc+aseg.mgz');
 mri = MRIread(parc_file);
@@ -141,30 +141,29 @@ fclose(fid);
 
 region_lookup = lower(string(C{:,2}));
 region_codes = C{:,1};
-clear fid C p
+%clear fid C p
 
 %% find the proportion of neocortical grey and white matter surrounding the electrodes
 offsetThr = power(offset+1,3);
-sVol = size(mri.vol);
 ROI = repmat("",nElec,1);
 nGM = nan(nElec,1);
 nWM = nan(nElec,1);
 
 disp(['Finding amount of surrounding grey and white matter for channel ' fs_subj]);
-for e = 1:nElec
+parfor e = 1:nElec
     %%
     x = round(elec(e,2)); % switches x and y axes to match FreeSurfer
     y = round(elec(e,1)); % switches x and y axes to match FreeSurfer
-    z = round(sVol(3)-elec(e,3)); %need to flip direction of last coordinate
+    z = round(mri.volsize(3)-elec(e,3)); %need to flip direction of last coordinate
     
     % original labelling from parcellation
     ROI(e) = region_lookup(region_codes==mri.vol(x,y,z));
         
     % Euclidian distance between each electrode & voxel (could be sped up!)
-    distances = nan(sVol);
-    for i=1:mri.volsize(1)
-       for j=1:mri.volsize(2)
-           for k=1:mri.volsize(3)
+    distances = nan(mri.volsize);
+    for i = 1:mri.volsize(1)
+       for j = 1:mri.volsize(2)
+           for k = 1:mri.volsize(3)
                distances(i,j,k) = sqrt((i-x)^2+(j-y)^2+(k-z)^2); % norm is SLOWER!
            end
        end
@@ -194,7 +193,7 @@ ptd.offset(:) = offset;
 ptd.totalVox(:) = offsetThr;
 
 idx = nGM+nWM ~= offsetThr;
-if length(idx)>1
+if nnz(idx)>1
      warning("Using less strict PTD for unlabeled GM/WM voxels in "+nnz(idx)+" chans: "+fs_subj);
      ptd.PTD(idx) = (nGM(idx)-nWM(idx)) / offsetThr; 
 end

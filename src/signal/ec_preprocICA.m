@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preprocICA(sbj,task,o,n,x,arg)
+function [errors,n,x] = ec_preprocICA(sbj,proj,task,o,n,x,arg)
 %% electroCUDA - Independent Components Analysis (ICA)
 % This function performs ICA on preprocesssed data from 'ec_preproc'
 % Additional denoising, detrending & high-pass filtering (HPF) can be temporarily
@@ -46,11 +46,12 @@ function [errors,n,x] = ec_preprocICA(sbj,task,o,n,x,arg)
 
 %% Input validation
 arguments
-    sbj % Subject name
-    task {mustBeText} = 'MMR' % task name
+    sbj string
+    proj string
+    task string
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
     n struct = [] % preloaded 'n' info output from ec_initialize or robustPreproc (OPTIONAL)
-    x {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
+    x {mustBeFloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
     arg.blocks {istext,isnumeric} = BlockBySubj(sbj,task) % Task blocks/runs to include
     arg.dirs struct = [] % Directory paths struct
     arg.save logical = false % Save outputs to disk
@@ -59,53 +60,53 @@ arguments
     arg.nIn {isstruct} = []
     arg.raw logical = false
 end
-blocks=arg.blocks; dirs=arg.dirs;
-% x=[]; n=[]; o=oICA; arg.raw=false; arg.nIn=[]; arg.save=0; arg.test=1; arg.redoN=1;
+% x=[]; n=[]; arg.raw=false; arg.nIn=[]; arg.save=0; arg.test=1;
 
 %% Initialize & load data
-if ~exist('dirs','var') || ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
-if ~exist('blocks','var') || isempty(blocks); blocks = BlockBySubj(sbj,task); end
-try parpool('threads'); catch;end
 reset(gpuDevice());
 errors = {};
 tt = tic;
 
 % Load EEG data
 if isempty(x)
-    [n,x,~,~,chNfo] = ec_loadSbj(dirs,o.sfx_src);
+    [n,x,chNfo,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
+        vars=["n" "x" "chNfo"]);
 end
 xOg = x;
 
 % Suffixes
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
+if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
+if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending string
+if ~isfolder(o.dirOut); mkdir(o.dirOut); end
 sfxB = "";
 
 %% Classify bad chans & frames
-% if o.doBadCh
-%     [chClass,chNfo.dist] = ec_classifyBadChs(x,chNfo.pialRAS,chNfo.ch); % Bad chan classifier
-%     ch_bad.("ai"+sfx) = chClass.bad;
-%     ch_bad.("xcorr"+sfx) = isoutlier(chClass.xcorr);
-%     ch_bad.("dev"+sfx) = isoutlier(chClass.dev);
-%     ch_bad.("grad"+sfx) = isoutlier(chClass.grad);
-%     % Hurst exponent
-%     idx = ~(ch_bad.empty|ch_bad.nan|chClass.bad|ch_bad.("flat"+sfx)|ch_bad.("diff"+sfx)|...
-%         ch_bad.("cov"+sfx)|ch_bad.("dev"+sfx)|ch_bad.("grad"+sfx));
-%     chHrst = abs(chClass.hurs - 0.5);
-%     [~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst);
-%     ch_bad.("hurstL"+sfx) = chHrst < chHrst_lo;
-%     ch_bad.("hurstH"+sfx) = chHrst > chHrst_hi;
-%     % Copy
-%     ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx)|...
-%         sum([ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),ch_bad.("sns"+sfx)*2,...
-%         ch_bad.("cov"+sfx),ch_bad.("dev"+sfx),ch_bad.("grad"+sfx),...
-%         ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx)],2)>=3;
-%     ch_bad(:,string(chClass.Properties.VariableNames(3:end))+"P"+sfx) = chClass(:,3:end);
-%     chGood = ~ch_bad.("bad"+sfx);
-%     disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
-%     disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
-%     sfxB = sfx;
-% end
+if o.doBadCh
+    [chClass,chNfo.dist] = ec_classifyBadChs(x,chNfo.pialRAS,chNfo.ch); % Bad chan classifier
+    ch_bad.("ai"+sfx) = chClass.bad;
+    ch_bad.("xcorr"+sfx) = isoutlier(chClass.xcorr);
+    ch_bad.("dev"+sfx) = isoutlier(chClass.dev);
+    ch_bad.("grad"+sfx) = isoutlier(chClass.grad);
+    % Hurst exponent
+    idx = ~(ch_bad.empty|ch_bad.nan|chClass.bad|ch_bad.("flat"+sfx)|ch_bad.("diff"+sfx)|...
+        ch_bad.("cov"+sfx)|ch_bad.("dev"+sfx)|ch_bad.("grad"+sfx));
+    chHrst = abs(chClass.hurs - 0.5);
+    [~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(idx),"median","ThresholdFactor",o.thrHurst);
+    ch_bad.("hurstL"+sfx) = chHrst < chHrst_lo;
+    ch_bad.("hurstH"+sfx) = chHrst > chHrst_hi;
+    % Copy
+    ch_bad.("bad"+sfx) = ch_bad.empty|ch_bad.nan|ch_bad.("ai"+sfx)|...
+        sum([ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),ch_bad.("sns"+sfx)*2,...
+        ch_bad.("cov"+sfx),ch_bad.("dev"+sfx),ch_bad.("grad"+sfx),...
+        ch_bad.("hurstL"+sfx),ch_bad.("hurstH"+sfx)],2)>=3;
+    ch_bad(:,string(chClass.Properties.VariableNames(3:end))+"P"+sfx) = chClass(:,3:end);
+    chGood = ~ch_bad.("bad"+sfx);
+    disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
+    disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
+    sfxB = sfx;
+end
 
 %% Robust detrending (temporary, aggressive for better ICA decomposition)
 if nnz(o.detrendOrder)
@@ -154,7 +155,7 @@ end
 
 %% Finalize & save
 sfx = o.suffix;
-n.icNfo = movevars(n.icNfo,["MNI" "dist" "sbjIC"],"After",width(n.icNfo));
+% n.icNfo = movevars(n.icNfo,["MNI" "dist" "sbjIC"],"After",width(n.icNfo));
 n.suffix = o.suffix;
 n.("o"+sfx) = o;
 
@@ -167,7 +168,7 @@ if arg.save
     fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
     save(fn,"n","-v7"); disp("SAVED: "+fn);
     % Save IC timecourses
-    fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
+    fn = o.dirOut+"x"+sfx+"_"+o.fnStr+".mat";
     savefast(fn,'x'); disp("SAVED: "+fn);
 end
 try reset(gpuDevice()); catch;end
@@ -183,7 +184,7 @@ toc(tt);
 
 %% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [o,n,chNfo,errors] = prepICA_lfn(x,o,n,arg,chNfo,sfxB,sfx1,errors,tt)
-ch_bad=chNfo.bad; nChs=height(chNfo); fin=1; chEig=[]; reset(gpuDevice());
+ch_bad=chNfo.bad; nChs=height(chNfo); fin=0; chEig=[];
 
 % Prep chans to use for ICA
 if isfield(arg,"nIn") && isstruct(arg.nIn) && isfield(arg.nIn,"chICA")
@@ -191,7 +192,7 @@ if isfield(arg,"nIn") && isstruct(arg.nIn) && isfield(arg.nIn,"chICA")
     chICA = arg.nIn.chICA;
     chRank = ec_rank(x(:,chICA),exact=1); % Calculate rank
     o.ica_pca = arg.nIn.ica.pca;
-    disp("[prepICA] Found user-specified params: keptChans="+numel(chICA)+" | rank="+chRank);
+    disp("[ec_preprocICA] Found user-specified params: keptChans="+numel(chICA)+" | rank="+chRank);
     fin = 1;
 else
     % Find channels with any redeemable data
@@ -204,9 +205,9 @@ else
     chBadr = sum(chBadr,2);
     chBad = find(chBadr>=1);
     chRank = ec_rank(x(:,chICA),exact=1);   
-    disp("[prepICA] Found redeemable chans: keptChans="+numel(chICA)+" | rank="+chRank);
+    disp("[ec_preprocICA] Found redeemable chans: keptChans="+numel(chICA)+" | rank="+chRank);
     if chRank >= numel(chICA)
-        fin=1; disp("[prepICA] SUCCESS - all redeemable channels ok for ICA");
+        fin=1; disp("[ec_preprocICA] SUCCESS - all redeemable channels ok for ICA");
     end
 end
 chICAbad = intersect(chICA,chBad);
@@ -229,17 +230,18 @@ try x = gpuArray(x); tol = gpuArray(tol);
 catch ME; chEig=[]; errors{end+1}=ME; getReport(ME)
 end
 
-% Run on CPU as fallback
+% Run on CPU as fallback (TO DO: use parfor instead of arrayfun?)
 chRm = cellfun(@gather,chRm,"UniformOutput",false);
 x=gather(x); tol=gather(tol);
 if isempty(chEig)
+    warning("[ec_preprocICA] Running CPU fallback for rank computation");
     chEig = arrayfun(@(rm) ec_rank(x(:,rm{:}),tol,eig=true),chRm,'UniformOutput',false);
 end
 
 % Finalize permutations
 chEig = gather(cellfun(@(e) min(e)-tol,chEig)); % get minimum eigenvalue
 chEigN = nnz(chEig>0);
-disp("[prepICA] Full-rank channel permutations: "+chEigN+"/"+nChs);
+disp("[ec_preprocICA] Full-rank channel permutations: "+chEigN+"/"+nChs);
 
 % If currently rank-deficient, try using permuted chans as ICA chans
 if ~fin && chRank<numel(chICA) && o.ica_pca<=0
@@ -248,7 +250,7 @@ if ~fin && chRank<numel(chICA) && o.ica_pca<=0
         if chRank <= chEigN
             chICA = find(chEig>0);
             chICAbad = intersect(chICA,chBad);
-            disp("[prepICA] SUCCESS - permuted chans ok for ICA:");
+            disp("[ec_preprocICA] SUCCESS - permuted chans ok for ICA:");
             disp("keptChans="+numel(chICA)+" | rank="+chRank+" | excluded=");
             disp(find(chEig<=0)');
             fin = 1;
@@ -258,7 +260,7 @@ end
 
 % Exclude low-eigenvalue/high-correlation chans if still rank-deficient
 if ~fin && chRank<numel(chICA)
-    disp("[prepICA] Permuted chans still rank-deficient, performing Eig-Corr exclusions...");
+    disp("[ec_preprocICA] Permuted chans still rank-deficient, performing Eig-Corr exclusions...");
     xCorrs = abs(corr(x)); xCorrs(xCorrs==1)=nan; [~,xCorrs]=max(xCorrs);
 
     while chRank<numel(chICA) && numel(chICAbad)>0
@@ -276,7 +278,7 @@ if ~fin && chRank<numel(chICA)
             chRank = ec_rank(x(:,chICA),exact=1);
         end
         if chRank>=numel(chICA); fin = 1; end
-        disp("[prepICA] Eig-Corr exclusion: keptChans="+numel(chICA)+" | rank="+chRank+" | excluded=");
+        disp("[ec_preprocICA] Eig-Corr exclusion: keptChans="+numel(chICA)+" | rank="+chRank+" | excluded=");
         disp([chRm; xCorrs(chRm)]');
     end
 end
@@ -286,12 +288,12 @@ if o.ica_pca>=0 && (chRank<numel(chICA) || numel(chICA)<floor(chRankOg*.95))
     chICA = chICAog;
     chRank = ec_rank(x(:,chICA),exact=1);
     o.ica_pca = chRank;
-    warning("[prepICA] Using PCA as last resort for rank-deficiency: o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
+    warning("[ec_preprocICA] Using PCA as last resort for rank-deficiency: o.ica_pca="+o.ica_pca+" for "+chNfo.sbj(1));
     errors{end+1,1} = lastwarn;
 else
     o.ica_pca = 0;
 end
-disp("[prepICA] Finalized ICA channels "+chNfo.sbj(1)+":");
+disp("[ec_preprocICA] Finalized ICA channels "+chNfo.sbj(1)+":");
 disp("keptChans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca);
 
 
@@ -300,7 +302,7 @@ disp("keptChans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca);
 ol_Q = gather(ol_Q)';
 ol_idx = sparse(logical(gather(ol_idx)))';
 ol_pct = 100-gather(ol_pct);
-disp("[prepICA] "+chNfo.sbj(1)+": pctExcludedOutlierFrames="+ol_pct);
+disp("[ec_preprocICA] "+chNfo.sbj(1)+": pctExcludedOutlierFrames="+ol_pct);
 
 
 %% Copy to permanent tables
@@ -319,7 +321,8 @@ chNfo.("ica"+sfx1)(:) = false;
 chNfo.("ica"+sfx1)(chICA) = true;
 ch_bad.("ica"+sfx1) = sparse(~chNfo.("ica"+sfx1));
 chNfo.bad = ch_bad;
-disp("[prepICA] Finished prep - "+chNfo.sbj(1)+":");
+n.chBad = ch_bad;
+disp("[ec_preprocICA] Finished prep - "+chNfo.sbj(1)+":");
 disp("keptChans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca+" | time="+...
     toc(tt)/60+"min");
 
@@ -406,20 +409,20 @@ xa = load_iEEG_LBCN(n.sbj,n.task,n.blocks,n.dirs);
 xa = (n.icW * xa(:,n.chICA)')';
 
 % Run classifier
-[chClass,n.icNfo.dist] = ec_classifyBadChs(xa,n.icNfo.MNI);
-icBad.ai = chClass.bad;
+[icClass,n.icDist] = ec_classifyBadChs(xa,n.icNfo.MNI);
+icBad.ai = icClass.bad;
 
 % Hurst exponent
-chHrst = abs(chClass.hurs - 0.5);
-[~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(~chClass.bad),...
+chHrst = abs(icClass.hurs - 0.5);
+[~,chHrst_lo,chHrst_hi] = isoutlier(chHrst(~icClass.bad),...
     "median","ThresholdFactor",o.thrHurst);
 icBad.hurstL = chHrst < chHrst_lo;
 icBad.hurstH = chHrst > chHrst_hi;
 
 % Copy
-chClass.Properties.VariableNames(2:end) =...
-    string(chClass.Properties.VariableNames(2:end))+"P";
-icBad(:,chClass.Properties.VariableNames(2:end)) = chClass(:,2:end);
+icClass.Properties.VariableNames(2:end) =...
+    string(icClass.Properties.VariableNames(2:end))+"P";
+icBad(:,icClass.Properties.VariableNames(2:end)) = icClass(:,2:end);
 n.icBad = icBad;
 
 disp("Bad ICs classifier: "); disp(icBad.ic(icBad.ai)'); toc(tt);

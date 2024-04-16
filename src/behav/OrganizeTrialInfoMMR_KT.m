@@ -1,14 +1,14 @@
-function OrganizeTrialInfoMMR_KT(sbj, proj, runs, dirs)
+function OrganizeTrialInfoMMR_KT(sbj,task, runs, dirs)
 
 for i1 = 1:length(runs)
     bn = runs{i1};
     
-    %% Load globalVar
-    load(sprintf('%s/orig/%s/global_%s_%s_%s.mat',dirs.data,sbj,proj,sbj,bn));
+
     
     % Load behavioral file
-    soda_name = dir(fullfile(globalVar.psych, 'sodata*.mat'));
-    K = load([globalVar.psych '/' soda_name.name]); % block 55 %% FIND FILE IN THE FOLDER AUTO
+    fn = fullfile(dirs.origSbj,bn,'sodata*.mat');
+    fn = dir(fn);
+    K = load(fullfile(fn.folder,fn.name)); % block 55 %% FIND FILE IN THE FOLDER AUTO
     
     
     for ii = 1:length(K.theData)
@@ -160,13 +160,13 @@ for i1 = 1:length(runs)
     trialinfo = trialinfoNew;
     
     %% Exceptions
-    if strcmp(sbj, 'S12_32_JTb') && strcmp(proj, 'MMR') && strcmp(bn, 'JT0112-45')
+    if strcmp(sbj, 'S12_32_JTb') && strcmp(task, 'MMR') && strcmp(bn, 'JT0112-45')
         trialinfo = trialinfo(2:end,:);
     else
     end
     
     % Save
-    save([globalVar.psych '/trialinfo_', bn '.mat'], 'trialinfo');
+    save(fullfile(dirs.origSbj,bn,['trialinfo_' bn '.mat']), 'trialinfo');
 end
 
 end

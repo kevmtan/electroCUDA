@@ -7,7 +7,8 @@ arguments
     x {mustBeFloat}
     b {isfloat,isa(b,"digitalFilter")}
     o.single (1,1) logical = false
-    o.gpu (1,1) logical = false
+    o.gpu (1,1) string {mustBeMember(o.gpu,["no" "matlab" "cuda"])} = "no"
+    o.mem double = []
 end
 
 %% Prep
@@ -26,7 +27,7 @@ if ~isa(b,"digitalFilter")
 end
 
 %% Run compiled CUDA binary
-if o.gpu && ~isgpuarray(x)
+if o.gpu=="cuda"
     try
         if isa(x,"single")
             x = ec_filtfilt1_fp32(x,b,a,z,nf,L);
@@ -35,17 +36,15 @@ if o.gpu && ~isgpuarray(x)
         end
         fin = 1;
     catch ME; getReport(ME)
-        reset(gpuDevice());
     end
 end
 
 %% Run as gpuArrayFun
-if ~fin && o.gpu
+if ~fin && o.gpu~="no"
     try
         x = gpuArrayFun_lfn(x,b,a,z,nf,L);
         fin = 1;
     catch ME; getReport(ME)
-        reset(gpuDevice());
     end
 end
 
@@ -54,9 +53,8 @@ if ~fin
     if isa(b,"digitalFilter")
         x = filtfilt(b,x);
     else
-        try parpool('threads'); catch;end
         parfor ch = 1:width(x)
-            x(:,ch) = ec_filtfilt1(x(:,ch),b,a,z,nf,L);
+            x(:,ch) = ec_filtfilt_fp(x(:,ch),b,a,z,nf,L);
         end
     end
 end
@@ -212,28 +210,18 @@ end
 
 %% filtfilt_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function x = gpuArrayFun_lfn(x,b,a,z,nf,L)
-nChs = width(x);
 x = num2cell(x,1);
 
-% Calculate number of chans that can fit VRAM
-memMax=gpuDevice().AvailableMemory; memIn=(whos("x").bytes/nChs)*1.5;
-memChs=floor(memMax/memIn); memItr=ceil(nChs/memChs); memChs=ceil(nChs/memItr);
-disp("[ec_filtfilt] gpuArrayFun start: memChs="+memChs+"/"+nChs+" time="+toc);
-
 % Transfer to GPU
+x = cellfun(@gpuArray,x,UniformOutput=false);
 b=gpuArray(b); a=gpuArray(a); z=gpuArray(z); nf=gpuArray(nf); L=gpuArray(L);
-chFin=gpuArray(false(nChs,1)); memChs=gpuArray(memChs); memItr=gpuArray(memItr);
-for v = 1:memItr
-    idx = find(~chFin,memChs);
-    x(idx) = arrayfun(@(xx) gpuArray(xx{:}), x(idx),UniformOutput=false);
-    x(idx) = arrayfun(@(xx) ec_filtfilt1(xx{:},b,a,z,nf,L), x(idx),UniformOutput=false);
-    x(idx) = cellfun(@gather, x(idx),UniformOutput=false);
-    chFin(idx) = true;
-    %disp("Wavelet transformed (GPUarray): "+sbj+" "+run+" "+idx(end)+"/"+nChs+" time="+toc);
-end
+
+% Run
+x = arrayfun(@(xx) ec_filtfilt_fp(xx{:},b,a,z,nf,L), x,UniformOutput=false);
+
+% Finalize
 x = cellfun(@gather,x,UniformOutput=false);
 x = horzcat(x{:});
-disp("[ec_filtfilt] gpuArrayFun finished: time="+toc);
 
 %% Depreciated
 % function [b,a,z,nfact,L] = getInit_lfn(b,a,nFrames)

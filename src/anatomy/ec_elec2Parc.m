@@ -46,17 +46,16 @@
 % MODIFIED: fix issues with sEEG, code optimizations for speed --Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
 
 
-function [elecParc,atlasNfo]=ec_elec2Parc(subj,atlas,out2text)
-
-if nargin<2
-    atlas = 'DK';
+function [elecParc,atlasNfo] = ec_elec2Parc(subj,atlas,fsDir,out2text)
+arguments
+    subj string
+    atlas string {mustBeMember(atlas,["DK" "D" "Y7" "HCP" "Y17"])}
+    fsDir char
+    out2text logical = false
 end
 
-if nargin<3
-    out2text = 'n';
-end
-
-fsDir = getFsurfSubDir();
+subj = char(subj);
+atlas = char(atlas);
 
 % Folder with surface files
 surfaceFolder = fullfile(fsDir,subj,'surf');
@@ -95,12 +94,10 @@ end
 mri = MRIread(mriFname);
 %mri.vol is ILA (i.e., S->I, R->L, P->A)
 sVol = size(mri.vol);
-clear mri mriFname
 
 % Import electrode labels
 labelFname = fullfile(fsDir,subj,'elec_recon',sprintf('%s.electrodeNames',subj));
 elecLabels = csv2Cell(labelFname,' ',2);
-
 
 %hem = [];
 atlasNfo = table;
@@ -219,7 +216,7 @@ for hemI = 1:2
 end
 %elecParc(cellfun(@isempty,elecParc)) = {''};
 
-if universalYes(out2text)
+if out2text
     txt_fname=fullfile(fsDir,subj,'elec_recon',[subj '_' upper(atlas) '_AtlasLabels.tsv']);
     fprintf('Outputing electrode anatomical locations to %s\n',txt_fname);
     fid=fopen(txt_fname,'w');
@@ -228,4 +225,7 @@ if universalYes(out2text)
     end
     fclose(fid);
 end
+
+elecParc = string(elecParc);
+atlasNfo.name = string(atlasNfo.name);
 end

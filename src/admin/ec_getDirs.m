@@ -1,17 +1,17 @@
-function dirs = ec_getDirs(proj,sbj,task,sbjID)
+function dirs = ec_getDirs(proj,task,sbj,sbjID)
 % You must edit 'ecu_paths' to match the directorieson your system
 %% Input validation
 arguments
-    proj {istext,isstruct} = "lbcn"
+    proj string = ""
+    task string = ""
     sbj {istext,isnumeric} = []
-    task string = "MMR";
     sbjID uint16 = []
 end
 
 if isempty(sbjID) && ~isempty(sbj)
     if isnumeric(sbj)
         sbjID = sbj;
-    else
+    elseif proj=="lbcn"
         sbjID = str2double(extractBetween(sbj,"_","_"));
     end
 end
@@ -19,26 +19,21 @@ end
 %% Organize dirs
 
 % Project-specific
-if isstruct(proj)
-    dirs = proj;
-else
-    dirs = ecu_paths(proj);
-    dirs.src = dirs.code+"src"+filesep;
-    dirs.srcCUDA = dirs.src+"cuda"+filesep;
-    dirs.orig = dirs.data+"orig"+filesep;
-    dirs.psych = dirs.orig;
-    dirs.proc = dirs.data+"proc"+filesep;
-    dirs.anal = dirs.data+"anal"+filesep;
-    dirs.fsaverage = dirs.freesurfer+"fsaverage"+filesep;
-end
+dirs = ecu_paths(proj);
+dirs.src = dirs.code+"src"+filesep;
+dirs.srcCUDA = dirs.src+"cuda"+filesep;
+dirs.orig = dirs.data+"orig"+filesep;
+dirs.psych = dirs.orig;
+dirs.proc = dirs.data+"proc"+filesep;
+dirs.anal = dirs.data+"anal"+filesep;
+dirs.fsaverage = dirs.freesurfer+"fsaverage"+filesep;
 
 % Subject-specific
-if ~isempty(sbj)
-    dirs.sbj = sbj;
-    dirs.sbjID = sbjID;
-    dirs.task = task;
-    dirs.psychSbj = dirs.psych+sbj+filesep;
-    dirs.origSbj = dirs.orig+sbj+filesep;
-    dirs.procSbj = dirs.proc+"s"+sbjID+filesep+task+filesep;
-    dirs.fsSbj = dirs.freesurfer+sbj+filesep;
-end
+if ~isany(sbj); return; end
+dirs.sbj = string(sbj);
+dirs.sbjID = sbjID;
+dirs.task = task;
+dirs.psychSbj = dirs.psych+sbj+filesep;
+dirs.origSbj = dirs.orig+sbj+filesep;
+dirs.procSbj = dirs.proc+"s"+sbjID+filesep+task+filesep;
+dirs.fsSbj = dirs.freesurfer+sbj+filesep;

@@ -15,32 +15,33 @@ trainBase = load('ImaGIN_trainBaseFeatures_ec.mat');
     = ec_trainClassifier_ImaGIN(trainBase.predictors,trainBase.response);
 
 % Save results
-save(saveDirClassifier+"ec_trainedClassifier_ImaGIN.mat",'mdl','-v7');
+v = matlabRelease;
+save(saveDirClassifier+"ec_trainedClassifier_ImaGIN_"+v.Release+".mat",'mdl','-v7');
 
 
-%% VLFeat
-reset(gpuDevice());
-clear all; close all; %#ok<*CLALL>
-vl_setup('verbose');
-
-
-%% MatConvNet
-% change paths for 'cudaRoot' and 'cudnnRoot' for your machine
-clear all; close all;
-d = ec_getDirs;
-cd(d.code+"bin");
-reset(gpuDevice());
-%gpuNfo = gpuDevice();
-
-% CUDA root dir
-cudaRoot = '/usr/local/cuda/';
-
-% cuDNN root dir (CUDA deep learning)
-cudnnRoot = '/usr/local/cuda-12.0/targets/x86_64-linux/';
-
-ec_vl_compilenn('enableGpu',true,'enableDouble',true,'verbose',true,...
-    'cudaMethod','nvcc','enableCudnn',true,...
-    'cudaRoot',cudaRoot,'cudnnRoot',cudnnRoot);
+%% VLFeat (use Matlab package manager: Add-Ons)
+% reset(gpuDevice());
+% clear all; close all; %#ok<*CLALL>
+% vl_setup('verbose');
+% 
+% 
+%% MatConvNet (use Matlab package manager: Add-Ons)
+% % change paths for 'cudaRoot' and 'cudnnRoot' for your machine
+% clear all; close all;
+% d = ec_getDirs;
+% cd(d.code+"bin");
+% reset(gpuDevice());
+% %gpuNfo = gpuDevice();
+% 
+% % CUDA root dir
+% cudaRoot = '/usr/local/cuda/';
+% 
+% % cuDNN root dir (CUDA deep learning)
+% cudnnRoot = '/usr/local/cuda-12.0/targets/x86_64-linux/';
+% 
+% ec_vl_compilenn('enableGpu',true,'enableDouble',true,'verbose',true,...
+%     'cudaMethod','nvcc','enableCudnn',true,...
+%     'cudaRoot',cudaRoot,'cudnnRoot',cudnnRoot);
 
 
 %% ec_wtc_fp: wavelet coherence (single- & double-precision)

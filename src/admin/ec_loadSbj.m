@@ -1,70 +1,86 @@
 function varargout = ec_loadSbj(dirs,a)
-% Input validation
+%% Load electroCUDA subject data
+% Output variables follow the same order as user input in "vars" argument
+
+%% Input validation
 arguments
     dirs {isempty,isstruct} = []
-    a.sfx string = ""   
-    a.vars {mustBeMember(a.vars,["n" "x" "psy" "trialNfo" "chNfo"])} = ["n" "x" "psy" "trialNfo" "chNfo"]
-    a.fs (1,1) double = 0
     a.sbj {istext,isnumeric} = []
-    a.proj string = ""
-    a.task string = ""
+    a.proj (1,1) string = ""
+    a.task (1,1) string = ""
+    a.sfx (1,1) string = ""
+    a.hz (1,1) double = 0
+    a.vars string...
+        {mustBeMember(a.vars,["n" "x" "psy" "trialNfo" "chNfo" "dirs"])} = "dirs"
 end
-if ~isstruct(dirs); dirs = ec_getDirs(a.proj,a.sbj,a.task); end
+
+% Directories
+if ~isstruct(dirs); dirs = ec_getDirs(a.proj,a.task,a.sbj); end
 sbjID = dirs.sbjID;
 task = dirs.task;
 if isnumeric(sbjID); sbjID = "s"+sbjID; end
 if ~startsWith(sbjID,"s"); sbjID = "s"+sbjID; end
 
 %% Load
-ii = 0;
 nOut = nargout;
+varargout = cell(1,nOut);
 
-% Metadata "n" struct
-fpath = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
-if any(a.vars=="n") || ~a.fs && any(ismember(a.vars,["psy" "trialNfo"]))
-    load(fpath,"n"); disp("[ec_loadSbj] Loaded: "+fpath); % Load
-    if ~a.fs; a.fs=n.fs; end % Check sampling rate
-    if any(a.vars=="n")
-        ii = ii+1;
-        varargout{ii} = n;
+% Check sampling rate
+if ~a.hz && any(ismember(a.vars,["n" "psy" "trialNfo"]))
+    fpath = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
+    load(fpath,"n"); disp("[ec_loadSbj] Check sampling rate: "+fpath); % Load
+    if ~a.hz; a.hz=n.hz; end
+end
+if a.hz==1000; a.hz=""; else; a.hz=string(a.hz); end % Default sampling rate not appended
+
+
+% Loop through requested vars
+for v = 1:numel(a.vars)
+    vv = a.vars(v); % Variable name
+
+    % Metadata "n" struct
+    if vv=="n" && v<nOut
+        fpath = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
+        disp("[ec_loadSbj] Loaded: "+fpath); % Load
+        varargout{v} = n;
+    end
+
+    % EEG data for a.sfx
+    if vv=="x" && v<nOut
+        fpath = dirs.procSbj+"x"+a.sfx+"_"+sbjID+"_"+task;
+        load(fpath,"x"); disp("[ec_loadSbj] Loaded: "+fpath);
+        varargout{v} = x;
+    end
+
+    % Behavioral task data aligned to EEG recordings
+    if vv=="psy" && v<nOut
+        fpath = dirs.procSbj+"psy"+a.hz+"_"+sbjID+"_"+task;
+        load(fpath,"psy");  disp("[ec_loadSbj] Loaded: "+fpath);
+        varargout{v} = psy;
+    end
+
+    % Trial information
+    if vv=="trialNfo" && v<nOut
+        fpath = dirs.procSbj+"trialNfo"+a.hz+"_"+sbjID+"_"+task;
+        load(fpath,"trialNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
+        varargout{v} = trialNfo;
+    end
+
+    % Channel information
+    if vv=="chNfo" && v<nOut
+        fpath = dirs.procSbj+"chNfo_"+sbjID+"_"+task;
+        load(fpath,"chNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
+        varargout{v} = chNfo;
+    end
+
+    % Dirs
+    if vv=="dirs" && v<nOut
+        varargout{v} = dirs;
     end
 end
-if a.fs==1000; a.fs=""; else; a.fs=string(a.fs); end % Default sampling rate not appended in filename
 
-% EEG data for a.sfx
-if any(a.vars=="x") && ii<nOut
-    fpath = dirs.procSbj+"x"+a.sfx+"_"+sbjID+"_"+task;
-    load(fpath,"x"); disp("[ec_loadSbj] Loaded: "+fpath);
-    ii = ii+1;
-    varargout{ii} = x;
-end
-
-% Behavioral task data aligned to EEG recordings
-if any(a.vars=="psy") && ii<nOut
-    fpath = dirs.procSbj+"psy"+a.fs+"_"+sbjID+"_"+task;
-    load(fpath,"psy");  disp("[ec_loadSbj] Loaded: "+fpath);
-    ii = ii+1;
-    varargout{ii} = psy;
-end
-
-% Trial information
-if any(a.vars=="trialNfo") && ii<nOut
-    fpath = dirs.procSbj+"trialNfo"+a.fs+"_"+sbjID+"_"+task;
-    load(fpath,"trialNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
-    ii = ii+1;
-    varargout{ii} = trialNfo;
-end
-
-% Channel information
-if any(a.vars=="chNfo") && ii<nOut
-    fpath = dirs.procSbj+"chNfo_"+sbjID+"_"+task;
-    load(fpath,"chNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
-    ii = ii+1;
-    varargout{ii} = chNfo;
-end
-
-% Dirs
-if ii < nOut
-    ii = ii+1;
-    varargout{ii} = dirs;
+% Dirs if extra output
+if v<nOut
+    v = v+1;
+    varargout{v} = dirs;
 end

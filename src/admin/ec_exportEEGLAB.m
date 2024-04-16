@@ -20,7 +20,7 @@ EEG.filename = char("EEG"+sfx+"_"+EEG.setname+".set");
 EEG.filepath = char(n.dirs.procSbj);
 EEG.pnts = height(x);
 EEG.nbchan = width(x);
-EEG.srate = n.fs;
+EEG.srate = n.hz;
 EEG.times = round(psy.time*1000)';
 EEG.trials = 1; % 1 for continuous
 EEG.history = {};
@@ -114,10 +114,10 @@ EEG.etc = struct;
 EEG.saved = 'no';
 
 %% Check dataset
-try eegChanges = ["","",""];
-    [EEG,eegChanges(1)] = eeg_checkset(EEG); 
-    [EEG,eegChanges(2)] = eeg_checkset(EEG,'eventconsistency');
-    [EEG,eegChanges(3)] = eeg_checkset(EEG,'chanlocs_homogeneous');
+try
+    [EEG,eegChanges] = eeg_checkset(EEG); 
+    %[EEG,eegChanges(2)] = eeg_checkset(EEG,'eventconsistency');
+    %[EEG,eegChanges(3)] = eeg_checkset(EEG,'chanlocs_homogeneous');
     disp(eegChanges);
 catch ME; warning("Error in eeg_checkset, skipping..."); getReport(ME)
 end

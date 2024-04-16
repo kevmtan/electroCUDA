@@ -14,7 +14,8 @@ nn = min(arg.nn,nChs);
 pos(isnan(pos)) = 0;
 
 if isempty(mdl)
-    load('ec_trainedClassifier_ImaGIN.mat','mdl');
+    v = matlabRelease;
+    load("ec_trainedClassifier_ImaGIN_"+v.Release+".mat","mdl");
 end
 
 %% Classify bad channels

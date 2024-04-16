@@ -44,15 +44,10 @@ arguments
     a.redoN logical = false
 end
 dirs = a.dirs;
-% n=[]; x=[]; o=os; a.ica=0; a.save=0; a.test=1;
+% n=[]; x=[]; a.ica=0; a.save=0; a.test=1;
 
 
 %% Options validation
-if sbj==""; sbj = o.sbj; end
-if task==""; task = o.task; end
-if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
-
-% Options struct
 if ~isfield(o,'wavelet');     o.wavelet="Morse"; end  % Name of frequency analysis
 if ~isfield(o,'fName');       o.fName="spec"; end     % Name of frequency analysis
 if ~isfield(o,'fLims');       o.fLims=[1 300]; end    % Frequency limits in hz; HFB=[70 200]
@@ -64,6 +59,7 @@ if ~isfield(o,'gpu');         o.gpu="no"; end         % Run on... ["no"|"matlab"
 
 % Consistency
 if o.single; o.singleOut = false; end
+if a.ica && o.suffix==""; o.suffix="i"; end
 
 
 %% Setup & initialize
@@ -71,8 +67,8 @@ tt=tic; errors={};
 
 % Load EEG data
 if isempty(x) || a.test
-    if a.ica && o.suffix==""; o.suffix="i"; end
-    [n,x,~,~,chNfo] = ec_loadSbj(dirs,o.suffix);
+    [n,x,chNfo,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.suffix,...
+        vars=["n" "x" "chNfo"]);
 end
 % if a.test; xOg=x; chNfoOg=chNfo; end %#ok<NASGU>
 

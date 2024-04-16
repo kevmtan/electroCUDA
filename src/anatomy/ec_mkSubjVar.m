@@ -3,7 +3,6 @@ if 0
     %% TEST
     sbj = 'S13_54_KDH'; %#ok<UNRCH>
     [~,~,datFormat] = GetFSdataFormat(sbj,'Stanford');
-    [dirServer,dirComp,dirCode,dirFS] = AddPaths('Kevin_DMN');
     dirs = ec_getDirs('MMR',sbj,dirServer,dirComp,dirCode,dirFS);
     isRedo = false;
 else % CHECK INPUTS
@@ -24,20 +23,20 @@ gvDir(gvDir.isdir|~startsWith(gvDir.name,'global'),:) = [];
 load([gvDir.folder{1} filesep gvDir.name{1}],'globalVar');
 
 % sub2AvgBrain config
-cfg.fsDir = dirs.fsDir_local;
+cfg.fsDir = dirs.freesurfer;
 cfg.plotEm = 0;
 cfg.outputTextfile = false;
 
 % Initialize variables
 subjVar = struct;
 elinfo = table;
-global globalFsDir; %#ok<GVMIS>
-globalFsDir = dirs.fsDir_local;
+% global globalFsDir; %#ok<GVMIS>
+% globalFsDir = dirs.fsDir_local;
 
 %% Transform native to average elec coords
 
 % Proximal tissue density
-ptd = getPtdIndex_KT(sbj);
+ptd = ec_getPtdIndex(sbj);
 elinfo.ch(1:height(ptd)) = uint16(0);
 elinfo.fsLabel = extractBefore(ptd.elec,"_");
 elinfo.hem = extractAfter(extractAfter(ptd.elec,"_"),"_");
@@ -51,12 +50,12 @@ elinfo.WMvox = ptd.WMvox;
 % Pial
 cfg.isInf = false;
 [~,~,elinfo.ECoG,elinfo.MNI,elinfo.pialRAS,elinfo.pialAvgVrt,elinfo.pialVrt]=...
-    sub2AvgBrain_KT(sbj,cfg);
+    ec_sub2AvgBrain(sbj,cfg);
 
 % Inflated
 cfg.isInf = true;
 [~,~,~,elinfo.INF,elinfo.infRAS,elinfo.infAvgVrt,elinfo.infVrt]=...
-    sub2AvgBrain_KT(sbj,cfg);
+    ec_sub2AvgBrain(sbj,cfg);
 
 % Setup
 elinfo.fsLabel = string(elinfo.fsLabel);
@@ -65,83 +64,6 @@ elinfo.ECoG = logical(elinfo.ECoG);
 fsChs = elinfo.fsLabel;
 nChFS = height(elinfo);
 
-%% Map electrode to brain atlases
-[DOCID,GID] = getGoogleSheetInfo('chan_names_ppt', 'chan_names_ppt_log');
-gSheet = GetGoogleSpreadsheet(DOCID, GID);
-gSheet.DK_index = uint8(str2double(gSheet.DK_index));
-gSheet.DK_short = string(gSheet.DK_short);
-gSheet.DK_lobe = string(gSheet.DK_lobe);
-gSheet.D_index = uint8(str2double(gSheet.D_index));
-gSheet.D_short = string(gSheet.D_short);
-gSheet.D_long = string(gSheet.D_long);
-gSheet.Yeo7_index = uint8(str2double(gSheet.Yeo7_index));
-gSheet.Yeo17_index = uint8(str2double(gSheet.Yeo17_index));
-
-% Desikan_Killian
-elecParc = string(ec_elec2Parc(sbj,'DK',0));
-if all(elecParc(:,1)==elinfo.fsLabel)
-    elinfo.Desikan_Killiany = elecParc(:,2);
-    for i = 1:36
-        idx = elinfo.Desikan_Killiany==gSheet.DK_short(i);
-        elinfo.DK(idx) = gSheet.DK_index(i);
-        elinfo.lobe(idx) = gSheet.DK_lobe(i);
-    end
-else; warning("DK error for "+sbj);
-end
-
-% Destrieux
-elecParc = string(ec_elec2ParcT(sbj,'D',0));
-if all(elecParc(:,1)==elinfo.fsLabel)
-    elinfo.destrieux = elecParc(:,2);
-    for i = 1:75
-        idx = elinfo.destrieux==gSheet.D_short(i);
-        elinfo.Destr(idx) = gSheet.D_index(i);
-        elinfo.DestrL(idx) = gSheet.D_long(i);
-    end
-else; warning("Destrieux error for "+sbj);
-end
-
-% Yeo7
-if isRedo; createIndivYeoMapping(sbj); end
-elecParc = string(ec_elec2ParcT(sbj,'Y7',0));
-if all(elecParc(:,1)==elinfo.fsLabel)
-    elinfo.Yeo7 = elecParc(:,2);
-    for i = 1:19
-        idx = elinfo.Yeo7==gSheet.Yeo7_labels(i);
-        elinfo.Yeo7i(idx) = gSheet.Yeo7_index(i);
-    end
-else; warning("Yeo7 error for "+sbj);
-end
-
-% Yeo17
-elecParc = string(ec_elec2ParcT(sbj,'Y17',0));
-elecParc = string(elecParc);
-if all(elecParc(:,1)==elinfo.fsLabel)
-    elinfo.Yeo17 = elecParc(:,2);
-    for i = 1:19
-        idx = elinfo.Yeo17==gSheet.Yeo17_labels(i);
-        elinfo.Yeo17i(idx) = gSheet.Yeo17_index(i);
-    end
-else; warning("Yeo17 error for "+sbj);
-end
-
-% HCP
-if isRedo; createIndivHCPMapping(sbj); end
-[elecParc,HCP] = ec_elec2ParcT(sbj,'HCP',0);
-elecParc = string(elecParc);
-if all(elecParc(:,1)==elinfo.fsLabel)
-    elinfo.HCP = elecParc(:,2);
-    elinfo.hcpRGB(:,3) = uint8(0);
-    HCP.name = string(HCP.name);
-    HCP.RGB = uint8(HCP.RGB);
-    for i = 1:height(HCP)
-        idx = elinfo.HCP==HCP.name(i);
-        if ~nnz(idx); continue; end
-        elinfo(idx,'hcpRGB') = HCP(i,'RGB');
-    end
-    elinfo.HCP = strrep(elinfo.HCP,"_ROI","");
-else; warning("HCP-MMP error for "+sbj);
-end
 
 %% Correct channel name
 
@@ -154,6 +76,10 @@ end
 gSheet = GetGoogleSpreadsheet(DOCID, GID);
 if strcmp(sbj,'S14_78_RS')
     pptChs = gSheet.('S14_78_RSa');
+elseif strcmp(sbj,'S12_41_KS')
+    pptChs = readtable("s41.csv",ReadVariableNames=false);
+elseif strcmp(sbj,'S16_95_JOB')
+    pptChs = readtable("s95.csv",ReadVariableNames=false);
 else
     pptChs = gSheet.(sbj);
 end

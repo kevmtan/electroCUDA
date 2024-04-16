@@ -32,6 +32,9 @@ chNfo{idx, vars} = nan;
 vars = ["MNI" "pialRAS" "INF" "infRAS"];
 chNfo{idx, vars} = nan(size(chNfo{idx,vars}));
 
+%%
+
+
 %% Location info
 
 % Channels with no hemisphere label

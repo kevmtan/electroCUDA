@@ -1,62 +1,73 @@
-function [errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,task,o,n,arg)
+function [errors,o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,n,a)
 % Check inputs
 arguments
-    sbj
-    task {mustBeText} = 'MMR'
+    sbj string
+    proj string
+    task string
     o struct = struct
     n struct = []
-    arg.dsTarg {isnumeric} = [] % Downsampling target freq
-    arg.ica logical = false 
-    arg.save logical = false
-    arg.redo logical = false
-    arg.redoN logical = false
-    arg.redoCh logical = false
-    arg.redoTr logical = false
-    arg.redoPsy logical = false
-    arg.dirs struct = []
-    arg.blocks {mustBeText} = BlockBySubj(sbj,task)
+    a.dsTarg double = [] % Downsampling target freq
+    a.ica logical = false 
+    a.save logical = false
+    a.redo logical = false
+    a.redoN logical = false
+    a.redoCh logical = false
+    a.redoTr logical = false
+    a.redoPsy logical = false
+    a.dirs struct = []
+    a.blocks string = BlockBySubj(sbj,task)
 end
-dirs=arg.dirs; blocks=arg.blocks; dsTarg=arg.dsTarg;
-if ~isstruct(dirs)||isempty(dirs); dirs=ec_getDirs(dirs,sbj,task); end
+dirs=a.dirs; blocks=a.blocks; dsTarg=a.dsTarg;
+if ~isstruct(dirs)||isempty(dirs); dirs = ec_getDirs(proj,task,sbj); end
 if isempty(blocks); blocks=BlockBySubj(sbj,task); end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending string
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
+blocks = string(blocks);
 errors={};
 % arg.save=0; arg.redoCh=0; arg.redoTr=0; arg.redoPsy=1;
 
 %% Initialize info struct
 fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr;
-if ~arg.ica || o.suffix=="i"
+if ~a.ica || o.suffix=="i"
     fn_base = o.dirOut+"n_"+o.fnStr;
-elseif arg.ica || startsWith(o.suffix,"i")
+elseif a.ica || startsWith(o.suffix,"i")
     fn_base = o.dirOut+"ni_"+o.fnStr;
 end
-if isempty(n) || arg.redo || arg.redoN
-    if isfile(fn) && ~arg.redo && ~arg.redoN
+if isempty(n) || a.redo || a.redoN
+    if isfile(fn) && ~a.redo && ~a.redoN
         load(fn,"n");
-    elseif isfile(fn_base) && ~arg.redo
+    elseif isfile(fn_base) && ~a.redo
         load(fn_base,"n");
-    elseif ~isfile(fn_base) || arg.redo
-        load(dirs.origSbj+"subjVar_"+sbj+".mat","subjVar");
-        fs = floor(subjVar.iEEG_rate);
+    elseif ~isfile(fn_base) || a.redo
+        % Load sbjNfo
+        fn = dirs.origSbj+"sbjNfo_s"+dirs.sbjID+"_"+task+".mat";
+        load(fn,"sbjNfo"); disp("LOADED: "+fn)
 
         n = struct; 
         n.sbj = sbj;
-        n.sbjID = uint16(str2double(extractBetween(sbj,"_","_")));
+        n.sbjID = dirs.sbjID;
+        n.proj = proj;
         n.task = task;
         n.suffix = o.suffix;
         n.fnStr = o.fnStr;
-        n.ICA = arg.ica;
-        n.fs = fs;
-        n.fs_orig = fs;
-        n.fs_Pdio = subjVar.Pdio_rate;
-        n.nChs = subjVar.nchan;
+        n.ICA = a.ica;
+        n.nChs = sbjNfo.nCh;
+        n.nBlocks = numel(blocks);
+        n.blocks = blocks;
+        n.hz = sbjNfo.hz;
+        n.hz_og = sbjNfo.hz;
+        n.hz_Pdio = sbjNfo.hz_Pdio;
+        n.nChPPT = sbjNfo.nChPPT;
+        n.nChFS = sbjNfo.nChFS;
+        n.fsNfo = sbjNfo.fsNfo;
+        n.sbjNfo = sbjNfo.demographics;
+        n.dirs = dirs;
     end
 end
 
 % Make sure ICA status
-if arg.ica || contains(o.suffix,"i")
+if a.ica || contains(o.suffix,"i")
     n.ICA = true;
 else
     n.ICA = false;
@@ -65,61 +76,59 @@ end
 % Add file strings
 n.fnStr = o.fnStr;
 n.suffix = o.suffix;
-fs = n.fs;
+hz = n.hz;
 
 % Figure out downsampling factor
-if dsTarg>0; ds=floor(n.fs_orig/dsTarg); else; ds=1; end
-if ds~=1; fs=dsTarg; disp(sbj+": downsampling task events...");
+if dsTarg>0; ds=floor(n.hz_og/dsTarg); else; ds=1; end
+if ds~=1; hz=dsTarg; disp(sbj+": downsampling task events...");
 else; dsTarg=0; disp(sbj+": dsT <= 1, not downsampling..."); end
-if fs==n.fs_orig; fs_s=""; else; fs_s=num2str(fs); end
+if hz==n.hz_og; hz_s=""; else; hz_s=num2str(hz); end
 
 %% chNfo
 fn = o.dirOut+"chNfo_"+o.fnStr;
-if ~isfile(fn) || arg.redoCh || arg.redo
-    load(dirs.origSbj+"chNfo_"+sbj+".mat","chNfo");
-    load(dirs.origSbj+"subjVar_"+sbj+".mat","subjVar");
-    ch_bad = chNfo(:,1:2);
-    ch_bad.bad(:) = false;
-    ch_bad.gv(abs(subjVar.badChan)) = true;
-    ch_bad.ref(abs(subjVar.refChan)) = true;
-    ch_bad.empty(abs(subjVar.emptyChan)) = true;
-    ch_bad.empty(contains(chNfo.fsLabel,"empty","IgnoreCase",true)) = true;
-    ch_bad.sus(abs(subjVar.susChan)) = true;
-    ch_bad.epi(abs(subjVar.epiChan)) = true;
-    ch_bad.noisy(abs(subjVar.noisyChan)) = true;
-    chNfo.bad = ch_bad(chNfo.ch,:);
+if ~isfile(fn) || a.redoCh || a.redo
+    % Load chNfo
+    fn = dirs.origSbj+"chNfo_s"+dirs.sbjID+"_"+task+".mat";
+    load(fn,"chNfo"); disp("LOADED: "+fn)
+
+    % Load marked chans
+    tMarkCh = '/home/kt/Gdrive/UCLA/Studies/MMR/anal/preproc/subject_info_chan_fs_220627.xlsx';
+    tMarkCh = readtable(tMarkCh);
+    [refChan,badChan,epiChan,emptyChan,noisyChan,altBadChan] = GetMarkedChans_KT(sbj,tMarkCh);
+
+    % Make ch_bad
+    chBad = chNfo(:,["sbjCh" "sbjID" "ch"]);
+    chBad.bad(:) = false;
+    chBad.gv(abs(badChan)) = true;
+    chBad.ref(abs(refChan)) = true;
+    chBad.empty(abs(emptyChan)) = true;
+    chBad.empty(contains(chNfo.fs,"empty","IgnoreCase",true)) = true;
+    chBad.sus(abs(altBadChan)) = true;
+    chBad.epi(abs(epiChan)) = true;
+    chBad.noisy(abs(noisyChan)) = true;
+    chNfo.bad = chBad(chNfo.ch,:);
 elseif nargout > 3
     load(o.dirOut+"chNfo_"+o.fnStr, "chNfo");
 end
 
 %% Get task events
-fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr;
-if ~isfile(fn) || dsTarg>0 || arg.redoTr || arg.redoPsy || arg.redo
-    [trialNfo,runIdx,runIdxOg,runTimes,runTimesOg,errorsEvent] =...
-        ec_getEventIdx(sbj,task,blocks,dirs,dsTarg=dsTarg);
+fn = o.dirOut+"trialNfo"+hz_s+"_"+o.fnStr;
+if ~isfile(fn) || dsTarg>0 || a.redoTr || a.redoPsy || a.redo
+    % Run
+    [trialNfo,n,errorsEvent] = ec_getEventIdx(sbj,n,dsTarg);
     if nnz(~cellfun(@isempty,errorsEvent)); errors{end+1,1} = errorsEvent; end
-
-    n.nFrames = runIdx(end,2);
-    n.nRuns = length(unique(trialNfo.run));
-    n.nTrials = height(trialNfo);
-    n.runs = unique(trialNfo.run);
-    n.runIdx = runIdx;
-    n.runIdxOg = runIdxOg;
-    n.runTimes = runTimes;
-    n.runTimesOg = runTimesOg;
-    n.blocks = blocks;
-    times = (1:n.nFrames)'/fs;
 elseif nargout > 4
     load(fn,"trialNfo");
 end
 
 %% Align task events & neural data
-fn = o.dirOut+"psy"+fs_s+"_"+ o.fnStr;
-if ~isfile(fn) || arg.redoPsy || arg.redoTr || arg.redo
+fn = o.dirOut+"psy"+hz_s+"_"+o.fnStr;
+if ~isfile(fn) || a.redoPsy || a.redoTr || a.redo
     try
-        [psy,trialNfo] = ec_alignNeuroBehav(trialNfo,sbj,n.runs,runIdx,times,fs,o);
-    catch ME; warning(['psy ERROR: ' sbj]); getReport(ME)
-        errors{end+1,1} = {lastwarn,ME};
+        times = (1:n.nFrames)'/hz;
+        [psy,trialNfo] = ec_alignNeuroBehav(trialNfo,sbj,n.runs,n.runIdx,times,hz,o);
+    catch ME; warning("psy ERROR: "+sbj); getReport(ME)
+        errors{end+1,1} = ME;
         psy = [];
     end
 elseif nargout > 5
@@ -127,30 +136,30 @@ elseif nargout > 5
 end
 
 %% Finalize
-n.fs = fs; % changed if downsampled
+n.hz = hz; % changed if downsampled
 n.errorPsy = errors;
 n.dirs = dirs;
 
 % Save to disk
-if arg.save
+if a.save
     fn = o.dirOut+"chNfo_"+o.fnStr;
-    if ~isfile(fn) || arg.redoCh || arg.redo
+    if ~isfile(fn) || a.redoCh || a.redo
         save(fn,"chNfo","-v7"); disp("SAVED: "+fn)
     end
 
-    fn = o.dirOut+"trialNfo"+fs_s+"_"+o.fnStr;
-    if ~isfile(fn) || arg.redoTr || arg.redo
+    fn = o.dirOut+"trialNfo"+hz_s+"_"+o.fnStr;
+    if ~isfile(fn) || a.redoTr || a.redo
         save(fn,"trialNfo","-v7"); disp("SAVED: "+fn)
     end
 
-    fn = o.dirOut+"psy"+fs_s+"_"+ o.fnStr;
-    if ~isfile(fn) || arg.redoPsy || arg.redo
-        save(fn,"psy","-v7.3"); disp("SAVED: "+fn)
+    fn = o.dirOut+"psy"+hz_s+"_"+o.fnStr;
+    if ~isfile(fn) || a.redoPsy || a.redo
+        save(fn,"psy","-v7"); disp("SAVED: "+fn)
     end
 
     fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr;
-    if ~isfile(fn) || arg.redoN || arg.redo
-        save(fn,"n","-v7.3"); disp("SAVED: "+fn)
+    if ~isfile(fn) || a.redoN || a.redo
+        save(fn,"n","-v7"); disp("SAVED: "+fn)
     end
 end
 disp([sbj ': finished trialNfo & psy']);

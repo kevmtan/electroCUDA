@@ -1,6 +1,6 @@
 function dirs = ecu_paths(proj)
 arguments
-    proj string = "" % Project name
+    proj string = "writeDefaultHere" % Project name
 end
 dirs.proj = proj;
 
@@ -14,6 +14,8 @@ dirs.code = "/home/kt/Gdrive/Git/electroCUDA/";
 dirs.cudaica = "/home/kt/bin/cudaica-kt/cudaica"; % CUDAICA binary file
 dirs.thundersvm = "/home/kt/bin/thundersvm-gpu/build/bin/"; % ThunderSVM binary folder
 
+% Freesurfer subjects dir (can be in freesurfer install location, can change per project)
+dirs.freesurfer = "/01/lbcn/freesurfer/";
 
 % Project directories (add new case per project)
 switch proj

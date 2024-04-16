@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preprocTimeFreq(sbj,task,o,n,x,arg)
+function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,task,o,n,x,arg)
 %% electroCUDA: time-frequency decomposition
 % This function performs time-frequency decomposition on channel or IC timecourses
 % (output of 'ec_preproc' or 'ec_preprocICA'). Decomposition is performed via
@@ -41,8 +41,9 @@ function [errors,n,x] = ec_preprocTimeFreq(sbj,task,o,n,x,arg)
 
 %% Input validation
 arguments
-    sbj {istext,isnumeric}
-    task {mustBeText} = 'MMR'
+    sbj string
+    proj string
+    task string
     o struct = struct % options struct (see "Options struct validation" below)
     n struct = [] % preloaded 'n' struct from ec_preproc (OPTIONAL)
     x (:,:) {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
@@ -51,14 +52,11 @@ arguments
     arg.raw (1,1) logical = false
     arg.save (1,1) logical = false
     arg.test (1,1) logical = false
-    arg.redoN (1,1) logical = false
 end
-dirs=arg.dirs;
-% n=[]; x=[]; arg.ica=0; arg.raw=0; arg.save=0; arg.test=1; arg.redoN=1;
+% n=[]; x=[]; arg.ica=0; arg.raw=0; arg.save=0; arg.test=1;
 % o=oSpec; o=oHFB;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
-if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
 % if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
 % if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
 % if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
@@ -76,27 +74,28 @@ fMean=logical(o.fMean);
 
 % Load EEG data
 if isempty(x)
-    if arg.ica && o.sfx_src==""; o.sfx_src="i"; end
-    [n,x,~,~,chNfo] = ec_loadSbj(dirs,o.sfx_src);
+    [n,x,chNfo,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
+        vars=["n" "x" "chNfo"]);
 end
 if arg.test; xOg = x; end %#ok<NASGU>
 if o.single; x = single; end
 
+
 % Load metadata
 sbjID = n.sbjID;
-nChs = width(x);
 nRuns = n.nRuns;
 blocks = string(n.blocks);
-fsOg = floor(n.fs_orig);
+hzOg = floor(n.hz);
 n.task = task;
 n.suffix = o.suffix;
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
+
 % Get downsampling factor & anti-aliasing filter
 ds = 0;
 if isany(o.dsTarg)
-    [ds(1),ds(2)] = rat(o.dsTarg/n.fs);
+    [ds(1),ds(2)] = rat(o.dsTarg/n.hz);
     % Errors
     if ds(1) > ds(2) 
         errors{end+1} = "[ec_preprocTimeFreq] "+sbj+" downsampling target > sampling rate";
@@ -109,7 +108,7 @@ if isany(o.dsTarg)
 end
 
 % Reset GPU & get free VRAM
-if o.doGPU || o.doCUDA
+if ismember(o.gpu,["matlab" "cuda"])
 	try reset(gpuDevice()); catch; end
     memMax = ec_ramAvail(true);
 else
@@ -124,13 +123,13 @@ x = mat2cell(x,n.runIdxOg(:,2));
 %% Continuous Wavelet Transform (within-run to avoid edge artifacts)
 cwtHz = cell(nRuns,1);
 for r = 1:nRuns
-    [x{r},cwtHz{r}] = ec_wt(xr,fs=fsOg,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
+    [x{r},cwtHz{r}] = ec_wt(x{r},hz=hzOg,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
     wavelet=o.wavelet,ds=ds,single=o.single,singleOut=o.singleOut,mem=memMax,...
     gpu=o.gpu,tic=tt);
     disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+blocks(r)+" time="+toc(tt));
 end
 
-%% Organize & clear memory
+%% Organize
 x = vertcat(x{:});
 if ~fMean
     x = flip(x,3); % Sort freqs from low to high
@@ -142,8 +141,7 @@ n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
 
 % Resample behavioral data
-[err,o,n] = ec_initialize(sbj,task,o,n,dirs=dirs,save=arg.save,ica=arg.ica,...
-    dsTarg=o.dsTarg);
+[err,n] = ec_resampleBeh(n,dsTarg=o.dsTarg,save=arg.save);
 if isany(err); errors{end+1}=err; end
 
 %% Robust detrending
@@ -172,9 +170,8 @@ if o.doBadFrames && ~arg.ica
     end
 
     % Identify
-    [chNfo.bad,x_bad] = ec_findBadFrames(x,chNfo.bad,x_bad,sfx,...
+    [n.chBad,n.xBad] = ec_findBadFrames(x,chNfo.bad,x_bad,sfx,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
-    n.xBad = x_bad;
     disp("[ec_preprocTimeFreq] Identified bad frames per chan: "+sbj+" time="+toc(tt));
 elseif o.doBadFrames
     [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,sfx,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
@@ -197,11 +194,9 @@ if fMean
 end
 
 %% Finalize
-% Convert to single if specified
-if o.singleOut; x = single(x); end
 
 % Reset GPU
-if o.doGPU
+if ismember(o.gpu,["matlab" "cuda"])
 	if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); end
 	try reset(gpuDevice()); catch; end
 end
@@ -231,135 +226,6 @@ end
 
 
 
-%%% CWT within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [x,frqs] = withinRun_lfn(xr,n,o,ds,run,memMax)
-
-% Get vars
-nChs=width(xr); sbj=n.sbj; fMean=o.fMean; singleOut=o.singleOut;
-
-% Single
-if o.single
-    xr = single(xr);
-else
-    xr = double(xr);
-end
-
-%% CWT per channel
-if o.doCUDA
-    % CUDA GPU binary (fastest)
-    if fMean
-        if o.single
-            [xr,frqs] = ec_cwtAvg_fp32(xr,fs,o.fLims,o.fVoices,ds);
-        else
-            [xr,frqs] = ec_cwtAvg_fp64(xr,fs,o.fLims,o.fVoices,ds);
-        end
-    else
-        if o.single
-            [xr,frqs] = ec_cwt_fp32(xr,fs,o.fLims,o.fVoices,ds);
-        else
-            [xr,frqs] = ec_cwt_fp64(xr,fs,o.fLims,o.fVoices,ds);
-        end
-    end
-
-    if singleOut
-        xr = cellfun(@single,xr,UniformOutput=false);
-    end
-else
-    % Generate wavelet filters
-    fb = cwtfilterbank(SignalLength=height(xr),VoicesPerOctave=o.fVoices,...
-        SamplingFrequency=n.fs_orig,FrequencyLimits=o.fLims);
-    frqs = fb.centerFrequencies';
-    nFrqs = numel(frqs);
-
-    % Convert to cell per chan
-    xr = arrayfun(@(ch) xr(:,ch), 1:nChs, UniformOutput=false);
-
-    if o.doGPU
-        % Matlab gpuArrays (fast)
-        xr = gpuArrayFun_lfn(xr,fb,n,o,ds,run,nFrqs,memMax);
-    else
-        % CPU parfor loop (slower, no GPU required)
-        tic;
-        parfor ch = 1:nChs
-            xr{ch} = cwt_lfn(fb,xr{ch},fMean,ds,singleOut);
-        end
-        disp("[ec_preprocTimeFreq] CPU wavelet transformed: "+sbj+" "+run+" time="+toc(tt));
-    end
-end
-
-%% Finalize
-
-% Reshape & concactenate
-if iscell(xr)
-    if fMean; xr = horzcat(xr{:});
-    else; xr = permute(cat(3,xr{:}),[1 3 2]); end
-end
-
-if singleOut
-    xr = single(xr);
-end
-
-
-
-%%% Run CWT on gpuArrayFun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xr = gpuArrayFun_lfn(xr,fb,n,o,ds,run,nFrqs,memMax)
-tic;
-% Get vars
-nChs=numel(xr); sbj=n.sbj;
-
-% Find number of chans that fit in GPU RAM
-memIn = whos("xr").bytes/nChs; 
-if o.fMean; memIn=memIn*nFrqs*.25; else; memIn=memIn*nFrqs; end
-if ds(2)>ds(1); memIn = memIn*(ds(1)/ds(2))*(ds(2)/4); end
-memChs=floor(memMax/memIn); memItr=ceil(nChs/memChs); memChs=ceil(nChs/memItr);
-disp("[ec_preprocTimeFreq] gpuArrayFun start: "+sbj+" "+run+" memChs="+gather(memChs)+"/"+nChs+" time="+toc(tt));
-
-% Move to GPU
-ds=gpuArray(ds); fMean=gpuArray(o.fMean); singleOut=gpuArray(o.singleOut);
-chFin=gpuArray(false(nChs,1)); memChs=gpuArray(memChs); memItr=gpuArray(memItr);
-
-% CWT gpuArrayFun across channels
-for v = 1:memItr
-    % Find chans to do 
-    idx = find(~chFin,memChs);
-
-    % Move ch data to GPU
-    xr(idx) = arrayfun(@(x) gpuArray(x{:}),xr(idx),UniformOutput=false);
-
-    % Run CWT
-    xr(idx) = arrayfun(@(x) cwt_lfn(fb,x{:},fMean,ds,singleOut),...
-        xr(idx),UniformOutput=false);
-
-    % Move to CPU
-    xr(idx) = cellfun(@gather,xr(idx),UniformOutput=false);
-    chFin(idx) = true;
-end
-xr = cellfun(@gather,xr,UniformOutput=false);
-disp("[preprocTimeFreq] gpuArrayFun finished: "+sbj+" "+run+" time="+toc(tt));
-
-
-
-%%% Continuous Wavelet Transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xx = cwt_lfn(fb,xx,fMean,ds,singleOut)
-if ~fMean
-    % CWT: magnitude (absolute value of each frame & freq)
-    xx = abs(fb.wt(xx))'; % wt(frames,freqs)
-else
-    % CWT: normalized average density (weighted integral normed by variance)
-    xx = fb.scaleSpectrum(xx,SpectrumType="density")'; % wt(frames,1)
-end
-
-% Downsample
-if ds(2) > ds(1)
-    xx = resample(xx,ds(1),ds(2));
-end
-
-% Convert to single
-if singleOut
-    xx = single(xx);
-end
-
-
 
 %% Depreciated
 % %% Normalize & downsample if not yet applied
@@ -369,3 +235,130 @@ end
 %     if singleIn||singleOut; xr=cellfun(@single,xr,UniformOutput=false); end
 %     disp("Downsampled (CPU): "+sbj+" "+run+" time="+toc(tt));
 % end
+% %%% CWT within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function [x,frqs] = withinRun_lfn(xr,n,o,ds,run,memMax)
+% 
+% % Get vars
+% nChs=width(xr); sbj=n.sbj; fMean=o.fMean; singleOut=o.singleOut;
+% 
+% % Single
+% if o.single
+%     xr = single(xr);
+% else
+%     xr = double(xr);
+% end
+% 
+% %% CWT per channel
+% if o.doCUDA
+%     % CUDA GPU binary (fastest)
+%     if fMean
+%         if o.single
+%             [xr,frqs] = ec_cwtAvg_fp32(xr,fs,o.fLims,o.fVoices,ds);
+%         else
+%             [xr,frqs] = ec_cwtAvg_fp64(xr,fs,o.fLims,o.fVoices,ds);
+%         end
+%     else
+%         if o.single
+%             [xr,frqs] = ec_cwt_fp32(xr,fs,o.fLims,o.fVoices,ds);
+%         else
+%             [xr,frqs] = ec_cwt_fp64(xr,fs,o.fLims,o.fVoices,ds);
+%         end
+%     end
+% 
+%     if singleOut
+%         xr = cellfun(@single,xr,UniformOutput=false);
+%     end
+% else
+%     % Generate wavelet filters
+%     fb = cwtfilterbank(SignalLength=height(xr),VoicesPerOctave=o.fVoices,...
+%         SamplingFrequency=n.fs_orig,FrequencyLimits=o.fLims);
+%     frqs = fb.centerFrequencies';
+%     nFrqs = numel(frqs);
+% 
+%     % Convert to cell per chan
+%     xr = arrayfun(@(ch) xr(:,ch), 1:nChs, UniformOutput=false);
+% 
+%     if o.doGPU
+%         % Matlab gpuArrays (fast)
+%         xr = gpuArrayFun_lfn(xr,fb,n,o,ds,run,nFrqs,memMax);
+%     else
+%         % CPU parfor loop (slower, no GPU required)
+%         tic;
+%         parfor ch = 1:nChs
+%             xr{ch} = cwt_lfn(fb,xr{ch},fMean,ds,singleOut);
+%         end
+%         disp("[ec_preprocTimeFreq] CPU wavelet transformed: "+sbj+" "+run+" time="+toc(tt));
+%     end
+% end
+% 
+% %% Finalize
+% 
+% % Reshape & concactenate
+% if iscell(xr)
+%     if fMean; xr = horzcat(xr{:});
+%     else; xr = permute(cat(3,xr{:}),[1 3 2]); end
+% end
+% 
+% if singleOut
+%     xr = single(xr);
+% end
+% 
+% 
+% 
+% %%% Run CWT on gpuArrayFun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function xr = gpuArrayFun_lfn(xr,fb,n,o,ds,run,nFrqs,memMax)
+% tic;
+% % Get vars
+% nChs=numel(xr); sbj=n.sbj;
+% 
+% % Find number of chans that fit in GPU RAM
+% memIn = whos("xr").bytes/nChs; 
+% if o.fMean; memIn=memIn*nFrqs*.25; else; memIn=memIn*nFrqs; end
+% if ds(2)>ds(1); memIn = memIn*(ds(1)/ds(2))*(ds(2)/4); end
+% memChs=floor(memMax/memIn); memItr=ceil(nChs/memChs); memChs=ceil(nChs/memItr);
+% disp("[ec_preprocTimeFreq] gpuArrayFun start: "+sbj+" "+run+" memChs="+gather(memChs)+"/"+nChs+" time="+toc(tt));
+% 
+% % Move to GPU
+% ds=gpuArray(ds); fMean=gpuArray(o.fMean); singleOut=gpuArray(o.singleOut);
+% chFin=gpuArray(false(nChs,1)); memChs=gpuArray(memChs); memItr=gpuArray(memItr);
+% 
+% % CWT gpuArrayFun across channels
+% for v = 1:memItr
+%     % Find chans to do 
+%     idx = find(~chFin,memChs);
+% 
+%     % Move ch data to GPU
+%     xr(idx) = arrayfun(@(x) gpuArray(x{:}),xr(idx),UniformOutput=false);
+% 
+%     % Run CWT
+%     xr(idx) = arrayfun(@(x) cwt_lfn(fb,x{:},fMean,ds,singleOut),...
+%         xr(idx),UniformOutput=false);
+% 
+%     % Move to CPU
+%     xr(idx) = cellfun(@gather,xr(idx),UniformOutput=false);
+%     chFin(idx) = true;
+% end
+% xr = cellfun(@gather,xr,UniformOutput=false);
+% disp("[preprocTimeFreq] gpuArrayFun finished: "+sbj+" "+run+" time="+toc(tt));
+%
+%
+% %%% Continuous Wavelet Transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function xx = cwt_lfn(fb,xx,fMean,ds,singleOut)
+% if ~fMean
+%     % CWT: magnitude (absolute value of each frame & freq)
+%     xx = abs(fb.wt(xx))'; % wt(frames,freqs)
+% else
+%     % CWT: normalized average density (weighted integral normed by variance)
+%     xx = fb.scaleSpectrum(xx,SpectrumType="density")'; % wt(frames,1)
+% end
+% 
+% % Downsample
+% if ds(2) > ds(1)
+%     xx = resample(xx,ds(1),ds(2));
+% end
+% 
+% % Convert to single
+% if singleOut
+%     xx = single(xx);
+% end
+

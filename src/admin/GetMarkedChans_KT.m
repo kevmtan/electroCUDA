@@ -1,4 +1,5 @@
-function [refChan, badChan, epiChan, emptyChan, noisyChan, altBadChan] = GetMarkedChans_KT(sbj_name, T)
+function [refChan, badChan, epiChan, emptyChan, noisyChan, altBadChan] =...
+    GetMarkedChans_KT(sbj_name, T)
 
 % Convert string to numbers
 markChans = {'Pathological','Noisy','Reference','Empty','Other'};

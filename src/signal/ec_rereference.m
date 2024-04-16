@@ -1,4 +1,4 @@
-function [x,mask] = ec_rereference(x,mask,refChs,o)
+function [x,mask] = ec_rereference(x,mask,refChs,a)
 % Noisetools function modified by Kevin Tan (2022)
 %      Modifications: compute efficiency & reduce rank reduction
 %
@@ -20,8 +20,8 @@ arguments
     x (:,:){mustBeFloat}
     mask (1,:) logical = true(1,size(x,2))
     refChs {isnumeric,islogical} = 0
-    o.thresh (1,1) double = 3
-    o.iters (1,1) double = 1
+    a.thresh (1,1) double = 3
+    a.iters (1,1) double = 1
     %o.forceRankCorrect logical = false
 end
 if numel(mask)~=width(x); error("Mask length must equal number of channels (width of x)"); end
@@ -34,7 +34,7 @@ if any(refChs); mask(refChs)=true; end % exclude reference chans
 disp("[ec_rereference] iter=0 | chs="+width(x)+" | refChs="+nnz(mask)+" | rank="+rnk); 
 
 % Iteration loop
-for t = 1:o.iters
+for t = 1:a.iters
     % Robust reference w/ rank correction
     x1 = x - (sum(x(:,mask),2,"omitnan")/(nnz(mask)+eps(0)+1)); % add 1 to denominator
     [rnk1,tol,eig1] = ec_rank(x,exact=true);
@@ -59,9 +59,9 @@ for t = 1:o.iters
     end
 
     % Remove outlier chans from good chans
-    if o.thresh > 0
+    if a.thresh > 0
         x_mad = mad(x,1) ./ mad(x(:,mask),1);
-        mask(x_mad > o.thresh) = false; % remove outlier chans from good chans
+        mask(x_mad > a.thresh) = false; % remove outlier chans from good chans
     end
 
     

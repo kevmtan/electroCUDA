@@ -1,20 +1,20 @@
-function [trialNfo,runIdx,runIdxOg,runTimes,runTimesOg,errors] =...
-    ec_getEventIdx(sbj,proj,blocks,dirs,args)
+function [trialNfo,n,errors] =...
+    ec_getEventIdx(sbj,n,dsTarg)
 arguments
-    sbj {ischar,isstring}
-    proj {ischar,isstring} = 'MMR'
-    blocks {isstring,ischar,iscellstr} = BlockBySubj(sbj,proj)
-    dirs struct = []
-    args.user {ischar,isstring} = 'Kevin_DMN'; 
-    args.dsTarg {isnumeric} = []
+    sbj string
+    n struct
+    dsTarg double = []
 end
-dsTarg=args.dsTarg;
-if ~isempty(dsTarg) && dsTarg>0; doDS=true; else; doDS=false; end
-if isempty(dirs); dirs = ec_getDirs(args.user,sbj,proj); end
+
+% Vars
+blocks = n.blocks;
+nBlocks = n.nBlocks;
+dirs = n.dirs;
+task = n.task;
+doDS = dsTarg>1;
 
 % Preallocate
 errors = {};
-nBlocks = length(blocks);
 runIdx = nan(nBlocks,2);
 runIdxOg = nan(nBlocks,2);
 runTimes = nan(nBlocks,2);
@@ -25,11 +25,11 @@ trialNfoB = cell(nBlocks,1);
 
 % Get events per block
 for b = 1:nBlocks
-    bn = blocks{b};
-    fn = dirs.origSbj+"global_"+proj+"_"+sbj+"_"+bn+".mat";
+    bn = blocks(b);
+    fn = dirs.origSbj+"global_"+task+"_"+sbj+"_"+bn+".mat";
     load(fn,'globalVar');
-    fs = floor(globalVar.iEEG_rate);
-    if doDS; ds = floor(fs/dsTarg); end
+    hz = floor(globalVar.iEEG_rate);
+    if doDS; ds = floor(hz/dsTarg); end
     
     % Load trialNfo
     fn = dirs.psychSbj+filesep+bn+filesep+"trialNfo_"+sbj+"_"+bn+".mat";
@@ -41,13 +41,13 @@ for b = 1:nBlocks
     if doDS
         iDS = 1:ds:globalVar.chanLength; % Downsample
         blockEndIdx(b) = length(iDS);
-        fs = dsTarg;
+        hz = dsTarg;
     else
         blockEndIdx(b) = globalVar.chanLength;
     end
 
     % Calculate block indices and timing
-    blockEndTime(b) = blockEndIdx(b)/fs;
+    blockEndTime(b) = blockEndIdx(b)/hz;
     if b==1
         runIdx(b,:) = [1 blockEndIdx(b)]; 
     else
@@ -55,8 +55,8 @@ for b = 1:nBlocks
         runIdx(b,2) = runIdx(b-1,2) + blockEndIdx(b);
     end
     runIdxOg(b,:) = [1 blockEndIdx(b)];
-    runTimes(b,:) = runIdx(b,:) ./ fs;
-    runTimesOg(b,:) = runIdxOg(b,:) ./ fs;
+    runTimes(b,:) = runIdx(b,:) ./ hz;
+    runTimesOg(b,:) = runIdxOg(b,:) ./ hz;
     
     % Figure out ITI after trials with no RT
     noRTtrials = find(trialNfo.resp=="none" | isundefined(trialNfo.resp) |...
@@ -97,27 +97,27 @@ for b = 1:nBlocks
     end
     
     % Calculate event indices
-    trialNfo.idxITI = round(trialNfo.onsITI * fs);
-    trialNfo.idxStim = round(trialNfo.onsStim * fs);
-    trialNfo.idxRT = round(trialNfo.onsRT * fs);
+    trialNfo.idxITI = round(trialNfo.onsITI * hz);
+    trialNfo.idxStim = round(trialNfo.onsStim * hz);
+    trialNfo.idxRT = round(trialNfo.onsRT * hz);
     trialNfo.idxEnd(:) = nan;
     trialNfo.idxEnd(1:end-1) = trialNfo.idxStim(2:end)-1;
-    trialNfo.idxEnd(end) = trialNfo.idxStim(end) + round(trialNfo.durTrial(end) * fs);
+    trialNfo.idxEnd(end) = trialNfo.idxStim(end) + round(trialNfo.durTrial(end) * hz);
     
     %% Warnings
     errorsB = {};
     idx = trialNfo{:,["onsITI" "onsStim" "onsRT"]} > blockEndTime(b);
     if nnz(idx)
-        warning(['["onsITI" "onsStim" "onsRT"] > blockEndTime ' sbj ' ' bn]);
-        errorsB{end+1,1} = {lastwarn,idx}; %#ok<*AGROW> 
+        warning("[onsITI onsStim onsRT] > blockEndTime "+sbj+" "+bn);
+        errorsB{end+1,1} = {"[onsITI onsStim onsRT] > blockEndTime ",idx}; %#ok<*AGROW> 
         trialNfo.onsITI(idx(:,1)) = blockEndTime(b);
         trialNfo.onsStim(idx(:,2)) = blockEndTime(b);
         trialNfo.onsRT(idx(:,3)) = blockEndTime(b);
     end
     idx = trialNfo{:,["idxITI","idxStim","idxRT","idxEnd"]} > blockEndIdx(b);
     if nnz(idx)
-        warning(['["idxITI","idxStim","idxRT","idxEnd"] > blockEndTime: ' sbj ' ' bn]);
-        errorsB{end+1,1} = {lastwarn,idx};
+        warning("[idxITI idxStim idxRT idxEnd] > blockEndTime: "+sbj+" "+bn);
+        errorsB{end+1,1} = {"[idxITI idxStim idxRT idxEnd] > blockEndTime: ",idx};
         trialNfo.idxITI(idx(:,1)) = blockEndIdx(b);
         trialNfo.idxStim(idx(:,2)) = blockEndIdx(b);
         trialNfo.idxRT(idx(:,3)) = blockEndIdx(b);
@@ -125,8 +125,8 @@ for b = 1:nBlocks
     end
     idx = trialNfo{:,["idxITI","idxStim","idxRT","idxEnd"]} < 1;
     if nnz(idx)
-        warning(['["idxITI","idxStim","idxRT","idxEnd"] < 1: ' sbj ' ' bn ]);
-        errorsB{end+1,1} = {lastwarn,idx};
+        warning("[idxITI,idxStim,idxRT,idxEnd] < 1: "+sbj+" "+bn);
+        errorsB{end+1,1} = {"[idxITI,idxStim,idxRT,idxEnd] < 1: ",idx};
         trialNfo.idxITI(idx(:,1)) = 1;
         trialNfo.idxStim(idx(:,2)) = 1;
         trialNfo.idxRT(idx(:,3)) = 1;
@@ -134,20 +134,20 @@ for b = 1:nBlocks
     end
     idx = trialNfo.idxITI > trialNfo.idxStim;
     if nnz(idx)
-        warning(['idxITI > idxStim for: ' sbj ' ' bn]);
-        errorsB{end+1,1} = {lastwarn,idx};
+        warning("idxITI > idxStim for: "+sbj+" "+bn);
+        errorsB{end+1,1} = {"idxITI > idxStim",idx};
     end
     idx = trialNfo.idxStim > trialNfo.idxRT;
-    if nnz(idx); warning(['idxStim > idxRT for: ' sbj ' ' bn]);
-        errorsB{end+1,1} = {lastwarn,idx};
+    if nnz(idx); warning("idxStim > idxRT for: "+sbj+" "+bn);
+        errorsB{end+1,1} = {"idxITI > idxStim",idx};
     end
     idx = trialNfo.idxRT > trialNfo.idxEnd;
-    if nnz(idx); warning(['idxRT > idxEnd for: ' sbj ' ' bn]);
-        errorsB{end+1,1} = {lastwarn,idx};
+    if nnz(idx); warning("idxRT > idxEnd for: "+sbj+" "+bn);
+        errorsB{end+1,1} = {"idxITI > idxStim",idx};
     end
     idx = trialNfo.idxStim > trialNfo.idxEnd;
-    if nnz(idx); warning(['idxStim > idxEnd: ' sbj ' ' bn]);
-        errorsB{end+1,1} = {lastwarn,idx};
+    if nnz(idx); warning("idxStim > idxEnd: "+sbj+" "+bn);
+        errorsB{end+1,1} = {"idxStim > idxEnd",idx};
     end
 
     %% Organize
@@ -170,3 +170,15 @@ trialNfo = vertcat(trialNfoB{:});
 trialNfo.trialA = uint16(1:height(trialNfo))';
 trialNfo = movevars(trialNfo,'trialA','Before','run');
 if nnz(~cellfun(@isempty,errors)); errors = vertcat(errors{:}); end
+
+
+% n struct
+n.nFrames = runIdx(end,2);
+n.nRuns = length(unique(trialNfo.run));
+n.nTrials = height(trialNfo);
+n.runs = unique(trialNfo.run);
+n.runIdx = runIdx;
+n.runIdxOg = runIdxOg;
+n.runTimes = runTimes;
+n.runTimesOg = runTimesOg;
+

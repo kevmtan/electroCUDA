@@ -13,7 +13,7 @@ function [x,frqs,scales,fb] = ec_wt(x,a)
 %% Input validation
 arguments
     x (:,:){mustBeFloat}              % Input data: x(frames,channels)
-    a.fs (1,1) double = nan           % Sampling rate
+    a.hz (1,1) double = nan           % Sampling rate
     a.lims (1,2) double = nan         % Frequency limits [lower,upper]
     a.voices (1,1) double = 10        % Voices per octave
     a.avg (1,1) logical = false       % Scale-average transform?
@@ -30,7 +30,7 @@ arguments
         {mustBeMember(a.gpu,["no" "matlab" "cuda"])} = "no"
     a.tic (1,1) uint64 = tic          % Timer
 end
-if ~isany(a.fs); error("[ec_wt] Must specify sampling rate (fs)"); end
+if ~isany(a.hz); error("[ec_wt] Must specify sampling rate (fs)"); end
 if ~isany(a.lims); error("[ec_wt] Must specify frequency limits (lims)"); end
 if a.ds<=1||~isany(a.ds); a.ds=0; end % Set no downsampling
 
@@ -48,7 +48,7 @@ if a.out=="complex"; a.real=false; else; a.real=true; end
 if a.out=="power"; a.pwr=true; else; a.pwr=false; end
 
 % Generate wavelet filter
-fb = cwtfilterbank(Wavelet=a.wavelet,SamplingFrequency=a.fs,SignalLength=height(x),...
+fb = cwtfilterbank(Wavelet=a.wavelet,SamplingFrequency=a.hz,SignalLength=height(x),...
     VoicesPerOctave=a.voices,FrequencyLimits=a.lims);
 frqs = fb.centerFrequencies; % CWT frequencies
 scales = fb.scales; % CWT scales
@@ -71,9 +71,9 @@ a.memIn = memIn/nChs;
 if a.gpu=="cuda" && ~a.avg && ismember(a.wavelet,["morse" "amor"])
     % GPU CUDA mex
     if a.single
-        x = ec_wt_fp32(x,a.fs,a.lims,a.voices,a.ds,a.real,a.pwr); % Single-precision
+        x = ec_wt_fp32(x,a.hz,a.lims,a.voices,a.ds,a.real,a.pwr); % Single-precision
     else
-        x = ec_wt_fp64(x,a.fs,a.lims,a.voices,a.ds,a.real,a.pwr); % Double-precision
+        x = ec_wt_fp64(x,a.hz,a.lims,a.voices,a.ds,a.real,a.pwr); % Double-precision
         if o.singleOut
             x = cellfun(@single,x,UniformOutput=false); % Output as single
         end

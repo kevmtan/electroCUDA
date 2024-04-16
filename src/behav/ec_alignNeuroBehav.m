@@ -119,6 +119,6 @@ psy.frame = int16(psy.latency*fs);
 
 %% Finalize
 if ~isequal(trialNfo.durTrial,trialNfo.durRT)
-    warning("[ec_epochPsy] trialNfo.durTrial ~= trialNfo.durRT: "+n.sbj); end
+    warning("[ec_epochPsy] trialNfo.durTrial ~= trialNfo.durRT: "+sbj); end
 disp("[ec_alignNeuroBehav] Finished!!! "+sbj);
 end
