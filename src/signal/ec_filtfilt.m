@@ -12,27 +12,20 @@ arguments
 end
 
 %% Prep
-if isgpuarray(x); o.gpu=true; end
-if isa(b,"digitalFilter") && o.gpu; b=b.Coefficients; end
-if o.single; x=single(x); end % Convert to single if needed
-sz = cast(size(x),like=x);
-if numel(sz)>2; x=x(:,:); end % Reshape to 2D
+if isgpuarray(x); o.gpu="matlab"; end
+if o.single; x=single(x); end
+if isa(x,"single"); o.single=true; else; x=double(x); end
 fin = 0;
 
-%% Get initial variables
-if ~isa(b,"digitalFilter")
-    [b,a,z,nf,L] = getInit_lfn(b,1,sz(1));
-    b=cast(b,like=x); a=cast(a,like=x); z=cast(z,like=x); nf=cast(nf,like=x);
-    L=cast(L,like=x);
-end
 
 %% Run compiled CUDA binary
 if o.gpu=="cuda"
+    if isa(b,"digitalFilter"); b1=b.Coefficients; else; b1=b; end
     try
         if isa(x,"single")
-            x = ec_filtfilt1_fp32(x,b,a,z,nf,L);
+            x = ec_filtfilt_fp32(single(b1),single(1),x);
         else
-            x = ec_filtfilt1_fp64(x,b,a,z,nf,L);
+            x = ec_filtfilt_fp64(double(b1),1,double(x));
         end
         fin = 1;
     catch ME; getReport(ME)
@@ -42,7 +35,12 @@ end
 %% Run as gpuArrayFun
 if ~fin && o.gpu~="no"
     try
-        x = gpuArrayFun_lfn(x,b,a,z,nf,L);
+        if ~isgpuarray(x); x=gpuArray(x); end
+        if isa(b,"digitalFilter")
+            x = filtfilt(b,x);
+        else
+            x = filtfilt(cast(b,like=x),cast(1,like=x),x);
+        end
         fin = 1;
     catch ME; getReport(ME)
     end
@@ -53,177 +51,178 @@ if ~fin
     if isa(b,"digitalFilter")
         x = filtfilt(b,x);
     else
-        parfor ch = 1:width(x)
-            x(:,ch) = ec_filtfilt_fp(x(:,ch),b,a,z,nf,L);
-        end
-    end
-end
-
-if numel(sz)>2
-    x = reshape(x,sz);
-end
-
-
-
-
-%% getInit_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [b1,a1,z1,nf,L] = getInit_lfn(b,a,nFrames)
-[L, ncols] = size(b);
-na = numel(a);
-
-% Rules for the first two inputs to represent an SOS filter: b is an
-% Lx6 matrix with L>1 or, b is a 1x6 vector, its 4th element is equal
-% to 1 and a has less than 2 elements.
-if ncols==6 && L==1 && na<=2
-    if b(4)==1
-        coder.internal.warning('signal:filtfilt:ParseSOS', 'SOS', 'G');
-    else
-        coder.internal.warning('signal:filtfilt:ParseB', 'a01', 'SOS');
-    end
-end
-issos = ncols==6 && (L>1 || (b(4)==1 && na<=2));
-
-cdt = zeros('like',b)+zeros('like',a);
-z1 = coder.nullcopy(zeros(2,L,'like',cdt));
-coder.varsize('b1','a1');
-
-if issos
-    %------------------------------------------------------------------
-    % b is an SOS matrix, a is a vector of scale values
-    %------------------------------------------------------------------
-    g = a(:);
-    ng = na;
-
-    coder.internal.assert(ng <= L+1,'signal:filtfilt:InvalidDimensionsScaleValues', L + 1)
-
-    sosMat = cast(b,'like',cdt);
-
-    if ng == L+1
-        % Include last scale value in the numerator part of the SOS
-        % Matrix
-        sosMat(L,1:3) = g(L+1)*b(L,1:3);
-        ng = ng-1;
-    end
-
-    for ii=1:ng
-        % Include scale values in the numerator part of the SOS Matrix
-        sosMat(ii,1:3) = g(ii)*b(ii,1:3);
-    end
-    ord = filtord(sosMat);
-
-    % Get second order section coefficients. Ensure a0 for each filter
-    % is normalized to 1
-    coder.internal.errorIf(any(sosMat(:,4) == 0),'signal:filtfilt:ZeroA0CoeffsSOS');
-
-    a0 = sosMat(:,4:6).';
-    b0 = sosMat(:,1:3).';
-    s = a0([1 1 1],:);
-    a1 = a0./s;
-    b1 = b0./s;
-
-    % length of edge transients
-    nf = max(1,3*ord);
-
-    % input data too short
-    coder.internal.errorIf(nFrames <= nf(1,1),'signal:filtfilt:InvalidDimensionsDataShortForFiltOrder', nf(1,1));
-
-    % Compute initial conditions to remove DC offset at beginning and
-    % end of filtered sequence.  Use sparse matrix to solve linear
-    % system for initial conditions zi, which is the vector of states
-    % for the filter b(z)/a(z) in the state-space formulation of the
-    % filter.
-    for ii=1:L
-        rhs  = (b1(2:3,ii) - b1(1,ii)*a1(2:3,ii));
-        z1(:,ii) = ( eye(2,'like',cdt) - [-a1(2:3,ii),[1;0]] ) \ rhs;
-    end
-else
-    %------------------------------------------------------------------
-    % b & a are vectors that define the transfer function of the filter
-    %------------------------------------------------------------------
-
-    coder.internal.errorIf((~isvector(a) || ~isvector(b)),'signal:filtfilt:InputNotSupported');
-    L = 1;
-    % Check coefficients - ensure a0 is 1
-    coder.internal.errorIf(a(1) == 0,'signal:filtfilt:ZeroA0Coeffs');
-
-    nb = numel(b);
-    nfilt = max(nb,na);
-    nf = max(1,3*(nfilt-1));  % length of edge transients
-
-    % input data too short
-    coder.internal.errorIf(nFrames <= nf(1,1),'signal:filtfilt:InvalidDimensionsDataShortForFiltOrder', nf(1,1));
-
-    if coder.target('MATLAB')
-        b1 = b(:)/a(1,1);
-        a1 = a(:)/a(1,1);
-
-        % Zero pad shorter coefficient vector as needed
-        if nb < nfilt
-            b1 = [b1; zeros(nfilt-nb,1)];
-        elseif na < nfilt
-            a1 = [a1; zeros(nfilt-na,1)];
-        end
-    else
-
-        b1 = zeros(nfilt, 1, 'like', cdt);
-        a1 = zeros(nfilt, 1, 'like', cdt);
-
-        for k = 1:coder.internal.indexInt(numel(b))
-            b1(k) = b(k)/a(1,1);
-        end
-
-        for k = 1:coder.internal.indexInt(numel(a))
-            a1(k) = a(k)/a(1,1);
-        end
-    end
-
-    % Compute initial conditions to remove DC offset at beginning and
-    % end of filtered sequence.  Use sparse matrix to solve linear
-    % system for initial conditions zi, which is the vector of states
-    % for the filter b(z)/a(z) in the state-space formulation of the
-    % filter.
-    if nfilt>1
-        useSparse = coder.target('MATLAB') || ~coder.internal.isCompiled || ...
-            strcmp(eml_option('UseMalloc'),'VariableSizeArrays');
-        if useSparse
-            % The sparse solution makes use of dynamic memory
-            % allocation during code generation
-            rows = [1:nfilt-1, 2:nfilt-1, 1:nfilt-2];
-            cols = [ones(1,nfilt-1), 2:nfilt-1, 2:nfilt-1];
-            vals = [1+a1(2,1), a1(3:nfilt,1).', ones(1,nfilt-2), -ones(1,nfilt-2)];
-            rhs  = b1(2:nfilt,1) - b1(1,1)*a1(2:nfilt,1);
-            % sparse function does not support single precision hence
-            % casting to double
-            z1 = sparse(rows,cols,double(vals)) \ double(rhs);
-            z1 = cast(z1,'like',cdt);
-        else
-            % The non-sparse solution to zi may be computed using:
-            z1 = ( eye(nfilt-1,'like',cdt) - [-a1(2:nfilt,1), [eye(nfilt-2,'like',cdt); ...
-                zeros(1,nfilt-2,'like',cdt)]] ) \ ( b1(2:nfilt,1) - b1(1,1)*a1(2:nfilt,1) );
-        end
-    else
-        z1 = zeros(0,1,'like',cdt);
+        x = filtfilt(cast(b,like=x),cast(1,like=x),x);
     end
 end
 
 
-
-%% filtfilt_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function x = gpuArrayFun_lfn(x,b,a,z,nf,L)
-x = num2cell(x,1);
-
-% Transfer to GPU
-x = cellfun(@gpuArray,x,UniformOutput=false);
-b=gpuArray(b); a=gpuArray(a); z=gpuArray(z); nf=gpuArray(nf); L=gpuArray(L);
-
-% Run
-x = arrayfun(@(xx) ec_filtfilt_fp(xx{:},b,a,z,nf,L), x,UniformOutput=false);
-
-% Finalize
-x = cellfun(@gather,x,UniformOutput=false);
-x = horzcat(x{:});
 
 %% Depreciated
+% %% Get initial variables
+% if ~isa(b,"digitalFilter")
+%     [b,a,z,nf,L] = getInit_lfn(b,1,sz(1));
+%     b=cast(b,like=x); a=cast(a,like=x); z=cast(z,like=x); nf=cast(nf,like=x);
+%     L=cast(L,like=x);
+% end
+% 
+% %% getInit_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function [b1,a1,z1,nf,L] = getInit_lfn(b,a,nFrames)
+% [L, ncols] = size(b);
+% na = numel(a);
+% 
+% % Rules for the first two inputs to represent an SOS filter: b is an
+% % Lx6 matrix with L>1 or, b is a 1x6 vector, its 4th element is equal
+% % to 1 and a has less than 2 elements.
+% if ncols==6 && L==1 && na<=2
+%     if b(4)==1
+%         coder.internal.warning('signal:filtfilt:ParseSOS', 'SOS', 'G');
+%     else
+%         coder.internal.warning('signal:filtfilt:ParseB', 'a01', 'SOS');
+%     end
+% end
+% issos = ncols==6 && (L>1 || (b(4)==1 && na<=2));
+% 
+% cdt = zeros('like',b)+zeros('like',a);
+% z1 = coder.nullcopy(zeros(2,L,'like',cdt));
+% coder.varsize('b1','a1');
+% 
+% if issos
+%     %------------------------------------------------------------------
+%     % b is an SOS matrix, a is a vector of scale values
+%     %------------------------------------------------------------------
+%     g = a(:);
+%     ng = na;
+% 
+%     coder.internal.assert(ng <= L+1,'signal:filtfilt:InvalidDimensionsScaleValues', L + 1)
+% 
+%     sosMat = cast(b,'like',cdt);
+% 
+%     if ng == L+1
+%         % Include last scale value in the numerator part of the SOS
+%         % Matrix
+%         sosMat(L,1:3) = g(L+1)*b(L,1:3);
+%         ng = ng-1;
+%     end
+% 
+%     for ii=1:ng
+%         % Include scale values in the numerator part of the SOS Matrix
+%         sosMat(ii,1:3) = g(ii)*b(ii,1:3);
+%     end
+%     ord = filtord(sosMat);
+% 
+%     % Get second order section coefficients. Ensure a0 for each filter
+%     % is normalized to 1
+%     coder.internal.errorIf(any(sosMat(:,4) == 0),'signal:filtfilt:ZeroA0CoeffsSOS');
+% 
+%     a0 = sosMat(:,4:6).';
+%     b0 = sosMat(:,1:3).';
+%     s = a0([1 1 1],:);
+%     a1 = a0./s;
+%     b1 = b0./s;
+% 
+%     % length of edge transients
+%     nf = max(1,3*ord);
+% 
+%     % input data too short
+%     coder.internal.errorIf(nFrames <= nf(1,1),'signal:filtfilt:InvalidDimensionsDataShortForFiltOrder', nf(1,1));
+% 
+%     % Compute initial conditions to remove DC offset at beginning and
+%     % end of filtered sequence.  Use sparse matrix to solve linear
+%     % system for initial conditions zi, which is the vector of states
+%     % for the filter b(z)/a(z) in the state-space formulation of the
+%     % filter.
+%     for ii=1:L
+%         rhs  = (b1(2:3,ii) - b1(1,ii)*a1(2:3,ii));
+%         z1(:,ii) = ( eye(2,'like',cdt) - [-a1(2:3,ii),[1;0]] ) \ rhs;
+%     end
+% else
+%     %------------------------------------------------------------------
+%     % b & a are vectors that define the transfer function of the filter
+%     %------------------------------------------------------------------
+% 
+%     coder.internal.errorIf((~isvector(a) || ~isvector(b)),'signal:filtfilt:InputNotSupported');
+%     L = 1;
+%     % Check coefficients - ensure a0 is 1
+%     coder.internal.errorIf(a(1) == 0,'signal:filtfilt:ZeroA0Coeffs');
+% 
+%     nb = numel(b);
+%     nfilt = max(nb,na);
+%     nf = max(1,3*(nfilt-1));  % length of edge transients
+% 
+%     % input data too short
+%     coder.internal.errorIf(nFrames <= nf(1,1),'signal:filtfilt:InvalidDimensionsDataShortForFiltOrder', nf(1,1));
+% 
+%     if coder.target('MATLAB')
+%         b1 = b(:)/a(1,1);
+%         a1 = a(:)/a(1,1);
+% 
+%         % Zero pad shorter coefficient vector as needed
+%         if nb < nfilt
+%             b1 = [b1; zeros(nfilt-nb,1)];
+%         elseif na < nfilt
+%             a1 = [a1; zeros(nfilt-na,1)];
+%         end
+%     else
+% 
+%         b1 = zeros(nfilt, 1, 'like', cdt);
+%         a1 = zeros(nfilt, 1, 'like', cdt);
+% 
+%         for k = 1:coder.internal.indexInt(numel(b))
+%             b1(k) = b(k)/a(1,1);
+%         end
+% 
+%         for k = 1:coder.internal.indexInt(numel(a))
+%             a1(k) = a(k)/a(1,1);
+%         end
+%     end
+% 
+%     % Compute initial conditions to remove DC offset at beginning and
+%     % end of filtered sequence.  Use sparse matrix to solve linear
+%     % system for initial conditions zi, which is the vector of states
+%     % for the filter b(z)/a(z) in the state-space formulation of the
+%     % filter.
+%     if nfilt>1
+%         useSparse = coder.target('MATLAB') || ~coder.internal.isCompiled || ...
+%             strcmp(eml_option('UseMalloc'),'VariableSizeArrays');
+%         if useSparse
+%             % The sparse solution makes use of dynamic memory
+%             % allocation during code generation
+%             rows = [1:nfilt-1, 2:nfilt-1, 1:nfilt-2];
+%             cols = [ones(1,nfilt-1), 2:nfilt-1, 2:nfilt-1];
+%             vals = [1+a1(2,1), a1(3:nfilt,1).', ones(1,nfilt-2), -ones(1,nfilt-2)];
+%             rhs  = b1(2:nfilt,1) - b1(1,1)*a1(2:nfilt,1);
+%             % sparse function does not support single precision hence
+%             % casting to double
+%             z1 = sparse(rows,cols,double(vals)) \ double(rhs);
+%             z1 = cast(z1,'like',cdt);
+%         else
+%             % The non-sparse solution to zi may be computed using:
+%             z1 = ( eye(nfilt-1,'like',cdt) - [-a1(2:nfilt,1), [eye(nfilt-2,'like',cdt); ...
+%                 zeros(1,nfilt-2,'like',cdt)]] ) \ ( b1(2:nfilt,1) - b1(1,1)*a1(2:nfilt,1) );
+%         end
+%     else
+%         z1 = zeros(0,1,'like',cdt);
+%     end
+% end
+% 
+% 
+% 
+% %% filtfilt_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function x = gpuArrayFun_lfn(x,b,a,z,nf,L)
+% x = num2cell(x,1);
+% 
+% % Transfer to GPU
+% x = cellfun(@gpuArray,x,UniformOutput=false);
+% b=gpuArray(b); a=gpuArray(a); z=gpuArray(z); nf=gpuArray(nf); L=gpuArray(L);
+% 
+% % Run
+% x = arrayfun(@(xx) ec_filtfilt_fp(xx{:},b,a,z,nf,L), x,UniformOutput=false);
+% 
+% % Finalize
+% x = cellfun(@gather,x,UniformOutput=false);
+% x = horzcat(x{:});
+
+
 % function [b,a,z,nfact,L] = getInit_lfn(b,a,nFrames)
 % [L, ncols] = size(b);
 % na = numel(a);

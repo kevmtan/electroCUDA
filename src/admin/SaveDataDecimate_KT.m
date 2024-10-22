@@ -1,14 +1,11 @@
-function SaveDataDecimate_KT(sbj_name, project_name, block_name, fs_iEEG, fs_Pdio, dirs, refChan, epiChan, emptyChan, badChan, noisyChan, altBadChan)
+function SaveDataDecimate_KT(sbj_name, project_name, block_name, fs_iEEG, fs_Pdio, dirs, target_fs)
+% refChan, epiChan, emptyChan, badChan, noisyChan, altBadChan
 
-%% load the data to define and eliminate bad channels
-
-% Loop across blocks
-for i = 1:length(block_name)
-    bn = block_name{i};
+%% Loop across blocks
+for b = 1:length(block_name)
+    bn = block_name{b};
     data_dir = [dirs.origDat '/' sbj_name '/' bn]; % directory for saving data
-    
-    target_fs = 1000; % 
-    
+
     if fs_iEEG <= target_fs
         ecog_ds = 1;
     else
@@ -18,18 +15,18 @@ for i = 1:length(block_name)
 
     % List all the files in that folder
     all_iEEG = dir(fullfile(data_dir, 'iEEG*.mat'));
-    for i = 1:length(all_iEEG)
-        channame_tmp = strsplit(all_iEEG(i).name, {'_', '.'});
-        channame_iEEG{i} = channame_tmp{end-1};
+    for b = 1:length(all_iEEG)
+        channame_tmp = strsplit(all_iEEG(b).name, {'_', '.'});
+        channame_iEEG{b} = channame_tmp{end-1};
     end
     
     cn_temp=strrep(cellstr(num2str(sort(str2double(channame_iEEG')),'%02d')),' ','')';
     channame_iEEG=cn_temp;
     
     all_Pdio = dir(fullfile(data_dir, 'Pdio*.mat'));
-    for i = 1:length(all_Pdio)
-        channame_tmp = strsplit(all_Pdio(i).name, {'_', '.'});
-        channame_Pdio{i} = channame_tmp{end-1};
+    for b = 1:length(all_Pdio)
+        channame_tmp = strsplit(all_Pdio(b).name, {'_', '.'});
+        channame_Pdio{b} = channame_tmp{end-1};
     end
     
     % Loop across iEEG channels
@@ -40,6 +37,7 @@ for i = 1:length(block_name)
         else
         end
         [P,Q] = rat(target_fs/fs_iEEG);
+        N = max([P Q]) * 2;
         wave = resample(double(d.wave),P,Q);
         fs = P/Q*fs_iEEG;
         fs_iEEG_final = fs;
@@ -76,13 +74,13 @@ for i = 1:length(block_name)
     globalVar.channame = channame_iEEG;
     globalVar.chanLength = length(wave);
     globalVar.nchan = length(globalVar.channame);
-    globalVar.refChan = refChan;
-    globalVar.epiChan = epiChan;
-    globalVar.emptyChan = emptyChan;
-    globalVar.badChan = [];
-    globalVar.noisyChan = noisyChan;
-    globalVar.altBadChan = altBadChan;
-    %globalVar.badChan = badChan;
+    % globalVar.refChan = refChan;
+    % globalVar.epiChan = epiChan;
+    % globalVar.emptyChan = emptyChan;
+    % globalVar.badChan = [];
+    % globalVar.noisyChan = noisyChan;
+    % globalVar.altBadChan = altBadChan;
+    % globalVar.badChan = badChan;
 
     save(fn,'globalVar');
     disp('globalVar updated')

@@ -49,9 +49,9 @@ static real32_T *emlrt_marshallIn(const mxArray *u,
                                   const emlrtMsgIdentifier *parentId,
                                   int32_T y_size[2]);
 
-static void emlrt_marshallOut(const emxArray_real32_T *u, const mxArray *y);
+static void emlrt_marshallOut(emxArray_real32_T *u, const mxArray *y);
 
-static const mxArray *emlrt_marshallOut(const real_T u_data[],
+static const mxArray *emlrt_marshallOut(real_T u_data[],
                                         const int32_T u_size[2]);
 
 // Function Definitions
@@ -151,15 +151,16 @@ static real32_T *emlrt_marshallIn(const mxArray *u,
   return y_data;
 }
 
-static void emlrt_marshallOut(const emxArray_real32_T *u, const mxArray *y)
+static void emlrt_marshallOut(emxArray_real32_T *u, const mxArray *y)
 {
   nvtxRangePushA("#fcn#emlrt_marshallOut#" MW_AT_LOCATION);
   emlrtMxSetData((mxArray *)y, &u->data[0]);
   emlrtSetDimensions((mxArray *)y, &u->size[0], 2);
+  u->canFreeData = false;
   nvtxRangePop();
 }
 
-static const mxArray *emlrt_marshallOut(const real_T u_data[],
+static const mxArray *emlrt_marshallOut(real_T u_data[],
                                         const int32_T u_size[2])
 {
   static const int32_T iv[2]{0, 0};
@@ -168,7 +169,7 @@ static const mxArray *emlrt_marshallOut(const real_T u_data[],
   nvtxRangePushA("#fcn#emlrt_marshallOut#" MW_AT_LOCATION);
   y = nullptr;
   m = emlrtCreateNumericArray(2, (const void *)&iv[0], mxDOUBLE_CLASS, mxREAL);
-  emlrtMxSetData((mxArray *)m, (void *)&u_data[0]);
+  emlrtMxSetData((mxArray *)m, &u_data[0]);
   emlrtSetDimensions((mxArray *)m, &u_size[0], 2);
   emlrtAssign(&y, m);
   nvtxRangePop();

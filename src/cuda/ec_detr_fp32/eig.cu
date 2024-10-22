@@ -27,28 +27,28 @@ static emlrtRTEInfo e_emlrtRTEI{
     56,                                                            // lineNo
     24,                                                            // colNo
     "eig",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/eig.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/eig.m" // pName
 };
 
 static emlrtRTEInfo f_emlrtRTEI{
     60,                                                            // lineNo
     28,                                                            // colNo
     "eig",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/eig.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/eig.m" // pName
 };
 
 static emlrtRTEInfo g_emlrtRTEI{
     85,                                                            // lineNo
     9,                                                             // colNo
     "eig",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/eig.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/eig.m" // pName
 };
 
 static emlrtRTEInfo h_emlrtRTEI{
     1,         // lineNo
     30,        // colNo
     "xsyheev", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
     "xsyheev.m" // pName
 };
 
@@ -56,7 +56,7 @@ static emlrtRTEInfo i_emlrtRTEI{
     89,                                                            // lineNo
     13,                                                            // colNo
     "eig",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/eig.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/eig.m" // pName
 };
 
 static emlrtRTEInfo
@@ -64,7 +64,7 @@ static emlrtRTEInfo
         40,      // lineNo
         37,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -72,7 +72,7 @@ static emlrtRTEInfo k_emlrtRTEI{
     47,        // lineNo
     20,        // colNo
     "xsyheev", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
     "xsyheev.m" // pName
 };
 
@@ -81,7 +81,7 @@ static emlrtRTEInfo
         1,        // lineNo
         27,       // colNo
         "xgehrd", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgehrd.m" // pName
     };
 
@@ -90,7 +90,7 @@ static emlrtRTEInfo
         99,      // lineNo
         24,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -98,14 +98,14 @@ static emlrtRTEInfo n_emlrtRTEI{
     42,                                                              // lineNo
     9,                                                               // colNo
     "schur",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/schur.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/schur.m" // pName
 };
 
 static emlrtRTEInfo o_emlrtRTEI{
     62,        // lineNo
     9,         // colNo
     "xsyheev", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
     "xsyheev.m" // pName
 };
 
@@ -114,7 +114,7 @@ static emlrtRTEInfo
         102,     // lineNo
         21,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -123,7 +123,7 @@ static emlrtRTEInfo
         76,       // lineNo
         22,       // colNo
         "xgehrd", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgehrd.m" // pName
     };
 
@@ -131,7 +131,7 @@ static emlrtRTEInfo r_emlrtRTEI{
     28,                     // lineNo
     9,                      // colNo
     "eigHermitianStandard", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/private/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/private/"
     "eigHermitianStandard.m" // pName
 };
 
@@ -140,7 +140,7 @@ static emlrtRTEInfo
         131,     // lineNo
         29,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -148,14 +148,14 @@ static emlrtRTEInfo t_emlrtRTEI{
     69,                                                              // lineNo
     13,                                                              // colNo
     "schur",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/schur.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/schur.m" // pName
 };
 
 static emlrtRTEInfo u_emlrtRTEI{
     63,        // lineNo
     9,         // colNo
     "xsyheev", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
     "xsyheev.m" // pName
 };
 
@@ -164,7 +164,7 @@ static emlrtRTEInfo
         132,     // lineNo
         29,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -172,14 +172,14 @@ static emlrtRTEInfo w_emlrtRTEI{
     46,                                                              // lineNo
     9,                                                               // colNo
     "schur",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/schur.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/schur.m" // pName
 };
 
 static emlrtRTEInfo x_emlrtRTEI{
     33,                     // lineNo
     5,                      // colNo
     "eigHermitianStandard", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/private/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/private/"
     "eigHermitianStandard.m" // pName
 };
 
@@ -188,7 +188,7 @@ static emlrtRTEInfo
         86,       // lineNo
         9,        // colNo
         "xgehrd", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgehrd.m" // pName
     };
 
@@ -197,7 +197,7 @@ static emlrtRTEInfo
         134,     // lineNo
         35,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -206,7 +206,7 @@ static emlrtRTEInfo
         87,       // lineNo
         9,        // colNo
         "xgehrd", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgehrd.m" // pName
     };
 
@@ -214,7 +214,7 @@ static emlrtRTEInfo cb_emlrtRTEI{
     23,                             // lineNo
     9,                              // colNo
     "eigRealSkewSymmetricStandard", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/private/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/private/"
     "eigRealSkewSymmetricStandard.m" // pName
 };
 
@@ -223,7 +223,7 @@ static emlrtRTEInfo
         111,      // lineNo
         29,       // colNo
         "xhseqr", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xhseqr.m" // pName
     };
 
@@ -232,7 +232,7 @@ static emlrtRTEInfo
         112,      // lineNo
         29,       // colNo
         "xhseqr", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xhseqr.m" // pName
     };
 
@@ -241,7 +241,7 @@ static emlrtRTEInfo
         160,     // lineNo
         13,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -249,7 +249,7 @@ static emlrtRTEInfo gb_emlrtRTEI{
     24,                             // lineNo
     9,                              // colNo
     "eigRealSkewSymmetricStandard", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/private/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/private/"
     "eigRealSkewSymmetricStandard.m" // pName
 };
 
@@ -258,7 +258,7 @@ static emlrtRTEInfo
         168,     // lineNo
         16,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -267,7 +267,7 @@ static emlrtRTEInfo
         129,      // lineNo
         9,        // colNo
         "xhseqr", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xhseqr.m" // pName
     };
 
@@ -276,7 +276,7 @@ static emlrtRTEInfo
         161,     // lineNo
         13,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -284,7 +284,7 @@ static emlrtRTEInfo kb_emlrtRTEI{
     27,            // lineNo
     13,            // colNo
     "eigStandard", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/private/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/private/"
     "eigStandard.m" // pName
 };
 
@@ -293,7 +293,7 @@ static emlrtRTEInfo
         130,      // lineNo
         9,        // colNo
         "xhseqr", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xhseqr.m" // pName
     };
 
@@ -301,7 +301,7 @@ static emlrtRTEInfo mb_emlrtRTEI{
     1,                                                             // lineNo
     20,                                                            // colNo
     "eig",                                                         // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/matfun/eig.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/matfun/eig.m" // pName
 };
 
 static emlrtRTEInfo
@@ -309,7 +309,7 @@ static emlrtRTEInfo
         99,      // lineNo
         1,       // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -318,7 +318,7 @@ static emlrtRTEInfo
         131,     // lineNo
         5,       // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -327,7 +327,7 @@ static emlrtRTEInfo
         132,     // lineNo
         5,       // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -336,7 +336,7 @@ static emlrtRTEInfo
         134,     // lineNo
         10,      // colNo
         "xgeev", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeev.m" // pName
     };
 
@@ -345,7 +345,7 @@ static emlrtRTEInfo
         111,      // lineNo
         9,        // colNo
         "xhseqr", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xhseqr.m" // pName
     };
 
@@ -354,7 +354,7 @@ static emlrtRTEInfo
         112,      // lineNo
         9,        // colNo
         "xhseqr", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xhseqr.m" // pName
     };
 

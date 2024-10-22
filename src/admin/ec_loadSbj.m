@@ -39,42 +39,42 @@ for v = 1:numel(a.vars)
     vv = a.vars(v); % Variable name
 
     % Metadata "n" struct
-    if vv=="n" && v<nOut
+    if vv=="n" && v<=nOut
         fpath = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
         disp("[ec_loadSbj] Loaded: "+fpath); % Load
         varargout{v} = n;
     end
 
     % EEG data for a.sfx
-    if vv=="x" && v<nOut
+    if vv=="x" && v<=nOut
         fpath = dirs.procSbj+"x"+a.sfx+"_"+sbjID+"_"+task;
         load(fpath,"x"); disp("[ec_loadSbj] Loaded: "+fpath);
         varargout{v} = x;
     end
 
     % Behavioral task data aligned to EEG recordings
-    if vv=="psy" && v<nOut
+    if vv=="psy" && v<=nOut
         fpath = dirs.procSbj+"psy"+a.hz+"_"+sbjID+"_"+task;
         load(fpath,"psy");  disp("[ec_loadSbj] Loaded: "+fpath);
         varargout{v} = psy;
     end
 
     % Trial information
-    if vv=="trialNfo" && v<nOut
+    if vv=="trialNfo" && v<=nOut
         fpath = dirs.procSbj+"trialNfo"+a.hz+"_"+sbjID+"_"+task;
         load(fpath,"trialNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
         varargout{v} = trialNfo;
     end
 
     % Channel information
-    if vv=="chNfo" && v<nOut
+    if vv=="chNfo" && v<=nOut
         fpath = dirs.procSbj+"chNfo_"+sbjID+"_"+task;
         load(fpath,"chNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
         varargout{v} = chNfo;
     end
 
     % Dirs
-    if vv=="dirs" && v<nOut
+    if vv=="dirs" && v<=nOut
         varargout{v} = dirs;
     end
 end

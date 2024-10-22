@@ -22,7 +22,7 @@ static emlrtRTEInfo emlrtRTEI{
     181,                     // lineNo
     24,                      // colNo
     "combineVectorElements", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/private/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/datafun/private/"
     "combineVectorElements.m" // pName
 };
 
@@ -30,7 +30,7 @@ static emlrtRTEInfo b_emlrtRTEI{
     20,                                                             // lineNo
     1,                                                              // colNo
     "sum",                                                          // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/sum.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/datafun/sum.m" // pName
 };
 
 // Function Definitions

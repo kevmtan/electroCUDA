@@ -125,7 +125,6 @@ for v = 1:2
     system('rm -rf codegen');
 end
 
-
 %% ec_filtfilt_fp: zero-phase filtering
 
 % Config
@@ -135,7 +134,7 @@ clear all; close all;
 % Paths & names
 fn = d.code+"bin"+filesep;
 fnc = d.srcCUDA+"codegen"+filesep+"mex"+filesep;
-funs = "ec_filtfilt_fp";
+funs = "filtfilt";
 funz = ["ec_filtfilt_fp32","ec_filtfilt_fp64"];
 
 % Compile loop
@@ -145,21 +144,15 @@ for v = 1:2
     system("rm -rf "+fnc+funs);
 
     if v==1
-        arg1 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % x
-        arg2 = coder.newtype('single',[2147483647-1 1],[1 0]); % b
-        arg3 = coder.newtype('single',[2147483647-1 1],[1 0]); % a
-        arg4 = coder.newtype('single',[2147483647-1 1],[1 0]); % z
-        arg5 = coder.newtype('single',[1 1],[0 0]); % nf
-        arg6 = coder.newtype('single',[1 1],[0 0]); % L
+        arg1 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % b/sos
+        arg2 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % a/g
+        arg3 = coder.newtype('single',[2147483647-1 65535-1 65535-1],[1 1 1]); % x
     elseif v==2
-        arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]); % x
-        arg2 = coder.newtype('double',[2147483647-1 1],[1 0]); % b
-        arg3 = coder.newtype('double',[2147483647-1 1],[1 0]); % a
-        arg4 = coder.newtype('double',[2147483647-1 1],[1 0]); % z
-        arg5 = coder.newtype('double',[1 1],[0 0]); % nf
-        arg6 = coder.newtype('double',[1 1],[0 0]); % L
+        arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]); % b/sos
+        arg2 = coder.newtype('double',[2147483647-1 65535-1],[1 1]); % a/g
+        arg3 = coder.newtype('double',[2147483647-1 65535-1 65535-1],[1 1 1]); % x
     end
-    argz = {arg1,arg2,arg3,arg4,arg5,arg6};
+    argz = {arg1,arg2,arg3};
 
     codegen(funs,"-o",funz(v),"-config",cfg,"-args",argz,"-gpuprofile");
 
@@ -168,6 +161,50 @@ for v = 1:2
     delete(d.srcCUDA+funz(v)+filesep+funz(v)+".mexa64");
     system('rm -rf codegen');
 end
+
+
+% %% ec_filtfilt_fp: zero-phase filtering
+% 
+% % Config
+% clear all; close all;
+% [cfg,d] = getCoderConfigs_lfn; 
+% 
+% % Paths & names
+% fn = d.code+"bin"+filesep;
+% fnc = d.srcCUDA+"codegen"+filesep+"mex"+filesep;
+% funs = "ec_filtfilt_fp";
+% funz = ["ec_filtfilt_fp32","ec_filtfilt_fp64"];
+% 
+% % Compile loop
+% for v = 1:2
+%     system("rm -rf "+fn+funz(v)+".mexa64");
+%     system("rm -rf "+d.srcCUDA+funz(v));
+%     system("rm -rf "+fnc+funs);
+% 
+%     if v==1
+%         arg1 = coder.newtype('single',[2147483647-1 65535-1],[1 1]); % x
+%         arg2 = coder.newtype('single',[2147483647-1 1],[1 0]); % b
+%         arg3 = coder.newtype('single',[2147483647-1 1],[1 0]); % a
+%         arg4 = coder.newtype('single',[2147483647-1 1],[1 0]); % z
+%         arg5 = coder.newtype('single',[1 1],[0 0]); % nf
+%         arg6 = coder.newtype('single',[1 1],[0 0]); % L
+%     elseif v==2
+%         arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]); % x
+%         arg2 = coder.newtype('double',[2147483647-1 1],[1 0]); % b
+%         arg3 = coder.newtype('double',[2147483647-1 1],[1 0]); % a
+%         arg4 = coder.newtype('double',[2147483647-1 1],[1 0]); % z
+%         arg5 = coder.newtype('double',[1 1],[0 0]); % nf
+%         arg6 = coder.newtype('double',[1 1],[0 0]); % L
+%     end
+%     argz = {arg1,arg2,arg3,arg4,arg5,arg6};
+% 
+%     codegen(funs,"-o",funz(v),"-config",cfg,"-args",argz,"-gpuprofile");
+% 
+%     movefile(fnc+funs,d.srcCUDA+funz(v),"f");
+%     movefile(funz(v)+".mexa64",fn+funz(v)+".mexa64");
+%     delete(d.srcCUDA+funz(v)+filesep+funz(v)+".mexa64");
+%     system('rm -rf codegen');
+% end
 
 
 
@@ -220,13 +257,14 @@ end
 %% CONFIGS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [cfg,d] = getCoderConfigs_lfn
 
-cfg = coder.gpuConfig('mex');
+cfg = coder.gpuConfig("mex");
 cfg.EnableAutoParallelization = true;
-cfg.DeepLearningConfig = coder.DeepLearningConfig("TargetLibrary","tensorrt");
+cfg.DeepLearningConfig = coder.DeepLearningConfig("tensorrt");
+cfg.TargetLang = "C++";
 cfg.DynamicMemoryAllocationThreshold = 65535;
 %cfg.FilePartitionMethod = "SingleFile";
 cfg.GenerateReport = true;
-cfg.GlobalDataSyncMethod = "SyncAlways"; %= "SyncAtEntryAndExits";
+%cfg.GlobalDataSyncMethod = "SyncAlways"; %= "SyncAtEntryAndExits";
 %cfg.ExtrinsicCalls = true;
 %cfg.EnableJIT = true;
 cfg.InlineBetweenUserFunctions = "Speed";

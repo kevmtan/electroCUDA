@@ -5,7 +5,7 @@
 //
 // rt_nonfinite.cu
 //
-// Code generation for function 'ec_filtfilt_fp'
+// Code generation for function 'filtfilt'
 //
 
 // Include files

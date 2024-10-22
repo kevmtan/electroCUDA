@@ -5,7 +5,7 @@
 //
 // rt_nonfinite.h
 //
-// Code generation for function 'ec_filtfilt_fp'
+// Code generation for function 'filtfilt'
 //
 
 #pragma once

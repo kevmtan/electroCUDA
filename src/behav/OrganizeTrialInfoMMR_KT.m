@@ -1,202 +1,215 @@
-function OrganizeTrialInfoMMR_KT(sbj,task, runs, dirs)
+function OrganizeTrialInfoMMR_KT(sbj,task,proj)
+% sbj="S13_54_KDH"; task="MMR"; proj="lbcn"; 
 
-for i1 = 1:length(runs)
-    bn = runs{i1};
-    
+dirs = ec_getDirs(proj,task,sbj);
+blocks = BlockBySubj(sbj,task);
 
-    
-    % Load behavioral file
-    fn = fullfile(dirs.origSbj,bn,'sodata*.mat');
-    fn = dir(fn);
-    K = load(fullfile(fn.folder,fn.name)); % block 55 %% FIND FILE IN THE FOLDER AUTO
-    
-    
-    for ii = 1:length(K.theData)
-        if size(K.theData(ii).kinfo,2) ~= 1
-            K.theData(ii).RT = NaN;
-            K.theData(ii).keys = NaN;
-            if ~isstruct(K.theData(ii).flip)
-                K.theData(ii).flip = {};
-                K.theData(ii).flip.StimulusOnsetTime = NaN;
-                %                 fprintf('Making it struct: %d\n',i)
-            end
-            K.theData(ii).flip.StimulusOnsetTime = NaN;
+for r = 1:length(blocks)
+    block = blocks{r};
+    withinRun_lfn(block,dirs);
+end
+
+
+
+%% Within-run subfunction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function withinRun_lfn(block,dirs)
+conds = ["self","other","semantic","episodic","math","rest","fact"];
+condNames = ["self-internal","other","self-external","autobio","math","rest","fact"];
+conds_math_memory = ["memory","memory","memory","memory","math","rest","memory"];
+
+% Get run number
+if contains(block,'_')
+    run = extractAfter(block,asManyOfPattern(wildcardPattern + "_"));
+elseif contains(block,'-')
+    run = extractAfter(block,asManyOfPattern(wildcardPattern + "-"));
+end
+run = uint8(str2double(run));
+sbjRun = "s"+dirs.sbjID+"r"+run;
+
+% load behavioral data
+fn = dir(fullfile(dirs.origSbj,block,"sodata*.mat"));
+K = load(fullfile(fn.folder,fn.name)); % block 55 %% FIND FILE IN THE FOLDER AUTO
+dat = struct2table(K.theData);
+dat.wlist = string(K.wlist);
+
+% Remove trial if no flip
+if iscell(dat.flip)
+    idx = cellfun(@isstruct,dat.flip);
+    if isany(idx)
+        disp(sbjRun+": removing trials with no flip");
+        disp(idx');
+        dat = struct2table(K.theData(idx));
+        dat.wlist = string(K.wlist(idx));
+    end
+end
+dat = [dat struct2table(dat.flip)];
+
+
+%% Make trialinfo for stimulus trials
+trialinfo = table;
+trialinfo.wlist = dat.wlist;
+
+% Keys & RT
+for t = 1:height(dat)
+    tmpRT = K.theData(t).RT;
+    tmpKey = string(K.theData(t).keys);
+
+    nResp = numel(tmpKey);
+    if nResp > 1 % more than one response
+        idx = find(ismember(tmpKey,["1" "2" "DownArrow" "End" "1!" "2@"]));
+        if isempty(idx)
+            tmpRT = tmpRT(1);
+            tmpKey = tmpKey(1);
         else
+            tmpRT = tmpRT(idx(1));
+            tmpKey = tmpKey(idx(1));
         end
+    elseif ~(tmpRT>0) || tmpKey=="noanswer"
+        nResp = 0;
     end
-    
-    % start trialinfo
-    trialinfo = table;
-    for i = 1:length(K.theData)
-        trialinfo.wlist = reshape(K.wlist,length(K.wlist),1);
+
+    % Correct keys
+    if tmpKey=="DownArrow"
+        tmpKey = "2";
+    elseif tmpKey=="End"
+        tmpKey = "1";
+    elseif tmpKey=="2@"
+        tmpKey = "2";
+    elseif tmpKey=="1!"
+        tmpKey = "1";
     end
-    for i = 1:length(K.theData)
-        % Find if multiple responses in keys
-        if iscell(K.theData(i).keys)
-            temp_key = K.theData(i).keys;
-            for ti = 1:length(temp_key)
-                temp_key{ti} = num2str(temp_key{ti});
-            end
-            idxKey = find(ismember(temp_key,{'1','2','DownArrow','End','1!','2@'}));
-            if ~isempty(idxKey)
-                temp_key = temp_key{idxKey};
-            else
-                temp_key = 'NaN';
-            end
+
+    trialinfo.RT(t) = tmpRT;
+    trialinfo.key(t) = tmpKey;
+    trialinfo.nResp(t) = uint8(nResp);
+end
+
+% Warn if multiple beh responses in some trials
+maxResp = max(trialinfo.nResp);
+if maxResp > 1
+    warning("["+sbjRun+"] Some trials have multiple behav responses, max="+maxResp); end
+
+% Add calculation info
+for t = 1:height(trialinfo)
+    [C,matches] = strsplit(trialinfo.wlist(t),["+" "-" "=" "and" "is"],CollapseDelimiters=true);
+    if sum(isstrprop(C{1}, 'digit')) > 0
+        isCalc = true;
+        Operand1 = str2double((C{1}));
+        Operand2 = str2double((C{2}));
+        if matches(1)=="-"
+            Operator = -1;
         else
-            temp_key = num2str(K.theData(i).keys);
+            Operator = 1;
         end
-        
-        if strcmp(temp_key,'DownArrow')
-            temp_key = '2';
-        elseif strcmp(temp_key,'End')
-            temp_key = '1';
-        elseif strcmp(temp_key,'NaN')
-            temp_key = 'noanswer';
-        elseif strcmp(temp_key,'2@')
-            temp_key = '2';
-        elseif strcmp(temp_key,'1!')
-            temp_key = '1';
-        end
-        trialinfo.keys{i} = temp_key;
-    end
-    
-    
-    for i=1:length(K.theData)
-        RTa=K.theData(i).RT;
-        RTb(i,1)=RTa(1);
-    end
-    
-    trialinfo.RT = RTb;
-    clear RTb
-    % trialinfo.RT = vertcat(K.theData(:).RT);%RTb;%
-    
-    condNames= {'self-internal','other','self-external','autobio','math','rest','fact'};
-    conds_math_memory = {'memory','memory','memory','memory','math','rest','memory'};
-    
-    % Add calculation info
-    for i = 1:size(trialinfo,1)
-        % Calculation info
-        [C,matches] = strsplit(trialinfo.wlist{i},{'+','-','=', 'and', 'is'},'CollapseDelimiters',true);
-        if sum(isstrprop(C{1}, 'digit')) > 0
-            isCalc = 1;
-            Operand1 = str2num((C{1}));
-            Operand2 = str2num((C{2}));
-            if strmatch(matches{1}, '-') == 1
-                Operator = -1;
-            else
-                Operator = 1;
-            end
-            CorrectResult = Operand1 + Operand2*Operator;
-            PresResult = str2num((C{3}(1:3))); % this is because sometimes there is a wrong character after the last digit
-            Deviant = CorrectResult - PresResult;
-            AbsDeviant = abs(Deviant);
-            if (Deviant == 0 && strcmp(trialinfo.keys{i}, '1') == 1) || (Deviant ~= 0 && strcmp(trialinfo.keys{i}, '2') == 1)
-                trialinfo.Accuracy(i,1) = 1;
-            else
-                trialinfo.Accuracy(i,1) = 0;
-            end
-            
-        elseif strmatch(trialinfo.wlist{i}, '+') == 1
-            isCalc = 0;
-            Operand1 = nan;
-            Operand2 = nan;
-            Operator = nan;
-            CorrectResult = nan;
-            PresResult = nan;
-            Deviant = nan;
-            AbsDeviant = nan;
+        CorrectResult = Operand1 + Operand2*Operator;
+        PresResult = str2double((C{3}(1:3))); % this is because sometimes there is a wrong character after the last digit
+        Deviant = CorrectResult - PresResult;
+        AbsDeviant = abs(Deviant);
+        if (Deviant==0 && trialinfo.key(t)=="1") || (Deviant~=0 && trialinfo.key(t)=="2")
+            acc = true;
         else
-            isCalc = 0;
-            Operand1 = nan;
-            Operand2 = nan;
-            Operator = nan;
-            CorrectResult = nan;
-            PresResult = nan;
-            Deviant = nan;
-            AbsDeviant = nan;
+            acc = false;
         end
-        trialinfo.condNames{i,1} = condNames{K.conds(i)};
-        trialinfo.conds_math_memory{i,1} = conds_math_memory{K.conds(i)};
-        trialinfo.isCalc(i,1) = isCalc;
-        trialinfo.Operand1(i,1) = Operand1;
-        trialinfo.Operand2(i,1) = Operand2;
-        trialinfo.OperandMin(i,1) = min(Operand1,Operand2);
-        trialinfo.OperandMax(i,1) = max(Operand1,Operand2);
-        trialinfo.Operator(i,1) = Operator;
-        trialinfo.CorrectResult(i,1) = CorrectResult;
-        trialinfo.PresResult(i,1) = PresResult;
-        trialinfo.Deviant(i,1) = Deviant;
-        trialinfo.AbsDeviant(i,1) = AbsDeviant;
-        trialinfo.StimulusOnsetTime(i,1) = K.theData(i).flip.StimulusOnsetTime;
-    end
-    
-    ITIs = nan(1,size(trialinfo,1)-1);
-    for t = 2:size(trialinfo,1)
-        ITIs(t-1)=trialinfo.StimulusOnsetTime(t,1)-(trialinfo.StimulusOnsetTime(t-1,1)+trialinfo.RT(t-1));
-    end
-    
-    
-    ITIreal = mean(ITIs(ITIs<1));
-    
-    restInds = find((ITIs > 4 & ITIs < 6) | (ITIs > 9 & ITIs < 11));
-    restOnsets = nan(1,length(restInds));
-    
-    for ri = 1:length(restInds)
-        restOnsets(ri)=trialinfo.StimulusOnsetTime(restInds(ri),1)+trialinfo.RT(restInds(ri))+ITIreal;
-    end
-    
-    rest_inds = restInds;
-    rest_inds = rest_inds + (1:length(rest_inds));
-    ntrials_total = size(trialinfo,1) + length(rest_inds);
-    trialinfoNew = table;
-    trialinfoNew(setdiff(1:ntrials_total,rest_inds),:)=trialinfo;
-    trialinfoNew.condNames(rest_inds)={'rest'};
-    trialinfoNew.conds_math_memory(rest_inds)={'rest'};
-    trialinfoNew.wlist(rest_inds)={'+'};
-    trialinfoNew.RT(rest_inds)=NaN;
-    trialinfoNew.allonsets(rest_inds)= NaN;
-    trialinfoNew.StimulusOnsetTime(rest_inds) = restOnsets;
-    trialinfo = trialinfoNew;
-    
-    %% Exceptions
-    if strcmp(sbj, 'S12_32_JTb') && strcmp(task, 'MMR') && strcmp(bn, 'JT0112-45')
-        trialinfo = trialinfo(2:end,:);
     else
+        isCalc = false;
+        Operand1 = nan;
+        Operand2 = nan;
+        Operator = nan;
+        CorrectResult = nan;
+        PresResult = nan;
+        Deviant = nan;
+        AbsDeviant = nan;
+        acc = false;
     end
-    
-    % Save
-    save(fullfile(dirs.origSbj,bn,['trialinfo_' bn '.mat']), 'trialinfo');
+    trialinfo.cond(t) = conds(K.conds(t));
+    trialinfo.condNames(t) = condNames(K.conds(t));
+    trialinfo.conds_math_memory(t) = conds_math_memory(K.conds(t));
+    trialinfo.isCalc(t) = isCalc;
+    trialinfo.Accuracy(t) = acc;
+    trialinfo.Operand1(t) = Operand1;
+    trialinfo.Operand2(t) = Operand2;
+    trialinfo.OperandMin(t) = min(Operand1,Operand2);
+    trialinfo.OperandMax(t) = max(Operand1,Operand2);
+    trialinfo.Operator(t) = Operator;
+    trialinfo.CorrectResult(t) = CorrectResult;
+    trialinfo.PresResult(t) = PresResult;
+    trialinfo.Deviant(t) = Deviant;
+    trialinfo.AbsDeviant(t) = AbsDeviant;
+    trialinfo.RT_og{t} = K.theData(t).RT;
+    trialinfo.key_og{t} = K.theData(t).keys;
 end
 
+% Copy from psychtoolbox output
+trialinfo.StimulusOnsetTime = dat.StimulusOnsetTime;
+trialinfo.flip = dat.FlipTimestamp;
+trialinfo.flipVBL = dat.VBLTimestamp;
+trialinfo.flipMiss = dat.Missed;
+trialinfo.flipDiff = trialinfo.flip - trialinfo.flipVBL;
+trialinfo.itiBeh(:) = nan;
+trialinfo.onsBeh = trialinfo.StimulusOnsetTime;
+trialinfo.durBeh = trialinfo.RT;
+
+% No response trials
+for t = find(~trialinfo.nResp)
+    if t+1 >= height(trialinfo)
+        onsDf = trialinfo.onsBeh(t+1) - trialinfo.onsBeh(t);
+    else
+        onsDf = K.stimdur;
+    end
+    if onsDf >= K.ITI + K.stimdur
+        trialinfo.durBeh(t) = K.stimdur;
+    else
+        trialinfo.durBeh(t) = onsDf - K.ITI;
+    end
 end
 
 
+%% Add rest trials to trialinfo
+restIdx = K.ind(K.ind <= K.fixmat)' - 1; % Insert rest trials after these stim trials
+restDur = K.FixTime(1:height(restIdx))'; % Duration of rest trial
 
-%     for t = 1:size(trialinfo,1)
-%         onset = trialinfo.StimulusOnsetTime(t,1);
-%         resp = trialinfo.StimulusOnsetTime(t,1)+trialinfo.RT(t);
-%         plot([onset onset],[0 1],'b-')
-%         hold on
-%         plot([resp resp],[0 1],'r-')
-%     end
-%
-%     for ri = 1:length(restInds)
-%         plot([restOnsets(ri) restOnsets(ri)],[0 1],'g-')
-%     end
-%
+% Ensure ITI > restDur
+t = 2:height(trialinfo);
+itis = trialinfo.onsBeh(t) - trialinfo.onsBeh(t-1) - trialinfo.durBeh(t-1);
+restIdx = restIdx(itis(restIdx) >= restDur);
+
+% Rest onsets/duration
+restOns = trialinfo.onsBeh(restIdx) + trialinfo.durBeh(restIdx);
+restDur = K.FixTime(1:numel(restIdx))'; % Duration of rest trial
+
+% Redo indices to make new table
+restIdx = restIdx + (1:height(restIdx))';
+nTrs = height(trialinfo) + height(restIdx);
+
+% New trialinfo with rest trials
+trialinfo2 = table;
+trialinfo2(setdiff(1:nTrs,restIdx),:) = trialinfo;
+trialinfo2.condNames(restIdx) = "rest";
+trialinfo2.conds_math_memory(restIdx) = "rest";
+trialinfo2.wlist(restIdx) = "+";
+trialinfo2.RT(restIdx) = NaN;
+trialinfo2.onsBeh(restIdx) = restOns;
+trialinfo2.durBeh(restIdx) = restDur;
 
 
-%% Correct for rest trials
-%     rest_inds = sort(K.rest_inds);
-%     rest_inds = rest_inds + (1:length(rest_inds));
-%     ntrials_total = size(trialinfo,1) + length(rest_inds);
-%     trialinfoNew = table;
-%     trialinfoNew(setdiff(1:ntrials_total,rest_inds),:)=trialinfo;
-%     trialinfoNew.condNames(rest_inds)={'rest'};
-%     trialinfoNew.conds_math_memory(rest_inds)={'rest'};
-%     trialinfoNew.wlist(rest_inds)={'+'};
-%     trialinfoNew.RT(rest_inds)=NaN;
-%     trialinfoNew.allonsets(rest_inds)=NaN;
-%
-%     trialinfo = trialinfoNew;
+%% Finalize trialinfo
+trialinfo = trialinfo2; % Replace old trialinfo
+
+% Calculate ITI
+t = 2:height(trialinfo);
+trialinfo.itiBeh(t) = trialinfo.onsBeh(t) - trialinfo.onsBeh(t-1) - trialinfo.durBeh(t-1);
+trialinfo.itiBeh(1) = K.ITI;
+
+% Add Basic info
+trialinfo.sbj(:) = dirs.sbj;
+trialinfo.sbjID(:) = dirs.sbjID;
+trialinfo.block(:) = string(block);
+trialinfo.run(:) = run;
+trialinfo.trial(:) = uint16(1:height(trialinfo));
+trialinfo.task(:) = dirs.task;
+trialinfo = movevars(trialinfo,["sbjID" "run" "trial"],"Before",1);
+trialinfo = movevars(trialinfo,["sbj" "block" "task"],"Before","StimulusOnsetTime");
+
+
+%% Save
+save(fullfile(dirs.origSbj,block,['trialinfo_' block '.mat']), 'trialinfo');

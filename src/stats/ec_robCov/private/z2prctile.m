@@ -31,7 +31,7 @@ end
 z=z2score(y,Q,m,iQ);
 
 %Second, compute percentile:
-[nD]=size(y,1);
+nD=size(y,1);
 if nargin<5
     Qdof=[];
 end

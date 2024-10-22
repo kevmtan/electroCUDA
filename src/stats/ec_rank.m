@@ -8,7 +8,7 @@ function [xRank,tol,xEig,xRank1] = ec_rank(x,tol,o)
 %% Input validation
 arguments
     x (:,:){mustBeFloat}            % Input data: x(observations,variables)
-    tol (1,1){isfloat} = 0          % Rank tolerance (min eigenvalue)
+    tol (1,1){mustBeFloat} = 0      % Rank tolerance (min eigenvalue)
     o.eig (1,1) logical = false     % Eigenvector as 1st output
     o.compare (1,1) logical = false % Compare with Matlab's rank() function
     o.exact (1,1) logical = false   % Determine exact rank tol (slower)

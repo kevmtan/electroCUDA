@@ -1,5 +1,4 @@
-function [trialNfo,n,errors] =...
-    ec_getEventIdx(sbj,n,dsTarg)
+function [trialNfo,n,errors] = ec_getEventIdx(sbj,n,dsTarg)
 arguments
     sbj string
     n struct

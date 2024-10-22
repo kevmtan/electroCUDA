@@ -25,7 +25,7 @@ static emlrtRTEInfo
         140,      // lineNo
         5,        // colNo
         "mtimes", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+blas/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+blas/"
         "mtimes.m" // pName
     };
 
@@ -82,14 +82,11 @@ void b_mtimes(emxArray_real32_T *cpu_A, emxArray_real32_T *gpu_A,
       gpuEmxMemcpyCpuToGpu_real32_T(gpu_B, cpu_B);
     }
     *B_outdatedOnGpu = false;
-    nvtxMarkA("#cublasCheck#" MW_AT_LINE);
-    cublasCheck(cublasSgemm(getCublasGlobalHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
-                            cpu_A->size[0], 1, cpu_A->size[1], (float *)&alpha1,
-                            (float *)&gpu_A->data[0], cpu_A->size[0],
-                            (float *)&gpu_B->data[0], cpu_A->size[1],
-                            (float *)&beta1, (float *)&gpu_C->data[0],
-                            cpu_A->size[0]),
-                __FILE__, __LINE__);
+    cublasSgemm(getCublasGlobalHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
+                cpu_A->size[0], 1, cpu_A->size[1], (float *)&alpha1,
+                (float *)&gpu_A->data[0], cpu_A->size[0],
+                (float *)&gpu_B->data[0], cpu_A->size[1], (float *)&beta1,
+                (float *)&gpu_C->data[0], cpu_A->size[0]);
     *C_outdatedOnGpu = false;
     *C_outdatedOnCpu = true;
   }
@@ -149,14 +146,11 @@ void mtimes(emxArray_real32_T *cpu_A, emxArray_real32_T *gpu_A,
       gpuEmxMemcpyCpuToGpu_real32_T(gpu_B, cpu_B);
     }
     *B_outdatedOnGpu = false;
-    nvtxMarkA("#cublasCheck#" MW_AT_LINE);
-    cublasCheck(cublasSgemm(getCublasGlobalHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
-                            cpu_A->size[0], cpu_B->size[1], cpu_A->size[1],
-                            (float *)&alpha1, (float *)&gpu_A->data[0],
-                            cpu_A->size[0], (float *)&gpu_B->data[0],
-                            cpu_A->size[1], (float *)&beta1,
-                            (float *)&gpu_C->data[0], cpu_A->size[0]),
-                __FILE__, __LINE__);
+    cublasSgemm(getCublasGlobalHandle(), CUBLAS_OP_N, CUBLAS_OP_N,
+                cpu_A->size[0], cpu_B->size[1], cpu_A->size[1],
+                (float *)&alpha1, (float *)&gpu_A->data[0], cpu_A->size[0],
+                (float *)&gpu_B->data[0], cpu_A->size[1], (float *)&beta1,
+                (float *)&gpu_C->data[0], cpu_A->size[0]);
     *C_outdatedOnGpu = false;
     *C_outdatedOnCpu = true;
   }

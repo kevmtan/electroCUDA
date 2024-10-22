@@ -19,15 +19,15 @@ arguments
     oe.conds string = string(unique(psy.cond));  % List of condition names (order by desired categorical order)
     oe.conds2 string = "";                       % List of custom condition names (ordered like 'oe.conds')
 end
-fs = n.fs;
-BLpre=oe.baselinePre*fs; BLend=oe.baselineEnd*fs; lims=oe.lims*fs; limsRT=oe.limsRT*fs;
-if ~isempty(lims)
+hz = n.hz;
+BLpre=oe.baselinePre*hz; BLend=oe.baselineEnd*hz; lims=oe.lims*hz; limsRT=oe.limsRT*hz;
+if nnz(lims)
     sz = numel(lims(1):lims(2));
-    if ~isempty(limsRT)
-        if limsRT(end)<=0
-            limsRT(2)=abs(lims(1)); end
-        szRT = numel(1:limsRT(2));
-    end
+else
+    sz = 0;
+end
+if ~isempty(limsRT)
+    szRT = numel(1:limsRT(2));
 end
 
 %% Align RT wtih sampling rate
@@ -115,14 +115,14 @@ for t = 1:height(trialNfo)
     ee.RTog(:) = trialNfo.RT(t);
     ee.postRT(:) = tr;
     ee.latency = ee.time - psy.time(trialNfo.idxStim(t));
-    ee.frame = int16(ee.latency*fs);
+    ee.frame = int16(ee.latency*hz);
     ee.pct(:) = 0;
     idx = ismember(ee.idx,iTrOg);
     ee.pct(idx) = normalize(ee.latency(idx),"range",[100 110-eps(110)]);
     ee.pct(~idx) = normalize(ee.latency(~idx),"range",[110 120-eps(120)]);
     if any(BLend)
         idx = find(ee.stim,1)-1;
-        idx = idx+floor(BLend(1)*fs) : idx+floor(BLend(2)*fs);
+        idx = idx+floor(BLend(1)*hz) : idx+floor(BLend(2)*hz);
         ee.BLend(idx) = tr;
     else
         ee.BLend(:) = 0;
@@ -161,23 +161,24 @@ end
 % Latency & RT
 ep.latency = floor(ep.latency*1000); %int32(round(anT.latency*1000));
 ep.RT = floor(ep.RT*1000);
-ep.latRT = ep.latency - ep.RT;
+ep.latRT = floor(ep.latency - ep.RT);
 
 % Bin & binRT
 bin = floor(1000*oe.bin);
-ep.bin = floor(ep.latency/bin)*bin;
-ep.binRT = floor(ep.latRT/bin)*bin;
 bin2 = floor(1000*oe.bin2);
-ep.bin2 = floor(ep.latency/bin2)*bin2;
+ep.bin = ceil(ep.latency/bin)*bin;
+ep.binRT = ceil(ep.latRT/bin)*bin;
+ep.bin2 = ceil(ep.latency/bin2)*bin2;
 
 % Pcts
 ep.pct = floor(ep.pct);
-ep.pct2 = floor(ep.pct/oe.pct2)*oe.pct2; % pct2
+ep.pct2 = ceil(ep.pct/oe.pct2)*oe.pct2; % pct2
 
 % Convert data type
 ep.latency = int32(ep.latency);
 ep.latRT = int32(ep.latRT);
 ep.bin = int16(ep.bin);
+ep.bin2 = int16(ep.bin2);
 ep.binRT = int16(ep.binRT);
 ep.pct = int16(ep.pct);
 ep.pct2 = int16(ep.pct2);

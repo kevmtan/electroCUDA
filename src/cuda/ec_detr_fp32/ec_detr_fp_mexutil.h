@@ -12,7 +12,6 @@
 
 // Include files
 #include "rtwtypes.h"
-#include "MWErrorCodeUtils.hpp"
 #include "emlrt.h"
 #include "mex.h"
 #include <cmath>
@@ -32,18 +31,13 @@ struct emxArray_real32_T;
 struct emxArray_int32_T;
 
 // Function Declarations
-void b_raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
-                      const char_T *errorName, const char_T *errorString);
-
-void checkCudaError(cudaError_t errCode, const char_T *file, uint32_T b_line);
+void checkCudaError(cudaError_t errorCode, const char_T *file, int32_T b_line);
 
 int64_T computeEndIdx(int64_T start, int64_T end, int64_T stride);
 
 uint64_T computeNumIters(int32_T ub, int32_T b_ub);
 
 uint64_T computeNumIters(int32_T ub);
-
-void cublasCheck(cublasStatus_t errCode, const char_T *file, uint32_T b_line);
 
 void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
                                   emxArray_int32_T *gpu, boolean_T needsCopy);
@@ -68,7 +62,10 @@ void gpuEmxReset_int32_T(emxArray_int32_T *gpu);
 
 void gpuEmxReset_real32_T(emxArray_real32_T *gpu);
 
-void raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
-                    const char_T *errorName, const char_T *errorString);
+void gpuThrowError(const char_T *file, int32_T b_line);
+
+void gpuThrowError(uint32_T errorCode, const char_T *errorName,
+                   const char_T *errorString, const char_T *file,
+                   int32_T b_line);
 
 // End of code generation (ec_detr_fp_mexutil.h)

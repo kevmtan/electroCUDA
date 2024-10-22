@@ -7,20 +7,19 @@ sbjs = {'S12_38_LK','S12_42_NC','S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS'
     'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
     'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR','S15_87_RL',...
     'S16_95_JOB','S16_96_LF'}';
+% sbjs = {'S12_38_LK'};
 
 proj = "lbcn";
 task = "MMR"; % task name
 
-%% Options
-proj = 'lbcn';
-task = 'MMR';
-usrStr = "Kevin_DMN";
+sfx = ""; %"";
 plotType = "spec"; % "hfb-lfp"; % "spec";
 doICA = false;
-nameStr = "230413_";
-sfx = ""; %"";
-
 isTest = false;
+
+
+%% Options
+nameStr = string(datetime('now','TimeZone','local','Format','yyMMdd'))+"_";
 
 % Options struct
 o = struct;
@@ -28,26 +27,58 @@ o.name = nameStr;
 o.save = true; %% save summary stats data %%%%
 o.gpu = false;
 
-% Timing (in seconds)
-o.fsTarg = []; % Target sampling rate
-o.dsTarg = [];
-o.BLpre = [-0.3 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
-o.BLend = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
-o.bin = 0.02; % Latency bin width (seconds)
-o.bin2 = 0.1; % Latency bin2 width (seconds)
-o.pct2 = 10; % 'Downsampled version' Percent RT width (percentile)
+% Epoching (see 'ec_epochPsy')
+o.epoch.bin = 0.01; % Fine latency bin width (secs)
+o.epoch.bin2 = 0.01; % Coarse latency bin width (secs)
+o.epoch.pct = 1; % Fine latency percent width (percentile)
+o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
+% Epoch baseline period (none=[0 0]):
+o.epoch.baselinePre = [-0.3 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
+o.epoch.baselineEnd = [0 0]; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
+% Epoch time limits (variable limits=[0 0]):
+o.epoch.lims = [0 0]; % Epoch start & end from stim onset (secs); ex=[-0.2 3]
+o.epoch.limsRT = [0 0]; % Epoch start & end from behavioral RT (secs); ex=[-1.5 .5]
+o.epoch.limtsPct = [0 0]; % Epoch start & end from latency percentile; ex=[-10 120]
 
-% Ensure trial epochs contain these times (skip=[])
-o.epoch = []; %[-0.2 3]; % Stimulus-locked epochs start/end (secs from stim onset); ex=[-0.2 3]
-o.epochRT = []; %o.BLpre; % RT-locked epochs start/end (secs from RT; ex=[-1.5 .5])
-o.epochPct = []; %[o.epoch(1) 1+o.epochRT(2)];
+% Preprocessing (see 'ec_epochBaseline')
+o.pre.double = true;
+o.pre.singleOut = true;
+o.pre.gpu = false; % CPU appears faster
+o.pre.hzTarg = nan; % Target sampling rate
+o.pre.log = false; % Log transform
+o.pre.runNorm = "robust"; % Normalize run
+o.pre.trialNorm = "robust"; % Normalize trial
+o.pre.trialNormByBaseline = false; % Divide trial by baseline norm
+o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+% Bad frames/outliers
+o.pre.interp = "linear";
+o.pre.badFields = ""; % skip=""
+o.pre.olCenter = "median";
+o.pre.olThr = 5; %5; % Threshold for outlier
+o.pre.olThr2 = 5; %0; % Threshold for outlier
+o.pre.olThrBL = 3; %3; % Threshold for baseline outlier
+% PCA (skip=[])
+o.pre.pca = 0; % Components to keep across channels
+o.pre.pcaSpec = 0; % Spectral components to keep per channel
+% Filtering (within-run):
+o.pre.hpf = 0; % Hi-pass cutoff in hertz (skip=0)
+o.pre.hpfSteep = 0.5;
+o.pre.hpfImpulse = "fir"; %"iir";
+o.pre.lpf = 20; % lo-pass in hz (skip=0)
+o.pre.lpfSteep = 0.5;
+o.pre.lpfImpulse = "fir";
+
+% Stats
+o.stats.epoch = [-.2 3];
+o.stats.epochRT = [-1.5 .2];
+o.stats.epochPct = [-.1 1.1];
 
 % Frequency bands
 o.freqIdx = []; %[1 14 20:4:83];
 o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band name
-o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-13hz)" "Beta (13-30hz)"...
+o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
     "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
-o.bandsF = [1 4; 4 8; 8 13; 13 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+o.bandsF = [1 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
 
 % All Conditions
 o.conds = ["other" "selfinternal" "selfexternal" "autobio" "math" "rest"]; % order
@@ -66,14 +97,6 @@ o.detrendThr =   2.5; %repmat(2.5,1,3); %[6 3]; % outlier threshold [threshChunk
 o.detrendItr =   5;  %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
 o.detrendWin =   0; % detrend timewindow in seconds {entire run=[],default=[]}
 
-% Filtering (within blocks)
-o.hiPass = 0.1; % Hi-pass cutoff in hertz (skip=0)
-o.hiPassSteep = 0.5;
-o.hiPassImpulse = "iir"; % GPU slower than CPU??
-o.loPass = 20; % lo-pass in hz (skip=0)
-o.loPassSteep = 0.5;
-o.loPassImpulse = "auto";
-
 % Bad frames
 o.missingInterp = "linear";
 o.badFields = []; %["hfo" "mad" "diff" "sns"]
@@ -87,7 +110,7 @@ o.pcaOl = "quartiles";
 o.pcaOlThr = 3;
 
 % Plot options
-o.oP = ecu_genPlotParams('MMR','timecourse');
+o.oP = ecu_genPlotParams("ERSP","MMR");
 o.oP.visible = 0;
 o.oP.save = 1;
 o.oP.doGPU = 0;
@@ -127,21 +150,17 @@ end
 
 %% Run sum stats %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for s = 1:height(statusSum)
-    for ii = 1:2 %1 %:2
+    for ii = 1:2 %:2 %1 %:2
         if statusSum.stats(s,ii)~=1  % s=1; ii=1;
             if ii==1; doICA=1; sfx="i"; o.name=nameStr+"ic_"+plotType; end
             if ii==2; doICA=0; sfx=""; o.name=nameStr+"ch_"+plotType; end
             sbj = statusSum.sbj{s};
-            dirs = ec_getDirs(proj,sbj,task);
-            o.dirIn = dirs.procSbj; %
-            o.dirFS = dirs.fsSbj; % Freesurfer subjects dir
-            o.dirOut = dirs.anal+"summary/"+o.name+"/";
-            o.dirOutSbj = dirs.anal+"summary/"+o.name+"/s"+statusSum.sbjID(s)+"/";
 
             %%
             try
+                %%
                 disp("STARTING SUMMARY PLOTS: "+sbj);
-                ec_summaryStats_sbjCh(sbj,proj,o,dirs,stats=1,plot=0,sfx=sfx,...
+                ec_summaryStats_sbjCh(sbj,proj,task,o,stats=1,plot=0,sfx=sfx,...
                     type=plotType,ICA=doICA,test=isTest);
                 statusSum.stats(s,ii) = 1;
             catch ME; getReport(ME)
@@ -168,20 +187,16 @@ try delete(gcp('nocreate')); catch;end
 try parpool('Processes'); catch;end
 for s = 1:height(statusSum)
     for ii = 1:2 %1 %:2
-        if ii==1; doICA=1; o.name = nameStr+"ic_"+plotType; end
-        if ii==2; doICA=0; o.name = nameStr+"ch_"+plotType; end
-        if statusSum.plot(s,ii)~=1 %&& isempty(statusP.error{s})
-            sbj = statusSum.sbj{s};
-            dirs = ec_getDirs(proj,sbj,task);
-            o.dirIn = dirs.procSbj; %
-            o.dirFS = dirs.fsSbj; % Freesurfer subjects dir
-            o.dirOut = dirs.anal+"summary/"+o.name+"/";
-            o.dirOutSbj = dirs.anal+"summary/"+o.name+"/s"+statusSum.sbjID(s)+"/";
+        if ii==1; doICA=1; sfx="i"; o.name=nameStr+"ic_"+plotType; end
+        if ii==2; doICA=0; sfx=""; o.name=nameStr+"ch_"+plotType; end
+        sbj = statusSum.sbj{s};
 
+        %%
+        if statusSum.plot(s,ii)~=1 %&& isempty(statusP.error{s})
             %%
             try
                 disp("STARTING SUMMARY PLOTS: "+sbj);
-                ec_summaryStats_sbjCh(sbj,proj,o,dirs,stats=0,plot=1,...
+                ec_summaryStats_sbjCh(sbj,proj,task,o,stats=0,plot=1,...
                     sfx=sfx,type=plotType,ICA=doICA,test=isTest);
                 statusSum.plot(s,ii) = 1;
             catch ME; getReport(ME)

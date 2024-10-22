@@ -110,6 +110,8 @@ elseif o.hem=="R"
         case 'frontal'; theta=120; phi=10;
         case 'parietal'; theta=70; phi=10;
     end
+else
+    error("[ec_plotCortexSurf] hemisphere must be 'L' or 'R' (o.hem)");
 end
 
 % Get axis

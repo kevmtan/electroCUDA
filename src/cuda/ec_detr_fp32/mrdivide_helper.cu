@@ -19,155 +19,131 @@
 #include "MWCUSOLVERUtils.hpp"
 #include "MWCudaDimUtility.hpp"
 #include "MWCudaMemoryFunctions.hpp"
-#include "MWErrorCodeUtils.hpp"
 #include "MWLaunchParametersUtilities.hpp"
 #include "MWLocationStringifyNvtx3.h"
 #include "lapacke.h"
 #include "math_constants.h"
 #include "nvtx3/nvToolsExt.h"
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
 
 // Variable Definitions
-static emlrtRTEInfo md_emlrtRTEI{
+static emlrtRTEInfo jd_emlrtRTEI{
     31,                // lineNo
     5,                 // colNo
     "mrdivide_helper", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/"
     "mrdivide_helper.m" // pName
 };
 
 static emlrtRTEInfo
-    nd_emlrtRTEI{
+    kd_emlrtRTEI{
         1,        // lineNo
         37,       // colNo
         "xgetrf", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgetrf.m" // pName
     };
 
-static emlrtRTEInfo od_emlrtRTEI{
+static emlrtRTEInfo ld_emlrtRTEI{
     44,                // lineNo
     32,                // colNo
     "mrdivide_helper", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/"
     "mrdivide_helper.m" // pName
 };
 
-static emlrtRTEInfo pd_emlrtRTEI{
-    18,           // lineNo
-    29,           // colNo
+static emlrtRTEInfo md_emlrtRTEI{
+    1,            // lineNo
+    1,            // colNo
     "xgetrf_gpu", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/gpucoder/gpucoder/+coder/+internal/"
-    "+lapack/xgetrf_gpu.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/gpucoder/gpucoder/+coder/+internal/"
+    "+lapack/xgetrf_gpu.p" // pName
 };
 
-static emlrtRTEInfo qd_emlrtRTEI{
+static emlrtRTEInfo nd_emlrtRTEI{
     44,                // lineNo
     35,                // colNo
     "mrdivide_helper", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/"
     "mrdivide_helper.m" // pName
 };
 
-static emlrtRTEInfo rd_emlrtRTEI{
-    50,           // lineNo
-    31,           // colNo
-    "xgetrf_gpu", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/gpucoder/gpucoder/+coder/+internal/"
-    "+lapack/xgetrf_gpu.m" // pName
-};
-
 static emlrtRTEInfo
-    sd_emlrtRTEI{
+    od_emlrtRTEI{
         61,       // lineNo
         9,        // colNo
         "xgeqp3", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeqp3.m" // pName
     };
 
-static emlrtRTEInfo td_emlrtRTEI{
-    53,           // lineNo
-    13,           // colNo
-    "xgetrf_gpu", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/gpucoder/gpucoder/+coder/+internal/"
-    "+lapack/xgetrf_gpu.m" // pName
-};
-
 static emlrtRTEInfo
-    ud_emlrtRTEI{
+    pd_emlrtRTEI{
         92,       // lineNo
         22,       // colNo
         "xgeqp3", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeqp3.m" // pName
     };
 
 static emlrtRTEInfo
-    vd_emlrtRTEI{
+    qd_emlrtRTEI{
         105,      // lineNo
         1,        // colNo
         "xgeqp3", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+lapack/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+lapack/"
         "xgeqp3.m" // pName
     };
 
-static emlrtRTEInfo wd_emlrtRTEI{
+static emlrtRTEInfo rd_emlrtRTEI{
     85,        // lineNo
     1,         // colNo
     "qrsolve", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/qrsolve.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/qrsolve.m" // pName
 };
 
-static emlrtRTEInfo xd_emlrtRTEI{
+static emlrtRTEInfo sd_emlrtRTEI{
     119,       // lineNo
     5,         // colNo
     "qrsolve", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/qrsolve.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/qrsolve.m" // pName
 };
 
-static emlrtRTEInfo yd_emlrtRTEI{
+static emlrtRTEInfo td_emlrtRTEI{
     44,                // lineNo
     5,                 // colNo
     "mrdivide_helper", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/"
     "mrdivide_helper.m" // pName
 };
 
-static emlrtRTEInfo ae_emlrtRTEI{
+static emlrtRTEInfo ud_emlrtRTEI{
     44,                // lineNo
     9,                 // colNo
     "mrdivide_helper", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/"
     "mrdivide_helper.m" // pName
 };
 
-static emlrtRTEInfo be_emlrtRTEI{
+static emlrtRTEInfo vd_emlrtRTEI{
     25,                // lineNo
     14,                // colNo
     "mrdivide_helper", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
+    "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/"
     "mrdivide_helper.m" // pName
 };
 
-static emlrtRTEInfo ce_emlrtRTEI{
-    18,           // lineNo
-    5,            // colNo
-    "xgetrf_gpu", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/gpucoder/gpucoder/+coder/+internal/"
-    "+lapack/xgetrf_gpu.m" // pName
-};
-
 // Function Declarations
-static void cusolverCheck(cusolverStatus_t errCode, const char_T *file,
-                          uint32_T b_line);
+static void cpuEmxAllocateOrResize_real32_T(emxArray_real32_T *cpu,
+                                            boolean_T needsCopy);
 
 static void gpuEmxMemcpyGpuToCpu_int32_T(emxArray_int32_T *cpu,
                                          emxArray_int32_T *gpu);
 
-static __global__ void mrdiv_kernel31(const int32_T b, const int32_T na,
+static __global__ void mrdiv_kernel31(const int32_T b, const int32_T c,
                                       emxArray_real32_T A, int32_T A_dim0);
 
 static __global__ void mrdiv_kernel32(const emxArray_real32_T B,
@@ -175,17 +151,36 @@ static __global__ void mrdiv_kernel32(const emxArray_real32_T B,
                                       const int32_T na, emxArray_real32_T Y);
 
 // Function Definitions
-static void cusolverCheck(cusolverStatus_t errCode, const char_T *file,
-                          uint32_T b_line)
+static void cpuEmxAllocateOrResize_real32_T(emxArray_real32_T *cpu,
+                                            boolean_T needsCopy)
 {
-  const char *errName;
-  const char *errString;
-  nvtxRangePushA("#fcn#cusolverCheck#" MW_AT_LOCATION);
-  if (errCode != CUSOLVER_STATUS_SUCCESS) {
-    cusolverGetErrorName(errCode, &errName);
-    cusolverGetErrorString(errCode, &errString);
-    nvtxMarkA("#raiseCudaError#" MW_AT_LINE);
-    raiseCudaError(errCode, file, b_line, errName, errString);
+  int32_T i;
+  int32_T totalSizeCpu;
+  void *newData;
+  nvtxRangePushA("#fcn#cpuEmxAllocateOrResize_real32_T#" MW_AT_LOCATION);
+  totalSizeCpu = 1;
+  i = 0;
+  nvtxRangePushA(
+      "#loop#cpuEmxAllocateOrResize_real32_T_whileloop_0##" MW_AT_LINE);
+  while (i < cpu->numDimensions) {
+    totalSizeCpu *= cpu->size[i];
+    i++;
+  }
+  nvtxRangePop();
+  if (cpu->allocatedSize < totalSizeCpu) {
+    newData =
+        emlrtCallocMex(static_cast<uint32_T>(totalSizeCpu), sizeof(real32_T));
+    needsCopy = (needsCopy && (totalSizeCpu > 0));
+    if (needsCopy) {
+      std::copy(cpu->data, cpu->data + static_cast<uint32_T>(totalSizeCpu),
+                static_cast<real32_T *>(newData));
+    }
+    if (cpu->canFreeData) {
+      emlrtFreeMex(cpu->data);
+    }
+    cpu->data = static_cast<real32_T *>(newData);
+    cpu->allocatedSize = totalSizeCpu;
+    cpu->canFreeData = true;
   }
   nvtxRangePop();
 }
@@ -204,17 +199,20 @@ static void gpuEmxMemcpyGpuToCpu_int32_T(emxArray_int32_T *cpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(cudaMemcpy(cpu->data, gpu->data,
-                            static_cast<uint32_T>(actualSize) * sizeof(int32_T),
-                            cudaMemcpyDeviceToHost),
-                 __FILE__, __LINE__);
+  if (gpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(cpu->data, gpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(int32_T),
+                   cudaMemcpyDeviceToHost),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
 static __global__ __launch_bounds__(1024, 1) void mrdiv_kernel31(
-    const int32_T b, const int32_T na, emxArray_real32_T A, int32_T A_dim0)
+    const int32_T b, const int32_T c, emxArray_real32_T A, int32_T A_dim0)
 {
   uint64_T gStride;
   uint64_T gThreadId;
@@ -222,8 +220,7 @@ static __global__ __launch_bounds__(1024, 1) void mrdiv_kernel31(
   gThreadId = mwGetGlobalThreadIndex();
   gStride = mwGetTotalThreadsLaunched();
   loopEnd =
-      (static_cast<uint64_T>(na) + 1UL) * (static_cast<uint64_T>(b) + 1UL) -
-      1UL;
+      (static_cast<uint64_T>(c) + 1UL) * (static_cast<uint64_T>(b) + 1UL) - 1UL;
   for (uint64_T idx{gThreadId}; idx <= loopEnd; idx += gStride) {
     int32_T i;
     int32_T j;
@@ -279,14 +276,15 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
   emxArray_real32_T *cpu_tau;
   int32_T cpu_minmn;
   int32_T *gpu_minmn;
-  nvtxRangePushA("#fcn#mrdiv#" MW_AT_LOCATION);
+  boolean_T A_needsCpuEnsureCapacity;
+  nvtxRangePushA("#fcn#mrdiv#" MW_AT_LOCATION "#I1924");
   nvtxMarkA("#checkCudaError#" MW_AT_LINE);
   nvtxMarkA("#mwCudaMalloc#" MW_AT_LINE);
   checkCudaError(mwCudaMalloc(&gpu_minmn, 4UL), __FILE__, __LINE__);
-  nvtxMarkA("#gpuEmxReset_int32_T#" MW_AT_LINE);
-  gpuEmxReset_int32_T(&gpu_ipiv_t);
   nvtxMarkA("#gpuEmxReset_real32_T#" MW_AT_LINE);
   gpuEmxReset_real32_T(&gpu_tau);
+  nvtxMarkA("#gpuEmxReset_int32_T#" MW_AT_LINE);
+  gpuEmxReset_int32_T(&gpu_ipiv_t);
   nvtxMarkA("#gpuEmxReset_int32_T#" MW_AT_LINE);
   gpuEmxReset_int32_T(&gpu_jpvt);
   nvtxMarkA("#gpuEmxReset_real32_T#" MW_AT_LINE);
@@ -297,25 +295,26 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
   gpuEmxReset_real32_T(&c_gpu_A);
   nvtxMarkA("#gpuEmxReset_real32_T#" MW_AT_LINE);
   gpuEmxReset_real32_T(&gpu_Y);
+  A_needsCpuEnsureCapacity = true;
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_Y, 1, &ae_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_Y, 1, &ud_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_A, 2, &be_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_A, 2, &vd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_B, 1, &qd_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_B, 1, &nd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&c_cpu_A, 2, &be_emlrtRTEI, true);
+  emxInit_real32_T(&c_cpu_A, 2, &vd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_int32_T#" MW_AT_LINE);
-  emxInit_int32_T(&ipiv, 2, &be_emlrtRTEI, true);
+  emxInit_int32_T(&ipiv, 2, &vd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_int32_T#" MW_AT_LINE);
-  emxInit_int32_T(&cpu_jpvt, 2, &be_emlrtRTEI, true);
+  emxInit_int32_T(&cpu_jpvt, 2, &vd_emlrtRTEI, true);
+  nvtxMarkA("#emxInit_int32_T#" MW_AT_LINE);
+  emxInit_int32_T(&cpu_ipiv_t, 1, &md_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_tau, 1, &be_emlrtRTEI, true);
-  nvtxMarkA("#emxInit_int32_T#" MW_AT_LINE);
-  emxInit_int32_T(&cpu_ipiv_t, 1, &ce_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_tau, 1, &vd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_ptrdiff_t#" MW_AT_LINE);
-  emxInit_ptrdiff_t(&jpvt_t, 1, &vd_emlrtRTEI, true);
+  emxInit_ptrdiff_t(&jpvt_t, 1, &qd_emlrtRTEI, true);
   if ((cpu_A->size[1] == 0) || ((B->size[0] == 0) || (B->size[1] == 0))) {
     int32_T i;
     cpu_minmn = B->size[0];
@@ -323,7 +322,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     cpu_A->size[0] = 1;
     cpu_A->size[1] = B->size[0];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_A, i, &md_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_A, i, &jd_emlrtRTEI);
     if (cpu_minmn - 1 >= 0) {
       if (*A_outdatedOnCpu) {
         nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
@@ -337,7 +336,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
   } else if (B->size[0] == B->size[1]) {
     int32_T i;
     real32_T tol;
-    boolean_T B_needsGpuEnsureCapacity;
+    boolean_T A_needsGpuEnsureCapacity;
     boolean_T b_A_outdatedOnCpu;
     boolean_T b_A_outdatedOnGpu;
     b_A_outdatedOnGpu = false;
@@ -345,7 +344,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     c_cpu_A->size[0] = B->size[0];
     c_cpu_A->size[1] = B->size[1];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(c_cpu_A, i, &nd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(c_cpu_A, i, &kd_emlrtRTEI);
     profileLoopStart("mrdiv_loop_1", __LINE__,
                      (B->size[0] * B->size[1] - 1) + 1, "");
     for (i = 0; i < B->size[0] * B->size[1]; i++) {
@@ -356,38 +355,32 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     i = cpu_ipiv_t->size[0];
     cpu_ipiv_t->size[0] = B->size[1];
     nvtxMarkA("#emxEnsureCapacity_int32_T#" MW_AT_LINE);
-    emxEnsureCapacity_int32_T(cpu_ipiv_t, i, &pd_emlrtRTEI);
+    emxEnsureCapacity_int32_T(cpu_ipiv_t, i, &md_emlrtRTEI);
     nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
     gpuEmxEnsureCapacity_real32_T(c_cpu_A, &b_gpu_A, !b_A_outdatedOnGpu);
     if (b_A_outdatedOnGpu) {
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_real32_T(&b_gpu_A, c_cpu_A);
     }
-    nvtxMarkA("#cusolverCheck#" MW_AT_LINE);
-    cusolverCheck(
-        cusolverDnSgetrf_bufferSize(getCuSolverGlobalHandle(), B->size[1],
-                                    B->size[1], (float *)&b_gpu_A.data[0],
-                                    B->size[1], getCuSolverWorkspaceReq()),
-        __FILE__, __LINE__);
+    cusolverDnSgetrf_bufferSize(getCuSolverGlobalHandle(), B->size[1],
+                                B->size[1], (float *)&b_gpu_A.data[0],
+                                B->size[1], getCuSolverWorkspaceReq());
     setCuSolverWorkspaceTypeSize(4);
     cusolverInitWorkspace();
-    b_A_outdatedOnCpu = false;
+    A_needsGpuEnsureCapacity = false;
     nvtxMarkA("#gpuEmxEnsureCapacity_int32_T#" MW_AT_LINE);
     gpuEmxEnsureCapacity_int32_T(cpu_ipiv_t, &gpu_ipiv_t, true);
-    nvtxMarkA("#cusolverCheck#" MW_AT_LINE);
-    cusolverCheck(
-        cusolverDnSgetrf(getCuSolverGlobalHandle(), B->size[1], B->size[1],
-                         (float *)&b_gpu_A.data[0], B->size[1],
-                         static_cast<real32_T *>(getCuSolverWorkspaceBuff()),
-                         &gpu_ipiv_t.data[0], gpu_minmn),
-        __FILE__, __LINE__);
-    B_needsGpuEnsureCapacity = true;
+    cusolverDnSgetrf(getCuSolverGlobalHandle(), B->size[1], B->size[1],
+                     (float *)&b_gpu_A.data[0], B->size[1],
+                     static_cast<real32_T *>(getCuSolverWorkspaceBuff()),
+                     &gpu_ipiv_t.data[0], gpu_minmn);
+    b_A_outdatedOnCpu = true;
     b_A_outdatedOnGpu = false;
     i = ipiv->size[0] * ipiv->size[1];
     ipiv->size[0] = 1;
     ipiv->size[1] = cpu_ipiv_t->size[0];
     nvtxMarkA("#emxEnsureCapacity_int32_T#" MW_AT_LINE);
-    emxEnsureCapacity_int32_T(ipiv, i, &rd_emlrtRTEI);
+    emxEnsureCapacity_int32_T(ipiv, i, &md_emlrtRTEI);
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
     checkCudaError(
@@ -401,8 +394,8 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       c_cpu_A->size[0] = maxmn;
       c_cpu_A->size[1] = cpu_minmn;
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(c_cpu_A, i, &td_emlrtRTEI);
-      b_A_outdatedOnCpu = true;
+      emxEnsureCapacity_real32_T(c_cpu_A, i, &md_emlrtRTEI);
+      A_needsGpuEnsureCapacity = true;
       profileLoopStart("mrdiv_loop_6", __LINE__, (maxmn * cpu_minmn - 1) + 1,
                        "");
       for (i = 0; i < maxmn * cpu_minmn; i++) {
@@ -410,28 +403,28 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
         b_A_outdatedOnGpu = true;
       }
       profileLoopEnd();
-      maxmn = cpu_ipiv_t->size[0] - 1;
-      profileLoopStart("mrdiv_loop_8", __LINE__, maxmn + 1, "");
-      for (int32_T u0{0}; u0 <= maxmn; u0++) {
+      maxmn = cpu_ipiv_t->size[0];
+      profileLoopStart("mrdiv_loop_8", __LINE__, (maxmn - 1) + 1, "");
+      for (int32_T u0{0}; u0 < maxmn; u0++) {
         ipiv->data[u0] = u0 + 1;
       }
       profileLoopEnd();
     } else {
       int32_T maxmn;
-      maxmn = cpu_ipiv_t->size[0] - 1;
-      profileLoopStart("mrdiv_loop_4", __LINE__, maxmn + 1, "");
-      for (int32_T u0{0}; u0 <= maxmn; u0++) {
-        if (B_needsGpuEnsureCapacity) {
+      maxmn = cpu_ipiv_t->size[0];
+      profileLoopStart("mrdiv_loop_4", __LINE__, (maxmn - 1) + 1, "");
+      for (int32_T u0{0}; u0 < maxmn; u0++) {
+        if (b_A_outdatedOnCpu) {
           nvtxMarkA("#gpuEmxMemcpyGpuToCpu_int32_T#" MW_AT_LINE);
           gpuEmxMemcpyGpuToCpu_int32_T(cpu_ipiv_t, &gpu_ipiv_t);
         }
-        B_needsGpuEnsureCapacity = false;
+        b_A_outdatedOnCpu = false;
         ipiv->data[u0] = cpu_ipiv_t->data[u0];
       }
       profileLoopEnd();
     }
     tol = 1.0F;
-    if (b_A_outdatedOnCpu) {
+    if (A_needsGpuEnsureCapacity) {
       nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
       gpuEmxEnsureCapacity_real32_T(c_cpu_A, &b_gpu_A, !b_A_outdatedOnGpu);
     }
@@ -445,20 +438,14 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_real32_T(gpu_A, cpu_A);
     }
-    nvtxMarkA("#cublasCheck#" MW_AT_LINE);
-    cublasCheck(cublasStrsm(getCublasGlobalHandle(), CUBLAS_SIDE_RIGHT,
-                            CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_N,
-                            CUBLAS_DIAG_NON_UNIT, 1, B->size[1], (float *)&tol,
-                            (float *)&b_gpu_A.data[0], B->size[1],
-                            (float *)&gpu_A->data[0], 1),
-                __FILE__, __LINE__);
-    nvtxMarkA("#cublasCheck#" MW_AT_LINE);
-    cublasCheck(cublasStrsm(getCublasGlobalHandle(), CUBLAS_SIDE_RIGHT,
-                            CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_N,
-                            CUBLAS_DIAG_UNIT, 1, B->size[1], (float *)&tol,
-                            (float *)&b_gpu_A.data[0], B->size[1],
-                            (float *)&gpu_A->data[0], 1),
-                __FILE__, __LINE__);
+    cublasStrsm(getCublasGlobalHandle(), CUBLAS_SIDE_RIGHT,
+                CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_N, CUBLAS_DIAG_NON_UNIT, 1,
+                B->size[1], (float *)&tol, (float *)&b_gpu_A.data[0],
+                B->size[1], (float *)&gpu_A->data[0], 1);
+    cublasStrsm(getCublasGlobalHandle(), CUBLAS_SIDE_RIGHT,
+                CUBLAS_FILL_MODE_LOWER, CUBLAS_OP_N, CUBLAS_DIAG_UNIT, 1,
+                B->size[1], (float *)&tol, (float *)&b_gpu_A.data[0],
+                B->size[1], (float *)&gpu_A->data[0], 1);
     *A_outdatedOnGpu = false;
     *A_outdatedOnCpu = true;
     cpu_minmn = B->size[1] - 2;
@@ -466,12 +453,17 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     for (int32_T u0{0}; u0 <= cpu_minmn; u0++) {
       i = ipiv->data[cpu_minmn - u0];
       if (i != (cpu_minmn - u0) + 1) {
+        if (A_needsCpuEnsureCapacity) {
+          nvtxMarkA("#cpuEmxAllocateOrResize_real32_T#" MW_AT_LINE);
+          cpuEmxAllocateOrResize_real32_T(cpu_A, !*A_outdatedOnCpu);
+        }
         if (*A_outdatedOnCpu) {
           nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
           gpuEmxMemcpyGpuToCpu_real32_T(cpu_A, gpu_A);
         }
         tol = cpu_A->data[cpu_minmn - u0];
         cpu_A->data[cpu_minmn - u0] = cpu_A->data[i - 1];
+        A_needsCpuEnsureCapacity = false;
         cpu_A->data[i - 1] = tol;
         *A_outdatedOnCpu = false;
         *A_outdatedOnGpu = true;
@@ -486,7 +478,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     int32_T na;
     int32_T u0;
     real32_T tol;
-    boolean_T B_needsGpuEnsureCapacity;
+    boolean_T A_needsGpuEnsureCapacity;
     boolean_T B_outdatedOnGpu;
     boolean_T b_A_outdatedOnCpu;
     boolean_T b_A_outdatedOnGpu;
@@ -497,7 +489,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     b_cpu_A->size[0] = B->size[1];
     b_cpu_A->size[1] = B->size[0];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(b_cpu_A, i, &od_emlrtRTEI);
+    emxEnsureCapacity_real32_T(b_cpu_A, i, &ld_emlrtRTEI);
     profileLoopStart("mrdiv_loop_0", __LINE__, (B->size[0] - 1) + 1, "");
     for (i = 0; i < B->size[0]; i++) {
       profileLoopStart("mrdiv_loop_2", __LINE__, (B->size[1] - 1) + 1, "");
@@ -512,9 +504,14 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     i = cpu_B->size[0];
     cpu_B->size[0] = cpu_A->size[1];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_B, i, &qd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_B, i, &nd_emlrtRTEI);
     profileLoopStart("mrdiv_loop_3", __LINE__, (cpu_A->size[1] - 1) + 1, "");
     for (i = 0; i < cpu_A->size[1]; i++) {
+      if (A_needsCpuEnsureCapacity) {
+        nvtxMarkA("#cpuEmxAllocateOrResize_real32_T#" MW_AT_LINE);
+        cpuEmxAllocateOrResize_real32_T(cpu_A, !*A_outdatedOnCpu);
+      }
+      A_needsCpuEnsureCapacity = false;
       if (*A_outdatedOnCpu) {
         nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
         gpuEmxMemcpyGpuToCpu_real32_T(cpu_A, gpu_A);
@@ -525,13 +522,13 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     }
     profileLoopEnd();
     maxmn = b_cpu_A->size[0];
-    na = b_cpu_A->size[1] - 1;
+    na = b_cpu_A->size[1];
     jpvt_outdatedOnGpu = false;
     i = cpu_jpvt->size[0] * cpu_jpvt->size[1];
     cpu_jpvt->size[0] = 1;
     cpu_jpvt->size[1] = b_cpu_A->size[1];
     nvtxMarkA("#emxEnsureCapacity_int32_T#" MW_AT_LINE);
-    emxEnsureCapacity_int32_T(cpu_jpvt, i, &sd_emlrtRTEI);
+    emxEnsureCapacity_int32_T(cpu_jpvt, i, &od_emlrtRTEI);
     u0 = b_cpu_A->size[0];
     minmana = b_cpu_A->size[1];
     if (u0 <= minmana) {
@@ -540,11 +537,11 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     i = cpu_tau->size[0];
     cpu_tau->size[0] = minmana;
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_tau, i, &ud_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_tau, i, &pd_emlrtRTEI);
     i = jpvt_t->size[0];
     jpvt_t->size[0] = b_cpu_A->size[1];
     nvtxMarkA("#emxEnsureCapacity_ptrdiff_t#" MW_AT_LINE);
-    emxEnsureCapacity_ptrdiff_t(jpvt_t, i, &vd_emlrtRTEI);
+    emxEnsureCapacity_ptrdiff_t(jpvt_t, i, &qd_emlrtRTEI);
     profileLoopStart("mrdiv_loop_5", __LINE__, (b_cpu_A->size[1] - 1) + 1, "");
     for (i = 0; i < b_cpu_A->size[1]; i++) {
       cpu_jpvt->data[i] = 0;
@@ -557,19 +554,22 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
                             (ptrdiff_t)b_cpu_A->size[0], &jpvt_t->data[0],
                             &cpu_tau->data[0]);
     b_A_outdatedOnGpu = true;
+    A_needsGpuEnsureCapacity = true;
     if ((int32_T)info_t != 0) {
       int64_T b;
+      uint64_T numIters;
       nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-      mwGetLaunchParameters1D(computeNumIters(na, maxmn - 1), &grid, &block,
-                              2147483647U);
+      numIters = computeNumIters(na - 1, maxmn - 1);
+      mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
       nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
       gpuEmxEnsureCapacity_real32_T(b_cpu_A, &c_gpu_A, false);
+      A_needsGpuEnsureCapacity = false;
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_real32_T(&c_gpu_A, b_cpu_A);
       validLaunchParams = mwValidateLaunchParameters(grid, block);
       if (validLaunchParams) {
         nvtxMarkA("#mrdiv_kernel31#" MW_AT_LINE);
-        mrdiv_kernel31<<<grid, block>>>(maxmn - 1, na, c_gpu_A,
+        mrdiv_kernel31<<<grid, block>>>(maxmn - 1, na - 1, c_gpu_A,
                                         b_cpu_A->size[0U]);
       }
       b_A_outdatedOnGpu = false;
@@ -587,20 +587,20 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       nvtxMarkA("#computeEndIdx#" MW_AT_LINE);
       b = computeEndIdx(static_cast<int64_T>(cpu_minmn + 1),
                         static_cast<int64_T>(minmana), 1L);
-      profileLoopStart("mrdiv_loop_11", __LINE__, b + 1L, "");
+      profileLoopStart("mrdiv_loop_12", __LINE__, b + 1L, "");
       for (int64_T k{0L}; k <= b; k++) {
         cpu_tau->data[static_cast<int32_T>((cpu_minmn + 1) + k) - 1] = 0.0F;
       }
       profileLoopEnd();
-      profileLoopStart("mrdiv_loop_13", __LINE__, na + 1, "");
-      for (u0 = 0; u0 <= na; u0++) {
+      profileLoopStart("mrdiv_loop_13", __LINE__, (na - 1) + 1, "");
+      for (u0 = 0; u0 < na; u0++) {
         cpu_jpvt->data[u0] = u0 + 1;
         jpvt_outdatedOnGpu = true;
       }
       profileLoopEnd();
     } else {
-      profileLoopStart("mrdiv_loop_7", __LINE__, na + 1, "");
-      for (u0 = 0; u0 <= na; u0++) {
+      profileLoopStart("mrdiv_loop_7", __LINE__, (na - 1) + 1, "");
+      for (u0 = 0; u0 < na; u0++) {
         cpu_jpvt->data[u0] = (int32_T)jpvt_t->data[u0];
         jpvt_outdatedOnGpu = true;
       }
@@ -628,15 +628,15 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       na++;
     }
     nvtxRangePop();
-    b_A_outdatedOnCpu = false;
+    A_needsCpuEnsureCapacity = false;
     i = cpu_Y->size[0];
     cpu_Y->size[0] = b_cpu_A->size[1];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_Y, i, &wd_emlrtRTEI);
-    profileLoopStart("mrdiv_loop_12", __LINE__, (b_cpu_A->size[1] - 1) + 1, "");
+    emxEnsureCapacity_real32_T(cpu_Y, i, &rd_emlrtRTEI);
+    profileLoopStart("mrdiv_loop_11", __LINE__, (b_cpu_A->size[1] - 1) + 1, "");
     for (i = 0; i < b_cpu_A->size[1]; i++) {
       cpu_Y->data[i] = 0.0F;
-      b_A_outdatedOnCpu = true;
+      A_needsCpuEnsureCapacity = true;
     }
     profileLoopEnd();
     cpu_minmn = 0;
@@ -645,8 +645,10 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     if (u0 <= maxmn) {
       maxmn = u0;
     }
-    nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-    gpuEmxEnsureCapacity_real32_T(b_cpu_A, &c_gpu_A, !b_A_outdatedOnGpu);
+    if (A_needsGpuEnsureCapacity) {
+      nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
+      gpuEmxEnsureCapacity_real32_T(b_cpu_A, &c_gpu_A, !b_A_outdatedOnGpu);
+    }
     nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
     gpuEmxEnsureCapacity_real32_T(cpu_tau, &gpu_tau, false);
     nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
@@ -661,31 +663,25 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_real32_T(&gpu_B, cpu_B);
     }
-    nvtxMarkA("#cusolverCheck#" MW_AT_LINE);
-    cusolverCheck(cusolverDnSormqr_bufferSize(
-                      getCuSolverGlobalHandle(), CUBLAS_SIDE_LEFT, CUBLAS_OP_T,
-                      cpu_B->size[0], 1, maxmn, (float *)&c_gpu_A.data[0],
-                      b_cpu_A->size[0], (float *)&gpu_tau.data[0],
-                      (float *)&gpu_B.data[0], cpu_B->size[0],
-                      getCuSolverWorkspaceReq()),
-                  __FILE__, __LINE__);
+    cusolverDnSormqr_bufferSize(
+        getCuSolverGlobalHandle(), CUBLAS_SIDE_LEFT, CUBLAS_OP_T,
+        cpu_B->size[0], 1, maxmn, (float *)&c_gpu_A.data[0], b_cpu_A->size[0],
+        (float *)&gpu_tau.data[0], (float *)&gpu_B.data[0], cpu_B->size[0],
+        getCuSolverWorkspaceReq());
     setCuSolverWorkspaceTypeSize(4);
     cusolverInitWorkspace();
-    B_needsGpuEnsureCapacity = false;
+    b_A_outdatedOnCpu = false;
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
     checkCudaError(
         cudaMemcpy(gpu_minmn, &cpu_minmn, 4UL, cudaMemcpyHostToDevice),
         __FILE__, __LINE__);
-    nvtxMarkA("#cusolverCheck#" MW_AT_LINE);
-    cusolverCheck(cusolverDnSormqr(
-                      getCuSolverGlobalHandle(), CUBLAS_SIDE_LEFT, CUBLAS_OP_T,
-                      cpu_B->size[0], 1, maxmn, (float *)&c_gpu_A.data[0],
-                      b_cpu_A->size[0], (float *)&gpu_tau.data[0],
-                      (float *)&gpu_B.data[0], cpu_B->size[0],
-                      static_cast<real32_T *>(getCuSolverWorkspaceBuff()),
-                      *getCuSolverWorkspaceReq(), gpu_minmn),
-                  __FILE__, __LINE__);
+    cusolverDnSormqr(getCuSolverGlobalHandle(), CUBLAS_SIDE_LEFT, CUBLAS_OP_T,
+                     cpu_B->size[0], 1, maxmn, (float *)&c_gpu_A.data[0],
+                     b_cpu_A->size[0], (float *)&gpu_tau.data[0],
+                     (float *)&gpu_B.data[0], cpu_B->size[0],
+                     static_cast<real32_T *>(getCuSolverWorkspaceBuff()),
+                     *getCuSolverWorkspaceReq(), gpu_minmn);
     B_outdatedOnGpu = false;
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
@@ -697,8 +693,8 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       i = cpu_B->size[0];
       cpu_B->size[0] = maxmn;
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(cpu_B, i, &xd_emlrtRTEI);
-      B_needsGpuEnsureCapacity = true;
+      emxEnsureCapacity_real32_T(cpu_B, i, &sd_emlrtRTEI);
+      b_A_outdatedOnCpu = true;
       profileLoopStart("mrdiv_loop_14", __LINE__, (maxmn - 1) + 1, "");
       for (i = 0; i < maxmn; i++) {
         cpu_B->data[i] = rtNaNF;
@@ -708,14 +704,14 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     }
     nvtxMarkA("#computeNumIters#" MW_AT_LINE);
     mwGetLaunchParameters1D(computeNumIters(na), &grid, &block, 2147483647U);
-    if (B_needsGpuEnsureCapacity) {
+    if (b_A_outdatedOnCpu) {
       nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
       gpuEmxEnsureCapacity_real32_T(cpu_B, &gpu_B, !B_outdatedOnGpu);
     }
     nvtxMarkA("#gpuEmxEnsureCapacity_int32_T#" MW_AT_LINE);
     gpuEmxEnsureCapacity_int32_T(cpu_jpvt, &gpu_jpvt, !jpvt_outdatedOnGpu);
     nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-    gpuEmxEnsureCapacity_real32_T(cpu_Y, &gpu_Y, !b_A_outdatedOnCpu);
+    gpuEmxEnsureCapacity_real32_T(cpu_Y, &gpu_Y, !A_needsCpuEnsureCapacity);
     if (B_outdatedOnGpu) {
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_real32_T(&gpu_B, cpu_B);
@@ -724,7 +720,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_int32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_int32_T(&gpu_jpvt, cpu_jpvt);
     }
-    if (b_A_outdatedOnCpu) {
+    if (A_needsCpuEnsureCapacity) {
       nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
       gpuEmxMemcpyCpuToGpu_real32_T(&gpu_Y, cpu_Y);
     }
@@ -758,7 +754,7 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
     cpu_A->size[0] = 1;
     cpu_A->size[1] = cpu_Y->size[0];
     nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-    emxEnsureCapacity_real32_T(cpu_A, i, &yd_emlrtRTEI);
+    emxEnsureCapacity_real32_T(cpu_A, i, &td_emlrtRTEI);
     profileLoopStart("mrdiv_loop_16", __LINE__, (cpu_Y->size[0] - 1) + 1, "");
     for (i = 0; i < cpu_Y->size[0]; i++) {
       if (*A_outdatedOnCpu) {
@@ -778,10 +774,10 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
   }
   nvtxMarkA("#emxFree_ptrdiff_t#" MW_AT_LINE);
   emxFree_ptrdiff_t(&jpvt_t);
-  nvtxMarkA("#emxFree_int32_T#" MW_AT_LINE);
-  emxFree_int32_T(&cpu_ipiv_t);
   nvtxMarkA("#emxFree_real32_T#" MW_AT_LINE);
   emxFree_real32_T(&cpu_tau);
+  nvtxMarkA("#emxFree_int32_T#" MW_AT_LINE);
+  emxFree_int32_T(&cpu_ipiv_t);
   nvtxMarkA("#emxFree_int32_T#" MW_AT_LINE);
   emxFree_int32_T(&cpu_jpvt);
   nvtxMarkA("#emxFree_int32_T#" MW_AT_LINE);
@@ -805,10 +801,10 @@ void mrdiv(emxArray_real32_T *cpu_A, boolean_T *A_outdatedOnCpu,
   gpuEmxFree_real32_T(&b_gpu_A);
   nvtxMarkA("#gpuEmxFree_int32_T#" MW_AT_LINE);
   gpuEmxFree_int32_T(&gpu_jpvt);
-  nvtxMarkA("#gpuEmxFree_real32_T#" MW_AT_LINE);
-  gpuEmxFree_real32_T(&gpu_tau);
   nvtxMarkA("#gpuEmxFree_int32_T#" MW_AT_LINE);
   gpuEmxFree_int32_T(&gpu_ipiv_t);
+  nvtxMarkA("#gpuEmxFree_real32_T#" MW_AT_LINE);
+  gpuEmxFree_real32_T(&gpu_tau);
   nvtxMarkA("#checkCudaError#" MW_AT_LINE);
   nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
   checkCudaError(mwCudaFree(gpu_minmn), __FILE__, __LINE__);

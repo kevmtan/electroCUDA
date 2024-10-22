@@ -45,55 +45,48 @@ static emlrtRTEInfo vb_emlrtRTEI{
 };
 
 static emlrtRTEInfo wb_emlrtRTEI{
-    49,                                                                // lineNo
-    20,                                                                // colNo
-    "linspace",                                                        // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/elmat/linspace.m" // pName
-};
-
-static emlrtRTEInfo xb_emlrtRTEI{
     41,                                                       // lineNo
     41,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo yb_emlrtRTEI{
+static emlrtRTEInfo xb_emlrtRTEI{
     41,                                                       // lineNo
     49,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo ac_emlrtRTEI{
+static emlrtRTEInfo yb_emlrtRTEI{
     80,                                                       // lineNo
     20,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo bc_emlrtRTEI{
+static emlrtRTEInfo ac_emlrtRTEI{
     42,                                                       // lineNo
     28,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo cc_emlrtRTEI{
+static emlrtRTEInfo bc_emlrtRTEI{
     124,                                                      // lineNo
     10,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo dc_emlrtRTEI{
+static emlrtRTEInfo cc_emlrtRTEI{
     109,                                                      // lineNo
     1,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo ec_emlrtRTEI{
+static emlrtRTEInfo dc_emlrtRTEI{
     110,                                                      // lineNo
     1,                                                        // colNo
     "ec_detr_fp",                                             // fName
@@ -101,64 +94,64 @@ static emlrtRTEInfo ec_emlrtRTEI{
 };
 
 static emlrtRTEInfo
-    fc_emlrtRTEI{
+    ec_emlrtRTEI{
         44,       // lineNo
         36,       // colNo
         "mtimes", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+blas/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+blas/"
         "mtimes.m" // pName
     };
 
-static emlrtRTEInfo gc_emlrtRTEI{
+static emlrtRTEInfo fc_emlrtRTEI{
     112,                                                      // lineNo
     1,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo hc_emlrtRTEI{
+static emlrtRTEInfo gc_emlrtRTEI{
     109,                                                           // lineNo
     24,                                                            // colNo
     "diag",                                                        // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/elmat/diag.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/elmat/diag.m" // pName
 };
 
-static emlrtRTEInfo ic_emlrtRTEI{
+static emlrtRTEInfo hc_emlrtRTEI{
     100,                                                           // lineNo
     5,                                                             // colNo
     "diag",                                                        // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/elmat/diag.m" // pName
+    "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/elmat/diag.m" // pName
 };
 
-static emlrtRTEInfo jc_emlrtRTEI{
+static emlrtRTEInfo ic_emlrtRTEI{
     1,                                                        // lineNo
     24,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo kc_emlrtRTEI{
+static emlrtRTEInfo jc_emlrtRTEI{
     114,                                                      // lineNo
     5,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo lc_emlrtRTEI{
+static emlrtRTEInfo kc_emlrtRTEI{
     114,                                                      // lineNo
     1,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo mc_emlrtRTEI{
+static emlrtRTEInfo lc_emlrtRTEI{
     115,                                                      // lineNo
     6,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo nc_emlrtRTEI{
+static emlrtRTEInfo mc_emlrtRTEI{
     108,                                                      // lineNo
     5,                                                        // colNo
     "ec_detr_fp",                                             // fName
@@ -166,146 +159,129 @@ static emlrtRTEInfo nc_emlrtRTEI{
 };
 
 static emlrtRTEInfo
-    oc_emlrtRTEI{
+    nc_emlrtRTEI{
         94,                  // lineNo
         5,                   // colNo
         "eml_mtimes_helper", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/ops/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/ops/"
         "eml_mtimes_helper.m" // pName
     };
 
 static emlrtRTEInfo
-    pc_emlrtRTEI{
+    oc_emlrtRTEI{
         44,       // lineNo
         48,       // colNo
         "mtimes", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/+blas/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/eml/+coder/+internal/+blas/"
         "mtimes.m" // pName
     };
 
-static emlrtRTEInfo qc_emlrtRTEI{
+static emlrtRTEInfo pc_emlrtRTEI{
     83,                                                       // lineNo
     5,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo rc_emlrtRTEI{
+static emlrtRTEInfo qc_emlrtRTEI{
     86,                                                       // lineNo
     5,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo
-    sc_emlrtRTEI{
-        126,       // lineNo
-        34,        // colNo
-        "vvarstd", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/private/"
-        "vvarstd.m" // pName
-    };
-
-static emlrtRTEInfo tc_emlrtRTEI{
-    30,                    // lineNo
-    21,                    // colNo
-    "applyScalarFunction", // fName
-    "/usr/local/MATLAB/R2024a/toolbox/eml/eml/+coder/+internal/"
-    "applyScalarFunction.m" // pName
-};
-
-static emlrtRTEInfo uc_emlrtRTEI{
+static emlrtRTEInfo rc_emlrtRTEI{
     1,                                                        // lineNo
     15,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo vc_emlrtRTEI{
+static emlrtRTEInfo sc_emlrtRTEI{
     37,                                                       // lineNo
     5,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo wc_emlrtRTEI{
+static emlrtRTEInfo tc_emlrtRTEI{
     59,                                                       // lineNo
     1,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo xc_emlrtRTEI{
+static emlrtRTEInfo uc_emlrtRTEI{
     80,                                                       // lineNo
     1,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo yc_emlrtRTEI{
+static emlrtRTEInfo vc_emlrtRTEI{
     83,                                                       // lineNo
     22,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo ad_emlrtRTEI{
+static emlrtRTEInfo wc_emlrtRTEI{
     111,                                                      // lineNo
     13,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo bd_emlrtRTEI{
+static emlrtRTEInfo xc_emlrtRTEI{
     111,                                                      // lineNo
     2,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo cd_emlrtRTEI{
+static emlrtRTEInfo yc_emlrtRTEI{
     113,                                                      // lineNo
     10,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo dd_emlrtRTEI{
+static emlrtRTEInfo ad_emlrtRTEI{
     114,                                                      // lineNo
     9,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo ed_emlrtRTEI{
+static emlrtRTEInfo bd_emlrtRTEI{
     116,                                                      // lineNo
     6,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo fd_emlrtRTEI{
+static emlrtRTEInfo cd_emlrtRTEI{
     116,                                                      // lineNo
     16,                                                       // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo gd_emlrtRTEI{
+static emlrtRTEInfo dd_emlrtRTEI{
     117,                                                      // lineNo
     8,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo hd_emlrtRTEI{
+static emlrtRTEInfo ed_emlrtRTEI{
     117,                                                      // lineNo
     5,                                                        // colNo
     "ec_detr_fp",                                             // fName
     "/home/kt/Gdrive/Git/electroCUDA/src/signal/ec_detr_fp.m" // pName
 };
 
-static emlrtRTEInfo id_emlrtRTEI{
+static emlrtRTEInfo fd_emlrtRTEI{
     88,                                                       // lineNo
     7,                                                        // colNo
     "ec_detr_fp",                                             // fName
@@ -313,15 +289,15 @@ static emlrtRTEInfo id_emlrtRTEI{
 };
 
 static emlrtRTEInfo
-    jd_emlrtRTEI{
+    gd_emlrtRTEI{
         126,       // lineNo
         9,         // colNo
         "vvarstd", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/datafun/private/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/datafun/private/"
         "vvarstd.m" // pName
     };
 
-static emlrtRTEInfo kd_emlrtRTEI{
+static emlrtRTEInfo hd_emlrtRTEI{
     124,                                                      // lineNo
     6,                                                        // colNo
     "ec_detr_fp",                                             // fName
@@ -329,15 +305,15 @@ static emlrtRTEInfo kd_emlrtRTEI{
 };
 
 static emlrtRTEInfo
-    ld_emlrtRTEI{
+    id_emlrtRTEI{
         94,                  // lineNo
         9,                   // colNo
         "eml_mtimes_helper", // fName
-        "/usr/local/MATLAB/R2024a/toolbox/eml/lib/matlab/ops/"
+        "/usr/local/MATLAB/R2024b/toolbox/eml/lib/matlab/ops/"
         "eml_mtimes_helper.m" // pName
     };
 
-static emlrtRTEInfo de_emlrtRTEI{
+static emlrtRTEInfo wd_emlrtRTEI{
     41,                                                       // lineNo
     10,                                                       // colNo
     "ec_detr_fp",                                             // fName
@@ -402,7 +378,7 @@ static __global__ void ec_detr_fp_kernel14(const emxArray_creal32_T V,
 
 static __global__ void ec_detr_fp_kernel15(const emxArray_int32_T iv,
                                            const emxArray_real32_T V,
-                                           const int32_T b, const int32_T b_iv,
+                                           const int32_T b, const int32_T c,
                                            emxArray_real32_T b_V,
                                            int32_T V_dim0, int32_T b_V_dim0);
 
@@ -449,7 +425,7 @@ static __global__ void ec_detr_fp_kernel23(const emxArray_real32_T d,
 
 static __global__ void ec_detr_fp_kernel24(const real32_T xbar,
                                            const emxArray_real32_T y,
-                                           const int32_T nx,
+                                           const int32_T b,
                                            emxArray_real32_T fv1);
 
 static __global__ void ec_detr_fp_kernel25(const emxArray_real32_T d,
@@ -461,7 +437,7 @@ static __global__ void ec_detr_fp_kernel26(const real32_T xbar,
                                            emxArray_real32_T absdiff);
 
 static __global__ void ec_detr_fp_kernel27(const emxArray_creal32_T D,
-                                           const int32_T nz,
+                                           const int32_T b,
                                            emxArray_creal32_T d,
                                            int32_T D_dim0);
 
@@ -568,7 +544,7 @@ static void binary_expand_op(emxArray_real32_T *in1,
     in1->size[0] = in4->size[0];
   }
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(in1, i, &rc_emlrtRTEI);
+  emxEnsureCapacity_real32_T(in1, i, &qc_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_1_0 = (in3->size[0] != 1);
   stride_2_0 = (in4->size[0] != 1);
@@ -606,7 +582,7 @@ static void binary_expand_op_1(emxArray_real32_T *in1,
     in1->size[0] = in3->size[0];
   }
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(in1, i, &qc_emlrtRTEI);
+  emxEnsureCapacity_real32_T(in1, i, &pc_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_1_0 = (in3->size[0] != 1);
   if (in3->size[0] == 1) {
@@ -641,7 +617,7 @@ static void binary_expand_op_2(emxArray_real32_T *in1,
     in1->size[1] = in4->size[0];
   }
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(in1, i, &nc_emlrtRTEI);
+  emxEnsureCapacity_real32_T(in1, i, &mc_emlrtRTEI);
   stride_0_1 = (in2->size[0] != 1);
   stride_1_1 = (in4->size[0] != 1);
   if (in4->size[0] == 1) {
@@ -676,7 +652,7 @@ static void binary_expand_op_3(emxArray_real32_T *in1,
   }
   in1->size[1] = in2->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(in1, i, &ec_emlrtRTEI);
+  emxEnsureCapacity_real32_T(in1, i, &dc_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_1_0 = (in3_idx_0 != 1);
   profileLoopStart("binary_expand_op_3_loop_0", __LINE__,
@@ -713,7 +689,7 @@ static void binary_expand_op_4(emxArray_real32_T *in1,
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   in3_idx_0 = in3->size[0];
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_in2, 2, &cc_emlrtRTEI, true);
+  emxInit_real32_T(&b_in2, 2, &bc_emlrtRTEI, true);
   i = b_in2->size[0] * b_in2->size[1];
   if (in3_idx_0 == 1) {
     b_in2->size[0] = in2->size[0];
@@ -722,7 +698,7 @@ static void binary_expand_op_4(emxArray_real32_T *in1,
   }
   b_in2->size[1] = in2->size[1];
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(b_in2, i, &cc_emlrtRTEI);
+  emxEnsureCapacity_real32_T(b_in2, i, &bc_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_1_0 = (in3_idx_0 != 1);
   profileLoopStart("binary_expand_op_4_loop_0", __LINE__,
@@ -763,11 +739,11 @@ static void binary_expand_op_5(emxArray_real32_T *in1, int32_T in2,
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
   in1_idx_0 = in1->size[0];
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_in1, 1, &de_emlrtRTEI, true);
+  emxInit_real32_T(&b_in1, 1, &wd_emlrtRTEI, true);
   i = b_in1->size[0];
   b_in1->size[0] = in1_idx_0;
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(b_in1, i, &de_emlrtRTEI);
+  emxEnsureCapacity_real32_T(b_in1, i, &wd_emlrtRTEI);
   stride_0_0 = (in1->size[0] != 1);
   stride_1_0 = (in3->size[0] != 1);
   profileLoopStart("binary_expand_op_5_loop_0", __LINE__, (in1_idx_0 - 1) + 1,
@@ -909,7 +885,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel14(
 
 static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel15(
     const emxArray_int32_T iv, const emxArray_real32_T V, const int32_T b,
-    const int32_T b_iv, emxArray_real32_T b_V, int32_T V_dim0, int32_T b_V_dim0)
+    const int32_T c, emxArray_real32_T b_V, int32_T V_dim0, int32_T b_V_dim0)
 {
   uint64_T gStride;
   uint64_T gThreadId;
@@ -917,8 +893,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel15(
   gThreadId = mwGetGlobalThreadIndex();
   gStride = mwGetTotalThreadsLaunched();
   loopEnd =
-      (static_cast<uint64_T>(b_iv) + 1UL) * (static_cast<uint64_T>(b) + 1UL) -
-      1UL;
+      (static_cast<uint64_T>(c) + 1UL) * (static_cast<uint64_T>(b) + 1UL) - 1UL;
   for (uint64_T idx{gThreadId}; idx <= loopEnd; idx += gStride) {
     int32_T i;
     int32_T k;
@@ -1078,7 +1053,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel23(
 }
 
 static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel24(
-    const real32_T xbar, const emxArray_real32_T y, const int32_T nx,
+    const real32_T xbar, const emxArray_real32_T y, const int32_T b,
     emxArray_real32_T fv1)
 {
   uint64_T gStride;
@@ -1086,7 +1061,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel24(
   uint64_T loopEnd;
   gThreadId = mwGetGlobalThreadIndex();
   gStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(nx);
+  loopEnd = static_cast<uint64_T>(b);
   for (uint64_T idx{gThreadId}; idx <= loopEnd; idx += gStride) {
     int32_T k;
     k = static_cast<int32_T>(idx);
@@ -1130,7 +1105,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel26(
 }
 
 static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel27(
-    const emxArray_creal32_T D, const int32_T nz, emxArray_creal32_T d,
+    const emxArray_creal32_T D, const int32_T b, emxArray_creal32_T d,
     int32_T D_dim0)
 {
   uint64_T gStride;
@@ -1138,7 +1113,7 @@ static __global__ __launch_bounds__(1024, 1) void ec_detr_fp_kernel27(
   uint64_T loopEnd;
   gThreadId = mwGetGlobalThreadIndex();
   gStride = mwGetTotalThreadsLaunched();
-  loopEnd = static_cast<uint64_T>(nz);
+  loopEnd = static_cast<uint64_T>(b);
   for (uint64_T idx{gThreadId}; idx <= loopEnd; idx += gStride) {
     int32_T k;
     k = static_cast<int32_T>(idx);
@@ -1339,7 +1314,8 @@ static void gpuEmxEnsureCapacity_boolean_T(const emxArray_boolean_T *cpu,
     i++;
   }
   nvtxRangePop();
-  if (gpu->allocatedSize < totalSizeCpu) {
+  if (((totalSizeCpu == 0) && (cpu->allocatedSize > 0)) ||
+      (gpu->allocatedSize < totalSizeCpu)) {
     i = cpu->allocatedSize;
     if (i < totalSizeCpu) {
       i = totalSizeCpu;
@@ -1349,7 +1325,7 @@ static void gpuEmxEnsureCapacity_boolean_T(const emxArray_boolean_T *cpu,
     checkCudaError(
         mwCudaMalloc(&newData, static_cast<uint32_T>(i) * sizeof(boolean_T)),
         __FILE__, __LINE__);
-    needsCopy = (needsCopy && gpu->canFreeData);
+    needsCopy = (needsCopy && (totalSizeGpu > 0));
     if (needsCopy) {
       nvtxMarkA("#checkCudaError#" MW_AT_LINE);
       nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
@@ -1397,7 +1373,8 @@ static void gpuEmxEnsureCapacity_creal32_T(const emxArray_creal32_T *cpu,
     i++;
   }
   nvtxRangePop();
-  if (gpu->allocatedSize < totalSizeCpu) {
+  if (((totalSizeCpu == 0) && (cpu->allocatedSize > 0)) ||
+      (gpu->allocatedSize < totalSizeCpu)) {
     i = cpu->allocatedSize;
     if (i < totalSizeCpu) {
       i = totalSizeCpu;
@@ -1407,7 +1384,7 @@ static void gpuEmxEnsureCapacity_creal32_T(const emxArray_creal32_T *cpu,
     checkCudaError(
         mwCudaMalloc(&newData, static_cast<uint32_T>(i) * sizeof(creal32_T)),
         __FILE__, __LINE__);
-    needsCopy = (needsCopy && gpu->canFreeData);
+    needsCopy = (needsCopy && (totalSizeGpu > 0));
     if (needsCopy) {
       nvtxMarkA("#checkCudaError#" MW_AT_LINE);
       nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
@@ -1454,7 +1431,8 @@ static void gpuEmxEnsureCapacity_real_T(const emxArray_real_T *cpu,
     i++;
   }
   nvtxRangePop();
-  if (gpu->allocatedSize < totalSizeCpu) {
+  if (((totalSizeCpu == 0) && (cpu->allocatedSize > 0)) ||
+      (gpu->allocatedSize < totalSizeCpu)) {
     i = cpu->allocatedSize;
     if (i < totalSizeCpu) {
       i = totalSizeCpu;
@@ -1464,7 +1442,7 @@ static void gpuEmxEnsureCapacity_real_T(const emxArray_real_T *cpu,
     checkCudaError(
         mwCudaMalloc(&newData, static_cast<uint32_T>(i) * sizeof(real_T)),
         __FILE__, __LINE__);
-    needsCopy = (needsCopy && gpu->canFreeData);
+    needsCopy = (needsCopy && (totalSizeGpu > 0));
     if (needsCopy) {
       nvtxMarkA("#checkCudaError#" MW_AT_LINE);
       nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
@@ -1489,7 +1467,7 @@ static void gpuEmxEnsureCapacity_real_T(const emxArray_real_T *cpu,
 static void gpuEmxFree_boolean_T(emxArray_boolean_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxFree_boolean_T#" MW_AT_LOCATION);
-  if (gpu->data != (void *)4207599121UL) {
+  if (gpu->data && gpu->canFreeData && (gpu->data != (void *)4207599121UL)) {
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
     checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
@@ -1501,7 +1479,7 @@ static void gpuEmxFree_boolean_T(emxArray_boolean_T *gpu)
 static void gpuEmxFree_creal32_T(emxArray_creal32_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxFree_creal32_T#" MW_AT_LOCATION);
-  if (gpu->data != (void *)4207599121UL) {
+  if (gpu->data && gpu->canFreeData && (gpu->data != (void *)4207599121UL)) {
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
     checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
@@ -1513,7 +1491,7 @@ static void gpuEmxFree_creal32_T(emxArray_creal32_T *gpu)
 static void gpuEmxFree_real_T(emxArray_real_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxFree_real_T#" MW_AT_LOCATION);
-  if (gpu->data != (void *)4207599121UL) {
+  if (gpu->data && gpu->canFreeData && (gpu->data != (void *)4207599121UL)) {
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
     checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
@@ -1537,13 +1515,15 @@ static void gpuEmxMemcpyCpuToGpu_creal32_T(emxArray_creal32_T *gpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(
-      cudaMemcpy(gpu->data, cpu->data,
-                 static_cast<uint32_T>(actualSize) * sizeof(creal32_T),
-                 cudaMemcpyHostToDevice),
-      __FILE__, __LINE__);
+  if (cpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(gpu->data, cpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(creal32_T),
+                   cudaMemcpyHostToDevice),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
@@ -1562,13 +1542,15 @@ static void gpuEmxMemcpyGpuToCpu_boolean_T(emxArray_boolean_T *cpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(
-      cudaMemcpy(cpu->data, gpu->data,
-                 static_cast<uint32_T>(actualSize) * sizeof(boolean_T),
-                 cudaMemcpyDeviceToHost),
-      __FILE__, __LINE__);
+  if (gpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(cpu->data, gpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(boolean_T),
+                   cudaMemcpyDeviceToHost),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
@@ -1587,13 +1569,15 @@ static void gpuEmxMemcpyGpuToCpu_creal32_T(emxArray_creal32_T *cpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(
-      cudaMemcpy(cpu->data, gpu->data,
-                 static_cast<uint32_T>(actualSize) * sizeof(creal32_T),
-                 cudaMemcpyDeviceToHost),
-      __FILE__, __LINE__);
+  if (gpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(cpu->data, gpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(creal32_T),
+                   cudaMemcpyDeviceToHost),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
@@ -1633,7 +1617,7 @@ static void times(emxArray_real32_T *in1, const emxArray_real32_T *in2,
     in1->size[0] = in3->size[0];
   }
   nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-  emxEnsureCapacity_real32_T(in1, i, &cc_emlrtRTEI);
+  emxEnsureCapacity_real32_T(in1, i, &bc_emlrtRTEI);
   stride_0_0 = (in2->size[0] != 1);
   stride_1_0 = (in3->size[0] != 1);
   if (in3->size[0] == 1) {
@@ -1738,13 +1722,13 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
   boolean_T fv2_outdatedOnCpu;
   boolean_T fv2_outdatedOnGpu;
   boolean_T iv_outdatedOnGpu;
+  boolean_T lin_needsGpuEnsureCapacity;
   boolean_T r1_outdatedOnCpu;
   boolean_T r1_outdatedOnGpu;
   boolean_T r_outdatedOnGpu;
   boolean_T w_outdatedOnGpu;
   boolean_T x_needsGpuEnsureCapacity;
   boolean_T x_outdatedOnCpu;
-  boolean_T x_outdatedOnGpu;
   boolean_T y_outdatedOnCpu;
   boolean_T y_outdatedOnGpu;
   nvtxMarkA("#entryPointStart#");
@@ -1828,7 +1812,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
   fv2_outdatedOnCpu = false;
   w_outdatedOnGpu = true;
   x_outdatedOnCpu = false;
-  x_outdatedOnGpu = true;
+  fv2_outdatedOnGpu = true;
   y_outdatedOnCpu = true;
   x_needsGpuEnsureCapacity = true;
   emlrtHeapReferenceStackEnterFcnR2012b(emlrtRootTLSGlobal);
@@ -1862,7 +1846,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
   // 'ec_detr_fp:31' reps = numel(ord);
   // 'ec_detr_fp:32' olPct = coder.nullcopy(nan(nChs,reps));
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&olPct, 2, &uc_emlrtRTEI, true);
+  emxInit_real_T(&olPct, 2, &rc_emlrtRTEI, true);
   i = olPct->size[0] * olPct->size[1];
   olPct->size[0] = cpu_x->size[1];
   olPct->size[1] = ord_size[1];
@@ -1872,68 +1856,68 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
   // 'ec_detr_fp:35' for ii = 1:reps
   b_i = ord_size[1];
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_regs, 2, &vc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_regs, 2, &sc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real_T#" MW_AT_LINE);
-  emxInit_real_T(&cpu_lin, 2, &wc_emlrtRTEI, true);
+  emxInit_real_T(&cpu_lin, 2, &tc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_fv, 1, &jc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_fv, 1, &ic_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_fv1, 1, &jc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_fv1, 1, &ic_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_z, 1, &xc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_z, 1, &uc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_boolean_T#" MW_AT_LINE);
-  emxInit_boolean_T(&b_cpu_x, 1, &bc_emlrtRTEI, true);
+  emxInit_boolean_T(&b_cpu_x, 1, &ac_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&c_cpu_x, 1, &cc_emlrtRTEI, true);
+  emxInit_real32_T(&c_cpu_x, 1, &bc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&d_cpu_x, 1, &cc_emlrtRTEI, true);
+  emxInit_real32_T(&d_cpu_x, 1, &bc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_r, 2, &yc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_r, 2, &vc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_y, 2, &ad_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_y, 2, &wc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_creal32_T#" MW_AT_LINE);
-  emxInit_creal32_T(&cpu_V, 2, &jc_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_V, 2, &ic_emlrtRTEI, true);
   nvtxMarkA("#emxInit_creal32_T#" MW_AT_LINE);
-  emxInit_creal32_T(&cpu_D, 2, &jc_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_D, 2, &ic_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_V, 2, &bd_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_V, 2, &xc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_creal32_T#" MW_AT_LINE);
-  emxInit_creal32_T(&cpu_d, 1, &cd_emlrtRTEI, true);
+  emxInit_creal32_T(&cpu_d, 1, &yc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_int32_T#" MW_AT_LINE);
-  emxInit_int32_T(&cpu_iv, 1, &dd_emlrtRTEI, true);
+  emxInit_int32_T(&cpu_iv, 1, &ad_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_y, 2, &ed_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_y, 2, &bd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_A, 2, &nc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_A, 2, &mc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&c_cpu_y, 2, &fd_emlrtRTEI, true);
+  emxInit_real32_T(&c_cpu_y, 2, &cd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&d_cpu_y, 1, &gd_emlrtRTEI, true);
+  emxInit_real32_T(&d_cpu_y, 1, &dd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_fv2, 1, &hd_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_fv2, 1, &ed_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_d, 1, &rc_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_d, 1, &qc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&e_cpu_y, 1, &id_emlrtRTEI, true);
+  emxInit_real32_T(&e_cpu_y, 1, &fd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_absdiff, 1, &jd_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_absdiff, 1, &gd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_r, 2, &kd_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_r, 2, &hd_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_r1, 2, &ld_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_r1, 2, &id_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&b_cpu_regs, 2, &cc_emlrtRTEI, true);
+  emxInit_real32_T(&b_cpu_regs, 2, &bc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_r2, 2, &fc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_r2, 2, &ec_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&c_cpu_V, 2, &kc_emlrtRTEI, true);
+  emxInit_real32_T(&c_cpu_V, 2, &jc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_r3, 2, &fc_emlrtRTEI, true);
+  emxInit_real32_T(&cpu_r3, 2, &ec_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&f_cpu_y, 1, &pc_emlrtRTEI, true);
+  emxInit_real32_T(&f_cpu_y, 1, &oc_emlrtRTEI, true);
   nvtxMarkA("#emxInit_real32_T#" MW_AT_LINE);
-  emxInit_real32_T(&cpu_r4, 2, &mc_emlrtRTEI, true);
-  profileLoopStart("ec_detr_fp_loop_0", __LINE__, (b_i - 1) + 1, "");
+  emxInit_real32_T(&cpu_r4, 2, &lc_emlrtRTEI, true);
+  profileLoopStart("ec_detr_fp_loop_0", __LINE__, (b_i - 1) + 1, "1957");
   for (int32_T ii{0}; ii < b_i; ii++) {
     int32_T k;
     int32_T nx;
@@ -1958,21 +1942,18 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
     emxEnsureCapacity_real32_T(cpu_regs, i, &vb_emlrtRTEI);
     regs_needsGpuEnsureCapacity = true;
     // 'ec_detr_fp:59' lin = linspace(-1,1,nFrames);
-    i = cpu_lin->size[0] * cpu_lin->size[1];
     cpu_lin->size[0] = 1;
     cpu_lin->size[1] = nFrames;
-    nvtxMarkA("#emxEnsureCapacity_real_T#" MW_AT_LINE);
-    emxEnsureCapacity_real_T(cpu_lin, i, &wb_emlrtRTEI);
-    fv2_outdatedOnGpu = true;
+    lin_needsGpuEnsureCapacity = true;
     if (nFrames >= 1) {
       nvtxMarkA("#gpuEmxEnsureCapacity_real_T#" MW_AT_LINE);
       gpuEmxEnsureCapacity_real_T(cpu_lin, &gpu_lin, true);
-      fv2_outdatedOnGpu = false;
-      nvtxMarkA("#ec_detr_fp_kernel1#" MW_AT_LINE);
+      lin_needsGpuEnsureCapacity = false;
+      nvtxMarkA("#ec_detr_fp_kernel1#" MW_AT_LINE "#I1958");
       ec_detr_fp_kernel1<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(nFrames,
                                                                   gpu_lin);
       if (cpu_lin->size[1] >= 2) {
-        nvtxMarkA("#ec_detr_fp_kernel2#" MW_AT_LINE);
+        nvtxMarkA("#ec_detr_fp_kernel2#" MW_AT_LINE "#I1959");
         ec_detr_fp_kernel2<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_lin);
         if (cpu_lin->size[1] >= 3) {
           real_T d2scaled;
@@ -1983,12 +1964,12 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
                                   2147483647U);
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel3#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel3#" MW_AT_LINE "#I1960");
             ec_detr_fp_kernel3<<<grid, block>>>(d2scaled, nz - 3, gpu_lin,
                                                 cpu_lin->size[1U]);
           }
-          if ((cpu_lin->size[1] & 1) == 1) {
-            nvtxMarkA("#ec_detr_fp_kernel4#" MW_AT_LINE);
+          if ((static_cast<uint32_T>(cpu_lin->size[1]) & 1U) == 1U) {
+            nvtxMarkA("#ec_detr_fp_kernel4#" MW_AT_LINE "#I1961");
             ec_detr_fp_kernel4<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(
                 gpu_lin, cpu_lin->size[1U]);
           }
@@ -1997,18 +1978,18 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
     }
     // 'ec_detr_fp:60' for k = 1:iOrd
     nz = static_cast<int32_T>(ord_data[ii]);
-    profileLoopStart("ec_detr_fp_loop_1", __LINE__, (nz - 1) + 1, "");
+    profileLoopStart("ec_detr_fp_loop_1", __LINE__, (nz - 1) + 1, "1962");
     for (k = 0; k < nz; k++) {
       // 'ec_detr_fp:61' regs(:,k) = lin.^k;
       nx = cpu_lin->size[1];
       nvtxMarkA("#computeNumIters#" MW_AT_LINE);
       mwGetLaunchParameters1D(computeNumIters(nx - 1), &grid, &block,
                               2147483647U);
-      if (fv2_outdatedOnGpu) {
+      if (lin_needsGpuEnsureCapacity) {
         nvtxMarkA("#gpuEmxEnsureCapacity_real_T#" MW_AT_LINE);
         gpuEmxEnsureCapacity_real_T(cpu_lin, &gpu_lin, true);
       }
-      fv2_outdatedOnGpu = false;
+      lin_needsGpuEnsureCapacity = false;
       if (regs_needsGpuEnsureCapacity) {
         nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
         gpuEmxEnsureCapacity_real32_T(cpu_regs, &gpu_regs, true);
@@ -2016,7 +1997,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       regs_needsGpuEnsureCapacity = false;
       validLaunchParams = mwValidateLaunchParameters(grid, block);
       if (validLaunchParams) {
-        nvtxMarkA("#ec_detr_fp_kernel5#" MW_AT_LINE);
+        nvtxMarkA("#ec_detr_fp_kernel5#" MW_AT_LINE "#I1963");
         ec_detr_fp_kernel5<<<grid, block>>>(
             k, gpu_lin, static_cast<int32_T>(static_cast<real32_T>(k) + 1.0F),
             nx - 1, gpu_regs, cpu_regs->size[0U]);
@@ -2031,12 +2012,10 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
     if (k - 1 >= 0) {
       i5 = static_cast<int32_T>(itr_data[ii]);
     }
-    profileLoopStart("ec_detr_fp_loop_2", __LINE__, (k - 1) + 1, "");
+    profileLoopStart("ec_detr_fp_loop_2", __LINE__, (k - 1) + 1, "1964");
     for (int32_T ch{0}; ch < k; ch++) {
       int32_T vlen;
-      boolean_T fv1_needsGpuEnsureCapacity;
       boolean_T fv1_outdatedOnCpu;
-      boolean_T fv_needsGpuEnsureCapacity;
       boolean_T fv_outdatedOnCpu;
       boolean_T z_outdatedOnCpu;
       // 'ec_detr_fp:41' [x(:,ch),w(:,ch)] =
@@ -2044,24 +2023,23 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       i = cpu_fv->size[0];
       cpu_fv->size[0] = cpu_x->size[0];
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(cpu_fv, i, &xb_emlrtRTEI);
+      emxEnsureCapacity_real32_T(cpu_fv, i, &wb_emlrtRTEI);
       nx = cpu_x->size[0] - 1;
       nvtxMarkA("#computeNumIters#" MW_AT_LINE);
       mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block, 2147483647U);
       if (x_needsGpuEnsureCapacity) {
         nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-        gpuEmxEnsureCapacity_real32_T(cpu_x, &gpu_x, !x_outdatedOnGpu);
+        gpuEmxEnsureCapacity_real32_T(cpu_x, &gpu_x, !fv2_outdatedOnGpu);
       }
       nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
       gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv, true);
-      fv_needsGpuEnsureCapacity = false;
-      if (x_outdatedOnGpu) {
+      if (fv2_outdatedOnGpu) {
         nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
         gpuEmxMemcpyCpuToGpu_real32_T(&gpu_x, cpu_x);
       }
       validLaunchParams = mwValidateLaunchParameters(grid, block);
       if (validLaunchParams) {
-        nvtxMarkA("#ec_detr_fp_kernel6#" MW_AT_LINE);
+        nvtxMarkA("#ec_detr_fp_kernel6#" MW_AT_LINE "#I1965");
         ec_detr_fp_kernel6<<<grid, block>>>(ch, gpu_x, nx, gpu_fv,
                                             cpu_x->size[0U]);
       }
@@ -2069,7 +2047,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       i = cpu_fv1->size[0];
       cpu_fv1->size[0] = cpu_w->size[0];
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(cpu_fv1, i, &yb_emlrtRTEI);
+      emxEnsureCapacity_real32_T(cpu_fv1, i, &xb_emlrtRTEI);
       nx = cpu_w->size[0] - 1;
       nvtxMarkA("#computeNumIters#" MW_AT_LINE);
       mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block, 2147483647U);
@@ -2079,14 +2057,13 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       }
       nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
       gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
-      fv1_needsGpuEnsureCapacity = false;
       if (w_outdatedOnGpu) {
         nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
         gpuEmxMemcpyCpuToGpu_real32_T(&gpu_w, cpu_w);
       }
       validLaunchParams = mwValidateLaunchParameters(grid, block);
       if (validLaunchParams) {
-        nvtxMarkA("#ec_detr_fp_kernel7#" MW_AT_LINE);
+        nvtxMarkA("#ec_detr_fp_kernel7#" MW_AT_LINE "#I1966");
         ec_detr_fp_kernel7<<<grid, block>>>(ch, gpu_w, nx, gpu_fv1,
                                             cpu_w->size[0U]);
       }
@@ -2106,15 +2083,16 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       //  Detrend per polynomial order
       // 'ec_detr_fp:80' z = coder.nullcopy(x);
       z_outdatedOnCpu = false;
-      x_outdatedOnGpu = false;
+      lin_needsGpuEnsureCapacity = false;
       i = cpu_z->size[0];
       cpu_z->size[0] = cpu_x->size[0];
       nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-      emxEnsureCapacity_real32_T(cpu_z, i, &ac_emlrtRTEI);
-      x_needsGpuEnsureCapacity = true;
+      emxEnsureCapacity_real32_T(cpu_z, i, &yb_emlrtRTEI);
+      w_outdatedOnGpu = true;
       // 'ec_detr_fp:81' for ii = 1:iItr
-      profileLoopStart("ec_detr_fp_loop_3", __LINE__, (i5 - 1) + 1, "");
+      profileLoopStart("ec_detr_fp_loop_3", __LINE__, (i5 - 1) + 1, "1967");
       for (int32_T b_ii{0}; b_ii < i5; b_ii++) {
+        uint64_T numIters;
         real32_T b_mn;
         real32_T mn;
         real32_T xbar;
@@ -2136,21 +2114,16 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           i = c_cpu_x->size[0];
           c_cpu_x->size[0] = cpu_fv->size[0];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(c_cpu_x, i, &cc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(c_cpu_x, i, &bc_emlrtRTEI);
           nx = cpu_fv->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
                                   2147483647U);
-          if (fv_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv, true);
-          }
-          fv_needsGpuEnsureCapacity = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(c_cpu_x, &b_gpu_x, true);
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel8#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel8#" MW_AT_LINE "#I1968");
             ec_detr_fp_kernel8<<<grid, block>>>(gpu_fv1, gpu_fv, nx, b_gpu_x);
           }
           b_x_outdatedOnCpu = true;
@@ -2170,8 +2143,6 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           nvtxMarkA("#times#" MW_AT_LINE);
           times(c_cpu_x, cpu_fv, cpu_fv1);
           b_x_outdatedOnCpu = false;
-          fv1_needsGpuEnsureCapacity = true;
-          fv_needsGpuEnsureCapacity = true;
         }
         vlen = c_cpu_x->size[0];
         if (c_cpu_x->size[0] == 0) {
@@ -2183,7 +2154,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
           b_x_outdatedOnCpu = false;
           xbar = c_cpu_x->data[0];
-          profileLoopStart("ec_detr_fp_loop_4", __LINE__, (vlen - 2) + 1, "");
+          profileLoopStart("ec_detr_fp_loop_4", __LINE__, (vlen - 2) + 1,
+                           "1998");
           for (nx = 0; nx <= vlen - 2; nx++) {
             xbar += c_cpu_x->data[nx + 1];
           }
@@ -2199,8 +2171,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
           fv1_outdatedOnCpu = false;
           g_cpu_y = cpu_fv1->data[0];
-          fv1_needsGpuEnsureCapacity = true;
-          profileLoopStart("ec_detr_fp_loop_5", __LINE__, (vlen - 2) + 1, "");
+          profileLoopStart("ec_detr_fp_loop_5", __LINE__, (vlen - 2) + 1,
+                           "1997");
           for (nx = 0; nx <= vlen - 2; nx++) {
             g_cpu_y += cpu_fv1->data[nx + 1];
           }
@@ -2217,26 +2189,16 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           i = d_cpu_x->size[0];
           d_cpu_x->size[0] = cpu_fv->size[0];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(d_cpu_x, i, &cc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(d_cpu_x, i, &bc_emlrtRTEI);
           nx = cpu_fv->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
                                   2147483647U);
-          if (fv1_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
-          }
-          fv1_needsGpuEnsureCapacity = false;
-          if (fv_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv, true);
-          }
-          fv_needsGpuEnsureCapacity = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(d_cpu_x, &c_gpu_x, true);
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel9#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel9#" MW_AT_LINE "#I1969");
             ec_detr_fp_kernel9<<<grid, block>>>(gpu_fv1, gpu_fv, nx, c_gpu_x);
           }
           c_x_outdatedOnCpu = true;
@@ -2258,8 +2220,6 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           nvtxMarkA("#times#" MW_AT_LINE);
           times(d_cpu_x, cpu_fv, cpu_fv1);
           c_x_outdatedOnCpu = false;
-          fv1_needsGpuEnsureCapacity = true;
-          fv_needsGpuEnsureCapacity = true;
         }
         vlen = d_cpu_x->size[0];
         if (d_cpu_x->size[0] == 0) {
@@ -2271,7 +2231,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
           c_x_outdatedOnCpu = false;
           xbar = d_cpu_x->data[0];
-          profileLoopStart("ec_detr_fp_loop_7", __LINE__, (vlen - 2) + 1, "");
+          profileLoopStart("ec_detr_fp_loop_7", __LINE__, (vlen - 2) + 1,
+                           "1996");
           for (nx = 0; nx <= vlen - 2; nx++) {
             xbar += d_cpu_x->data[nx + 1];
           }
@@ -2287,8 +2248,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
           fv1_outdatedOnCpu = false;
           g_cpu_y = cpu_fv1->data[0];
-          fv1_needsGpuEnsureCapacity = true;
-          profileLoopStart("ec_detr_fp_loop_8", __LINE__, (vlen - 2) + 1, "");
+          profileLoopStart("ec_detr_fp_loop_8", __LINE__, (vlen - 2) + 1,
+                           "1995");
           for (nx = 0; nx <= vlen - 2; nx++) {
             g_cpu_y += cpu_fv1->data[nx + 1];
           }
@@ -2310,8 +2271,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
           fv1_outdatedOnCpu = false;
           g_cpu_y = cpu_fv1->data[0];
-          fv1_needsGpuEnsureCapacity = true;
-          profileLoopStart("ec_detr_fp_loop_9", __LINE__, (vlen - 2) + 1, "");
+          profileLoopStart("ec_detr_fp_loop_9", __LINE__, (vlen - 2) + 1,
+                           "1994");
           for (nx = 0; nx <= vlen - 2; nx++) {
             g_cpu_y += cpu_fv1->data[nx + 1];
           }
@@ -2323,17 +2284,12 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           b_cpu_regs->size[0] = cpu_regs->size[0];
           b_cpu_regs->size[1] = cpu_regs->size[1];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(b_cpu_regs, i, &cc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(b_cpu_regs, i, &bc_emlrtRTEI);
           nx = cpu_regs->size[1] - 1;
-          vlen = cpu_regs->size[0] - 1;
+          nz = cpu_regs->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-          mwGetLaunchParameters1D(computeNumIters(nx, vlen), &grid, &block,
-                                  2147483647U);
-          if (fv1_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
-          }
-          fv1_needsGpuEnsureCapacity = false;
+          numIters = computeNumIters(nx, nz);
+          mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
           if (regs_needsGpuEnsureCapacity) {
             nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
             gpuEmxEnsureCapacity_real32_T(cpu_regs, &gpu_regs, true);
@@ -2343,9 +2299,9 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           gpuEmxEnsureCapacity_real32_T(b_cpu_regs, &b_gpu_regs, true);
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel10#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel10#" MW_AT_LINE "#I1970");
             ec_detr_fp_kernel10<<<grid, block>>>(
-                gpu_fv1, gpu_regs, vlen, nx, b_gpu_regs, b_cpu_regs->size[0U],
+                gpu_fv1, gpu_regs, nz, nx, b_gpu_regs, b_cpu_regs->size[0U],
                 cpu_regs->size[0U]);
           }
           nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
@@ -2365,20 +2321,18 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           fv1_outdatedOnCpu = false;
           nvtxMarkA("#binary_expand_op_4#" MW_AT_LINE);
           binary_expand_op_4(b_cpu_r, cpu_regs, cpu_fv1);
-          fv1_needsGpuEnsureCapacity = true;
-          regs_needsGpuEnsureCapacity = true;
         }
         g_cpu_y += 2.22044605E-16F;
         i = cpu_r->size[0] * cpu_r->size[1];
         cpu_r->size[0] = cpu_regs->size[0];
         cpu_r->size[1] = cpu_regs->size[1];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(cpu_r, i, &dc_emlrtRTEI);
+        emxEnsureCapacity_real32_T(cpu_r, i, &cc_emlrtRTEI);
         nx = cpu_regs->size[1] - 1;
-        vlen = cpu_regs->size[0] - 1;
+        nz = cpu_regs->size[0] - 1;
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-        mwGetLaunchParameters1D(computeNumIters(nx, vlen), &grid, &block,
-                                2147483647U);
+        numIters = computeNumIters(nx, nz);
+        mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
         nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
         gpuEmxEnsureCapacity_real32_T(b_cpu_r, &gpu_r, false);
         if (regs_needsGpuEnsureCapacity) {
@@ -2392,9 +2346,9 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         gpuEmxMemcpyCpuToGpu_real32_T(&gpu_r, b_cpu_r);
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel11#" MW_AT_LINE);
-          ec_detr_fp_kernel11<<<grid, block>>>(g_cpu_y, gpu_r, gpu_regs, vlen,
-                                               nx, b_gpu_r, cpu_r->size[0U],
+          nvtxMarkA("#ec_detr_fp_kernel11#" MW_AT_LINE "#I1971");
+          ec_detr_fp_kernel11<<<grid, block>>>(g_cpu_y, gpu_r, gpu_regs, nz, nx,
+                                               b_gpu_r, cpu_r->size[0U],
                                                cpu_regs->size[0U]);
         }
         r_outdatedOnGpu = false;
@@ -2405,24 +2359,19 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           cpu_r1->size[0] = cpu_r->size[0];
           cpu_r1->size[1] = cpu_r->size[1];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(cpu_r1, i, &ec_emlrtRTEI);
+          emxEnsureCapacity_real32_T(cpu_r1, i, &dc_emlrtRTEI);
           nx = cpu_r->size[1] - 1;
-          vlen = cpu_r->size[0] - 1;
+          nz = cpu_r->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-          mwGetLaunchParameters1D(computeNumIters(nx, vlen), &grid, &block,
-                                  2147483647U);
-          if (fv1_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
-          }
-          fv1_needsGpuEnsureCapacity = false;
+          numIters = computeNumIters(nx, nz);
+          mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_r1, &gpu_r1, true);
           y_outdatedOnCpu = false;
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel12#" MW_AT_LINE);
-            ec_detr_fp_kernel12<<<grid, block>>>(gpu_fv1, b_gpu_r, vlen, nx,
+            nvtxMarkA("#ec_detr_fp_kernel12#" MW_AT_LINE "#I1972");
+            ec_detr_fp_kernel12<<<grid, block>>>(gpu_fv1, b_gpu_r, nz, nx,
                                                  gpu_r1, cpu_r1->size[0U],
                                                  cpu_r->size[0U]);
           }
@@ -2444,7 +2393,6 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           binary_expand_op_3(cpu_r1, cpu_r, cpu_fv1);
           r1_outdatedOnCpu = false;
           r1_outdatedOnGpu = true;
-          fv1_needsGpuEnsureCapacity = true;
           y_outdatedOnCpu = true;
         }
         // 'ec_detr_fp:111' [V,D] = eig(rr'*rr);
@@ -2452,12 +2400,12 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         cpu_r2->size[0] = cpu_r1->size[1];
         cpu_r2->size[1] = cpu_r1->size[0];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(cpu_r2, i, &fc_emlrtRTEI);
+        emxEnsureCapacity_real32_T(cpu_r2, i, &ec_emlrtRTEI);
         nx = cpu_r1->size[0] - 1;
-        vlen = cpu_r1->size[1] - 1;
+        nz = cpu_r1->size[1] - 1;
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-        mwGetLaunchParameters1D(computeNumIters(nx, vlen), &grid, &block,
-                                2147483647U);
+        numIters = computeNumIters(nx, nz);
+        mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
         if (y_outdatedOnCpu) {
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_r1, &gpu_r1, !r1_outdatedOnGpu);
@@ -2471,16 +2419,16 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         r1_outdatedOnGpu = false;
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel13#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel13#" MW_AT_LINE "#I1973");
           ec_detr_fp_kernel13<<<grid, block>>>(
-              gpu_r1, vlen, nx, gpu_r2, cpu_r2->size[0U], cpu_r1->size[0U]);
+              gpu_r1, nz, nx, gpu_r2, cpu_r2->size[0U], cpu_r1->size[0U]);
         }
-        x_outdatedOnGpu = false;
+        lin_needsGpuEnsureCapacity = false;
         nvtxMarkA("#mtimes#" MW_AT_LINE);
-        coder::internal::blas::mtimes(cpu_r2, &gpu_r2, &x_outdatedOnGpu, cpu_r1,
-                                      &gpu_r1, &r1_outdatedOnGpu, cpu_y,
-                                      &y_outdatedOnCpu, &gpu_y,
-                                      &y_outdatedOnGpu);
+        coder::internal::blas::mtimes(
+            cpu_r2, &gpu_r2, &lin_needsGpuEnsureCapacity, cpu_r1, &gpu_r1,
+            &r1_outdatedOnGpu, cpu_y, &y_outdatedOnCpu, &gpu_y,
+            &y_outdatedOnGpu);
         if (y_outdatedOnCpu) {
           nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
           gpuEmxMemcpyGpuToCpu_real32_T(cpu_y, &gpu_y);
@@ -2492,7 +2440,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         b_cpu_V->size[0] = cpu_V->size[0];
         b_cpu_V->size[1] = cpu_V->size[1];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(b_cpu_V, i, &gc_emlrtRTEI);
+        emxEnsureCapacity_real32_T(b_cpu_V, i, &fc_emlrtRTEI);
         nx = cpu_V->size[0] * cpu_V->size[1] - 1;
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
         mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
@@ -2505,7 +2453,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_V, cpu_V);
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel14#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel14#" MW_AT_LINE "#I1974");
           ec_detr_fp_kernel14<<<grid, block>>>(gpu_V, nx, b_gpu_V);
         }
         // 'ec_detr_fp:113' D = real(diag(D));
@@ -2513,7 +2461,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           i = cpu_d->size[0];
           cpu_d->size[0] = 1;
           nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-          emxEnsureCapacity_creal32_T(cpu_d, i, &ic_emlrtRTEI);
+          emxEnsureCapacity_creal32_T(cpu_d, i, &hc_emlrtRTEI);
           cpu_d->data[0] = cpu_D->data[0];
           fv2_outdatedOnCpu = false;
         } else {
@@ -2522,18 +2470,15 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           if (nz <= vlen) {
             vlen = nz;
           }
-          if (cpu_D->size[1] > 0) {
-            nz = vlen;
-          } else {
-            nz = 0;
+          if (cpu_D->size[1] <= 0) {
+            vlen = 0;
           }
           i = cpu_d->size[0];
-          cpu_d->size[0] = nz;
+          cpu_d->size[0] = vlen;
           nvtxMarkA("#emxEnsureCapacity_creal32_T#" MW_AT_LINE);
-          emxEnsureCapacity_creal32_T(cpu_d, i, &hc_emlrtRTEI);
-          nz--;
+          emxEnsureCapacity_creal32_T(cpu_d, i, &gc_emlrtRTEI);
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-          mwGetLaunchParameters1D(computeNumIters(nz), &grid, &block,
+          mwGetLaunchParameters1D(computeNumIters(vlen - 1), &grid, &block,
                                   2147483647U);
           nvtxMarkA("#gpuEmxEnsureCapacity_creal32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_creal32_T(cpu_D, &gpu_D, false);
@@ -2543,8 +2488,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           gpuEmxMemcpyCpuToGpu_creal32_T(&gpu_D, cpu_D);
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel27#" MW_AT_LINE);
-            ec_detr_fp_kernel27<<<grid, block>>>(gpu_D, nz, b_gpu_d,
+            nvtxMarkA("#ec_detr_fp_kernel27#" MW_AT_LINE "#I1993");
+            ec_detr_fp_kernel27<<<grid, block>>>(gpu_D, vlen - 1, b_gpu_d,
                                                  cpu_D->size[0U]);
           }
           fv2_outdatedOnCpu = true;
@@ -2556,7 +2501,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           gpuEmxMemcpyGpuToCpu_creal32_T(cpu_d, &b_gpu_d);
         }
         xbar = cpu_d->data[0].re;
-        profileLoopStart("ec_detr_fp_loop_10", __LINE__, (vlen - 2) + 1, "");
+        profileLoopStart("ec_detr_fp_loop_10", __LINE__, (vlen - 2) + 1,
+                         "1975");
         for (i = 0; i <= vlen - 2; i++) {
           if (std::isnan(cpu_d->data[i + 1].re)) {
             fv2_outdatedOnCpu = false;
@@ -2570,10 +2516,10 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
         }
         profileLoopEnd();
-        nx = cpu_d->size[0] - 1;
+        nx = cpu_d->size[0];
         nz = 0;
-        profileLoopStart("ec_detr_fp_loop_11", __LINE__, nx + 1, "");
-        for (i = 0; i <= nx; i++) {
+        profileLoopStart("ec_detr_fp_loop_11", __LINE__, (nx - 1) + 1, "1976");
+        for (i = 0; i < nx; i++) {
           if (cpu_d->data[i].re / xbar > 1.0E-7) {
             nz++;
           }
@@ -2582,10 +2528,10 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         i = cpu_iv->size[0];
         cpu_iv->size[0] = nz;
         nvtxMarkA("#emxEnsureCapacity_int32_T#" MW_AT_LINE);
-        emxEnsureCapacity_int32_T(cpu_iv, i, &jc_emlrtRTEI);
+        emxEnsureCapacity_int32_T(cpu_iv, i, &ic_emlrtRTEI);
         vlen = 0;
-        profileLoopStart("ec_detr_fp_loop_12", __LINE__, nx + 1, "");
-        for (i = 0; i <= nx; i++) {
+        profileLoopStart("ec_detr_fp_loop_12", __LINE__, (nx - 1) + 1, "1977");
+        for (i = 0; i < nx; i++) {
           if (cpu_d->data[i].re / xbar > 1.0E-7) {
             cpu_iv->data[vlen] = i;
             iv_outdatedOnGpu = true;
@@ -2594,15 +2540,12 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         }
         profileLoopEnd();
         nz = b_cpu_V->size[0];
-        i = c_cpu_V->size[0] * c_cpu_V->size[1];
         c_cpu_V->size[0] = b_cpu_V->size[0];
         c_cpu_V->size[1] = cpu_iv->size[0];
-        nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(c_cpu_V, i, &kc_emlrtRTEI);
-        nx = cpu_iv->size[0] - 1;
+        vlen = cpu_iv->size[0];
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-        mwGetLaunchParameters1D(computeNumIters(nx, nz - 1), &grid, &block,
-                                2147483647U);
+        numIters = computeNumIters(vlen - 1, nz - 1);
+        mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
         nvtxMarkA("#gpuEmxEnsureCapacity_int32_T#" MW_AT_LINE);
         gpuEmxEnsureCapacity_int32_T(cpu_iv, &gpu_iv, !iv_outdatedOnGpu);
         nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
@@ -2614,16 +2557,16 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         iv_outdatedOnGpu = false;
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel15#" MW_AT_LINE);
-          ec_detr_fp_kernel15<<<grid, block>>>(gpu_iv, b_gpu_V, nz - 1, nx,
-                                               c_gpu_V, c_cpu_V->size[0U],
-                                               b_cpu_V->size[0U]);
+          nvtxMarkA("#ec_detr_fp_kernel15#" MW_AT_LINE "#I1978");
+          ec_detr_fp_kernel15<<<grid, block>>>(
+              gpu_iv, b_gpu_V, nz - 1, vlen - 1, c_gpu_V, c_cpu_V->size[0U],
+              b_cpu_V->size[0U]);
         }
         i = b_cpu_V->size[0] * b_cpu_V->size[1];
         b_cpu_V->size[0] = c_cpu_V->size[0];
         b_cpu_V->size[1] = c_cpu_V->size[1];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(b_cpu_V, i, &lc_emlrtRTEI);
+        emxEnsureCapacity_real32_T(b_cpu_V, i, &kc_emlrtRTEI);
         nx = c_cpu_V->size[0] * c_cpu_V->size[1] - 1;
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
         mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
@@ -2632,35 +2575,35 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         gpuEmxEnsureCapacity_real32_T(b_cpu_V, &b_gpu_V, true);
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel16#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel16#" MW_AT_LINE "#I1979");
           ec_detr_fp_kernel16<<<grid, block>>>(c_gpu_V, nx, b_gpu_V);
         }
         fv2_outdatedOnGpu = false;
         //  discard weak dims
         // 'ec_detr_fp:115' rr = rr*V;
-        x_needsGpuEnsureCapacity = false;
+        w_outdatedOnGpu = false;
         i = cpu_r4->size[0] * cpu_r4->size[1];
         cpu_r4->size[0] = cpu_r1->size[0];
         cpu_r4->size[1] = cpu_r1->size[1];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(cpu_r4, i, &mc_emlrtRTEI);
-        nz = cpu_r1->size[0] * cpu_r1->size[1] - 1;
-        profileLoopStart("ec_detr_fp_loop_13", __LINE__, nz + 1, "");
-        for (i = 0; i <= nz; i++) {
+        emxEnsureCapacity_real32_T(cpu_r4, i, &lc_emlrtRTEI);
+        vlen = cpu_r1->size[0] * cpu_r1->size[1] - 1;
+        profileLoopStart("ec_detr_fp_loop_13", __LINE__, vlen + 1, "1980");
+        for (i = 0; i <= vlen; i++) {
           if (r1_outdatedOnCpu) {
             nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
             gpuEmxMemcpyGpuToCpu_real32_T(cpu_r1, &gpu_r1);
           }
           r1_outdatedOnCpu = false;
           cpu_r4->data[i] = cpu_r1->data[i];
-          x_needsGpuEnsureCapacity = true;
+          w_outdatedOnGpu = true;
         }
         profileLoopEnd();
         nvtxMarkA("#mtimes#" MW_AT_LINE);
-        coder::internal::blas::mtimes(
-            cpu_r4, &gpu_r4, &x_needsGpuEnsureCapacity, b_cpu_V, &b_gpu_V,
-            &fv2_outdatedOnGpu, cpu_r1, &r1_outdatedOnCpu, &gpu_r1,
-            &r1_outdatedOnGpu);
+        coder::internal::blas::mtimes(cpu_r4, &gpu_r4, &w_outdatedOnGpu,
+                                      b_cpu_V, &b_gpu_V, &fv2_outdatedOnGpu,
+                                      cpu_r1, &r1_outdatedOnCpu, &gpu_r1,
+                                      &r1_outdatedOnGpu);
         y_outdatedOnCpu = true;
         // 'ec_detr_fp:116' b = (x'*rr) / (rr'*rr);
         if (cpu_fv->size[0] == cpu_fv1->size[0]) {
@@ -2668,31 +2611,21 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           cpu_A->size[0] = 1;
           cpu_A->size[1] = cpu_fv->size[0];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(cpu_A, i, &nc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(cpu_A, i, &mc_emlrtRTEI);
           nx = cpu_fv->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
                                   2147483647U);
-          if (fv1_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
-          }
-          fv1_needsGpuEnsureCapacity = false;
-          if (fv_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv, true);
-          }
-          fv_needsGpuEnsureCapacity = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_A, &gpu_A, true);
-          x_needsGpuEnsureCapacity = false;
+          w_outdatedOnGpu = false;
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel17#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel17#" MW_AT_LINE "#I1981");
             ec_detr_fp_kernel17<<<grid, block>>>(gpu_fv1, b_mn, gpu_fv, nx,
                                                  gpu_A);
           }
-          x_outdatedOnGpu = false;
+          lin_needsGpuEnsureCapacity = false;
           A_outdatedOnCpu = true;
         } else {
           if (A_outdatedOnCpu) {
@@ -2712,10 +2645,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           nvtxMarkA("#binary_expand_op_2#" MW_AT_LINE);
           binary_expand_op_2(cpu_A, cpu_fv, b_mn, cpu_fv1);
           A_outdatedOnCpu = false;
-          x_outdatedOnGpu = true;
-          fv1_needsGpuEnsureCapacity = true;
-          fv_needsGpuEnsureCapacity = true;
-          x_needsGpuEnsureCapacity = true;
+          lin_needsGpuEnsureCapacity = true;
+          w_outdatedOnGpu = true;
         }
         if ((cpu_A->size[1] == 0) || (cpu_r1->size[0] == 0) ||
             (cpu_r1->size[1] == 0)) {
@@ -2723,7 +2654,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           b_cpu_y->size[0] = 1;
           b_cpu_y->size[1] = cpu_r1->size[1];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(b_cpu_y, i, &oc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(b_cpu_y, i, &nc_emlrtRTEI);
           nz = cpu_r1->size[1];
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(nz - 1), &grid, &block,
@@ -2732,10 +2663,10 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           gpuEmxEnsureCapacity_real32_T(b_cpu_y, &b_gpu_y, true);
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel18#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel18#" MW_AT_LINE "#I1982");
             ec_detr_fp_kernel18<<<grid, block>>>(nz - 1, b_gpu_y);
           }
-          w_outdatedOnGpu = false;
+          x_needsGpuEnsureCapacity = false;
           fv2_outdatedOnCpu = true;
         } else {
           i = b_cpu_y->size[0] * b_cpu_y->size[1];
@@ -2745,16 +2676,17 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           emxEnsureCapacity_real32_T(b_cpu_y, i, &c_emlrtRTEI);
           xbar = 1.0F;
           g_cpu_y = 0.0F;
-          if (x_needsGpuEnsureCapacity) {
+          if (w_outdatedOnGpu) {
             nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_A, &gpu_A, !x_outdatedOnGpu);
+            gpuEmxEnsureCapacity_real32_T(cpu_A, &gpu_A,
+                                          !lin_needsGpuEnsureCapacity);
           }
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_r1, &gpu_r1, !r1_outdatedOnGpu);
           y_outdatedOnCpu = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(b_cpu_y, &b_gpu_y, true);
-          if (x_outdatedOnGpu) {
+          if (lin_needsGpuEnsureCapacity) {
             nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
             gpuEmxMemcpyCpuToGpu_real32_T(&gpu_A, cpu_A);
           }
@@ -2763,27 +2695,24 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
             gpuEmxMemcpyCpuToGpu_real32_T(&gpu_r1, cpu_r1);
           }
           r1_outdatedOnGpu = false;
-          nvtxMarkA("#cublasCheck#" MW_AT_LINE);
-          cublasCheck(
-              cublasSgemm(getCublasGlobalHandle(), CUBLAS_OP_N, CUBLAS_OP_N, 1,
-                          cpu_r1->size[1], cpu_A->size[1], (float *)&xbar,
-                          (float *)&gpu_A.data[0], 1, (float *)&gpu_r1.data[0],
-                          cpu_A->size[1], (float *)&g_cpu_y,
-                          (float *)&b_gpu_y.data[0], 1),
-              __FILE__, __LINE__);
-          w_outdatedOnGpu = false;
+          cublasSgemm(getCublasGlobalHandle(), CUBLAS_OP_N, CUBLAS_OP_N, 1,
+                      cpu_r1->size[1], cpu_A->size[1], (float *)&xbar,
+                      (float *)&gpu_A.data[0], 1, (float *)&gpu_r1.data[0],
+                      cpu_A->size[1], (float *)&g_cpu_y,
+                      (float *)&b_gpu_y.data[0], 1);
+          x_needsGpuEnsureCapacity = false;
           fv2_outdatedOnCpu = true;
         }
         i = cpu_r3->size[0] * cpu_r3->size[1];
         cpu_r3->size[0] = cpu_r1->size[1];
         cpu_r3->size[1] = cpu_r1->size[0];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(cpu_r3, i, &fc_emlrtRTEI);
+        emxEnsureCapacity_real32_T(cpu_r3, i, &ec_emlrtRTEI);
         nx = cpu_r1->size[0] - 1;
-        vlen = cpu_r1->size[1] - 1;
+        nz = cpu_r1->size[1] - 1;
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-        mwGetLaunchParameters1D(computeNumIters(nx, vlen), &grid, &block,
-                                2147483647U);
+        numIters = computeNumIters(nx, nz);
+        mwGetLaunchParameters1D(numIters, &grid, &block, 2147483647U);
         if (y_outdatedOnCpu) {
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_r1, &gpu_r1, !r1_outdatedOnGpu);
@@ -2797,16 +2726,16 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         r1_outdatedOnGpu = false;
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel19#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel19#" MW_AT_LINE "#I1983");
           ec_detr_fp_kernel19<<<grid, block>>>(
-              gpu_r1, vlen, nx, gpu_r3, cpu_r3->size[0U], cpu_r1->size[0U]);
+              gpu_r1, nz, nx, gpu_r3, cpu_r3->size[0U], cpu_r1->size[0U]);
         }
-        x_outdatedOnGpu = false;
+        lin_needsGpuEnsureCapacity = false;
         nvtxMarkA("#mtimes#" MW_AT_LINE);
-        coder::internal::blas::mtimes(cpu_r3, &gpu_r3, &x_outdatedOnGpu, cpu_r1,
-                                      &gpu_r1, &r1_outdatedOnGpu, c_cpu_y,
-                                      &y_outdatedOnCpu, &c_gpu_y,
-                                      &y_outdatedOnGpu);
+        coder::internal::blas::mtimes(
+            cpu_r3, &gpu_r3, &lin_needsGpuEnsureCapacity, cpu_r1, &gpu_r1,
+            &r1_outdatedOnGpu, c_cpu_y, &y_outdatedOnCpu, &c_gpu_y,
+            &y_outdatedOnGpu);
         if (y_outdatedOnCpu) {
           nvtxMarkA("#gpuEmxMemcpyGpuToCpu_real32_T#" MW_AT_LINE);
           gpuEmxMemcpyGpuToCpu_real32_T(c_cpu_y, &c_gpu_y);
@@ -2814,36 +2743,37 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         y_outdatedOnCpu = false;
         nvtxMarkA("#mrdiv#" MW_AT_LINE);
         coder::internal::mrdiv(b_cpu_y, &fv2_outdatedOnCpu, &b_gpu_y,
-                               &w_outdatedOnGpu, c_cpu_y);
+                               &x_needsGpuEnsureCapacity, c_cpu_y);
         // 'ec_detr_fp:117' z = r*(V*b') + mn;
         i = f_cpu_y->size[0];
         f_cpu_y->size[0] = b_cpu_y->size[1];
         nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(f_cpu_y, i, &pc_emlrtRTEI);
+        emxEnsureCapacity_real32_T(f_cpu_y, i, &oc_emlrtRTEI);
         nx = b_cpu_y->size[1] - 1;
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
         mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
                                 2147483647U);
         nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-        gpuEmxEnsureCapacity_real32_T(b_cpu_y, &b_gpu_y, !w_outdatedOnGpu);
+        gpuEmxEnsureCapacity_real32_T(b_cpu_y, &b_gpu_y,
+                                      !x_needsGpuEnsureCapacity);
         nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
         gpuEmxEnsureCapacity_real32_T(f_cpu_y, &d_gpu_y, true);
-        if (w_outdatedOnGpu) {
+        if (x_needsGpuEnsureCapacity) {
           nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
           gpuEmxMemcpyCpuToGpu_real32_T(&b_gpu_y, b_cpu_y);
         }
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel20#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel20#" MW_AT_LINE "#I1984");
           ec_detr_fp_kernel20<<<grid, block>>>(b_gpu_y, nx, d_gpu_y);
         }
-        w_outdatedOnGpu = false;
+        x_needsGpuEnsureCapacity = false;
         fv2_outdatedOnCpu = true;
         nvtxMarkA("#b_mtimes#" MW_AT_LINE);
-        coder::internal::blas::b_mtimes(b_cpu_V, &b_gpu_V, &fv2_outdatedOnGpu,
-                                        f_cpu_y, &d_gpu_y, &w_outdatedOnGpu,
-                                        d_cpu_y, &y_outdatedOnCpu, &e_gpu_y,
-                                        &y_outdatedOnGpu);
+        coder::internal::blas::b_mtimes(
+            b_cpu_V, &b_gpu_V, &fv2_outdatedOnGpu, f_cpu_y, &d_gpu_y,
+            &x_needsGpuEnsureCapacity, d_cpu_y, &y_outdatedOnCpu, &e_gpu_y,
+            &y_outdatedOnGpu);
         nvtxMarkA("#b_mtimes#" MW_AT_LINE);
         coder::internal::blas::b_mtimes(cpu_r, &b_gpu_r, &r_outdatedOnGpu,
                                         d_cpu_y, &e_gpu_y, &y_outdatedOnGpu,
@@ -2853,32 +2783,27 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           i = cpu_z->size[0];
           cpu_z->size[0] = cpu_fv2->size[0];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(cpu_z, i, &qc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(cpu_z, i, &pc_emlrtRTEI);
           nx = cpu_fv2->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
                                   2147483647U);
-          if (fv_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv, true);
-          }
-          fv_needsGpuEnsureCapacity = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_fv2, &gpu_fv2, !fv2_outdatedOnGpu);
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_z, &gpu_z, true);
-          x_needsGpuEnsureCapacity = false;
+          w_outdatedOnGpu = false;
           if (fv2_outdatedOnGpu) {
             nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
             gpuEmxMemcpyCpuToGpu_real32_T(&gpu_fv2, cpu_fv2);
           }
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel21#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel21#" MW_AT_LINE "#I1985");
             ec_detr_fp_kernel21<<<grid, block>>>(mn, gpu_fv, gpu_fv2, nx,
                                                  gpu_z);
           }
-          x_outdatedOnGpu = false;
+          lin_needsGpuEnsureCapacity = false;
           z_outdatedOnCpu = true;
         } else {
           if (z_outdatedOnCpu) {
@@ -2897,9 +2822,8 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           nvtxMarkA("#binary_expand_op_1#" MW_AT_LINE);
           binary_expand_op_1(cpu_z, cpu_fv2, cpu_fv, mn);
           z_outdatedOnCpu = false;
-          x_outdatedOnGpu = true;
-          fv_needsGpuEnsureCapacity = true;
-          x_needsGpuEnsureCapacity = true;
+          lin_needsGpuEnsureCapacity = true;
+          w_outdatedOnGpu = true;
         }
         //  Find outliers
         // 'ec_detr_fp:86' d = (x-z).*w;
@@ -2912,37 +2836,28 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           i = b_cpu_d->size[0];
           b_cpu_d->size[0] = cpu_fv->size[0];
           nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(b_cpu_d, i, &rc_emlrtRTEI);
+          emxEnsureCapacity_real32_T(b_cpu_d, i, &qc_emlrtRTEI);
           nx = cpu_fv->size[0] - 1;
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
                                   2147483647U);
-          if (fv1_needsGpuEnsureCapacity) {
+          if (w_outdatedOnGpu) {
             nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
+            gpuEmxEnsureCapacity_real32_T(cpu_z, &gpu_z,
+                                          !lin_needsGpuEnsureCapacity);
           }
-          fv1_needsGpuEnsureCapacity = false;
-          if (x_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_z, &gpu_z, !x_outdatedOnGpu);
-          }
-          x_needsGpuEnsureCapacity = false;
-          if (fv_needsGpuEnsureCapacity) {
-            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-            gpuEmxEnsureCapacity_real32_T(cpu_fv, &gpu_fv, true);
-          }
-          fv_needsGpuEnsureCapacity = false;
+          w_outdatedOnGpu = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(b_cpu_d, &gpu_d, true);
           fv2_outdatedOnGpu = false;
-          if (x_outdatedOnGpu) {
+          if (lin_needsGpuEnsureCapacity) {
             nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
             gpuEmxMemcpyCpuToGpu_real32_T(&gpu_z, cpu_z);
           }
-          x_outdatedOnGpu = false;
+          lin_needsGpuEnsureCapacity = false;
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel22#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel22#" MW_AT_LINE "#I1986");
             ec_detr_fp_kernel22<<<grid, block>>>(gpu_fv1, gpu_z, gpu_fv, nx,
                                                  gpu_d);
           }
@@ -2971,9 +2886,6 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           binary_expand_op(b_cpu_d, cpu_fv, cpu_z, cpu_fv1);
           d_outdatedOnCpu = false;
           fv2_outdatedOnCpu = true;
-          fv1_needsGpuEnsureCapacity = true;
-          x_needsGpuEnsureCapacity = true;
-          fv_needsGpuEnsureCapacity = true;
           fv2_outdatedOnGpu = true;
         }
         // 'ec_detr_fp:87' thrItr = iThr*std(d);
@@ -2991,11 +2903,11 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
             gpuEmxMemcpyCpuToGpu_real32_T(&gpu_d, b_cpu_d);
           }
           fv2_outdatedOnCpu = false;
-          nvtxMarkA("#ec_detr_fp_kernel25#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel25#" MW_AT_LINE "#I1989");
           ec_detr_fp_kernel25<<<dim3(1U, 1U, 1U), dim3(32U, 1U, 1U)>>>(gpu_d,
                                                                        g_gpu_y);
           nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-          nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+          nvtxMarkA("#cudaMemcpy#" MW_AT_LINE "#I1990");
           checkCudaError(
               cudaMemcpy(&g_cpu_y, g_gpu_y, 4UL, cudaMemcpyDeviceToHost),
               __FILE__, __LINE__);
@@ -3006,21 +2918,21 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           }
           d_outdatedOnCpu = false;
           xbar = b_cpu_d->data[0];
-          profileLoopStart("ec_detr_fp_loop_14", __LINE__, (vlen - 1) + 1, "");
+          profileLoopStart("ec_detr_fp_loop_14", __LINE__, (vlen - 1) + 1,
+                           "1991");
           for (nx = 0; nx < vlen; nx++) {
             xbar += b_cpu_d->data[nx + 1];
           }
           profileLoopEnd();
           xbar /= static_cast<real32_T>(b_cpu_d->size[0]);
-          i = cpu_absdiff->size[0];
           cpu_absdiff->size[0] = b_cpu_d->size[0];
-          nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-          emxEnsureCapacity_real32_T(cpu_absdiff, i, &sc_emlrtRTEI);
           nvtxMarkA("#computeNumIters#" MW_AT_LINE);
           mwGetLaunchParameters1D(computeNumIters(vlen), &grid, &block,
                                   2147483647U);
-          nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-          gpuEmxEnsureCapacity_real32_T(b_cpu_d, &gpu_d, !fv2_outdatedOnCpu);
+          if (fv2_outdatedOnGpu) {
+            nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
+            gpuEmxEnsureCapacity_real32_T(b_cpu_d, &gpu_d, !fv2_outdatedOnCpu);
+          }
           fv2_outdatedOnGpu = false;
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
           gpuEmxEnsureCapacity_real32_T(cpu_absdiff, &gpu_absdiff, true);
@@ -3031,23 +2943,17 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
           fv2_outdatedOnCpu = false;
           validLaunchParams = mwValidateLaunchParameters(grid, block);
           if (validLaunchParams) {
-            nvtxMarkA("#ec_detr_fp_kernel26#" MW_AT_LINE);
+            nvtxMarkA("#ec_detr_fp_kernel26#" MW_AT_LINE "#I1992");
             ec_detr_fp_kernel26<<<grid, block>>>(xbar, gpu_d, vlen,
                                                  gpu_absdiff);
           }
-          nvtxMarkA("#cublasCheck#" MW_AT_LINE);
-          cublasCheck(cublasSnrm2(getCublasGlobalHandle(), b_cpu_d->size[0],
-                                  (float *)&gpu_absdiff.data[0], 1,
-                                  (float *)&x),
-                      __FILE__, __LINE__);
+          cublasSnrm2(getCublasGlobalHandle(), b_cpu_d->size[0],
+                      (float *)&gpu_absdiff.data[0], 1, (float *)&x);
           g_cpu_y = x / std::sqrt(static_cast<real32_T>(b_cpu_d->size[0] - 1));
         }
         // 'ec_detr_fp:88' w(abs(d)>thrItr) = 0;
         nx = b_cpu_d->size[0];
-        i = e_cpu_y->size[0];
         e_cpu_y->size[0] = b_cpu_d->size[0];
-        nvtxMarkA("#emxEnsureCapacity_real32_T#" MW_AT_LINE);
-        emxEnsureCapacity_real32_T(e_cpu_y, i, &tc_emlrtRTEI);
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
         mwGetLaunchParameters1D(computeNumIters(nx - 1), &grid, &block,
                                 2147483647U);
@@ -3063,23 +2969,18 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         }
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel23#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel23#" MW_AT_LINE "#I1987");
           ec_detr_fp_kernel23<<<grid, block>>>(gpu_d, nx - 1, f_gpu_y);
         }
-        nx = e_cpu_y->size[0] - 1;
+        nx = e_cpu_y->size[0];
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
-        mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block,
+        mwGetLaunchParameters1D(computeNumIters(nx - 1), &grid, &block,
                                 2147483647U);
-        if (fv1_needsGpuEnsureCapacity) {
-          nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-          gpuEmxEnsureCapacity_real32_T(cpu_fv1, &gpu_fv1, true);
-        }
-        fv1_needsGpuEnsureCapacity = false;
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel24#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel24#" MW_AT_LINE "#I1988");
           ec_detr_fp_kernel24<<<grid, block>>>(thr_data[ii] * g_cpu_y, f_gpu_y,
-                                               nx, gpu_fv1);
+                                               nx - 1, gpu_fv1);
         }
         fv1_outdatedOnCpu = true;
         //  update weights
@@ -3092,22 +2993,23 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         nvtxMarkA("#computeNumIters#" MW_AT_LINE);
         mwGetLaunchParameters1D(computeNumIters(nz - 1), &grid, &block,
                                 2147483647U);
-        if (x_needsGpuEnsureCapacity) {
+        if (w_outdatedOnGpu) {
           nvtxMarkA("#gpuEmxEnsureCapacity_real32_T#" MW_AT_LINE);
-          gpuEmxEnsureCapacity_real32_T(cpu_z, &gpu_z, !x_outdatedOnGpu);
+          gpuEmxEnsureCapacity_real32_T(cpu_z, &gpu_z,
+                                        !lin_needsGpuEnsureCapacity);
         }
         x_needsGpuEnsureCapacity = false;
-        if (x_outdatedOnGpu) {
+        if (lin_needsGpuEnsureCapacity) {
           nvtxMarkA("#gpuEmxMemcpyCpuToGpu_real32_T#" MW_AT_LINE);
           gpuEmxMemcpyCpuToGpu_real32_T(&gpu_z, cpu_z);
         }
         validLaunchParams = mwValidateLaunchParameters(grid, block);
         if (validLaunchParams) {
-          nvtxMarkA("#ec_detr_fp_kernel28#" MW_AT_LINE);
+          nvtxMarkA("#ec_detr_fp_kernel28#" MW_AT_LINE "#I1999");
           ec_detr_fp_kernel28<<<grid, block>>>(gpu_z, ch, nz - 1, gpu_x,
                                                cpu_x->size[0U]);
         }
-        x_outdatedOnGpu = false;
+        fv2_outdatedOnGpu = false;
         x_outdatedOnCpu = true;
       } else {
         if (x_outdatedOnCpu) {
@@ -3121,7 +3023,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         nvtxMarkA("#binary_expand_op_5#" MW_AT_LINE);
         binary_expand_op_5(cpu_x, ch, cpu_z);
         x_outdatedOnCpu = false;
-        x_outdatedOnGpu = true;
+        fv2_outdatedOnGpu = true;
         x_needsGpuEnsureCapacity = true;
       }
       nz = cpu_w->size[0];
@@ -3130,7 +3032,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
                               2147483647U);
       validLaunchParams = mwValidateLaunchParameters(grid, block);
       if (validLaunchParams) {
-        nvtxMarkA("#ec_detr_fp_kernel29#" MW_AT_LINE);
+        nvtxMarkA("#ec_detr_fp_kernel29#" MW_AT_LINE "#I2000");
         ec_detr_fp_kernel29<<<grid, block>>>(gpu_fv1, ch, nz - 1, gpu_w,
                                              cpu_w->size[0U]);
       }
@@ -3140,7 +3042,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       i = b_cpu_x->size[0];
       b_cpu_x->size[0] = cpu_w->size[0];
       nvtxMarkA("#emxEnsureCapacity_boolean_T#" MW_AT_LINE);
-      emxEnsureCapacity_boolean_T(b_cpu_x, i, &bc_emlrtRTEI);
+      emxEnsureCapacity_boolean_T(b_cpu_x, i, &ac_emlrtRTEI);
       nx = cpu_w->size[0] - 1;
       nvtxMarkA("#computeNumIters#" MW_AT_LINE);
       mwGetLaunchParameters1D(computeNumIters(nx), &grid, &block, 2147483647U);
@@ -3150,7 +3052,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
       w_outdatedOnGpu = false;
       validLaunchParams = mwValidateLaunchParameters(grid, block);
       if (validLaunchParams) {
-        nvtxMarkA("#ec_detr_fp_kernel30#" MW_AT_LINE);
+        nvtxMarkA("#ec_detr_fp_kernel30#" MW_AT_LINE "#I2001");
         ec_detr_fp_kernel30<<<grid, block>>>(ch, gpu_w, nx, d_gpu_x,
                                              cpu_w->size[0U]);
       }
@@ -3161,7 +3063,7 @@ void ec_detr_fp(emxArray_real32_T *cpu_x, emxArray_real32_T *cpu_w,
         nvtxMarkA("#gpuEmxMemcpyGpuToCpu_boolean_T#" MW_AT_LINE);
         gpuEmxMemcpyGpuToCpu_boolean_T(b_cpu_x, &d_gpu_x);
         nz = b_cpu_x->data[0];
-        profileLoopStart("ec_detr_fp_loop_6", __LINE__, (vlen - 2) + 1, "");
+        profileLoopStart("ec_detr_fp_loop_6", __LINE__, (vlen - 2) + 1, "2002");
         for (nx = 0; nx <= vlen - 2; nx++) {
           nz += b_cpu_x->data[nx + 1];
         }

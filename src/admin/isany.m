@@ -21,7 +21,7 @@ if isnumeric(x) || islogical(x)
         y = false;
     end
 elseif istext(x)
-    if any(x~="","all")
+    if any(x~="" & ~ismissing(x),"all") 
         y = true;
     else
         y = false;
@@ -30,7 +30,7 @@ elseif any(isobject(x),"all")
     y = true;
 elseif iscell(x)
     if any(cellfun(@nnz,x(cellfun(@isnumeric,x))),"all") ||...
-            any(cellfun(@(xx) xx~="",x(cellfun(@istext,x))),"all") ||...
+            any(cellfun(@(xx) xx~="" & ~ismissing(xx), x(cellfun(@istext,x))),"all") ||...
             any(cellfun(@isobject,x),"all")
         y = true;
     else

@@ -14,6 +14,9 @@ dirs.code = "/home/kt/Gdrive/Git/electroCUDA/";
 dirs.cudaica = "/home/kt/bin/cudaica-kt/cudaica"; % CUDAICA binary file
 dirs.thundersvm = "/home/kt/bin/thundersvm-gpu/build/bin/"; % ThunderSVM binary folder
 
+% Root dir of project data (can change per proj below)
+dirs.data = "/01/lbcn/"; 
+
 % Freesurfer subjects dir (can be in freesurfer install location, can change per project)
 dirs.freesurfer = "/01/lbcn/freesurfer/";
 

@@ -14,57 +14,18 @@
 #include "ec_detr_fp_types.h"
 #include "rt_nonfinite.h"
 #include "MWCudaMemoryFunctions.hpp"
-#include "MWErrorCodeUtils.hpp"
 #include "MWLocationStringifyNvtx3.h"
 #include "nvtx3/nvToolsExt.h"
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
-#include <cstdlib>
 #include <cstring>
 
 // Function Definitions
-void b_raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
-                      const char_T *errorName, const char_T *errorString)
-{
-  emlrtRTEInfo rtInfo;
-  uint64_T len;
-  char_T *brk;
-  char_T *fn;
-  char_T *pn;
-  nvtxRangePushA("#fcn#b_raiseCudaError#" MW_AT_LOCATION);
-  len = strlen(file);
-  pn = static_cast<char_T *>(calloc(len + 1UL, 1UL));
-  fn = static_cast<char_T *>(calloc(len + 1UL, 1UL));
-  memcpy(pn, file, len);
-  memcpy(fn, file, len);
-  brk = strrchr(fn, '.');
-  *brk = '\x00';
-  brk = strrchr(fn, '/');
-  if (brk == nullptr) {
-    brk = strrchr(fn, '\\');
-  }
-  if (brk == nullptr) {
-    brk = fn;
-  } else {
-    brk++;
-  }
-  rtInfo.lineNo = static_cast<int32_T>(b_line);
-  rtInfo.colNo = 0;
-  rtInfo.fName = brk;
-  rtInfo.pName = pn;
-  emlrtCUDAError(static_cast<uint32_T>(errCode), (char_T *)errorName,
-                 (char_T *)errorString, &rtInfo, emlrtRootTLSGlobal);
-  nvtxRangePop();
-}
-
-void checkCudaError(cudaError_t errCode, const char_T *file, uint32_T b_line)
+void checkCudaError(cudaError_t errorCode, const char_T *file, int32_T b_line)
 {
   nvtxRangePushA("#fcn#checkCudaError#" MW_AT_LOCATION);
-  if (errCode != cudaSuccess) {
-    nvtxMarkA("#b_raiseCudaError#" MW_AT_LINE);
-    b_raiseCudaError(errCode, file, b_line, cudaGetErrorName(errCode),
-                     cudaGetErrorString(errCode));
+  if (errorCode != cudaSuccess) {
+    nvtxMarkA("#gpuThrowError#" MW_AT_LINE);
+    gpuThrowError(errorCode, cudaGetErrorName(errorCode),
+                  cudaGetErrorString(errorCode), file, b_line);
   }
   nvtxRangePop();
 }
@@ -87,7 +48,9 @@ uint64_T computeNumIters(int32_T ub, int32_T b_ub)
 {
   uint64_T n;
   uint64_T numIters;
+  boolean_T overflow;
   nvtxRangePushA("#fcn#computeNumIters#" MW_AT_LOCATION);
+  overflow = false;
   n = 0UL;
   if (ub >= 0) {
     n = static_cast<uint64_T>(ub + 1);
@@ -96,8 +59,13 @@ uint64_T computeNumIters(int32_T ub, int32_T b_ub)
   n = 0UL;
   if (b_ub >= 0) {
     n = static_cast<uint64_T>(b_ub + 1);
+    overflow = (numIters > MAX_uint64_T / static_cast<uint64_T>(b_ub + 1));
   }
   numIters *= n;
+  if (overflow) {
+    nvtxMarkA("#gpuThrowError#" MW_AT_LINE);
+    gpuThrowError(__FILE__, __LINE__);
+  }
   nvtxRangePop();
   return numIters;
 }
@@ -112,20 +80,6 @@ uint64_T computeNumIters(int32_T ub)
   }
   nvtxRangePop();
   return numIters;
-}
-
-void cublasCheck(cublasStatus_t errCode, const char_T *file, uint32_T b_line)
-{
-  const char *errName;
-  const char *errString;
-  nvtxRangePushA("#fcn#cublasCheck#" MW_AT_LOCATION);
-  if (errCode != CUBLAS_STATUS_SUCCESS) {
-    cublasGetErrorName(errCode, &errName);
-    cublasGetErrorString(errCode, &errString);
-    nvtxMarkA("#raiseCudaError#" MW_AT_LINE);
-    raiseCudaError(errCode, file, b_line, errName, errString);
-  }
-  nvtxRangePop();
 }
 
 void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
@@ -152,7 +106,8 @@ void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
     i++;
   }
   nvtxRangePop();
-  if (gpu->allocatedSize < totalSizeCpu) {
+  if (((totalSizeCpu == 0) && (cpu->allocatedSize > 0)) ||
+      (gpu->allocatedSize < totalSizeCpu)) {
     i = cpu->allocatedSize;
     if (i < totalSizeCpu) {
       i = totalSizeCpu;
@@ -162,7 +117,7 @@ void gpuEmxEnsureCapacity_int32_T(const emxArray_int32_T *cpu,
     checkCudaError(
         mwCudaMalloc(&newData, static_cast<uint32_T>(i) * sizeof(int32_T)),
         __FILE__, __LINE__);
-    needsCopy = (needsCopy && gpu->canFreeData);
+    needsCopy = (needsCopy && (totalSizeGpu > 0));
     if (needsCopy) {
       nvtxMarkA("#checkCudaError#" MW_AT_LINE);
       nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
@@ -209,7 +164,8 @@ void gpuEmxEnsureCapacity_real32_T(const emxArray_real32_T *cpu,
     i++;
   }
   nvtxRangePop();
-  if (gpu->allocatedSize < totalSizeCpu) {
+  if (((totalSizeCpu == 0) && (cpu->allocatedSize > 0)) ||
+      (gpu->allocatedSize < totalSizeCpu)) {
     i = cpu->allocatedSize;
     if (i < totalSizeCpu) {
       i = totalSizeCpu;
@@ -219,7 +175,7 @@ void gpuEmxEnsureCapacity_real32_T(const emxArray_real32_T *cpu,
     checkCudaError(
         mwCudaMalloc(&newData, static_cast<uint32_T>(i) * sizeof(real32_T)),
         __FILE__, __LINE__);
-    needsCopy = (needsCopy && gpu->canFreeData);
+    needsCopy = (needsCopy && (totalSizeGpu > 0));
     if (needsCopy) {
       nvtxMarkA("#checkCudaError#" MW_AT_LINE);
       nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
@@ -244,7 +200,7 @@ void gpuEmxEnsureCapacity_real32_T(const emxArray_real32_T *cpu,
 void gpuEmxFree_int32_T(emxArray_int32_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxFree_int32_T#" MW_AT_LOCATION);
-  if (gpu->data != (void *)4207599121UL) {
+  if (gpu->data && gpu->canFreeData && (gpu->data != (void *)4207599121UL)) {
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
     checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
@@ -256,7 +212,7 @@ void gpuEmxFree_int32_T(emxArray_int32_T *gpu)
 void gpuEmxFree_real32_T(emxArray_real32_T *gpu)
 {
   nvtxRangePushA("#fcn#gpuEmxFree_real32_T#" MW_AT_LOCATION);
-  if (gpu->data != (void *)4207599121UL) {
+  if (gpu->data && gpu->canFreeData && (gpu->data != (void *)4207599121UL)) {
     nvtxMarkA("#checkCudaError#" MW_AT_LINE);
     nvtxMarkA("#mwCudaFree#" MW_AT_LINE);
     checkCudaError(mwCudaFree(gpu->data), __FILE__, __LINE__);
@@ -279,12 +235,15 @@ void gpuEmxMemcpyCpuToGpu_int32_T(emxArray_int32_T *gpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(cudaMemcpy(gpu->data, cpu->data,
-                            static_cast<uint32_T>(actualSize) * sizeof(int32_T),
-                            cudaMemcpyHostToDevice),
-                 __FILE__, __LINE__);
+  if (cpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(gpu->data, cpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(int32_T),
+                   cudaMemcpyHostToDevice),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
@@ -303,13 +262,15 @@ void gpuEmxMemcpyCpuToGpu_real32_T(emxArray_real32_T *gpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(
-      cudaMemcpy(gpu->data, cpu->data,
-                 static_cast<uint32_T>(actualSize) * sizeof(real32_T),
-                 cudaMemcpyHostToDevice),
-      __FILE__, __LINE__);
+  if (cpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(gpu->data, cpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(real32_T),
+                   cudaMemcpyHostToDevice),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
@@ -328,13 +289,15 @@ void gpuEmxMemcpyGpuToCpu_real32_T(emxArray_real32_T *cpu,
     i++;
   }
   nvtxRangePop();
-  nvtxMarkA("#checkCudaError#" MW_AT_LINE);
-  nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
-  checkCudaError(
-      cudaMemcpy(cpu->data, gpu->data,
-                 static_cast<uint32_T>(actualSize) * sizeof(real32_T),
-                 cudaMemcpyDeviceToHost),
-      __FILE__, __LINE__);
+  if (gpu->data) {
+    nvtxMarkA("#checkCudaError#" MW_AT_LINE);
+    nvtxMarkA("#cudaMemcpy#" MW_AT_LINE);
+    checkCudaError(
+        cudaMemcpy(cpu->data, gpu->data,
+                   static_cast<uint32_T>(actualSize) * sizeof(real32_T),
+                   cudaMemcpyDeviceToHost),
+        __FILE__, __LINE__);
+  }
   nvtxRangePop();
 }
 
@@ -352,37 +315,34 @@ void gpuEmxReset_real32_T(emxArray_real32_T *gpu)
   nvtxRangePop();
 }
 
-void raiseCudaError(int32_T errCode, const char_T *file, uint32_T b_line,
-                    const char_T *errorName, const char_T *errorString)
+void gpuThrowError(const char_T *file, int32_T b_line)
 {
   emlrtRTEInfo rtInfo;
-  uint64_T len;
-  char_T *brk;
-  char_T *fn;
-  char_T *pn;
-  nvtxRangePushA("#fcn#raiseCudaError#" MW_AT_LOCATION);
-  len = strlen(file);
-  pn = static_cast<char_T *>(std::calloc(static_cast<uint32_T>(len + 1UL), 1U));
-  fn = static_cast<char_T *>(std::calloc(static_cast<uint32_T>(len + 1UL), 1U));
-  memcpy(pn, file, len);
-  memcpy(fn, file, len);
-  brk = strrchr(fn, '.');
-  *brk = '\x00';
-  brk = strrchr(fn, '/');
-  if (brk == nullptr) {
-    brk = strrchr(fn, '\\');
-  }
-  if (brk == nullptr) {
-    brk = fn;
-  } else {
-    brk++;
-  }
-  rtInfo.lineNo = static_cast<int32_T>(b_line);
+  nvtxRangePushA("#fcn#gpuThrowError#" MW_AT_LOCATION);
+  rtInfo.lineNo = b_line;
   rtInfo.colNo = 0;
-  rtInfo.fName = brk;
-  rtInfo.pName = pn;
-  emlrtCUDAError(static_cast<uint32_T>(errCode), (char_T *)errorName,
-                 (char_T *)errorString, &rtInfo, emlrtRootTLSGlobal);
+  rtInfo.fName = "";
+  rtInfo.pName = file;
+  emlrtCUDAError(
+      0U, (char_T *)"_",
+      (char_T
+           *)"Unable to launch kernel. Loop nest contains too many iterations.",
+      &rtInfo, emlrtRootTLSGlobal);
+  nvtxRangePop();
+}
+
+void gpuThrowError(uint32_T errorCode, const char_T *errorName,
+                   const char_T *errorString, const char_T *file,
+                   int32_T b_line)
+{
+  emlrtRTEInfo rtInfo;
+  nvtxRangePushA("#fcn#gpuThrowError#" MW_AT_LOCATION);
+  rtInfo.lineNo = b_line;
+  rtInfo.colNo = 0;
+  rtInfo.fName = "";
+  rtInfo.pName = file;
+  emlrtCUDAError(errorCode, (char_T *)errorName, (char_T *)errorString, &rtInfo,
+                 emlrtRootTLSGlobal);
   nvtxRangePop();
 }
 
