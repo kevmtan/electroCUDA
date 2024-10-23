@@ -6,7 +6,7 @@ sbjs = {'S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS','S12_38_LK','S12_39_RT'
     'S15_87_RL','S16_95_JOB','S16_96_LF'}';
 % ISSUES: s54, s87
 
-% sbjs = {'S15_87_RL'};
+%sbjs = {'S14_74_OD'};
 
 proj = 'lbcn';
 task = 'MMR';
@@ -27,31 +27,33 @@ for s = 1:length(sbjs)
     %sbj = 'S12_38_LK';
 
     %%
-    try
-        % Convert berhavioral data to trialinfo
-        switch task
-            case 'UCLA'
-                OrganizeTrialInfoUCLA_rest(sbj,task,dirs) % FIX 1 trial missing from K.conds? INCLUDE REST!!!
-            case 'MMR'
-                OrganizeTrialInfoMMR_KT(sbj,task,proj);
-                %OrganizeTrialInfoMMR_rest(sbj_name, project_name, block_names, dirs) %%% FIX ISSUE WITH TABLE SIZE, weird, works when separate, loop clear variable issue
+    if ~status.fin(s)
+        try
+            % Convert berhavioral data to trialinfo
+            switch task
+                case 'UCLA'
+                    OrganizeTrialInfoUCLA_rest(sbj,task,dirs) % FIX 1 trial missing from K.conds? INCLUDE REST!!!
+                case 'MMR'
+                    OrganizeTrialInfoMMR_KT(sbj,task,proj);
+                    %OrganizeTrialInfoMMR_rest(sbj_name, project_name, block_names, dirs) %%% FIX ISSUE WITH TABLE SIZE, weird, works when separate, loop clear variable issue
+            end
+
+            %% Task event identifier
+            ec_eventIdentifier_lbcn(sbj,task,proj,targetHz=1000,saveFig=true); % new ones, photo = 1; old ones, photo = 2; china, photo = varies, depends on the clinician, normally 9, mic = 2
+
+            %% Make trialNfo
+            % for b = 1:length(runs)
+            %     run = runs{b};
+            %     ec_makeTrialNfo(sbj,run,dirs,prompts)
+            % end
+
+            %%
+            status.fin(s) = true;
+        catch ME
+            status.error{s} = ME;
+            status.fin(s) = false;
+            getReport(ME)
         end
-
-        %% Task event identifier
-        %ec_eventIdentifier_lbcn(sbj,task,proj,targetHz=1000,saveFig=true); % new ones, photo = 1; old ones, photo = 2; china, photo = varies, depends on the clinician, normally 9, mic = 2
-
-        %% Make trialNfo
-        % for b = 1:length(runs)
-        %     run = runs{b};
-        %     ec_makeTrialNfo(sbj,run,dirs,prompts)
-        % end
-
-        %%
-        status.fin(s) = true;
-    catch ME
-        status.error{s} = ME;
-        status.fin(s) = false;
-        getReport(ME)
     end
 end
 

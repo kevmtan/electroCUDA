@@ -16,16 +16,12 @@ end
 
 function makeTrialNfo_run(sbj,block,dirs,prompts)
 % Load trialinfo, get event timing locks
-load(fullfile(dirs.origSbj,block,['trialinfo_' block '.mat']),'trialinfo');
+load(fullfile(dirs.origSbj,block,['trialinfo_' block '.mat']), 'trialinfo');
 nTrials = height(trialinfo);
-
-% Load psy
-load(fullfile(dirs.origSbj,block,['psy_' block '.mat']),'psy');
 
 % Prompt variables
 prompts = movevars(prompts,["word" "eng"],"After","valence");
 vPrompts = string(prompts.Properties.VariableNames);
-
 
 %% Make trialNfo
 
@@ -72,6 +68,7 @@ trialNfo = movevars(trialNfo,"cnd","After","trial");
 trialNfo = movevars(trialNfo,["resp" "trueKey" "eqAcu"],"After","RT");
 trialNfo = movevars(trialNfo,vPrompts,"After","eqAcu");
 
+disp(['Made trialNfo: ' sbj ' ' block]);
 
 %% Save
 save(dirs.origSbj+block+filesep+"trialNfo_"+sbj+"_"+block+".mat", "trialNfo");
