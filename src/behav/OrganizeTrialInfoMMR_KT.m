@@ -199,7 +199,7 @@ trialinfo = trialinfo2; % Replace old trialinfo
 % Calculate ITI
 t = 2:height(trialinfo);
 trialinfo.itiBeh(t) = trialinfo.onsBeh(t) - trialinfo.onsBeh(t-1) - trialinfo.durBeh(t-1);
-trialinfo.itiBeh(1) = 0.3; % K.ITI;
+trialinfo.itiBeh(1) = min([0.5 max(trialinfo.itiBeh)]); %0.3; %K.ITI;
 
 % Add Basic info
 trialinfo.sbj(:) = dirs.sbj;

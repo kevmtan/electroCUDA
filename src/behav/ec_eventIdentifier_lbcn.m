@@ -67,6 +67,7 @@ end
 % Load photodiode
 load(sprintf('%s/%s/Pdio%s_%.2d.mat',dirs.origSbj,block,block,pd_ch),'anlg'); % going to be present in the globalVar
 anlg = double(anlg)';
+anlg = anlg/max(anlg);
 
 % Resample photodiode
 if a.targetHz && a.targetHz~=round(pd_hz)
@@ -74,8 +75,14 @@ if a.targetHz && a.targetHz~=round(pd_hz)
     anlg = resample(anlg,P,Q);
     pd_hz = a.targetHz;
 end
+anlg = half(anlg); % convert to fp16 to more easily find mode
 
-% Normalize photodiode
+% Rescale to stable upper/lower thresholds
+anlg = anlg/max(anlg);
+U = mode(anlg(anlg>0.5));
+L = mode(anlg(anlg<0.5));
+anlg(anlg>U) = deal(U);
+anlg(anlg<L) = deal(L);
 anlg = anlg/max(anlg);
 
 
@@ -83,29 +90,28 @@ anlg = anlg/max(anlg);
 
 % Make psychophysics table
 psy = timetable(anlg,SampleRate=pd_hz,StartTime=seconds(1/pd_hz));
-psy.pd = psy.anlg>0.3; % above threshold
-psy.pdDF = sparse([0;diff(psy.pd)]);
-%psy.anlg = [];
+psy = renamevars(psy,"anlg","pdioRaw");
+psy.pdio = psy.pdioRaw>=0.5; % above threshold
+psy.pdDF = sparse([0;diff(psy.pdio)]);
 
 % Get photodiode onset/offsets
 onsPdio = seconds(psy.Time(psy.pdDF==1));
 offPdio = seconds(psy.Time(psy.pdDF==-1));
 
 % Add onset/offset if pdio on at start/end of recording
-if psy.pd(1)
+if psy.pdio(1)
     onsPdio = [seconds(psy.Time(1)); onsPdio]; end
-if psy.pd(end)
+if psy.pdio(end)
     offPdio = [offPdio, seconds(psy.Time(end))]; end
 
 % Determine number of trigger flashes at start of task
-[initOnsN,initOffN] = find_skip_lfn(psy.pd);
+[initOnsN,initOffN] = find_skip_lfn(psy.pdio);
 [initOnsN,initOffN] = ... % Add exceptions
     EventIdentifierExceptions(sbj,task,block,initOnsN,initOffN);
 
 % Trial onsets/offsets
 onsPd = onsPdio(1+initOnsN:end); % Add in calculia production the finisef to experiment to have 12 pulses
-offPd = offPdio(1+initOffN:end); %#ok<NASGU>
-%pd_rt = pd_off - pd_ons; % stim duration/RT
+offPd = offPdio(1+initOffN:end);
 
 % % Don't count errant flashes
 % pd_iti = [onsPd(2:end)-offPd(1:end-1); 99]; % ITI
@@ -115,7 +121,7 @@ offPd = offPdio(1+initOffN:end); %#ok<NASGU>
 
 % Get trials, insturuction onsets
 if ismember(task,["Memoria" "Memoria_stim"]) && ismember("nstim",trialinfo.Properties.VariableNames)
-    % modified for Memoria for cases where each trial has diff # of stim
+    % Modified for Memoria for cases where each trial has diff # of stim
     onsStim = nan(nTrials,max(trialinfo.nstim));
     counter = 1;
     for ti = 1:nTrials
@@ -124,9 +130,11 @@ if ismember(task,["Memoria" "Memoria_stim"]) && ismember("nstim",trialinfo.Prope
         counter = counter+trialinfo.nstim(ti);
     end
 else
-    % Add other kind of exceptions for when there is more triggers in the end - Calculia
-    %[onsPd,offPd] = StimOnsetExceptions(sbj,block,onsPd,offPd);
-    %onsPd = EventIdentifierExceptions_moreTriggers(onsPd,offPd,sbj,task,block);
+    if ~ismember(task,["MMR" "UCLA"])
+        % Add other kind of exceptions for when there is more triggers in the end - Calculia
+        [onsPd,offPd] = StimOnsetExceptions(sbj,block,onsPd,offPd);
+        onsPd = EventIdentifierExceptions_moreTriggers(onsPd,offPd,sbj,task,block);
+    end
     onsStim = onsPd;
 end
 
@@ -153,14 +161,9 @@ for t = tFirst+1:height(sot)
     if ~isnan(sot.pd(t)); continue; end
     tPrev = find(sot.pd>0 & sot.trial<=sot.trial(t),1,'last'); % Previous filled pdio onset
     sot.ntrp(t) = sot.beh(t) - sot.beh(tPrev) + sot.pd(tPrev);
+
     % Find closest pdio onset
-    if t-tPrev>9 && nnz(~isnan(sot.pd))>14 
-        lm = fitlm(sot,'pd~beh',RobustOpts=1); % Robust regression (correct behav-pdio drift)
-        sot.lm = predict(lm,sot);
-        [df,idx] = min(abs(onsStim - sot.lm(t))); % Compare with linear estimate
-    else
-        [df,idx] = min(abs(onsStim - sot.ntrp(t))); % Compare with interpolated
-    end
+    [df,idx] = min(abs(onsStim - sot.ntrp(t))); % Compare with interpolated
     if df <= 0.03
         sot.pd(t) = onsStim(idx); end % Only use if within 40ms
 end
@@ -227,7 +230,7 @@ tiledlayout(hf,2,4,TileSpacing="tight",Padding="tight");
 % Photodiode signal vs. onsets
 nexttile([1 4]);
 hold on
-plot(psy.Time,psy.anlg,Color=[.5 .5 .5],DisplayName="Pdio Signal");
+plot(psy.Time,psy.pdioRaw,Color=[.5 .5 .5],DisplayName="Pdio Signal");
 plot(onsStim,repmat(0.2,height(onsStim),1),"*",Color=[1 0 0],DisplayName="Pdio");
 plot(sot.ntrp,repmat(0.4,height(sot),1),"*",Color="#FF8C00",DisplayName="Interp");
 plot(sot.lm,repmat(0.6,height(sot),1),"*",Color=[1 0 1],DisplayName="Regress");
@@ -278,16 +281,16 @@ end
 
 
 %% Updating trialinfo & psy
-trialinfo.pdio(sot.trial(~isnan(sot.pd))) = true;
+trialinfo.noPdio(sot.trial(isnan(sot.pd))) = true;
 
 trialinfo.onsBeh(sot.trial) = sot.beh;
 trialinfo.onsBeh(tRest) = trialinfo.onsBeh(tRest-1) + trialinfo.durBeh(tRest-1);
 
-trialinfo.lockStim(sot.trial) = sot.fin;
+trialinfo.lockStim(sot.trial) = round(sot.fin*pd_hz)/pd_hz; % 
 trialinfo.lockStim(tRest) = trialinfo.lockStim(tRest-1) + trialinfo.durBeh(tRest-1);
 
-psy.pdio = half(psy.anlg);
-psy.pd=[]; psy.pdDF=[]; psy.anlg=[];
+psy.pdioRaw = half(psy.pdioRaw);
+psy.pdDF=[];
 
 
 %% Save

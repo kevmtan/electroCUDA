@@ -44,7 +44,7 @@ for s = 1:length(sbjs)
             %% Make trialNfo
             % for b = 1:length(runs)
             %     run = runs{b};
-            %     ec_makeTrialNfo(sbj,run,dirs,prompts)
+            %     ec_makeTrialNfo_MMR(sbj,run,dirs,prompts)
             % end
 
             %%
