@@ -1,18 +1,31 @@
 function OrganizeTrialInfoMMR_KT(sbj,task,proj)
+arguments
+    sbj (1,1) string
+    task (1,1) string
+    proj (1,1) string
+end
 % sbj="S13_54_KDH"; task="MMR"; proj="lbcn"; 
 
+%% Prep
 dirs = ec_getDirs(proj,task,sbj);
-blocks = BlockBySubj(sbj,task);
+blocks = string(BlockBySubj(sbj,task));
 
+%% Loop across blocks/runs
 for r = 1:length(blocks)
-    block = blocks{r};
+    block = blocks(r);
     withinRun_lfn(block,dirs);
 end
 
 
 
-%% Within-run subfunction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Within-run subfunction %%%%%%%%%%%%%%%s%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function withinRun_lfn(block,dirs)
+arguments
+    block (1,1) string
+    dirs (1,1) struct
+end
+
+%%
 conds = ["self","other","semantic","episodic","math","rest","fact"];
 condNames = ["self-internal","other","self-external","autobio","math","rest","fact"];
 conds_math_memory = ["memory","memory","memory","memory","math","rest","memory"];
@@ -24,7 +37,7 @@ elseif contains(block,'-')
     run = extractAfter(block,asManyOfPattern(wildcardPattern + "-"));
 end
 run = uint8(str2double(run));
-sbjRun = "s"+dirs.sbjID+"r"+run;
+sbjRun = "s"+compose("%03d",dirs.sbjID)+"_r"+compose("%02d",run);
 
 % load behavioral data
 fn = dir(fullfile(dirs.origSbj,block,"sodata*.mat"));
@@ -36,8 +49,8 @@ dat.wlist = string(K.wlist);
 if iscell(dat.flip)
     idx = cellfun(@isstruct,dat.flip);
     if isany(idx)
-        disp(sbjRun+": removing trials with no flip");
-        disp(idx');
+        disp("["+sbjRun+"] Removing trials without stimulus render flip:");
+        disp(find(~idx)');
         dat = struct2table(K.theData(idx));
         dat.wlist = string(K.wlist(idx));
     end
@@ -87,7 +100,9 @@ end
 % Warn if multiple beh responses in some trials
 maxResp = max(trialinfo.nResp);
 if maxResp > 1
-    warning("["+sbjRun+"] Some trials have multiple behav responses, max="+maxResp); end
+    disp("["+sbjRun+"] Multiple behavioral responses in these trials (max="+maxResp+"), selecting best response:");
+    disp(find(trialinfo.nResp>1)');
+end
 
 % Add calculation info
 for t = 1:height(trialinfo)
@@ -204,13 +219,15 @@ trialinfo.itiBeh(1) = min([0.5 max(trialinfo.itiBeh)]); %0.3; %K.ITI;
 % Add Basic info
 trialinfo.sbj(:) = dirs.sbj;
 trialinfo.sbjID(:) = dirs.sbjID;
+trialinfo.sbjRun(:) = sbjRun;
 trialinfo.block(:) = string(block);
 trialinfo.run(:) = run;
 trialinfo.trial(:) = uint16(1:height(trialinfo));
 trialinfo.task(:) = dirs.task;
 trialinfo = movevars(trialinfo,["sbjID" "run" "trial"],"Before",1);
-trialinfo = movevars(trialinfo,["sbj" "block" "task"],"Before","StimulusOnsetTime");
+trialinfo = movevars(trialinfo,["sbj" "sbjRun" "block" "task"],"Before","StimulusOnsetTime");
 
 
 %% Save
-save(fullfile(dirs.origSbj,block,['trialinfo_' block '.mat']), 'trialinfo');
+save(fullfile(dirs.origSbj,block,"trialinfo_"+block+".mat"), "trialinfo");
+%disp("["+sbjRun+"] Saved initial trialinfo table!");
