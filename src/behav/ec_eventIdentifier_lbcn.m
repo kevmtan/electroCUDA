@@ -4,11 +4,11 @@ arguments
     task (1,1) string
     proj (1,1) string
     a.save (1,1) logical = true
-    a.targetHz (1,1) double = nan
+    a.hzTarget (1,1) double = nan
     a.date (1,1) string = string(datetime('now','TimeZone','local','Format','yyMMdd'))
 end
 % sbj="S15_87_RL"; sbj="S13_54_KDH"; sbj="S14_74_OD";
-% task="MMR"; proj="lbcn"; a.save=0; a.targetHz=1000; r=1;
+% task="MMR"; proj="lbcn"; a.save=0; a.hzTarget=1000; r=1;
 % OrganizeTrialInfoMMR_KT(sbj,task,proj);
 
 %% Prep
@@ -62,10 +62,10 @@ anlg = double(anlg)';
 anlg = anlg/max(anlg);
 
 % Resample photodiode
-if a.targetHz && a.targetHz~=round(hz)
-    [P,Q] = rat(a.targetHz/hz);
+if a.hzTarget && a.hzTarget~=round(hz)
+    [P,Q] = rat(a.hzTarget/hz);
     anlg = resample(anlg,P,Q);
-    hz = a.targetHz;
+    hz = a.hzTarget;
 end
 anlg = half(anlg); % convert to fp16 to more easily find mode
 
@@ -76,15 +76,14 @@ L = mode(anlg(anlg<0.5));
 anlg(anlg>U) = U;
 anlg(anlg<L) = L;
 anlg = anlg/max(anlg);
-anlg(anlg<eps("half")) = eps("half");
+anlg(anlg<eps("half")) = 0;
 
 
 %% Extract photodiode triggers
 
 % Make psychophysics table
-psy = timetable(anlg,SampleRate=hz,StartTime=seconds(1/hz));
+psy = timetable(anlg,SampleRate=hz,StartTime=seconds(0));
 psy = renamevars(psy,"anlg","photodiode");
-hzStep = seconds(psy.Properties.TimeStep);
 
 % Photodiode activity & timing
 psy.pdio = psy.photodiode>=0.5; % pdio active (above threshold)
@@ -277,27 +276,30 @@ trialinfo.lockErr(:) = nan;
 trialinfo.lockITI(:) = nan;
 trialinfo.lockStim(:) = nan;
 trialinfo.lockOff(:) = nan;
+lockDur = ceil(trialinfo.durBeh*hz);
 
 % Pdio-Behav alignment error (interstimulus interval: Behav-Final)
 trialinfo.lockErr(tFirst) = 0;
 trialinfo.lockErr(sod.trial) = sod.BehFin/1000;
 
 % Stim timings from pdio-behav data (round by sampling rate)
-trialinfo.lockStim(sot.trial) = round(sot.fin*hz)/hz;
-trialinfo.lockOff(sot.trial) = trialinfo.lockStim(sot.trial) + trialinfo.durBeh(sot.trial);
-trialinfo.lockOff(sot.trial) = ceil(trialinfo.lockOff(sot.trial)*hz)/hz;
+trialinfo.lockStim(sot.trial) = round(sot.fin*hz);
+trialinfo.lockOff(sot.trial) = trialinfo.lockStim(sot.trial) + lockDur(sot.trial);
 
 % Rest trial timings from pdio-behav data (round by sampling rate)
-trialinfo.lockStim(tRest) = trialinfo.lockOff(tRest-1) + hzStep; % frame after prev stim offset
-trialinfo.lockStim(tRest) = floor(trialinfo.lockStim(tRest)*hz)/hz;
-trialinfo.lockOff(tRest) = trialinfo.lockStim(tRest) + trialinfo.durBeh(tRest);
-trialinfo.lockOff(tRest) = ceil(trialinfo.lockOff(tRest)*hz)/hz;
+trialinfo.lockStim(tRest) = trialinfo.lockOff(tRest-1) + 1; % frame after prev stim offset
+trialinfo.lockOff(tRest) = trialinfo.lockStim(tRest) + lockDur(tRest);
 
 % ITI timings from pdio-behav data (round by sampling rate)
-trialinfo.lockITI(1) = trialinfo.lockStim(1) - trialinfo.itiBeh(1);
-trialinfo.lockITI(2:end) = trialinfo.lockOff(1:end-1) + hzStep; % frame after prev stim offset
+trialinfo.lockITI(1) = trialinfo.lockStim(1) - ceil(trialinfo.itiBeh(1)*hz);
+trialinfo.lockITI(2:end) = trialinfo.lockOff(1:end-1) + 1; % frame after prev stim offset
 trialinfo.lockITI(trialinfo.lockITI<0) = 0;
-trialinfo.lockITI = floor(trialinfo.lockITI*hz)/hz;
+trialinfo.lockITI(tRest) = nan;
+
+% Convert from frames to seconds
+trialinfo.lockITI = trialinfo.lockITI/hz;
+trialinfo.lockStim = trialinfo.lockStim/hz;
+trialinfo.lockOff = trialinfo.lockOff/hz;
 
 
 %% Save

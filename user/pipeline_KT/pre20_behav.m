@@ -46,15 +46,15 @@ parfor s = 1:height(status)
 
         % Event identifier
         if stat.organize && ~stat.event
-            ec_eventIdentifier_lbcn(sbj,task,proj,targetHz=1000,save=true,date=statusDate);
+            ec_eventIdentifier_lbcn(sbj,task,proj,hzTarget=1000,save=true,date=statusDate);
             stat.event = true;
         end
 
         % Finalize trialNfo & psy
-        if stat.event && ~stat.nfo
-            ec_makeTrialNfo_MMR(sbj,task,proj,prompts);
-            stat.nfo = true;
-        end
+        %if stat.event && ~stat.nfo
+        %    ec_makeTrialNfo_MMR(sbj,task,proj,prompts);
+        %    stat.nfo = true;
+        %end
     catch ME
         stat.error{1} = ME;
         getReport(ME);
