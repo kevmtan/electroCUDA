@@ -22,7 +22,9 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 
 
@@ -134,7 +136,7 @@ trialNfo.idxOns = round(trialNfo.lockStim*hz) + 1;
 trialNfo.idxOff = ceil(trialNfo.lockOff*hz) + 1;
 trialNfo = convertvars(trialNfo,["idxOns" "idxOff"],"uint32");
 
-% Rest onsets: frame after offset of previous trial
+% Rest onsets: ensure frame after offset of previous trial
 t = find(trialNfo.cond=="rest");
 trialNfo.idxOns(t) = trialNfo.idxOff(t-1) + 1;
 

@@ -18,7 +18,14 @@ end
 
 
 
-%% Within-run subfunction %%%%%%%%%%%%%%%s%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
 function withinRun_lfn(block,dirs)
 arguments
     block (1,1) string
