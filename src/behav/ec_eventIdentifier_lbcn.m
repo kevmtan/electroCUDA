@@ -7,8 +7,8 @@ arguments
     a.hzTarget (1,1) double = nan
     a.date (1,1) string = string(datetime('now','TimeZone','local','Format','yyMMdd'))
 end
-% sbj="S15_87_RL"; sbj="S13_54_KDH"; sbj="S14_74_OD";
-% task="MMR"; proj="lbcn"; a.save=0; a.hzTarget=1000; r=1;
+% sbj="S15_87_RL"; sbj="S13_54_KDH"; sbj="S14_74_OD"; sbj="S12_42_NC"
+% task="MMR"; proj="lbcn"; a.save=0; hzTarget=1000; r=1;
 % OrganizeTrialInfoMMR_KT(sbj,task,proj);
 
 %% Prep
@@ -45,9 +45,10 @@ end
 % Basic info
 nTrials = height(trialinfo);
 sbjRun = trialinfo.sbjRun(1);
+hzTarg = a.hzTarget;
 
 % Photodiode channel
-if dirs.sbjID>=87
+if dirs.sbjID >= 87
     pd_ch = 1;
 else % new ones, photo = 1; old ones, photo = 2; china, photo = varies, depends on the clinician, normally 9, mic = 2
     pd_ch = 2;
@@ -55,39 +56,54 @@ end
 
 % Load globalVar
 load(dirs.origSbj+"global_"+task+"_"+sbj+"_"+block+".mat","globalVar");
-hz = globalVar.Pdio_rate;
-if strcmp(task, {'Calculia_production', 'Calculia_production_addsubmult'})
-    hz = 10000;
-end
+nFrames = globalVar.chanLength;
+hz = round(globalVar.Pdio_rate);
+if strcmp(task,["Calculia_production" "Calculia_production_addsubmult"])
+    hz = 10000; end
+if ~isany(hzTarg) % Match target sampling rate to EEG if not specified
+    hzTarg = round(globalVar.iEEG_rate); end
 
 % Load photodiode
 load(sprintf('%s/%s/Pdio%s_%.2d.mat',dirs.origSbj,block,block,pd_ch), "anlg"); % going to be present in the globalVar
-anlg = double(anlg)';
-anlg = anlg/max(anlg);
+anlg = double(anlg)'; % convert to double & make row vector
+anlg = anlg/max(anlg); % normalize
 
-% Resample photodiode
-if a.hzTarget && a.hzTarget~=round(hz)
-    [P,Q] = rat(a.hzTarget/hz);
-    anlg = resample(anlg,P,Q);
-    hz = a.hzTarget;
+
+%% Make psychophysics table from photodiode signal
+
+% Resample photodiode signal
+if isany(hzTarg) && hzTarg~=round(hz)
+    [ds1,ds2] = rat(hzTarg/hz);
+    anlg = resample(anlg,ds1,ds2);
+    hz = hzTarg;
 end
-anlg = half(anlg); % convert to fp16 to more easily find mode
+
+% Make psychophysics timetable
+psy = timetable(anlg,SampleRate=hz,StartTime=seconds(0));
+
+% Ensure psy has same # of frames as EEG data
+if height(psy)~=nFrames
+    tx = seconds(((1:nFrames)'-1)/hz); % EEG frames starting at 0
+    psy = retime(psy,tx,"linear");
+end
+
+% Normalize
+psy.anlg = psy.anlg/max(psy.anlg); 
+psy.anlg = half(psy.anlg); % convert to fp16 to more easily find mode
 
 % Rescale to stable upper/lower thresholds
-anlg = anlg/max(anlg);
-U = mode(anlg(anlg>0.5));
-L = mode(anlg(anlg<0.5));
-anlg(anlg>U) = U;
-anlg(anlg<L) = L;
-anlg = anlg/max(anlg);
-anlg(anlg<eps("half")) = 0;
+U = mode(psy.anlg(psy.anlg>0.5));
+L = mode(psy.anlg(psy.anlg<0.5));
+psy.anlg(psy.anlg>U) = U;
+psy.anlg(psy.anlg<L) = L;
+psy.anlg = psy.anlg/max(psy.anlg);
+psy.anlg(psy.anlg<eps("half")) = 0;
+
+% Rename to photodiode
+psy = renamevars(psy,"anlg","photodiode");
 
 
 %% Extract photodiode triggers
-
-% Make psychophysics table
-psy = timetable(anlg,SampleRate=hz,StartTime=seconds(0));
-psy = renamevars(psy,"anlg","photodiode");
 
 % Photodiode activity & timing
 psy.pdio = psy.photodiode>=0.5; % pdio active (above threshold)

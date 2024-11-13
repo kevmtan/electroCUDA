@@ -118,15 +118,11 @@ hz = psy.Properties.SampleRate;
 
 % Convert signals back to logical
 psy.on = psy.onHz>=0.5;
-psy.onDf = [0; diff(psy.on)];
+psy.onDf = [0; diff(psy.on)]; % Indicate stimulus onset & offset
 psy.pdio = psy.photodiode>=0.5;
 
 % Convert signals to half-precision
 psy = convertvars(psy,["onHz" "photodiode"],"half");
-% psy.onHz(psy.onHz <= eps("half")) = 0;
-% psy.onHz(psy.onHz >= 1-eps("half")) = 1;
-% psy.photodiode(psy.photodiode <= eps("half")) = 0;
-% psy.photodiode(psy.photodiode >= 1-eps("half")) = 1;
 
 
 %% Clear timing variables
