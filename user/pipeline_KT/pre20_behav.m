@@ -51,10 +51,10 @@ parfor s = 1:height(status)
         end
 
         % Finalize trialNfo & psy
-        %if stat.event && ~stat.nfo
-        %    ec_makeTrialNfo_MMR(sbj,task,proj,prompts);
-        %    stat.nfo = true;
-        %end
+        if stat.event && ~stat.nfo
+           ec_makeTrialNfo_MMR(sbj,task,proj,prompts);
+           stat.nfo = true;
+        end
     catch ME
         stat.error{1} = ME;
         getReport(ME);

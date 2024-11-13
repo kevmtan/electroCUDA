@@ -113,8 +113,8 @@ psy.pct(:) = nan;
 psy.RT(:) = nan;
 psy.latRT(:) = seconds(nan);
 psy.stim(:) = uint16(0);
-psy.BLpre(:) = sparse(0);
-psy.BLend(:) = sparse(0);
+psy.pre(:) = sparse(0);
+psy.post(:) = sparse(0);
 psy.on(:) = false;
 psy.onHz(:) = false;
 psy.noPdio(:) = sparse(false);
@@ -127,7 +127,7 @@ psy.idx(:) = uint32(1:height(psy));
 psy = movevars(psy,["pdio" "photodiode" "noPdio"],"After","onHz");
 
 
-%% Fill psy & trialNfo
+%% Fill trialNfo & psy
 
 % Psy indices of stim timing (add 1 since psy starts at 0 sec)
 trialNfo.idxOns = round(trialNfo.lockStim*hz) + 1;
@@ -141,7 +141,7 @@ trialNfo.idxOns(t) = trialNfo.idxOff(t-1) + 1;
 % Psy indices of ITI timing
 t = 2:nTrials;
 trialNfo.idxITI(t) = trialNfo.idxOff(t-1) + 1;
-trialNfo.idxITI(1) = floor(trialNfo.lockITI(1)*hz) + 1; % First trial
+trialNfo.idxITI(1) = trialNfo.idxOns(1) - ceil(trialNfo.itiBeh(1)*hz); % First trial
 trialNfo.idxITI(trialNfo.cond=="rest") = nan;
 
 % Get psy times from indices
@@ -152,62 +152,32 @@ trialNfo.iti(t) = psy.Time(trialNfo.idxITI(t));
 
 % Loop across trials
 for t = 1:nTrials
-    % Get indices
+    % Psy indices
     idxStim = trialNfo.idxOns(t):trialNfo.idxOff(t);
-    if trialNfo.cond~="rest"
+    if trialNfo.cond(t)~="rest"
         idxITI = trialNfo.idxITI(t):trialNfo.idxOns(t)-1;
         idxTr = trialNfo.idxITI(t):trialNfo.idxOff(t);
-        trialNfo.durITI(t) = range(psy.Time(idxITI));
+
+        trialNfo.durITI(t) = range(psy.Time(idxITI)); % ITI duration
+        psy.on(idxStim) = true; % Stimulus on logical
+
+        % ITI pre-/post-stimulus trial
+        psy.pre(idxITI) = t;
+        if t > 1
+            psy.post(idxITI) = t-1; end
     else
-        idxITI = nan;
+        idxITI = 0;
         idxTr = idxStim;
         trialNfo.durITI(t) = seconds(0);
     end
 
-    if t > 1
-        psy.BLend(idxITI) = trialNfo.trial(t-1); end
-    psy.BLpre(idxITI) = t;
-
-    % Get trial stimulus onset
-    trialNfo.ons(t) = psy.Time(round(trialNfo.lockStim(t)*hz));
-
-    % Find ITI onset
-    if t==1
-        trialNfo.iti(t) = psy.Time(floor(trialNfo.lockITI(t)*hz));
-    elseif trialNfo.itiBeh(t) > 0
-        trialNfo.iti(t) = psy.Time(psy.idx(trialNfo.off(t-1))+1); % Frame after end of prev trial
-    end
-
-    % Fill ITI
-    if trialNfo.itiBeh(t) > 0
-        idxITI = timerange(trialNfo.iti(t),trialNfo.ons(t));
-        trialNfo.durITI(t) = range(psy.Time(idxITI));
-    else
-        idxITI = timerange(seconds(0),seconds(0));
-        trialNfo.durITI(t) = seconds(0);
-        trialNfo.ons(t) = psy.Time(psy.idx(trialNfo.off(t-1))+1); % Stim starts after end of prev trial
-    end
-    if t > 1
-        psy.BLend(idxITI) = trialNfo.trial(t-1); end
-    psy.BLpre(idxITI) = t;
-    trialNfo.idxITI{t} = idxITI;
-
-    % Stimulus offset
-    idxOff = ceil(trialNfo.durBeh(t)*hz);
-    idxOff = psy.idx(trialNfo.ons(t)) + idxOff;
-    trialNfo.off(t) = psy.Time(idxOff);
-
-    % Stimulus duration
-    idxStim = timerange(trialNfo.ons(t),trialNfo.off(t),'closed');
+    % Stimulus metadata
     if trialNfo.cond(t)~="rest"
         psy.on(idxStim) = true; end
     psy.stim(idxStim) = t;
     trialNfo.durStim(t) = range(psy.Time(idxStim));
-    trialNfo.idxOns{t} = idxStim;
 
     % Trial metadata
-    idxTr = timerange(trialNfo.iti(t),trialNfo.off(t),'closed');
-    if isnan(trialNfo.iti(t)); idxTr=idxStim; end
     psy.trial(idxTr) = t;
     psy.RT(idxTr) = trialNfo.RT(t);
     psy.cnd(idxTr) = trialNfo.cnd(t);
@@ -216,19 +186,26 @@ for t = 1:nTrials
     psy.resp(idxTr) = trialNfo.resp(t);
     psy.noPdio(idxTr) = trialNfo.noPdio(t);
     trialNfo.durTrial(t) = range(psy.Time(idxTr));
-    trialNfo.idxTrial{t} = idxTr;
 
-    % Latency
+    % Latency relative to stimulus
     psy.latency(idxTr) = psy.Time(idxTr) - trialNfo.ons(t);
+
+    % Latency percentage
     psy.pct(idxTr) = psy.latency(idxTr) ./ max(psy.latency(idxStim));
-    psy.pct(idxITI) = psy.latency(idxITI) ./ (trialNfo.ons(t)-trialNfo.iti(t));
-    psy.pct(idxITI) = psy.pct(idxITI) ./ 10;
+    if any(idxITI)
+        psy.pct(idxITI) = psy.latency(idxITI) ./ (trialNfo.ons(t)-trialNfo.iti(t));
+        psy.pct(idxITI) = psy.pct(idxITI) ./ 10;
+    end
+
+    % Latency relative to behav RT
     psy.latRT(idxStim) = psy.Time(idxStim) - trialNfo.off(t);
-    if t > 1
+    if t>1 && any(idxITI)
         psy.latRT(idxITI) = psy.Time(idxITI) - trialNfo.off(t-1); end
 end
-psy.frame = int32(seconds(psy.latency)*hz);
-psy.onHz = psy.on;
+
+% Finalize
+psy.frame = int32(seconds(psy.latency)*hz); % frame within trial
+psy.onHz = psy.on; % copy stimulus on logical for resampling
 
 
 %% Save

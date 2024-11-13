@@ -198,7 +198,7 @@ sot = eventIdExceptions_SOT(sot,sbjRun,task);
 sot.BehPd = sot.beh - sot.pd; % behav vs. pdio
 sot.NtrpPd = sot.ntrp - sot.pd; % interpolated vs. pdio
 sot.LmPd = sot.lm - sot.pd; % drift corrected vs. pdio
-sot.BehFin = sot.beh - sot.fin; 
+sot.BehFin = sot.beh - sot.fin;
 
 % Onset diff
 sod = table;

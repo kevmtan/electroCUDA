@@ -4,7 +4,7 @@ arguments
     task (1,1) string
     proj (1,1) string
 end
-% sbj="S13_54_KDH"; task="MMR"; proj="lbcn"; 
+% sbj="S13_54_KDH"; task="MMR"; proj="lbcn";
 
 %% Prep
 dirs = ec_getDirs(proj,task,sbj);
