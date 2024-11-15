@@ -13,8 +13,7 @@ arguments
     a.redo logical = false
     a.redoN logical = false
     a.redoCh logical = false
-    a.redoTr logical = false
-    a.redoPsy logical = false
+    a.redoBeh logical = false
     a.dirs struct = []
     a.blocks string = BlockBySubj(sbj,task)
 end
@@ -120,7 +119,7 @@ fn2 = o.dirOut+"psy"+hz_s+"_"+o.fnStr+".mat";
 psy=[]; trialNfo=[];
 
 % Do trialNfo & psy
-if ~isfile(fn) || ~isfile(fn2) || hzTarget>0 || a.redoTr || a.redoPsy || a.redo
+if ~isfile(fn) || ~isfile(fn2) || hzTarget>0 || a.redoBeh || a.redo
     % Make trialNfo & psy
     [psy,trialNfo] = ec_concatRunsBehav_MMR(sbj,task,proj,hzTarget=hzTarget);
     disp(sbj+": made trialNfo & psy");
@@ -148,6 +147,7 @@ if ~isempty(psy) && ~isempty(trialNfo)
         n.runTimes(r,:) = [psy.Time(min(idx)) psy.Time(max(idx))];
         n.runTimesOg(r) = psy.timeR(max(idx));
     end
+    n.conds = unique(trialNfo.cond);
     disp(sbj+": updated 'n"+o.suffix+"' with info from 'trialNfo' & 'psy'");
 end
 
@@ -165,12 +165,12 @@ if a.save || a.saveN
     end
 
     fn = o.dirOut+"trialNfo"+hz_s+"_"+o.fnStr+".mat";
-    if ~isfile(fn) || a.redoTr || a.redo
+    if ~isfile(fn) || a.redoBeh || a.redo
         save(fn,"trialNfo","-v7"); disp("SAVED: "+fn)
     end
 
     fn = o.dirOut+"psy"+hz_s+"_"+o.fnStr+".mat";
-    if ~isfile(fn) || a.redoPsy || a.redo
+    if ~isfile(fn) || a.redoBeh || a.redo
         save(fn,"psy","-v7"); disp("SAVED: "+fn)
     end
 

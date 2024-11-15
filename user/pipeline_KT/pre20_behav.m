@@ -10,6 +10,8 @@ proj = "lbcn";
 task = "MMR";
 test = false;
 
+conds = ["Other","Self","Semantic","Episodic","Math","Rest"];
+
 statusDate = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
 statusFn = "/01/lbcn/logs/preproc/pre20_behav/"+statusDate;
 
@@ -20,7 +22,7 @@ status.event(:) = false;
 status.nfo(:) = false;
 status.error = cell(height(status),1);
 
-load('/home/kt/Gdrive/UCLA/Studies/MMR/anal/beh/prompts_220524.mat','prompts');
+load('/home/kt/Gdrive/UCLA/Studies/MMR/anal/beh/prompts_241114.mat','prompts');
 
 try parpool('Processes'); catch; end
 
@@ -52,7 +54,7 @@ parfor s = 1:height(status)
 
         % Finalize trialNfo & psy
         if stat.event && ~stat.nfo
-           ec_makeTrialNfo_MMR(sbj,task,proj,prompts);
+           ec_makeTrialNfo_MMR(sbj,task,proj,prompts,conds);
            stat.nfo = true;
         end
     catch ME

@@ -1,13 +1,12 @@
 %% Task info
 
-% Subject Names
-sbjs = {'S12_38_LK','S12_42_NC','S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS',...
-    'S12_39_RT','S12_40_MJ','S12_41_KS','S12_45_LR','S13_46_JDB','S13_47_JT2','S13_50_LGM',...
-    'S13_51_MTL','S13_52_FVV','S13_53_KS2','S13_54_KDH','S13_56_THS','S13_57_TVD',...
-    'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
-    'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR','S15_87_RL',...
-    'S16_95_JOB','S16_96_LF'}';
-% sbjs = {'S12_38_LK'};
+sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
+    "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
+    "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
+    "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
+    "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
+    "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
+% ISSUES: s54
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -29,16 +28,13 @@ o.gpu = false;
 
 % Epoching (see 'ec_epochPsy')
 o.epoch.bin = 0.01; % Fine latency bin width (secs)
-o.epoch.bin2 = 0.01; % Coarse latency bin width (secs)
+o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
 o.epoch.pct = 1; % Fine latency percent width (percentile)
 o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
-% Epoch baseline period (none=[0 0]):
-o.epoch.baselinePre = [-0.3 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
-o.epoch.baselineEnd = [0 0]; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
-% Epoch time limits (variable limits=[0 0]):
-o.epoch.lims = [0 0]; % Epoch start & end from stim onset (secs); ex=[-0.2 3]
-o.epoch.limsRT = [0 0]; % Epoch start & end from behavioral RT (secs); ex=[-1.5 .5]
-o.epoch.limtsPct = [0 0]; % Epoch start & end from latency percentile; ex=[-10 120]
+% Epoch time limits (secs) [nan=variable, 0=none]
+o.epoch.pre = 0.2; % Pre-stimulus duration [nan=ITI]
+o.epoch.peri = 0;  % Peri-stimulus duration [nan=all]
+o.epoch.post = 0.5;  % Post-stimulus duration [nan=ITI]
 
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.double = true;

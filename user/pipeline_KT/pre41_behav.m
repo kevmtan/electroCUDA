@@ -36,7 +36,7 @@ parfor s = 1:height(status)
         try
             o.suffix = "";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                save=doSave,saveN=doSave,hzTarget=hz,redoTr=1,redoPsy=1);
+                save=doSave,saveN=doSave,hzTarget=hz,redoBeh=1);
 
             o.suffix = "i";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
@@ -49,7 +49,7 @@ parfor s = 1:height(status)
             stat.hz1000 = true;
         catch ME
             stat.error{1} = ME;
-            getReport(ME);
+            getReport(ME)
         end
     end
 
@@ -59,7 +59,7 @@ parfor s = 1:height(status)
         try
             o.suffix = "s";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                save=doSave,saveN=doSave,hzTarget=hz,redoTr=1,redoPsy=1);
+                save=doSave,saveN=doSave,hzTarget=hz,redoBeh=1);
 
             o.suffix = "is";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
@@ -68,7 +68,7 @@ parfor s = 1:height(status)
             stat.hz100 = true;
         catch ME
             stat.error{1} = ME;
-            getReport(ME);
+            getReport(ME)
         end
     end
     status(s,:) = stat;

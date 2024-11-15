@@ -24,8 +24,8 @@ for r = 1:numel(runs)
     sbjRun = "s"+compose("%03d",dirs.sbjID)+"_r"+compose("%02d",run);
     load(fullfile(dirs.origSbj,"trialNfo_"+sbjRun+".mat"), "trialNfo");
     load(fullfile(dirs.origSbj,"psy_"+sbjRun+".mat"), "psy");
-    trialNfo(:,["condNames" "conds_math_memory" "isCalc" "Accuracy" "Operand1"...
-        "Operand2" "OperandMin" "OperandMax" "Operator" "CorrectResult" "PresResult"...
+    trialNfo(:,["conds_math_memory" "isCalc" "Operand1" "Operand2"...
+        "OperandMin" "OperandMax" "Operator" "CorrectResult" "PresResult"...
         "Deviant" "AbsDeviant" "RT_og" "key_og" "StimulusOnsetTime"]) = [];
     if a.test; trialNfo0=trialNfo; psy0=psy; end %#ok<NASGU>
 
@@ -87,12 +87,13 @@ end
 
 %% Finalize
 psy = psy2;
-psy = movevars(psy,"tr","Before","trial");
+psy = movevars(psy,"tr","After","run");
+psy = movevars(psy,"trial","Before","timeR");
 psy = movevars(psy,"idx","After",width(psy));
 
 trialNfo = trialNfo2;
 trialNfo = movevars(trialNfo,"tr","Before","trial");
-trialNfo.Properties.RowNames = "r"+trialNfo.run+"_t"+trialNfo.tr+"_"+trialNfo.cnd;
+trialNfo.Properties.RowNames = "r"+trialNfo.run+"_t"+trialNfo.tr+"_"+trialNfo.cond;
 
 
 
@@ -141,7 +142,7 @@ trialNfo.idxOff(:) = uint32(0);
 % psy
 psy.run(:) = trialNfo.run(1);
 psy.trial(:) = uint16(0);
-psy.cnd(:) = "";
+psy.cond(:) = "";
 psy.latency(:) = seconds(nan);
 psy.frame(:) = int32(0);
 psy.pct(:) = nan;
@@ -151,11 +152,9 @@ psy.stim(:) = uint16(0);
 psy.pre(:) = sparse(0);
 psy.post(:) = sparse(0);
 psy.noPdio(:) = sparse(false);
-psy.cond(:) = "";
 psy.valence(:) = int8(0);
 psy.resp(:) = categorical("none",["true","false","none"],Ordinal=true);
 psy.sbjID(:) = trialNfo.sbjID(1);
-psy.sbjRun(:) = trialNfo.sbjRun(1);
 psy.idx(:) = uint32(1:height(psy));
 % Psy var order
 psy = movevars(psy,varNames,"After",0);
@@ -164,13 +163,13 @@ psy = movevars(psy,varNames,"After",0);
 %% Calculate resampled event times
 
 % Stim trials
-t = trialNfo.cond~="rest";
+t = trialNfo.cond~="Rest";
 trialNfo.idxOns(t) = psy.idx(psy.onDf==1);
 trialNfo.idxOff(t) = psy.idx(find(psy.onDf==-1)-1);
 trialNfo = convertvars(trialNfo,["idxOns" "idxOff" "idxITI"],"uint32");
 
 % Rest onsets: frame after offset of previous trial
-t = find(trialNfo.cond=="rest");
+t = find(trialNfo.cond=="Rest");
 trialNfo.idxOns(t) = trialNfo.idxOff(t-1) + 1;
 trialNfo.idxOff(t) = trialNfo.idxOns(t) + uint32(ceil(trialNfo.durBeh(t)*hz));
 
@@ -178,19 +177,19 @@ trialNfo.idxOff(t) = trialNfo.idxOns(t) + uint32(ceil(trialNfo.durBeh(t)*hz));
 t = 2:nTrials;
 trialNfo.idxITI(t) = trialNfo.idxOff(t-1) + 1;
 trialNfo.idxITI(1) = trialNfo.idxOns(1) - ceil(trialNfo.itiBeh(1)*hz); % First trial
-trialNfo.idxITI(trialNfo.cond=="rest") = nan;
+trialNfo.idxITI(trialNfo.cond=="Rest") = nan;
 
 % Get psy times from indices
 trialNfo.ons = psy.Time(trialNfo.idxOns);
 trialNfo.off = psy.Time(trialNfo.idxOff);
-t = trialNfo.cond~="rest";
+t = trialNfo.cond~="Rest";
 trialNfo.iti(t) = psy.Time(trialNfo.idxITI(t));
 
 % Loop across trials
 for t = 1:nTrials
     % Psy indices
     idxStim = trialNfo.idxOns(t):trialNfo.idxOff(t);
-    if trialNfo.cond(t)~="rest"
+    if trialNfo.cond(t)~="Rest"
         idxITI = trialNfo.idxITI(t):trialNfo.idxOns(t)-1;
         idxTr = trialNfo.idxITI(t):trialNfo.idxOff(t);
 
@@ -213,7 +212,6 @@ for t = 1:nTrials
     % Trial metadata
     psy.trial(idxTr) = t;
     psy.RT(idxTr) = trialNfo.RT(t);
-    psy.cnd(idxTr) = trialNfo.cnd(t);
     psy.cond(idxTr) = trialNfo.cond(t);
     psy.valence(idxTr) = trialNfo.valence(t);
     psy.resp(idxTr) = trialNfo.resp(t);

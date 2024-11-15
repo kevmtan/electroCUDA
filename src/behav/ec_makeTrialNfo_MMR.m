@@ -1,9 +1,10 @@
-function ec_makeTrialNfo_MMR(sbj,task,proj,prompts)
+function ec_makeTrialNfo_MMR(sbj,task,proj,prompts,conds)
 arguments
     sbj (1,1) string
     task (1,1) string
     proj (1,1) string
     prompts table
+    conds string
 end
 % sbj="S12_38_LK"; sbj="S15_87_RL";
 % task="MMR"; proj="lbcn"; r=1;
@@ -16,7 +17,7 @@ blocks = string(BlockBySubj(sbj,task));
 %% loop across runs
 for r = 1:length(blocks)
     block = blocks(r);
-    makeTrialNfo_run(sbj,block,dirs,prompts);
+    makeTrialNfo_run(sbj,block,dirs,prompts,conds);
 end
 
 
@@ -29,7 +30,7 @@ end
 
 
 
-function makeTrialNfo_run(sbj,block,dirs,prompts)
+function makeTrialNfo_run(sbj,block,dirs,prompts,conds)
 
 % Load trialinfo, get event timing locks
 load(fullfile(dirs.origSbj,block,"trialinfo_"+block+".mat"), "trialinfo");
@@ -40,7 +41,6 @@ sbjRun = trialinfo.sbjRun(1);
 load(fullfile(dirs.origSbj,"psy_"+sbjRun+".mat"), "psy");
 hz = psy.Properties.SampleRate;
 % Prompt variables
-prompts = movevars(prompts,["word" "eng"],"After","valence");
 vPrompts = string(prompts.Properties.VariableNames);
 
 
@@ -48,6 +48,7 @@ vPrompts = string(prompts.Properties.VariableNames);
 
 % Begin trialInfo
 trialNfo = renamevars(trialinfo,"wlist","prompt");
+trialNfo.Cond = categorical(trialNfo.cond,conds,Ordinal=true);
 trialNfo.sbjRun(:) = sbjRun;
 
 % Response
@@ -55,8 +56,7 @@ trialNfo.resp(:) = "none";
 trialNfo.resp(trialNfo.key=="1") = "true";
 trialNfo.resp(trialNfo.key=="2") = "false";
 trialNfo.resp = categorical(trialNfo.resp,["true","false","none"],'Ordinal',true);
-trialNfo.trueKey = trialNfo.resp=="true";
-trialNfo.eqAcu = trialinfo.Accuracy==1;
+trialNfo = renamevars(trialNfo,"Accuracy","acu");
 
 % Prompt edits
 trialNfo.prompt(trialNfo.prompt=="10  + 1 = 11") = "10 + 1 = 11";
@@ -86,10 +86,10 @@ for t = 1:nTrials
 end
 
 % Move vars
+trialNfo = movevars(trialNfo,["cond" "RT" "resp"],"After","trial");
+trialNfo = movevars(trialNfo,vPrompts,"After","resp");
+trialNfo = movevars(trialNfo,["Cond" "condition" "category" "target"],"Before","Valence");
 trialNfo = movevars(trialNfo,"sbjRun","Before","sbj");
-trialNfo = movevars(trialNfo,"cnd","After","trial");
-trialNfo = movevars(trialNfo,["resp" "trueKey" "eqAcu"],"After","RT");
-trialNfo = movevars(trialNfo,vPrompts,"After","eqAcu");
 
 
 %% Preallocate trialNfo & psy
@@ -108,7 +108,7 @@ trialNfo.idxOff(:) = uint32(0);
 % Psy
 psy.run(:) = trialNfo.run(1);
 psy.trial(:) = uint16(0);
-psy.cnd(:) = "";
+psy.cond(:) = "";
 psy.latency(:) = seconds(nan);
 psy.frame(:) = int32(0);
 psy.pct(:) = nan;
@@ -120,11 +120,9 @@ psy.post(:) = sparse(0);
 psy.on(:) = false;
 psy.onHz(:) = false;
 psy.noPdio(:) = sparse(false);
-psy.cond(:) = "";
 psy.valence(:) = int8(0);
 psy.resp(:) = categorical("none",["true","false","none"],Ordinal=true);
 psy.sbjID(:) = trialNfo.sbjID(1);
-psy.sbjRun(:) = sbjRun;
 psy.idx(:) = uint32(1:height(psy));
 psy = movevars(psy,["pdio" "photodiode" "noPdio"],"After","onHz");
 
@@ -137,26 +135,26 @@ trialNfo.idxOff = ceil(trialNfo.lockOff*hz) + 1;
 trialNfo = convertvars(trialNfo,["idxOns" "idxOff"],"uint32");
 
 % Rest onsets: ensure frame after offset of previous trial
-t = find(trialNfo.cond=="rest");
+t = find(trialNfo.cond=="Rest");
 trialNfo.idxOns(t) = trialNfo.idxOff(t-1) + 1;
 
 % Psy indices of ITI timing
 t = 2:nTrials;
 trialNfo.idxITI(t) = trialNfo.idxOff(t-1) + 1;
 trialNfo.idxITI(1) = trialNfo.idxOns(1) - ceil(trialNfo.itiBeh(1)*hz); % First trial
-trialNfo.idxITI(trialNfo.cond=="rest") = nan;
+trialNfo.idxITI(trialNfo.cond=="Rest") = nan;
 
 % Get psy times from indices
 trialNfo.ons = psy.Time(trialNfo.idxOns);
 trialNfo.off = psy.Time(trialNfo.idxOff);
-t = trialNfo.cond~="rest";
+t = trialNfo.cond~="Rest";
 trialNfo.iti(t) = psy.Time(trialNfo.idxITI(t));
 
 % Loop across trials
 for t = 1:nTrials
     % Psy indices
     idxStim = trialNfo.idxOns(t):trialNfo.idxOff(t);
-    if trialNfo.cond(t)~="rest"
+    if trialNfo.cond(t)~="Rest"
         idxITI = trialNfo.idxITI(t):trialNfo.idxOns(t)-1;
         idxTr = trialNfo.idxITI(t):trialNfo.idxOff(t);
 
@@ -174,7 +172,7 @@ for t = 1:nTrials
     end
 
     % Stimulus metadata
-    if trialNfo.cond(t)~="rest"
+    if trialNfo.cond(t)~="Rest"
         psy.on(idxStim) = true; end
     psy.stim(idxStim) = t;
     trialNfo.durStim(t) = range(psy.Time(idxStim));
@@ -182,7 +180,6 @@ for t = 1:nTrials
     % Trial metadata
     psy.trial(idxTr) = t;
     psy.RT(idxTr) = trialNfo.RT(t);
-    psy.cnd(idxTr) = trialNfo.cnd(t);
     psy.cond(idxTr) = trialNfo.cond(t);
     psy.valence(idxTr) = trialNfo.valence(t);
     psy.resp(idxTr) = trialNfo.resp(t);

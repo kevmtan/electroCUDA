@@ -4,20 +4,20 @@ arguments
     trialNfo table
     n struct
     tt (1,1) uint64 = tic
-    oe.bin (1,1) double = 0.02;                  % Fine latency bin width (secs)
-    oe.bin2 (1,1) double = 0.1;                  % Coarse latency bin width (secs)
-    oe.pct (1,1) double = 1;                     % Fine latency percent width (percentile)
-    oe.pct2 (1,1) double = 10;                   % Coarse latency percent width (percentile)
-    % Epoch baseline period (none=[]):
-    oe.baselinePre (1,2) double = [0 0];         % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
-    oe.baselineEnd (1,2) double = [0 0];         % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
-    % Epoch time limits (variable limits=[]):
-    oe.lims (1,2) double = [0 0];                % Epoch start & end from stim onset (secs); ex=[-0.2 3]
-    oe.limsRT (1,2) double = [0 0];              % Epoch start & end from behavioral RT (secs); ex=[-1.5 .5]
-    oe.limtsPct (1,2) double = [0 0];            % Epoch start & end from latency percentile; ex=[-10 120]
+    oe.bin (1,1) double = 0.02                  % Fine latency bin width (secs)
+    oe.bin2 (1,1) double = 0.1                  % Coarse latency bin width (secs)
+    oe.pct (1,1) double = 1                     % Fine latency percent width (percentile)
+    oe.pct2 (1,1) double = 10                   % Coarse latency percent width (percentile)
+    % Epoch time limits (secs) [nan=variable, 0=none]
+    oe.pre (1,1) double = nan                   % Pre-stimulus duration [nan=ITI]
+    oe.peri (1,1) double = nan                  % Peri-stimulus duration [nan=all]
+    oe.post (1,1) double = nan                  % Post-stimulus duration [nan=ITI]
     % Task conditions
-    oe.conds string = string(unique(psy.cond));  % List of condition names (order by desired categorical order)
-    oe.conds2 string = "";                       % List of custom condition names (ordered like 'oe.conds')
+    oe.conds string = string(unique(psy.cond))  % List of condition names (order by desired categorical order)
+    oe.conds2 string = ""                       % List of custom condition names (ordered like 'oe.conds')
+    % Epoch baseline period (none=[]):
+    %oe.baselinePre (1,2) double = [0 0];         % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
+    %oe.baselineEnd (1,2) double = [0 0];         % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
 end
 hz = n.hz;
 BLpre=oe.baselinePre*hz; BLend=oe.baselineEnd*hz; lims=oe.lims*hz; limsRT=oe.limsRT*hz;

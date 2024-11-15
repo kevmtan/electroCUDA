@@ -33,7 +33,7 @@ arguments
 end
 
 %%
-conds = ["self","other","semantic","episodic","math","rest","fact"];
+conds = ["Self","Other","Semantic","Episodic","Math","Rest","Fact"];
 condNames = ["self-internal","other","self-external","autobio","math","rest","fact"];
 conds_math_memory = ["memory","memory","memory","memory","math","rest","memory"];
 
@@ -143,7 +143,7 @@ for t = 1:height(trialinfo)
         AbsDeviant = nan;
         acc = false;
     end
-    trialinfo.cnd(t) = conds(K.conds(t));
+    trialinfo.cond(t) = conds(K.conds(t));
     trialinfo.condNames(t) = condNames(K.conds(t));
     trialinfo.conds_math_memory(t) = conds_math_memory(K.conds(t));
     trialinfo.isCalc(t) = isCalc;
@@ -206,7 +206,7 @@ nTrs = height(trialinfo) + height(restIdx);
 % New trialinfo with rest trials
 trialinfo2 = table;
 trialinfo2(setdiff(1:nTrs,restIdx),:) = trialinfo;
-trialinfo2.cnd(restIdx) = "rest";
+trialinfo2.cond(restIdx) = "Rest";
 trialinfo2.condNames(restIdx) = "rest";
 trialinfo2.conds_math_memory(restIdx) = "rest";
 trialinfo2.wlist(restIdx) = "+";
