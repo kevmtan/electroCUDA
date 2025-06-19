@@ -140,9 +140,10 @@ trialNfo.idxOns(t) = trialNfo.idxOff(t-1) + 1;
 
 % Psy indices of ITI timing
 t = 2:nTrials;
-trialNfo.idxITI(t) = trialNfo.idxOff(t-1) + 1;
+trialNfo.idxITI(t) = trialNfo.idxOff(t-1) + 1; % Stim trials except 1st
 trialNfo.idxITI(1) = trialNfo.idxOns(1) - ceil(trialNfo.itiBeh(1)*hz); % First trial
-trialNfo.idxITI(trialNfo.cond=="Rest") = nan;
+t = find(trialNfo.cond=="Rest");
+trialNfo.idxITI(t) = nan;
 
 % Get psy times from indices
 trialNfo.ons = psy.Time(trialNfo.idxOns);

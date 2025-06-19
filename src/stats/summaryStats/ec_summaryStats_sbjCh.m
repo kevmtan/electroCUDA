@@ -16,6 +16,7 @@ if a.test
     disp("TESTING sumStats: "+sbj);
     dbstop if error
 end
+
 %%
 % a.type="spec"; a.ICA=1; a.test=1; a.stats=1; a.plot=0; a.sfx="i";
 if contains(a.sfx,"i"); a.ICA = true; end
@@ -64,7 +65,6 @@ tic;
     ec_loadSbj(dirs,sfx=a.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo"]);
 if a.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;
-xs = single(xs);
 
 %% Initialize
 sbj = ns.sbj;
@@ -106,7 +106,7 @@ disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
 %% Analysis template
 oo = namedargs2cell(o.epoch);
-[ep,psy,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
+[ep,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
 if ~a.test; ep.time=[]; end
 
 %% Baseline correction, filtering, downsampling
@@ -409,8 +409,9 @@ B = B(["hfb" "lfp"],:);
 % disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
 %% Analysis template
-anT = ec_epochMetadata(psy,trialNfo,nh,o); toc;
-if ~a.test; anT.time=[]; end
+oo = namedargs2cell(o.epoch);
+[ep,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
+if ~a.test; ep.time=[]; end
 
 %% HFB: denoise & baseline correction
 [xh,nh] = ec_baselineTrials(xh,nh,psy,anT,trialNfo,o); toc;
@@ -666,8 +667,9 @@ B.Properties.RowNames = B.name;
 B = B("hfb",:);
 
 %% Analysis template
-anT = ec_epochMetadata(psy,trialNfo,nh,o); toc;
-if ~a.test; anT.time=[]; end
+oo = namedargs2cell(o.epoch);
+[ep,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
+if ~a.test; ep.time=[]; end
 
 %% HFB: denoise & baseline correction
 [xh,nh] = ec_baselineTrials(xh,nh,psy,anT,trialNfo,o); toc;

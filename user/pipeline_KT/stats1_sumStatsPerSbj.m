@@ -1,12 +1,11 @@
 %% Task info
-
 sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
     "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
     "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-% ISSUES: s54
+% sbjs="S12_38_LK"; sbjs="S12_42_NC";
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -14,7 +13,7 @@ task = "MMR"; % task name
 sfx = ""; %"";
 plotType = "spec"; % "hfb-lfp"; % "spec";
 doICA = false;
-isTest = false;
+isTest = true;
 
 
 %% Options
@@ -32,9 +31,9 @@ o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
 o.epoch.pct = 1; % Fine latency percent width (percentile)
 o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
 % Epoch time limits (secs) [nan=variable, 0=none]
-o.epoch.pre = 0.2; % Pre-stimulus duration [nan=ITI]
-o.epoch.peri = 0;  % Peri-stimulus duration [nan=all]
-o.epoch.post = 0.5;  % Post-stimulus duration [nan=ITI]
+o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
+o.epoch.post = 0.5; % Duration after stim offset [nan = post-stim ITI]
+o.epoch.max = nan; % Max duration after stim onset, supercedes 'post' [nan = no limit]
 
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.double = true;
@@ -46,6 +45,9 @@ o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = "robust"; % Normalize trial
 o.pre.trialNormByBaseline = false; % Divide trial by baseline norm
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+% Epoch baseline period (none=[]):
+o.pre.baselinePre = [-0.2 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
+o.pre.baselineEnd = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
 % Bad frames/outliers
 o.pre.interp = "linear";
 o.pre.badFields = ""; % skip=""
@@ -77,8 +79,8 @@ o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
 o.bandsF = [1 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
 
 % All Conditions
-o.conds = ["other" "selfinternal" "selfexternal" "autobio" "math" "rest"]; % order
-o.conds2 = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % custom condition names
+o.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
+o.conds2 = []; %["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % custom condition names
 
 o.logSpec = false; %
 o.normalizeSpec = [];
@@ -129,6 +131,7 @@ elseif plotType=="hfb-lfp"
 else
     o.oP.textsize = 8;
 end
+
 
 %%
 sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/summary/summarySbj_'...

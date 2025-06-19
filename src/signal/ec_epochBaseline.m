@@ -29,7 +29,7 @@ arguments
     % Filtering (within-run):
     op.hpf (1,1) double = 0.1;           % Hi-pass cutoff in hertz (skip=0)
     op.hpfSteep (1,1) double = 0.5;
-    op.hpfImpulse {mustBeMember(op.hpfImpulse,["auto" "fir" "iir"])} = "iir"; 
+    op.hpfImpulse {mustBeMember(op.hpfImpulse,["auto" "fir" "iir"])} = "iir";
     op.lpf (1,1) double = 0;                         % lo-pass in hz (skip=0)
     op.lpfSteep = 0.5;
     op.lpfImpulse {mustBeMember(op.lpfImpulse,["auto" "fir" "iir"])} = "auto";
@@ -59,7 +59,6 @@ if isany(op.badFields)
     end
     disp("Removed bad frames: "+sbj);
 end
-
 
 %% Prep
 
