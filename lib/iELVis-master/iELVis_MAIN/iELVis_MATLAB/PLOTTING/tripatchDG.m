@@ -3,7 +3,7 @@ function handle=tripatchDG(struct, nofigure, varargin)
 %
 % A *very* slightly modified version of the freesurfer function tripatch.m
 
-if nargin<2 || isempty(nofigure)
+if nargin<2 | isempty(nofigure)
    figure
 end
 if nargin<3
