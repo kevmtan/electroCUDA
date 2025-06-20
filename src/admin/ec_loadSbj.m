@@ -2,10 +2,11 @@ function varargout = ec_loadSbj(dirs,a)
 %% Load electroCUDA subject data
 % Output variables follow the same order as user input in "vars" argument
 
+
 %% Input validation
 arguments
-    dirs {isempty,isstruct} = []
-    a.sbj {istext,isnumeric} = []
+    dirs struct = []
+    a.sbj {mustBeTextOrNumeric} = ""
     a.proj (1,1) string = ""
     a.task (1,1) string = ""
     a.sfx (1,1) string = ""
@@ -14,16 +15,17 @@ arguments
         {mustBeMember(a.vars,["n" "x" "psy" "trialNfo" "chNfo" "dirs"])} = "dirs"
 end
 
+
+%% Main
+nOut = nargout;
+varargout = cell(1,nOut);
+
 % Directories
-if ~isstruct(dirs); dirs = ec_getDirs(a.proj,a.task,a.sbj); end
+if isempty(dirs); dirs = ec_getDirs(a.proj,a.task,a.sbj); end
 sbjID = dirs.sbjID;
 task = dirs.task;
 if isnumeric(sbjID); sbjID = "s"+sbjID; end
 if ~startsWith(sbjID,"s"); sbjID = "s"+sbjID; end
-
-%% Load
-nOut = nargout;
-varargout = cell(1,nOut);
 
 % Check sampling rate
 if ~a.hz && any(ismember(a.vars,["n" "psy" "trialNfo"]))

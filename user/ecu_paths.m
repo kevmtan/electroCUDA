@@ -1,33 +1,36 @@
 function dirs = ecu_paths(proj)
 arguments
-    proj string = "writeDefaultHere" % Project name
+    proj (1,1) string % Project name
 end
 dirs.proj = proj;
 
-%% User paths (must edit per user!)
-% NOTE: directory paths must end with a slash
+%% User-editable section
+%   directory paths must end with a slash (filesep)
+
+% Paths to executables
+dirs.cudaica = "/home/kt/bin/cudaica-kt/cudaica"; % CUDAICA binary file
+dirs.thundersvm = "/home/kt/bin/thundersvm-gpu/build/bin"; % ThunderSVM binary folder
 
 % electroCUDA code directory
 dirs.code = "/home/kt/Gdrive/Git/electroCUDA/";
 
-% Paths to executable binaries
-dirs.cudaica = "/home/kt/bin/cudaica-kt/cudaica"; % CUDAICA binary file
-dirs.thundersvm = "/home/kt/bin/thundersvm-gpu/build/bin/"; % ThunderSVM binary folder
-
-% Root dir of project data (can change per proj below)
-dirs.data = "/01/lbcn/"; 
-
-% Freesurfer subjects dir (can be in freesurfer install location, can change per project)
-dirs.freesurfer = "/01/lbcn/freesurfer/";
-
 % Project directories (add new case per project)
 switch proj
-    case "lbcn"
-        dirs.data = "/01/lbcn/"; % Root dir of project data
-        dirs.freesurfer = "/01/lbcn/freesurfer/"; % Freesurfer subjects dir (can be in freesurfer install location)
     case "ov"
-        dirs.data = "/01/ov/"; % Root dir of project data
-        dirs.freesurfer = "/01/ov/freesurfer/"; % Freesurfer subjects dir (can be in freesurfer install location)
+        % Root dir of project data
+        dirs.data = "/01/ov/";
+        % Freesurfer subjects dir (can be in freesurfer install location)
+        dirs.freesurfer = "/01/ov/freesurfer/";
+        % Get subject numeric ID from text string "sbj" (e.g., subject's directory name)
+        dirs.getSbjID = @(sbj) double(sbj); % ex: "007" = 7
+
+    case "lbcn"
+        % Root dir of project data
+        dirs.data = "/01/lbcn/";
+        % Freesurfer subjects dir (can be in freesurfer install location)
+        dirs.freesurfer = "/01/lbcn/freesurfer/";
+        % Get subject numeric ID from text string (ex: "eeg_034_2025" = 34)
+        dirs.getSbjID = @(sbj) double(extractBetween(sbj,"_","_"));
 end
 
 
