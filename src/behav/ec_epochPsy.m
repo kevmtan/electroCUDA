@@ -17,6 +17,10 @@ arguments
     % Task conditions
     oe.conds string = string(unique(psy.cond)) % List of condition names (order by desired categorical order)
     oe.conds2 string = ""                      % List of custom condition names (ordered like 'oe.conds')
+    % Epoch baseline period for subsequent processing
+    %   (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
+    oe.baselinePre {mustBeFloat} = [] % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
+    oe.baselinePost {mustBeFloat} = [] % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
 end
 % n=ns; oe=o.epoch; oe.conds=o.conds; oe.conds2=o.conds2;
 oe.pre=seconds(abs(oe.pre)); oe.post=seconds(abs(oe.post));
@@ -118,6 +122,28 @@ end
 ep = vertcat(ep{:});
 ep(:,["Time" "onHz" "photodiode" "trial" "timeR"]) = [];
 
+% Label pre-stimulus baseline frames
+if isany(oe.baselinePre)
+    if isscalar(oe.baselinePre)
+        ep.BLpre = -abs(oe.baselinePre)<=ep.latency & ep.pre;
+    elseif numel(oe.baselinePre)==2
+        ep.BLpre = oe.baselinePre(1)<=ep.latency & ep.latency<oe.baselinePre(2);
+    end
+else
+    ep.BLpre(:) = false;
+end
+
+% Label post-stimulus baseline frames
+if isany(oe.baselinePost)
+    if isscalar(oe.baselinePost)
+        ep.BLpre = oe.baselinePost<=ep.latency & ep.post;
+    elseif numel(oe.baselinePost)==2
+        ep.BLpre = oe.baselinePost(1)<=ep.latency & ep.latency<oe.baselinePost(2);
+    end
+else
+    ep.BLpost(:) = false;
+end
+
 % Task condition categorical order
 if ~isany(oe.conds2)
     ep.cond = categorical(ep.cond,oe.conds);
@@ -144,9 +170,10 @@ ep = convertvars(ep,["pct" "pct2"],"int8");
 % Reorder vars
 ep = movevars(ep,["frame" "latency" "bin" "bin2" "pct" "pct2" "latRT" "binRT" "binRT2"],...
     "After","cond");
+ep = movevars(ep,["BLpre" "BLpost"],"After","post");
 
+% Row names
 ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
-
 
 
 disp("[ec_epochMetadata] Made analysis template: "+n.sbj+" time="+toc(tt));

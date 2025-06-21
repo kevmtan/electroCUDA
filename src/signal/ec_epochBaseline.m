@@ -3,15 +3,20 @@ function [x,trs] = ec_epochBaseline(x,n,psy,ep,tt,op)
 arguments
     x {mustBeFloat}
     n struct
-    psy table
+    psy timetable
     ep table
     tt uint64 = tic
     op.gpu (1,1) logical = false
     op.double (1,1) logical = true
     op.singleOut (1,1) logical = false
     op.hzTarg (1,1) double = nan
-    op.log (1,1) logical = false;                      % Log transform
+    % Within-run preprocessing
+    op.log (1,1) logical = false;               % Log transform
     op.runNorm string = "zscore";               % Normalize run
+    % Within-trial preprocessing (baseline correction)
+    %   Epoch baseline period (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
+    op.baselinePre {mustBeFloat} = [] % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
+    op.baselinePost {mustBeFloat} = [] % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
     op.trialNorm string = "robust";             % Normalize trial
     op.trialNormByBaseline (1,1) logical = true;       % Divide trial by baseline norm
     op.trialBaseline string = "median";         % Subtract trial by mean or median of baseline period (skip=[])
@@ -36,7 +41,7 @@ arguments
 end
 if op.double; x=double(x); end
 op.fs2 = double(op.lpf*n.hz);
-sbj = n.sbj; 
+sbj = n.sbj;
 % blThr = op.thrOLbl;
 % runIdx = n.runIdxOg(:,2);
 % if op.hzTarg; ds=op.hzTarg/fs; else; ds=[]; end
@@ -62,6 +67,10 @@ end
 
 %% Prep
 
+% Convert 'half' vars to 'single' for parallel threads
+idx = varfun(@(v) isa(v,"half"),psy,OutputFormat="uniform");
+psy = convertvars(psy,idx,"single");
+
 % Get downsampling factor & anti-aliasing filter
 if isany(op.hzTarg)
     [ds(1),ds(2)] = rat(op.hzTarg/n.hz);
@@ -69,19 +78,19 @@ if isany(op.hzTarg)
     if ds(1)>ds(2); error("[ec_epochBaseline] downsampling target > sampling rate"); end
     if ds(1)~=1; error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
     ds = ds(2);
+    disp("[ec_epochBaseline] downsampling factor = "+ds);
 else
     ds = 1;
 end
-disp("[ec_epochBaseline] downsampling factor = "+ds);
 
 % Trial Indices
-trs = groupcounts(ep,["run" "trialA"]);
+trs = groupcounts(ep,["run" "tr"]);
 trs.i = false(height(trs),height(ep));
 for t = 1:height(trs)
-    trs.i(t,:) = ep.trialA==trs.trialA(t); end
+    trs.i(t,:) = ep.tr==trs.tr(t); end
 
 % Prepare filters
-[~,idx] = min(n.runIdxOg(:,2)); hpf=[]; lpf=[];
+[~,idx] = min(n.runIdxOg); hpf=[]; lpf=[];
 if isany(op.hpf)
     hpf = ec_designFilt(x(psy.run==n.runs(idx),1,1),n.hz,op.hpf,"highpass",...
         steepness=op.hpfSteep,impulse=op.hpfImpulse,coefOut=true);
@@ -99,13 +108,13 @@ disp("[ec_epochBaseline] Prepared data & filters: "+n.sbj+" time="+toc(tt));
 parfor c = 1:numel(x) % By channel
     x{c} = withinCh_lfn(x{c},n,psy,ep,trs,hpf,lpf,ds,op);
 end
-disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 %% Finalize
 x = cellfun(@(y) permute(y,[1 3 2]),x,'UniformOutput',false);
 x = horzcat(x{:});
 if op.singleOut; x=single(x); end
 if op.gpu; x=gather(x); end % parfevalOnAll(@gpuDevice,0,[]); reset(gpuDevice());
+disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
@@ -120,7 +129,7 @@ function xc = withinCh_lfn(xc,n,psy,ep,trs,hpf,lpf,ds,op)
 % xc=x{104};
 
 % Reshape per run
-xc = mat2cell(xc,n.runIdxOg(:,2));
+xc = mat2cell(xc,n.runIdxOg);
 
 % Processing within-run (HPF, norm, outliers, PCA, LPF)
 for r = 1:n.nRuns
@@ -130,10 +139,10 @@ end
 xc = vertcat(xc{:});
 
 % Epoch
-xc = xc(ep.iPsy,:); % Match epoched indices
+xc = xc(ep.idx,:); % Match epoched indices
 
 % Robust baseline correction
-if any(ep.BLpre) || any(ep.BLend)
+if any(ep.BLpre) || any(ep.BLpost)
     xc = acrossTrials_lfn(xc,ep,trs,op);
 end
 
@@ -167,6 +176,10 @@ if any(op.olThr2)
     xr = fillmissing(xr,"linear",1,EndValues="nearest");
 end
 
+% PCA (use ec_robustPCA??)
+if op.pcaSpec
+    [~,xr] = pca(xr,NumComponents=op.pcaSpec,Economy=false); end
+
 % Low-pass filter
 if ~isempty(lpf)
     xr = ec_filtfilt(xr,lpf); end
@@ -179,7 +192,8 @@ elseif isany(op.runNorm)
 end
 
 % Downsample
-xr = xr(1:ds:end,:);
+if ds > 1
+    xr = xr(1:ds:end,:); end
 
 
 
@@ -189,7 +203,7 @@ trs = table2struct(trs);
 
 % Reshape by trial
 x = arrayfun(@(t) x(t.i,:), trs,UniformOutput=false);
-idb = arrayfun(@(t) ep.BLpre(t.i)|ep.BLend(t.i), trs,UniformOutput=false);
+idb = arrayfun(@(t) ep.BLpre(t.i)|ep.BLpost(t.i), trs,UniformOutput=false); % baseline
 
 % Baseline correct within-trial (robust z-score)
 for t = 1:numel(x)
@@ -223,57 +237,57 @@ xt = (xt-bl)./bl0;
 
 % function xc = withinCh_lfn(xc,rr,idr,stim,fs2,hpf,lpf,op)
 % %% Compute within chan/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% xc = squeeze(xc); 
-% 
+% xc = squeeze(xc);
+%
 % % Log transform
 % if op.log
 %     xc = arrayfun(@log,xc); end
-% 
+%
 % % Outliers, HPF, z-score (within-run)
 % for r = rr
 %     id = idr(:,r);
 %     xc(id,:) = withinChRun_lfn(xc(id,:),~stim(id),fs2,hpf,op);
 % end
-% 
+%
 % % PCA (use ec_robustPCA??)
 % if op.pcaSpec
 %     [~,xc] = pca(xc,NumComponents=op.pcaSpec,Economy=false); end
-% 
+%
 % % LPF (within-run) [after PCA]
 % if ~isempty(lpf)
 %     for r = rr
 %         xc(idr(:,r),:) = ec_filtfilt(xc(idr(:,r),:),lpf); end
 % end
-% 
+%
 % % Finalize
 % xc = permute(xc,[1 3 2]);
-% 
-% 
-% 
+%
+%
+%
 % function xr = withinChRun_lfn(xr,idb,fs2,hpf,op)
 % %% Compute within run per chan/IC  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
+%
 % % Baseline outliers
 % if any(op.olThrBL)
 %     xr(idb,:) = filloutliers(xr(idb,:),nan(1,like=xr),op.olCenter,1,ThresholdFactor=op.olThrBL); end
-% 
+%
 % % Peri-stimulus outliers
 % if any(op.olThr)
 %     xr = filloutliers(xr,nan(1,like=xr),op.olCenter,1,ThresholdFactor=op.olThr); end
-% 
+%
 % % Interpolate outliers/missing (slower on GPU)
-% xr = fillmissing_lfn(xr,fs2); 
-% 
+% xr = fillmissing_lfn(xr,fs2);
+%
 % % High-pass filter
 % if ~isempty(hpf)
 %     xr = ec_filtfilt(xr,hpf); end
-% 
+%
 % % Redo outliers
 % if any(op.olThr2)
 %     xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr2);
 %     xr = fillmissing_lfn(xr,fs2);
 % end
-% 
+%
 % % Normalize (z-score)
 % if op.runNorm=="robust"
 %     xr = normalize(xr,1,"zscore","robust");

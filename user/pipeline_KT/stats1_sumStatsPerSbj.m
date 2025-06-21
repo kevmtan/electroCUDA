@@ -25,15 +25,21 @@ o.name = nameStr;
 o.save = true; %% save summary stats data %%%%
 o.gpu = false;
 
+% All Conditions
+o.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
+o.conds2 = []; % custom condition names
+
 % Epoching (see 'ec_epochPsy')
-o.epoch.bin = 0.01; % Fine latency bin width (secs)
-o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
-o.epoch.pct = 1; % Fine latency percent width (percentile)
-o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
+o.epoch.float = "single";
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = 0.5; % Duration after stim offset [nan = post-stim ITI]
 o.epoch.max = nan; % Max duration after stim onset, supercedes 'post' [nan = no limit]
+% Epoch time bins (secs)
+o.epoch.bin = 0.01; % Fine latency bin width (secs)
+o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
+o.epoch.pct1 = 1; % Fine latency percent width (percentile)
+o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
 
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.double = true;
@@ -67,9 +73,9 @@ o.pre.lpfSteep = 0.5;
 o.pre.lpfImpulse = "fir";
 
 % Stats
-o.stats.epoch = [-.2 3];
-o.stats.epochRT = [-1.5 .2];
-o.stats.epochPct = [-.1 1.1];
+o.stats.epoch = [-.2 3]; % latency range for stats
+o.stats.epochRT = [-1.5 .2]; % latency range for stats (relative to RT)
+o.stats.epochPct = [-.1 1.1]; % latency percentages for stats
 
 % Frequency bands
 o.freqIdx = []; %[1 14 20:4:83];
@@ -77,11 +83,6 @@ o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band na
 o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
     "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
 o.bandsF = [1 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
-
-% All Conditions
-o.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
-o.conds2 = []; %["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % custom condition names
-
 o.logSpec = false; %
 o.normalizeSpec = [];
 o.normalizeLFP = "robust";
