@@ -1,4 +1,4 @@
-function o = ec_sumStatsSpec_sbjCh(sbj,proj,task,o,a)
+function o = ec_summaryCh_spec(sbj,proj,task,o,a)
 arguments
     sbj string
     proj string
@@ -12,8 +12,9 @@ if a.test
     disp("TESTING sumStats: "+sbj);
     dbstop if error
 end
-%% Load
 % a.plot=0; a.test=1;
+%% Load
+
 if contains(o.sfx,"i"); o.ICA = true; end
 if o.ICA && ~contains(o.sfx,"i"); o.sfx = o.sfx + "i"; end
 dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
@@ -26,9 +27,9 @@ o.dirOutSbj = dirs.anal+"summary/"+o.name+"/s"+dirs.sbjID+"/";
 tic;
 [ns,xs,psy,trialNfo,chNfo] =...
     ec_loadSbj(dirs,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo"]);
+xs = single(xs);
 if a.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;
-xs = single(xs);
 
 %% Initialize
 sbj = ns.sbj;
@@ -70,10 +71,10 @@ disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
 %% Analysis template
 oo = namedargs2cell(o.epoch);
-[ep,psy,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
+[ep,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
 if ~a.test; ep.time=[]; end
 
-%% Baseline correction, filtering, downsampling
+%% Preprocessing: baseline correction, filtering, downsampling
 oo = namedargs2cell(o.pre);
 xs = ec_epochBaseline(xs,ns,psy,ep,oo{:}); toc % ADD DOWNSAMPLING
 
@@ -103,16 +104,16 @@ trialNfo.RT1 = int32(trialNfo.RT*1000);
 xe = nan(nLats,nChs,nTrs,"like",x);
 xhe = nan(nLats,nChs,nTrs,"like",x);
 for t = 1:nTrs
-    idx = ep.idx(ep.trialA==trialNfo.trialA(t));
+    idx = ep.idx(ep.tr==trialNfo.tr(t));
     idx = idx(ismember(ep.bin2(idx),lats5));
-    idx = idx(ep.iPsy(idx)<=trialNfo.idxEnd(t));
+    idx = idx(ep.idx(idx)<=trialNfo.idxOff(t));
     [~,ia,ib] = intersect(lats5,ep.bin2(idx),'stable');
     xe(ia,:,t) = x(idx(ib),:);
     xhe(ia,:,t) = mean(xs(idx(ib),:,B.id("hfb",:)),3,'omitnan');
 end
-trialNfo.RT1(~trialNfo.RT1) = trialNfo.trialA(~trialNfo.RT1);
+trialNfo.RT1(~trialNfo.RT1) = trialNfo.tr(~trialNfo.RT1);
 
-[trialNfo,idx] = sortrows(trialNfo,["condC" "RT1" "trialA"]);
+[trialNfo,idx] = sortrows(trialNfo,["condC" "RT1" "tr"]);
 xe = xe(:,:,idx);
 xhe = xhe(:,:,idx);
 disp("Finished plotting prep: "+sbj);
@@ -138,7 +139,7 @@ if ~a.plot
     disp("SAVED: "+fn);
 else
     %%
-    spec_runPlots(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo);
+    ec_summaryCh_specPlot(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo);
 end
 end
 
@@ -158,7 +159,7 @@ doICA = ns.ICA;
 if doICA; chNames = ns.icNfo.ic; else; chNames=[1:nChs,1]; end
 epoch = int16(floor(o.stats.epoch*1000));
 epochRT = int16(floor(o.stats.epochRT*1000));
-epochPct = int16(floor(o.stats.epochPct*100));
+epochPct = int16(o.stats.epochPct);
 
 %% Calculate stats
 ss = cell(nChs,1);
@@ -176,12 +177,10 @@ parfor ch = 1:nChs
         idx = anCh.bin2>=epoch(1) & anCh.bin2<=epoch(2);
 
         % All frequencies
-        sl = grpstats(anCh(idx,:),["condC" "bin2"],"mean","DataVars",["latency" "x"]);
+        sl = grpstats(anCh(idx,:),["cond" "bin2"],"mean","DataVars",["latency" "x"]);
         sl.Properties.VariableNames = strrep(sl.Properties.VariableNames,"mean_","");
         sl.Properties.VariableNames = strrep(sl.Properties.VariableNames,"GroupCount","N");
-        sl.Properties.VariableNames("condC")="cond"; sl.cond=string(sl.cond);
-        sl.latency = single(sl.latency);
-        sl.N = uint16(sl.N);
+        sl.latency=single(sl.latency); sl.cond=string(sl.cond); sl.N=uint16(sl.N);
         sl.sbjCh(:) = sbjChs(ch);
         sl.Properties.RowNames = sl.sbjCh+"_"+sl.cond+"_"+sl.bin2;
         sl = movevars(sl,"sbjCh","Before","cond");
@@ -195,10 +194,10 @@ parfor ch = 1:nChs
         anCh.x = [];
 
         % Frequency bands
-        sl2 = grpstats(anCh(idx,:),["condC" "bin2"],["mean" "sem"],"DataVars",B.name);
+        sl2 = grpstats(anCh(idx,:),["cond" "bin2"],["mean" "sem"],"DataVars",B.name);
         sl2.Properties.VariableNames = strrep(sl2.Properties.VariableNames,"mean_","");
         sl2.Properties.VariableNames = strrep(sl2.Properties.VariableNames,"sem_","SE_");
-        sl2.condC=[]; sl2.bin2=[]; sl2.GroupCount=[]; sl2.Properties.RowNames={};
+        sl2.cond=[]; sl2.bin2=[]; sl2.GroupCount=[]; sl2.Properties.RowNames={};
         sl = [sl,sl2]; % Concactenate & copy
         sl = movevars(sl,sl2.Properties.VariableNames,"Before","x");
         ssCh.ms{1} = sl;
@@ -208,12 +207,11 @@ parfor ch = 1:nChs
     if ~isempty(epochRT)
         idx = anCh.binRT>=epochRT(1) & anCh.binRT<=epochRT(2);
         % Frequency bands
-        sr = grpstats(anCh(idx,:),["condC" "binRT"],["mean" "sem"],"DataVars",B.name);
+        sr = grpstats(anCh(idx,:),["cond" "binRT"],["mean" "sem"],"DataVars",B.name);
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"mean_","");
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"sem_","SE_");
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"GroupCount","N");
-        sr.Properties.VariableNames("condC")="cond"; sr.cond=string(sr.cond);
-        sr.N = uint16(sr.N);
+        sr.N=uint16(sr.N); sr.cond=string(sr.cond);
         sr.sbjCh(:) = sbjChs(ch);
         sr = movevars(sr,"sbjCh","Before","cond");
         sr.Properties.RowNames = sr.sbjCh+"_"+sr.cond+"_"+sr.binRT;
@@ -224,12 +222,11 @@ parfor ch = 1:nChs
     if ~isempty(epochPct)
         idx = anCh.pct2>=epochPct(1) & anCh.pct2<=epochPct(2);
         % Frequency bands
-        sp = grpstats(anCh(idx,:),["condC" "pct2"],["mean" "sem"],"DataVars",B.name);
+        sp = grpstats(anCh(idx,:),["cond" "pct2"],["mean" "sem"],"DataVars",B.name);
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"mean_","");
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"sem_","SE_");
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"GroupCount","N");
-        sp.Properties.VariableNames("condC")="cond"; sp.cond=string(sp.cond);
-        sp.N = uint16(sp.N);
+        sp.N=uint16(sp.N); sp.cond=string(sp.cond);
         sp.sbjCh(:) = sbjChs(ch);
         sp = movevars(sp,"sbjCh","Before","cond");
         sp.Properties.RowNames = sp.sbjCh+"_"+sp.cond+"_"+sp.pct2;
@@ -255,7 +252,7 @@ sbjID = na.sbjID;
 nChs = size(xa,2);
 epoch = int16(floor(o.stats.epoch*1000));
 epochRT = int16(floor(o.stats.epochRT*1000));
-epochPct = int16(floor(o.stats.epochPct*100));
+epochPct = int16(o.stats.epochPct);
 if nargin<7
     ss = table;
     ss.ch = (1:nChs)';
@@ -277,14 +274,12 @@ parfor ch = 1:nChs
         idx = anCh.bin2>=epoch(1) & anCh.bin2<=epoch(2);
 
         % All frequencies
-        sl = grpstats(anCh(idx,:),["condC" "bin2"],["mean" "sem"],"DataVars",["latency" "x"]);
+        sl = grpstats(anCh(idx,:),["cond" "bin2"],["mean" "sem"],"DataVars",["latency" "x"]);
         sl.Properties.VariableNames = strrep(sl.Properties.VariableNames,"_x","_"+band);
         sl.Properties.VariableNames = strrep(sl.Properties.VariableNames,"mean_","");
         sl.Properties.VariableNames = strrep(sl.Properties.VariableNames,"sem_","SE_");
         sl.Properties.VariableNames = strrep(sl.Properties.VariableNames,"GroupCount","N");
-        sl.Properties.VariableNames("condC")="cond"; sl.cond=string(sl.cond);
-        sl.latency = single(sl.latency);
-        sl.N = uint16(sl.N);
+        sl.latency=single(sl.latency); sl.cond=string(sl.cond); sl.N=uint16(sl.N);
         sl.sbjCh(:) = sbjChs(ch);
         sl.Properties.RowNames = sl.sbjCh+"_"+sl.cond+"_"+sl.bin2;
         sl = movevars(sl,"sbjCh","Before","cond");
@@ -301,13 +296,12 @@ parfor ch = 1:nChs
     %% RT-locked stats
     if ~isempty(epochRT)
         idx = anCh.binRT>=epochRT(1) & anCh.binRT<=epochRT(2);
-        sr = grpstats(anCh(idx,:),["condC" "binRT"],["mean" "sem"],"DataVars","x");
+        sr = grpstats(anCh(idx,:),["cond" "binRT"],["mean" "sem"],"DataVars","x");
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"_x","_"+band);
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"mean_","");
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"sem_","SE_");
         sr.Properties.VariableNames = strrep(sr.Properties.VariableNames,"GroupCount","N");
-        sr.Properties.VariableNames("condC")="cond"; sr.cond=string(sr.cond);
-        sr.N = uint16(sr.N);
+        sr.N=uint16(sr.N); sr.cond=string(sr.cond);
         sr.sbjCh(:) = sbjChs(ch);
         sr.Properties.RowNames = sr.sbjCh+"_"+sr.cond+"_"+sr.binRT;
         sr = movevars(sr,"sbjCh","Before","cond");
@@ -323,13 +317,12 @@ parfor ch = 1:nChs
     %% Percent RT stats
     if ~isempty(epochPct)
         idx = anCh.pct2>=epochPct(1) & anCh.pct2<=epochPct(2);
-        sp = grpstats(anCh(idx,:),["condC" "pct2"],["mean" "sem"],"DataVars","x");
+        sp = grpstats(anCh(idx,:),["cond" "pct2"],["mean" "sem"],"DataVars","x");
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"_x","_"+band);
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"mean_","");
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"sem_","SE_");
         sp.Properties.VariableNames = strrep(sp.Properties.VariableNames,"GroupCount","N");
-        sp.Properties.VariableNames("condC")="cond"; sp.cond=string(sp.cond);
-        sp.N = uint16(sp.N);
+        sp.N=uint16(sp.N); sp.cond=string(sp.cond);
         sp.sbjCh(:) = sbjChs(ch);
         sp.Properties.RowNames = sp.sbjCh+"_"+sp.cond+"_"+sp.pct2;
         sp = movevars(sp,"sbjCh","Before","cond");

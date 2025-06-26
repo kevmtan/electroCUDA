@@ -1,5 +1,5 @@
 % Run spec plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function ec_sumStatsSpec_sbjCh_plot(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo)
+function ec_summaryCh_specPlot(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo)
 % Load
 [ns,chNfo] = ec_loadSbj(dirs,sfx=a.sfx+"s",vars=["n" "chNfo"]);
 sbjID = ns.sbjID;
