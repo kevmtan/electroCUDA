@@ -5,19 +5,19 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-% s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC";
+% s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
 
 proj = "lbcn";
 task = "MMR"; % task name
 dirs = ec_getDirs(proj,task);
-
-saveStats = true; % save summary stats data
 
 
 %% Options
 
 % Options struct
 o = struct;
+o.test = false;
+o.plot = true;
 o.sfx = "";
 o.gpu = false;
 
@@ -56,7 +56,7 @@ o.pre.hzTarg = 100; % Target sampling rate
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = "robust"; % Normalize trial
-o.pre.trialNormByBaseline = false; % Divide trial by baseline norm
+o.pre.trialNormByBaseline = false; % Divide trial by baseline norm (true = divide my all-trial norm)
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear";
@@ -80,12 +80,13 @@ o.pre.lpfImpulse = "fir";
 o.stats.epoch = [-.2 3]; % latency range for stats
 o.stats.epochRT = [-1.5 .5]; % latency range for stats (relative to RT)
 o.stats.epochPct = [-10 110]; % latency percentages for stats
+o.stats.trialPlotLats = [-.2 5];
 
 % Plot options
 o.oP = ecu_genPlotParams("ERSP","MMR");
 o.oP.visible = 0;
-o.oP.save = 1;
-o.oP.doGPU = 0;
+o.oP.save = true;
+o.oP.doGPU = false;
 o.oP.clim = [-4 4];
 o.oP.climICA = [];
 o.oP.climICA_z = [-6 6];
@@ -138,7 +139,7 @@ for s = 1:height(logs.i{1})
             
             %%
             try
-                disp("STARTING SUMMARY PLOTS: "+sbj);
+                disp("STARTING SUMMARY STATS: "+sbj);
                 logs.i{ii}.o{s} = ec_summaryCh_spec(sbj,proj,task,o);
                 logs.i{ii}.stats(s) = 1;
             catch ME; getReport(ME)
@@ -148,7 +149,7 @@ for s = 1:height(logs.i{1})
 
             %%
             logs.i{ii}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(logsFn,'logs','date','-v7');
+            save(logsFn,'logs','logsFn','-v7');
         else
             disp("SKIPPING: "+o.name);
         end
@@ -159,20 +160,15 @@ end
 
 %% Run plotting %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 try delete(gcp('nocreate')); catch;end
-try parpool('Processes'); catch;end
-for s = 1:height(status)
+try parpool('local12'); catch;end
+for s = 1:height(logs.i{1})
     for ii = 1:2 %1 %:2
-        if ii==1; doICA=1; sfx="i"; name=name+"ic_"+plotType; end
-        if ii==2; doICA=0; sfx=""; name=name+"ch_"+plotType; end
-        sbj = logs.i{ii}.sbj(s);
-
         %%
-        if logs.i{ii}.plot(s,ii)~=1 %&& isempty(statusP.error{s})
+        if logs.i{ii}.plot(s)~=1 %&& isempty(statusP.error{s})
             %%
             try
-                disp("STARTING SUMMARY PLOTS: "+sbj);
-                ec_summaryCh_specPlot(sbj,proj,task,o,stats=0,plot=1,...
-                    sfx=sfx,type=plotType,ICA=doICA,test=isTest);
+                disp("STARTING SUMMARY PLOTS: "+logs.i{ii}.sbj(s));
+                ec_summaryCh_specPlot(logs.i{ii}.o{s});
                 logs.i{ii}.plot(s) = 1;
             catch ME; getReport(ME)
                 logs.i{ii}.error{s} = ME;
@@ -181,7 +177,7 @@ for s = 1:height(status)
 
             %%
             logs.i{ii}.time(s,ii) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(logsFn,'status','date','-v7');
+            save(logsFn,'logs','logsFn','-v7');
         else
             disp("SKIPPING PLOTS: "+o.name);
         end

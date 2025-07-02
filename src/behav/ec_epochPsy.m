@@ -26,21 +26,11 @@ end
 oe.pre=seconds(abs(oe.pre)); oe.post=seconds(abs(oe.post));
 
 
-%% Prep
+%% Main
 trs = height(trialNfo);
 ep = cell(trs,1); % trial epochs
 
-
-% Task condition categorical order
-if ~isany(oe.conds2)
-    trialNfo.cond = categorical(trialNfo.cond,oe.conds);
-else % Custom condition names
-    [~,ci] = max(trialNfo.cond==oe.conds,[],2);
-    trialNfo.cond = oe.conds2(ci)';
-    trialNfo.cond = categorical(trialNfo.cond,oe.conds2);
-end
-
-%% Collate frames per trial
+% Loop to collate frames across trials
 for t = 1:trs
     % Prep
     tNfo = trialNfo(t,:);
@@ -132,7 +122,7 @@ end
 
 %% Finalize
 ep = vertcat(ep{:});
-ep(:,["Time" "onHz" "photodiode" "trial" "timeR"]) = [];
+ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "idr"]) = [];
 
 % Label pre-stimulus baseline frames
 if isany(oe.baselinePre)
@@ -186,6 +176,9 @@ ep = convertvars(ep,["pct" "pct2"],"int8");
 ep = movevars(ep,["frame" "latency" "bin" "bin2" "pct" "pct2" "latRT" "binRT" "binRT2"],...
     "After","cond");
 ep = movevars(ep,["BLpre" "BLpost"],"After","post");
+
+% New indices
+ep.ide = uint32(1:height(ep))';
 
 % Row names
 ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);

@@ -5,14 +5,12 @@ arguments
     task string
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
     a.plot logical = false
-    a.test logical = false
-    a.dbstop logical = false
 end
-if a.test
+if o.test
     disp("TESTING sumStats: "+sbj);
     dbstop if error
 end
-% a.plot=0; a.test=1;
+% a.plot=0; o.test=1;
 %% Load
 if contains(o.sfx,"i"); o.ICA = true; end
 if o.ICA && ~contains(o.sfx,"i"); o.sfx = o.sfx + "i"; end
@@ -28,7 +26,7 @@ tic;
 [ns,xs,psy,trialNfo,chNfo] =...
     ec_loadSbj(dirs,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo"]);
 xs = single(xs);
-if a.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
+if o.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;
 
 %% Initialize
@@ -63,15 +61,14 @@ B.Properties.RowNames = B.name;
 %% Get mean evoked magnitude per freq & cond
 fAvg = nan(numel(conds),nChs,numel(ns.freqs),"like",xs);
 for c = 1:numel(conds)
-    idx = psy.stim & psy.cond==conds(c);
-    fAvg(c,:,:) = mean(xs(idx,:,:),1,"omitnan");
+    id = psy.stim & psy.cond==conds(c);
+    fAvg(c,:,:) = mean(xs(id,:,:),1,"omitnan");
 end
 disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 
 %% Analysis template
 oo = namedargs2cell(o.epoch);
 [ep,trialNfo] = ec_epochPsy(psy,trialNfo,ns,oo{:},conds=o.conds,conds2=o.conds2); toc
-if ~a.test; end
 
 %% Preprocessing: baseline correction, filtering, downsampling
 oo = namedargs2cell(o.pre);
@@ -82,43 +79,44 @@ ss = statsSpec_lfn(xs,ns,sbjChs,ep,B,o); toc
 
 %% LFP: load & initialize
 [n,x,psy1] = ec_loadSbj(dirs,sfx=o.sfx,vars=["n" "x" "psy"]);
-if a.test; x1=x; end %#ok<NASGU>
+if o.test; x1=x; end %#ok<NASGU>
 x = single(x);
 n.suffix = o.sfx;
 
 %% LFP: denoise, downsample & baseline correction
 oo = namedargs2cell(o.pre);
 x = ec_epochBaseline(x,n,psy1,ep,oo{:}); toc
-if ~a.test; clear n; clear psy1; clear trialNfo1; end
+if ~o.test; clear n; clear psy1; clear trialNfo1; end
 
 %% LFP: summary stats
 ss = statsBand_lfn(x,ns,sbjChs,ep,"lfp",o,ss); toc;
 
 %% Organize data for plotting
-lats5 = int16(1000 * (o.stats.epoch(1):o.epoch.bin2:5))';
-nLats = numel(lats5);
-trialNfo.RT1 = int32(trialNfo.RT*1000);
+o.lats5 = unique(ep.bin2);
+o.lats5(o.lats5 < o.stats.trialPlotLats(1)*1000) = [];
+o.lats5(o.lats5 > o.stats.trialPlotLats(2)*1000) = [];
+nLats = numel(o.lats5);
 
 % Slice full timecourses for plotting
 xe = nan(nLats,nChs,nTrs,"like",x);
 xhe = nan(nLats,nChs,nTrs,"like",x);
 for t = 1:nTrs
-    idx = ep.idx(ep.tr==trialNfo.tr(t));
-    idx = idx(ismember(ep.bin2(idx),lats5));
-    idx = idx(ep.idx(idx)<=trialNfo.idxOff(t));
-    [~,ia,ib] = intersect(lats5,ep.bin2(idx),'stable');
-    xe(ia,:,t) = x(idx(ib),:);
-    xhe(ia,:,t) = mean(xs(idx(ib),:,B.id("hfb",:)),3,'omitnan');
+    id = ep.ide(ep.tr==trialNfo.tr(t));
+    id = id(ismember(ep.bin2(id),o.lats5));
+    id = id(ep.idx(id)<=trialNfo.idxOff(t));
+    [~,ia,ib] = intersect(o.lats5,ep.bin2(id),'stable');
+    xe(ia,:,t) = x(id(ib),:);
+    xhe(ia,:,t) = mean(xs(id(ib),:,B.id("hfb",:)),3,'omitnan');
 end
-trialNfo.RT1(~trialNfo.RT1) = trialNfo.tr(~trialNfo.RT1);
 
-[trialNfo,idx] = sortrows(trialNfo,["cond" "RT1" "tr"]);
-xe = xe(:,:,idx);
-xhe = xhe(:,:,idx);
+% Order trials
+[trialNfo,id] = sortrows(trialNfo,["cond" "RT" "tr"]);
+xe = xe(:,:,id);
+xhe = xhe(:,:,id);
 disp("Finished plotting prep: "+sbj);
 
 %% Save summary stats
-if ~a.test; clear x xh nh ep; end
+if ~o.test; clear x xh nh ep; end
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
 if ~isfolder(o.dirOutSbj); mkdir(o.dirOutSbj); end
 % try parfevalOnAll(@gpuDevice,0,[]); catch;end
@@ -134,7 +132,7 @@ if ~a.plot
     savefast(fn,'xe','xhe','fAvg','B','trialNfo');
     disp("SAVED: "+fn);
 else
-    ec_summaryCh_specPlot(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo);
+    ec_summaryCh_specPlot(o,ss,xe,xhe,fAvg,B,trialNfo)
 end
 end
 

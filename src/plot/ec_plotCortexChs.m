@@ -80,22 +80,21 @@ if ismember(dVars,"order")
     d = sortrows(d,'order','ascend');
 end
 
-
-% Convert to gpuArray
-if o.doGPU
-    idx = structfun(@(o) isnumeric(o)||islogical(o),o);
-    oFields = string(fieldnames(o));
-    oFields = oFields(idx);
-    for i = 1:numel(oFields)
-        o.(oFields(i)) = gpuArray(o.(oFields(i)));
-    end
-    idx = varfun(@(d) isa(d,"double"),d(1,:),"OutputFormat","uniform");
-    d = convertvars(d,idx,"single");
-    idx = varfun(@(d) isnumeric(d)||islogical(d),d(1,:),"OutputFormat","uniform");
-    d = convertvars(d,idx,"gpuArray");
-    nVars = gpuArray(nVars);
-    varSz = gpuArray(varSz);
-end
+% % Convert to gpuArray
+% if o.doGPU
+%     idx = structfun(@(o) isnumeric(o)||islogical(o),o);
+%     oFields = string(fieldnames(o));
+%     oFields = oFields(idx);
+%     for i = 1:numel(oFields)
+%         o.(oFields(i)) = gpuArray(o.(oFields(i)));
+%     end
+%     idx = varfun(@(d) isa(d,"double"),d(1,:),"OutputFormat","uniform");
+%     d = convertvars(d,idx,"single");
+%     idx = varfun(@(d) isnumeric(d)||islogical(d),d(1,:),"OutputFormat","uniform");
+%     d = convertvars(d,idx,"gpuArray");
+%     nVars = gpuArray(nVars);
+%     varSz = gpuArray(varSz);
+% end
 
 % Get datatip template
 if o.visible
@@ -107,8 +106,8 @@ end
 % Get axis
 ax = isgraphics(h,'axes');
 if ~nnz(ax)
-    h(end+1)=gca;
-    ax=height(h);
+    h(end+1) = gca;
+    ax = height(h);
 end
 
 
@@ -130,19 +129,18 @@ if nnz(o.pullF)
 end
 
 %% Plot electrodes
-if o.parallel
-    hEEG = gobjects(nChs,1);
-    if o.doGPU; warning("parfor not recommended for GPU, use arrayfun instead"); end
+hEEG = gobjects(nChs,1);
+if o.parallel && ~o.doGPU
     parfor e = 1:nChs
-        hEEG(e) = plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV); %#ok<PFBNS>
+        hEEG(e) = plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
     end
 else
-    d = table2struct(d);
-    hEEG = arrayfun(@(de) plotCh_lfn(de,h(ax),row1,dataTipVars,nVars,varSz,alignV),d);
+    for e = 1:nChs
+        hEEG(e) = plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
+    end
+    %d = table2struct(d);
+    %hEEG = arrayfun(@(de) plotCh_lfn(de,h(ax),row1,dataTipVars,nVars,varSz,alignV),d);
 end
-%for e = 1:nChs
-%    hEEG(e) = plotCh_lfn(d(e,:),h(ax),visible,row1,nVars,varSz,alignV);
-%end
 
 % Return graphics array
 h = [h;hEEG];

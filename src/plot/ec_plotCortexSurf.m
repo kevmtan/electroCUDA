@@ -155,7 +155,9 @@ hCort = trisurf(cort,'FaceVertexCData',curvCol,'Parent',h(ax));
 alpha(o.opacity); % set cortex opacity
 
 % Axis properties
-set(h(ax),'Position',o.insPos); axis tight; axis equal; axis off; 
+if ~isa(h(ax).Parent,'matlab.graphics.layout.TiledChartLayout')
+    set(h(ax),'Position',o.insPos); end
+axis tight; axis equal; axis off;
 hold on; rotate3d on;
 
 % Optimize lighting

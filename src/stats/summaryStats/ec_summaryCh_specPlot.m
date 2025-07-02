@@ -1,32 +1,32 @@
 % Run spec plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ec_summaryCh_specPlot(o,ss,xe,xhe,fAvg,B,trialNfo)
+% o.oP.visible=1; o.oP.save=0; o.oP.doGPU=0;
 
 % Load
-[ns,chNfo] = ec_loadSbj(o.dirs,sfx=a.sfx+"s",vars=["n" "chNfo"]);
+[ns,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx+"s",vars=["n" "chNfo"]);
 sbjID = ns.sbjID;
-if nargin<=1
+
+% Load summary stats
+if ~exist("ss","var")
     fn = o.dirOut+"s"+sbjID+"_"+o.name+".mat";
     load(fn,"ss"); disp("LOADED: "+fn);
+end
 
+% Load plot data
+if ~exist("xe","var")
     fn = o.dirOut+"plot_s"+sbjID+".mat";
     load(fn,"xe","xhe","fAvg","B","trialNfo"); disp("LOADED: "+fn);
 end
 
-%% Prep
-doICA = a.ICA;
-sbj = ns.sbj;
-
-% Get plot options & electrode plotting data
-[o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,ns,B,chNfo,doICA);
-o.oP.freqs = ns.freqs;
-% oP.visible=1; oP.save=0; oP.doGPU=0;
+%% Get plot options & electrode plotting data
+[o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,ns,chNfo,trialNfo);
 
 %% Parfor loop across channels/ICs
 try parpool('Processes'); catch; end
 parfor ch = 1:nChs
     % Load channel/IC info
     dCh = d;
-    if doICA; dCh.wts(dCh.ica) = icWts(ch,:); end
+    if o.ICA; dCh.wts(dCh.ica) = icWts(ch,:); end %#ok<PFBNS>
 
     % Load EEG stats/recordings
     xN = xNfo(ch,:);
@@ -34,17 +34,17 @@ parfor ch = 1:nChs
     fCh = squeeze(fAvg(:,ch,:));
     vars = string(sc.Properties.VariableNames);
     if any(vars=="ms"); sc.ms{1}.latency = sc.ms{1}.bin2; end
-    if any(vars=="RT"); sc.RT{1}.latency = sc.RT{1}.binRT; end
+    if any(vars=="RT"); sc.RT{1}.latency = sc.RT{1}.binRT2; end
     if any(vars=="pct"); sc.pct{1}.latency = sc.pct{1}.pct2; end
     xCh = squeeze(xe(:,ch,:));
     xhCh = squeeze(xhe(:,ch,:));
 
     %% Plot function
-    spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,sbj,xN);
+    spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,xN);
 end
 
 %% Delete plot data
-if ~a.test
+if ~o.test
     fn = o.dirOut+"plot_s"+sbjID+".mat";
     delete(fn(:)); disp("DELETED: "+fn);
 end
@@ -52,27 +52,21 @@ end
 
 
 
-% Plot spec chans/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,sbj,xN)
-warning('off','MATLAB:handle_graphics:Layout:NoPositionSetInTiledChartLayout');
+%% Main within-ch plot subfunction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,xN)
+%warning('off','MATLAB:handle_graphics:Layout:NoPositionSetInTiledChartLayout');
 
 % Channel plot data
-[o,dCh,sbjCh,hemN] = getElecPlotData_lfn(o,dCh,xN);
+[dCh,hemN,ch,sbjCh] = getElecPlotData_lfn(o,dCh,xN);
 
-% 
-nConds = numel(o.conds);
+%
+conds = o.conds;
+nConds = numel(conds);
 oP = o.oP;
-conds = oP.conds;
-conds2 = oP.conds2;
-%lats = oP.lats;
-lats5 = oP.lats5;
 
 %% Initialize figure
-if ~o.save
-    h = figure('Position',[0 0 1920 1080],'color','white','MenuBar','none','ToolBar','none');
-else
-    h = figure('Position',[0 0 1920 1080],'color','white','MenuBar','none','ToolBar','none','Visible','off');
-end
+% h = figure('Position',[0 0 1920 1080],'Theme','light','color','white','MenuBar','none','ToolBar','none');
+h = figure('Position',[0 0 1920 1080],'Theme','light','color','white','MenuBar','none','ToolBar','none','Visible','off');
 hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','tight');
 
 %% Legends
@@ -90,7 +84,7 @@ hold on
 for c = 1:nConds
     plot(0,0,'o','Color',oP.col(c,:),'LineWidth',8);
 end
-lgd = legend(conds2,"FontSize",oP.textsize+4,"Location","southeast","AutoUpdate","off");
+lgd = legend(conds,"FontSize",oP.textsize+4,"Location","southeast","AutoUpdate","off");
 title(lgd,"Condition"); axis off; hold off;
 
 % Z-score colorbar
@@ -98,58 +92,58 @@ colormap(oP.cmap); clim(oP.clim);
 lgd = colorbar(gca,"west","FontSize",oP.textsize+2); lgd.Label.String = "z-score";
 
 %% Total average spectral magnitude
-frqTicks = 3:10:numel(oP.freqs);
-frqDisp = string(round(oP.freqs(frqTicks)));
+frqTicks = 3:10:numel(o.freqs);
+frqDisp = string(round(o.freqs(frqTicks)));
 nexttile; hold on
 for c = 1:nConds
     plot(squeeze(fCh(c,:)),'LineWidth',2,'Color',oP.col(c,:));
 end
 hold off
-xticks(frqTicks); xticklabels(frqDisp); xlim([1 numel(oP.freqs)])
+xticks(frqTicks); xticklabels(frqDisp); xlim([1 numel(o.freqs)])
 set(gca,'Fontsize',oP.textsize); ylabel("Magnitude");
 title("Spectrum (1-300Hz)","FontSize",oP.textsize+2);
 
 %% LFP single-trial
 for c = 1:nConds
     nexttile;
-    plotSingleTrials_lfn(xCh(:,trialNfo.cond==conds(c))',lats5, oP.textsize);
+    plotSingleTrials_lfn(xCh(:,trialNfo.cond==conds(c))',o.lats5,oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials: LFP","FontSize",oP.textsize+2)
+    title(conds(c)+" trials: LFP","FontSize",oP.textsize+2)
     if c==1; xlabel("Latency (ms)"); ylabel("Trials by RT"); end
 end
 
 %% Plot lateral electrodes on native cortex
-plotElecs_lfn(o,hl,hemN,dCh,sbj,oP,"lateral")
+plotElecs_lfn(o,hl,hemN,dCh,ch,"lateral")
 
 %% HFB single-trial
 for c = 1:nConds
     nexttile;
-    plotSingleTrials_lfn(xhCh(:,trialNfo.cond==conds(c))',lats5, oP.textsize);
+    plotSingleTrials_lfn(xhCh(:,trialNfo.cond==conds(c))',o.lats5,oP.textsize);
     clim(oP.clim);
-    title(conds2(c)+" trials: "+B.disp(B.name=="hfb"),"FontSize",oP.textsize+2);
+    title(conds(c)+" trials: "+B.disp(B.name=="hfb"),"FontSize",oP.textsize+2);
     if c==1; xlabel("Latency (ms)"); ylabel("Trials by RT"); end
 end
 
 %% Plot medial electrodes on native cortex
-plotElecs_lfn(o,hl,hemN,dCh,sbj,oP,"medial")
+plotElecs_lfn(o,hl,hemN,dCh,ch,"medial")
 
 %% ERSP
 scM = sc.ms{:};
 for c = 1:nConds
     nexttile
-    idx = ismember(scM.cond,conds2(c)); % & sc.latency>=-200 & sc.latency<=5000;
+    idx = ismember(scM.cond,conds(c)); % & sc.latency>=-200 & sc.latency<=5000;
     imagesc(scM.x(idx,:)','XData',scM.latency(idx,:)');
     yticks(frqTicks); yticklabels(frqDisp);
     set(gca,'FontSize',oP.textsize,'YDir','normal','color',[1 1 1]);
     colormap(flip(cbrewer2('RdBu'))); clim(oP.clim);
-    title(conds2(c)+": ERSP","FontSize",oP.textsize+2);
+    title(conds(c)+": ERSP","FontSize",oP.textsize+2);
     if c==1; xlabel("Latency (ms)"); ylabel("Frequency (Hz)"); end
 end
 
 %% Stim-locked avg
 for c = 1:height(B)
     nexttile;
-    plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
+    plotFrameAvg_lfn(sc.ms{1},B.name(c),conds,oP);
     set(gca,'FontSize',oP.textsize);
     title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize+2);
     if c==1; xlabel("Latency (ms)"); ylabel("z-score"); end
@@ -162,7 +156,7 @@ end
 %% RT-locked avg
 for c = 1:height(B)
     nexttile;
-    plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
+    plotFrameAvg_lfn(sc.RT{1},B.name(c),conds,oP);
     set(gca,'FontSize',oP.textsize);
     title("RT latency:  "+B.disp(c),'FontSize',oP.textsize+2);
     if c==1; xlabel("RT - Latency (ms)"); ylabel("z-score"); end
@@ -173,34 +167,33 @@ for c = 1:height(B)
 end
 
 %% Save fig
-if o.save
-    fn = o.dirOutSbj+sbjCh+"_spec.jpg";
-    exportgraphics(hl,fn,"Resolution",150);
-    disp("SAVED: "+fn);
-    close all
+fn = o.dirOutSbj+sbjCh+"_spec.jpg";
+exportgraphics(hl,fn,"Resolution",150);
+disp("SAVED: "+fn);
+close all; % IMPORTANT I guess
 end
-end
+
 
 
 %% Plot Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Make plot options & channel plotting data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,n,B,chNfo)
+function [o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,n,chNfo,trialNfo)
+
+o.conds = string(unique(trialNfo.cond));
+o.freqs = n.freqs;
 
 % Add to plot options
-o.oP.lats = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:o.stats.epoch(2))))';
-o.oP.lats5 = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:5)))';
-o.oP.latsRT = int16(floor(1000*(o.stats.epochRT(1):o.epoch.bin2:o.stats.epochRT(2))))';
-o.oP.conds = o.conds;
-o.oP.conds2 = o.conds2;
-o.oP.B = B;
-o.oP.dirOutSbj = o.dirOutSbj;
-o.oP.dirFS = o.dirFS;
 if nnz(chNfo.ECoG)/height(chNfo) > 0.75
     o.oP.alpha = 0.95;
 else
     o.oP.alpha = 0.25;
 end
+% o.oP.lats = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:o.stats.epoch(2))))';
+% o.oP.lats5 = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:5)))';
+% o.oP.latsRT = int16(floor(1000*(o.stats.epochRT(1):o.epoch.bin2:o.stats.epochRT(2))))';
+% o.oP.dirOutSbj = o.dirOutSbj;
+% o.oP.dirFS = o.dirFS;
 
 % Make ch plotting data table
 d = table;
@@ -212,8 +205,9 @@ d.sz(:) = 2;
 d.bSz(:) = 1;
 d.col(:,1:3) = 0;
 d.bCol(:,1:3) = 0;
-d.MNI = chNfo.MNI;
-d.pialRAS = chNfo.pialRAS;
+% d.MNI = chNfo.MNI;
+% d.pialRAS = chNfo.pialRAS;
+d.pos = chNfo.pialRAS;
 d.order(:) = nan;
 if o.ICA
     if o.sfx=="i"; sfx1=""; else; sfx1="_"+o.sfx; end
@@ -237,7 +231,7 @@ end
 
 
 % Get electrode plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [o,dCh,sbjCh,hemN] = getElecPlotData_lfn(o,dCh,xN)
+function [dCh,hemN,ch,sbjCh] = getElecPlotData_lfn(o,dCh,xN)
 if o.ICA
     % Color by ICA weights
     %dCh.wts = normalize(dCh.wts,"range",oP.climICA);
@@ -259,22 +253,18 @@ else
     dCh.order = dCh.ch;
     dCh.order(ch) = Inf;
 end
-o.ch = ch;
-o.sbjCh = sbjCh;
-dCh(ismember(dCh.pialRAS(:,1),[0 nan]),:) = [];
+dCh(ismember(dCh.pos(:,1),[0 nan]),:) = [];
 dCh = sortrows(dCh,'order','ascend');
 end
 
 
 % Plot electrodes %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,medial) 
-if nargin<7; medial=""; end
+function plotElecs_lfn(o,hl,hemN,dCh,ch,medial) 
 %if a.type=="hfb"; span=5; else; span=[1 2]; end
 span = [1 2];
-dCh.pos = dCh.pialRAS;
 
 % Hemisphere
-hem = dCh.hem(dCh.ch==a.ch);
+hem = dCh.hem(dCh.ch==ch);
 if ~ismember(hem,["L" "R"]) % If no hemisphere
     hem = [dCh.hem=="L" dCh.hem=="R"];
     if hem(2)>hem(1)
@@ -289,14 +279,14 @@ if ismember(medial,["lateral" ""])
     if nnz(hemN)>1
         % Left
         plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) &...
-            dCh.hem~="R",:),"latero-anterior","pial",sbj,oP,hem);
+            dCh.hem~="R",:),"latero-anterior","pial",o,hem);
 
         % Right
         plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["lateral" "both"]) &...
-            dCh.hem~="L",:),"latero-anterior","pial",sbj,oP,hem);
+            dCh.hem~="L",:),"latero-anterior","pial",o,hem);
     else
         plotCortex_lfn(nexttile(hl,span),dCh(ismember(dCh.lat,["lateral" "both"]),:),...
-            "lateral","pial",sbj,oP,hem);
+            "lateral","pial",o,hem);
     end
 end
 
@@ -306,23 +296,23 @@ if ismember(medial,["medial" ""])
     if nnz(hemN)>1
         % Left
         plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) &...
-            dCh.hem~="R",:),"medio-posterior","pial",sbj,oP,hem);
+            dCh.hem~="R",:),"medio-posterior","pial",o,hem);
 
         % Right
         plotCortex_lfn(nexttile(hl),dCh(ismember(dCh.lat,["medial" "both"]) &...
-            dCh.hem~="L",:),"medio-posterior","pial",sbj,oP,hem);
+            dCh.hem~="L",:),"medio-posterior","pial",o,hem);
     else
         plotCortex_lfn(nexttile(hl,span),dCh(ismember(dCh.lat,["medial" "both"]),:),...
-            "medial","pial",sbj,oP,hem);
+            "medial","pial",o,hem);
     end
 end
 end
 
 
 % Plot cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCortex_lfn(h,dCh,lat,surf,sbj,oP,hem)
-ec_plotCortex(hem,lat,dCh,sbj=sbj,sbjDir=oP.dirFS,surfType=surf,...
-    visible=oP.visible,opacity=oP.alpha,doGPU=oP.doGPU,h=h,...
+function plotCortex_lfn(h,dCh,lat,surf,o,hem)
+ec_plotCortex(hem,lat,dCh,sbj=o.dirs.sbj,sbjDir=o.dirFS,surfType=surf,...
+    visible=o.oP.visible,opacity=o.oP.alpha,doGPU=o.oP.doGPU,h=h,...
     save=0,flip=0,pullF=15,parallel=0);
 end
 
@@ -336,51 +326,10 @@ colormap(flip(cbrewer2('RdBu')));
 end
 
 
-% Plot averaged timecourses per condition %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCondAvg_lfn(B,sc,oP)
-for c = 1:height(B)
-    % Stim-locked
-    nexttile;
-    plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
-    set(gca,'FontSize',oP.textsize);
-    title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize);
-    xlabel("Latency (ms)",'FontSize',oP.textsize);
-    if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize);  end
-    hold on
-    plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
-    plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
-    hold off
-
-    % RT-locked
-    nexttile;
-    plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
-    set(gca,'FontSize',oP.textsize);
-    title("RT latency:  "+B.disp(c),'FontSize',oP.textsize);
-    xlabel("RT - Latency (ms)",'FontSize',oP.textsize);
-    hold on
-    plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
-    plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
-    hold off
-
-    % Percent RT
-    nexttile;
-    plotFrameAvg_lfn(sc.pct{1},B.name(c),oP);
-    set(gca,'FontSize',oP.textsize);
-    title("RT percent:  "+B.disp(c),'FontSize',oP.textsize);
-    xlabel("Latency/RT (%)",'FontSize',oP.textsize);
-    hold on
-    plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
-    plot([100 100],ylim,'k-','LineWidth',oP.o1D.width);
-    plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
-    hold off
-end
-end
-
-
 % Plot averaged timecourses %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotFrameAvg_lfn(dat,band,oP)
+function plotFrameAvg_lfn(dat,band,conds,oP)
 warning('off','MATLAB:Figure:UnableToSetRendererToOpenGL');
-nConds = numel(oP.conds2);
+nConds = numel(conds);
 
 lats = unique(dat.latency)';
 lats = repmat(lats,nConds,1);
@@ -388,7 +337,7 @@ y = nan(nConds,length(lats));
 ySE = y;
 %ySig = y;
 for c = 1:nConds
-    cond = oP.conds2(c);
+    cond = conds(c);
     idxP = ismember(dat.latency,lats(c,:)) & dat.cond==cond;
     idx = ismember(lats(c,:),dat.latency(idxP));
     y(c,idx) = dat.(band)(idxP)';
@@ -397,3 +346,44 @@ end
 mseb(lats,y,ySE,oP.o1D,1); axis tight
 set(gca,'fontsize',oP.textsize);
 end
+
+
+% % Plot averaged timecourses per condition %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function plotCondAvg_lfn(B,sc,oP)
+% for c = 1:height(B)
+%     % Stim-locked
+%     nexttile;
+%     plotFrameAvg_lfn(sc.ms{1},B.name(c),oP);
+%     set(gca,'FontSize',oP.textsize);
+%     title("Stim latency:  "+B.disp(c),'FontSize',oP.textsize);
+%     xlabel("Latency (ms)",'FontSize',oP.textsize);
+%     if c==1; ylabel("Magnitude (z)",'FontSize',oP.textsize);  end
+%     hold on
+%     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
+%     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
+%     hold off
+% 
+%     % RT-locked
+%     nexttile;
+%     plotFrameAvg_lfn(sc.RT{1},B.name(c),oP);
+%     set(gca,'FontSize',oP.textsize);
+%     title("RT latency:  "+B.disp(c),'FontSize',oP.textsize);
+%     xlabel("RT - Latency (ms)",'FontSize',oP.textsize);
+%     hold on
+%     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
+%     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
+%     hold off
+% 
+%     % Percent RT
+%     nexttile;
+%     plotFrameAvg_lfn(sc.pct{1},B.name(c),oP);
+%     set(gca,'FontSize',oP.textsize);
+%     title("RT percent:  "+B.disp(c),'FontSize',oP.textsize);
+%     xlabel("Latency/RT (%)",'FontSize',oP.textsize);
+%     hold on
+%     plot([0 0],ylim,'k-','LineWidth',oP.o1D.width);
+%     plot([100 100],ylim,'k-','LineWidth',oP.o1D.width);
+%     plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
+%     hold off
+% end
+% end

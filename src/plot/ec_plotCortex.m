@@ -75,9 +75,9 @@ arguments
     a.opacity {isnumeric} = []
     a.figPos {isnumeric} = []
     a.insPos {isnumeric} = []
-    a.align logical = []
-    a.parallel logical = []
-    a.visible logical = []
+    a.align logical = false
+    a.parallel logical = false
+    a.visible logical = false
     a.save logical = false
     a.pullF {isnumeric} = 15
     a.flip logical = false
@@ -210,7 +210,7 @@ for i = 1:numel(hems)
         
 
         % Collate figure handles
-        if numel(hems)==1 && numel(views)==1 || isgraphics(h)
+        if isscalar(hems) && isscalar(views) || isgraphics(h)
             h = hi;
         else
             h.(fn) = hi;

@@ -1,4 +1,4 @@
-function hLight = locView(theta,phi,o,hAx)
+function hLight = ec_locView(theta,phi,o,hAx)
 % function loc_view(axis,theta,phi,lightProperties) 
 % this function orients the brain and always puts the lighting behind you
 % theta and phi are in degrees, not radians
