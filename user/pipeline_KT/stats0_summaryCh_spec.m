@@ -5,7 +5,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-% sbjs="S12_38_LK"; sbjs="S12_42_NC";
+% s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC";
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -52,7 +52,7 @@ o.bandsF = [1 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
 o.pre.double = true;
 o.pre.singleOut = true;
 o.pre.gpu = false; % CPU appears faster
-o.pre.hzTarg = nan; % Target sampling rate
+o.pre.hzTarg = 100; % Target sampling rate
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = "robust"; % Normalize trial
@@ -124,14 +124,14 @@ if ~exist('logs','var')
     logs.i{2} = logs.i{1};
 end
 
-statusFn = dirs.anal+"summary/logs/"+date+"_"+...
+logsFn = dirs.anal+"summary/logs/"+date+"_"+...
     string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'))+"_log.mat";
 
 
 %% Run sum stats %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for s = 1:height(status)
+for s = 1:height(logs.i{1})
     for ii = 1:2 %:2 %1 %:2
-        if logs.i{ii}.stats(s,ii)~=1  % s=1; ii=1;
+        if logs.i{ii}.stats(s)~=1  % s=1; ii=1;
             sbj = logs.i{ii}.sbj(s);
             o.name = logs.name(ii);
             o.ICA = logs.ICA(ii);
@@ -139,7 +139,7 @@ for s = 1:height(status)
             %%
             try
                 disp("STARTING SUMMARY PLOTS: "+sbj);
-                logs.i{ii}.o{s} = ec_summaryCh_spec(sbj,proj,task,o,plot=0);
+                logs.i{ii}.o{s} = ec_summaryCh_spec(sbj,proj,task,o);
                 logs.i{ii}.stats(s) = 1;
             catch ME; getReport(ME)
                 logs.i{ii}.error{s} = ME;
@@ -147,8 +147,8 @@ for s = 1:height(status)
             end
 
             %%
-            logs.i{ii}.time(s,ii) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(statusFn,'status','date','-v7');
+            logs.i{ii}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(logsFn,'logs','date','-v7');
         else
             disp("SKIPPING: "+o.name);
         end
@@ -181,7 +181,7 @@ for s = 1:height(status)
 
             %%
             logs.i{ii}.time(s,ii) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(statusFn,'status','date','-v7');
+            save(logsFn,'status','date','-v7');
         else
             disp("SKIPPING PLOTS: "+o.name);
         end

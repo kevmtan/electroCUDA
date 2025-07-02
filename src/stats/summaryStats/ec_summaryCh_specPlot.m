@@ -1,11 +1,11 @@
 % Run spec plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function ec_summaryCh_specPlot(a,o,dirs,ss,xe,xhe,fAvg,B,trialNfo)
+function ec_summaryCh_specPlot(o,ss,xe,xhe,fAvg,B,trialNfo)
+
 % Load
-[ns,chNfo] = ec_loadSbj(dirs,sfx=a.sfx+"s",vars=["n" "chNfo"]);
+[ns,chNfo] = ec_loadSbj(o.dirs,sfx=a.sfx+"s",vars=["n" "chNfo"]);
 sbjID = ns.sbjID;
-if nargin<=3
-    if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
-    else; fn=o.dirOut+"s"+sbjID+"_chSumStats_"+o.name+".mat"; end
+if nargin<=1
+    fn = o.dirOut+"s"+sbjID+"_"+o.name+".mat";
     load(fn,"ss"); disp("LOADED: "+fn);
 
     fn = o.dirOut+"plot_s"+sbjID+".mat";
@@ -17,8 +17,8 @@ doICA = a.ICA;
 sbj = ns.sbj;
 
 % Get plot options & electrode plotting data
-[d,oP,xNfo,nChs,icWts] = mk_oP_chDat(a,o,ns,B,chNfo,doICA);
-oP.freqs = ns.freqs;
+[o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,ns,B,chNfo,doICA);
+o.oP.freqs = ns.freqs;
 % oP.visible=1; oP.save=0; oP.doGPU=0;
 
 %% Parfor loop across channels/ICs
@@ -40,7 +40,7 @@ parfor ch = 1:nChs
     xhCh = squeeze(xhe(:,ch,:));
 
     %% Plot function
-    spec_plotChan(a,sc,xCh,xhCh,dCh,fCh,trialNfo,B,oP,sbj,xN);
+    spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,sbj,xN);
 end
 
 %% Delete plot data
@@ -53,19 +53,22 @@ end
 
 
 % Plot spec chans/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function spec_plotChan(a,sc,xCh,xhCh,dCh,fCh,trialNfo,B,oP,sbj,xN)
+function spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,sbj,xN)
 warning('off','MATLAB:handle_graphics:Layout:NoPositionSetInTiledChartLayout');
-nConds = numel(oP.conds);
+
+% Channel plot data
+[o,dCh,sbjCh,hemN] = getElecPlotData_lfn(o,dCh,xN);
+
+% 
+nConds = numel(o.conds);
+oP = o.oP;
 conds = oP.conds;
 conds2 = oP.conds2;
 %lats = oP.lats;
 lats5 = oP.lats5;
 
-% Channel plot data
-[dCh,sbjCh,hemN,a] = getElecPlotData_lfn(a,dCh,oP,xN);
-
 %% Initialize figure
-if ~oP.save
+if ~o.save
     h = figure('Position',[0 0 1920 1080],'color','white','MenuBar','none','ToolBar','none');
 else
     h = figure('Position',[0 0 1920 1080],'color','white','MenuBar','none','ToolBar','none','Visible','off');
@@ -74,7 +77,7 @@ hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','tight');
 
 %% Legends
 nexttile;
-if a.ICA % Chan name
+if o.ICA % Chan name
     text(1,1,sbjCh+" ("+xN.order+")",Interpreter='none',Units='normalized',FontSize=20,...
         HorizontalAlignment='right',VerticalAlignment='top');
 else
@@ -116,7 +119,7 @@ for c = 1:nConds
 end
 
 %% Plot lateral electrodes on native cortex
-plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,"lateral")
+plotElecs_lfn(o,hl,hemN,dCh,sbj,oP,"lateral")
 
 %% HFB single-trial
 for c = 1:nConds
@@ -128,7 +131,7 @@ for c = 1:nConds
 end
 
 %% Plot medial electrodes on native cortex
-plotElecs_lfn(a,hl,hemN,dCh,sbj,oP,"medial")
+plotElecs_lfn(o,hl,hemN,dCh,sbj,oP,"medial")
 
 %% ERSP
 scM = sc.ms{:};
@@ -170,8 +173,8 @@ for c = 1:height(B)
 end
 
 %% Save fig
-if oP.save
-    fn = oP.dirOutSbj+sbjCh+"_spec.jpg";
+if o.save
+    fn = o.dirOutSbj+sbjCh+"_spec.jpg";
     exportgraphics(hl,fn,"Resolution",150);
     disp("SAVED: "+fn);
     close all
@@ -182,22 +185,21 @@ end
 %% Plot Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Make plot options & channel plotting data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [d,oP,xNfo,nChs,icWts] = mk_oP_chDat(a,o,n,B,chNfo,doICA)
+function [o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,n,B,chNfo)
 
 % Add to plot options
-oP = o.oP;
-oP.lats = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:o.stats.epoch(2))))';
-oP.lats5 = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:5)))';
-oP.latsRT = int16(floor(1000*(o.stats.epochRT(1):o.epoch.bin2:o.stats.epochRT(2))))';
-oP.conds = o.conds;
-oP.conds2 = o.conds2;
-oP.B = B;
-oP.dirOutSbj = o.dirOutSbj;
-oP.dirFS = o.dirFS;
+o.oP.lats = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:o.stats.epoch(2))))';
+o.oP.lats5 = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:5)))';
+o.oP.latsRT = int16(floor(1000*(o.stats.epochRT(1):o.epoch.bin2:o.stats.epochRT(2))))';
+o.oP.conds = o.conds;
+o.oP.conds2 = o.conds2;
+o.oP.B = B;
+o.oP.dirOutSbj = o.dirOutSbj;
+o.oP.dirFS = o.dirFS;
 if nnz(chNfo.ECoG)/height(chNfo) > 0.75
-    oP.alpha = 0.95;
+    o.oP.alpha = 0.95;
 else
-    oP.alpha = 0.25;
+    o.oP.alpha = 0.25;
 end
 
 % Make ch plotting data table
@@ -213,8 +215,8 @@ d.bCol(:,1:3) = 0;
 d.MNI = chNfo.MNI;
 d.pialRAS = chNfo.pialRAS;
 d.order(:) = nan;
-if a.ICA
-    if a.sfx=="i"; sfx1=""; else; sfx1="_"+a.sfx; end
+if o.ICA
+    if o.sfx=="i"; sfx1=""; else; sfx1="_"+o.sfx; end
     d.ica = chNfo.("ica"+sfx1);
     d.wts(:) = nan;
     d.sz(~d.ica) = 2;
@@ -223,7 +225,7 @@ end
 
 % Get IC/chan info
 nChs = n.xChs;
-if doICA
+if o.ICA
     nChs = n.nICs;
     xNfo = n.icNfo;
     icWts = zscore(n.ica.winv',1,'all');
@@ -235,12 +237,12 @@ end
 
 
 % Get electrode plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [dCh,sbjCh,hemN,a] = getElecPlotData_lfn(a,dCh,oP,xN)
-if a.ICA
+function [o,dCh,sbjCh,hemN] = getElecPlotData_lfn(o,dCh,xN)
+if o.ICA
     % Color by ICA weights
     %dCh.wts = normalize(dCh.wts,"range",oP.climICA);
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
+        ec_colorbarFromValues(dCh.wts,'RdBu',o.oP.climICA,zscore=o.oP.climICA_z);
     ch = xN.ic;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
@@ -257,8 +259,8 @@ else
     dCh.order = dCh.ch;
     dCh.order(ch) = Inf;
 end
-a.ch = ch;
-a.sbjCh = sbjCh;
+o.ch = ch;
+o.sbjCh = sbjCh;
 dCh(ismember(dCh.pialRAS(:,1),[0 nan]),:) = [];
 dCh = sortrows(dCh,'order','ascend');
 end

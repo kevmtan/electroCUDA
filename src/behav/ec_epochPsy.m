@@ -31,6 +31,15 @@ trs = height(trialNfo);
 ep = cell(trs,1); % trial epochs
 
 
+% Task condition categorical order
+if ~isany(oe.conds2)
+    trialNfo.cond = categorical(trialNfo.cond,oe.conds);
+else % Custom condition names
+    [~,ci] = max(trialNfo.cond==oe.conds,[],2);
+    trialNfo.cond = oe.conds2(ci)';
+    trialNfo.cond = categorical(trialNfo.cond,oe.conds2);
+end
+
 %% Collate frames per trial
 for t = 1:trs
     % Prep
@@ -46,7 +55,7 @@ for t = 1:trs
         elseif cond=="Rest"
             tNfo.iti = tNfo.ons - seconds(0.3);
         end
-        tNfo.idxITI = find(psy.Time==tNfo.iti);
+        tNfo.idxITI = psy.idx(tNfo.iti);
 
         % Extract pre-stim table
         e{1} = psy(timerange(tNfo.iti,tNfo.ons),:);
@@ -87,6 +96,8 @@ for t = 1:trs
     % Latency
     e.latency = seconds(e.Time - tNfo.ons); % relative to stimulus
     e.latRT = seconds(e.Time - tNfo.off); % relative to RT
+    e.latency = round(e.latency*n.hz)/n.hz;
+    e.latRT = round(e.latRT*n.hz)/n.hz;
 
     % Latency percentage
     e.pct(iPre) = normalize(e.latency(iPre),"range",[-10 0-eps]);
@@ -96,9 +107,10 @@ for t = 1:trs
     % REMOVE frames over max latency ('max' argument)
     if ~isnan(oe.max)
         e(e.latency>oe.max,:) = [];
-        tNfo.off = e.Time(end);
-        tNfo.idxOff = e.idx(end);
-        tNfo.durStim = seconds(e.latency(end));
+        iStim = e.stim==tr;
+        tNfo.off = max(e.Time(iStim));
+        tNfo.idxOff = max(e.idx(iStim));
+        tNfo.durStim = range(e.Time(iStim));
     end
     tNfo.durTrial = range(e.Time);
 
@@ -110,7 +122,7 @@ for t = 1:trs
     e.RT(:) = tNfo.RT;
     e.valence(:) = tNfo.valence;
     e.resp(:) = tNfo.resp;
-    %e.noPdio(:) = tNfo.noPdio;
+    e.noPdio(:) = tNfo.noPdio;
 
     % Copy to main
     ep{t} = e;
@@ -147,19 +159,22 @@ end
 % Task condition categorical order
 if ~isany(oe.conds2)
     ep.cond = categorical(ep.cond,oe.conds);
+    trialNfo.cond = categorical(trialNfo.cond,oe.conds);
 else % Custom condition names
     [~,ci] = max(ep.cond==oe.conds,[],2);
     ep.cond = oe.conds2(ci)';
     ep.cond = categorical(ep.cond,oe.conds2);
+    trialNfo.cond = oe.conds2(ci)';
+    trialNfo.cond = categorical(trialNfo.cond,oe.conds2);
 end
 
 % Bin timings
 ep.frame = round(ep.latency*n.hz); % frame within trial
-ep.bin = floor(ep.latency/oe.bin) * oe.bin * 1000;
+ep.bin = round(ep.latency/oe.bin) * oe.bin * 1000;
 ep.bin2 = floor(ep.latency/oe.bin2) * oe.bin2 * 1000;
 ep.pct = floor(ep.pct);
 ep.pct2 = floor(ep.pct/oe.pct2) * oe.pct2;
-ep.binRT = floor(ep.latRT/oe.bin) * oe.bin * 1000;
+ep.binRT = round(ep.latRT/oe.bin) * oe.bin * 1000;
 ep.binRT2 = floor(ep.latRT/oe.bin2) * oe.bin2 * 1000;
 
 % Convert vars
@@ -176,7 +191,7 @@ ep = movevars(ep,["BLpre" "BLpost"],"After","post");
 ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
 
 
-disp("[ec_epochMetadata] Made analysis template: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPsy] Made analysis template: "+n.sbj+" time="+toc(tt));
 
 
 
