@@ -18,7 +18,7 @@ arguments
     oe.conds string = string(unique(psy.cond)) % List of condition names (order by desired categorical order)
     oe.conds2 string = ""                      % List of custom condition names (ordered like 'oe.conds')
     % Epoch baseline period for subsequent processing
-    %   (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
+    %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
     oe.baselinePre {mustBeFloat} = [] % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
     oe.baselinePost {mustBeFloat} = [] % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
 end
@@ -125,7 +125,9 @@ ep = vertcat(ep{:});
 ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "idr"]) = [];
 
 % Label pre-stimulus baseline frames
-if isany(oe.baselinePre)
+if abs(oe.baselinePre)==inf
+    ep.BLpre = ep.pre>0;
+elseif isany(oe.baselinePre)
     if isscalar(oe.baselinePre)
         ep.BLpre = -abs(oe.baselinePre)<=ep.latency & ep.pre;
     elseif numel(oe.baselinePre)==2
@@ -136,11 +138,13 @@ else
 end
 
 % Label post-stimulus baseline frames
-if isany(oe.baselinePost)
+if abs(oe.baselinePost)==inf
+    ep.BLpost = ep.post>0;
+elseif isany(oe.baselinePost)
     if isscalar(oe.baselinePost)
-        ep.BLpre = oe.baselinePost<=ep.latency & ep.post;
+        ep.BLpost = oe.baselinePost<=ep.latency & ep.post;
     elseif numel(oe.baselinePost)==2
-        ep.BLpre = oe.baselinePost(1)<=ep.latency & ep.latency<oe.baselinePost(2);
+        ep.BLpost = oe.baselinePost(1)<=ep.latency & ep.latency<oe.baselinePost(2);
     end
 else
     ep.BLpost(:) = false;

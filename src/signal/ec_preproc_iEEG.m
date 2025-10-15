@@ -80,7 +80,7 @@ blocks=arg.blocks; dirs=arg.dirs;
 % if ~isfield(o,'doBadFrames');   o.doBadFrames=true; end  % true/false
 % if ~isfield(o,'thrMAD');        o.thrMAD=10; end       % Z-threshold relative to all data points to exclude timepoints
 % if ~isfield(o,'thrDiff');       o.thrDiff=10; end      % Z-threshold for amplitude differences of consecutive timepoints
-% if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq spikes
+% if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq spikes; Sensor-specific noise thresh (try 5)
 % % % Interpolate bad channels
 % % if ~isfield(o,'interpolateCh');    o.interpolateCh=false; end % true/false
 % % % Detect outliers: spatiotemporal covariance (slow, often unecessary!)

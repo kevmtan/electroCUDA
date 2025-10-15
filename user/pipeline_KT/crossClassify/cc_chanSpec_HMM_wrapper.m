@@ -6,26 +6,26 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 % s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
-%sbjs="S12_42_NC";
 
 proj = "lbcn";
 task = "MMR"; % task name
-analFolder = "summary";
-analName = "spec";
+analFolder = "classifySpec";
+analName = "ccHMM";
 
 dirs = ec_getDirs(proj,task);
 o = struct;
 
 %% Options
 o.name = ""; % fill later
-o.sfx = "";
+o.sfx = "s";
 o.test = false;
 o.gpu = false;
 o.plot = true;
 
 % All Conditions
 o.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
-o.conds2 = []; % custom condition names
+o.condsClassify = ["Episodic" "Semantic"];
+o.condsCross = ["Other" "Self"];
 
 % Epoching (see 'ec_epochPsy')
 o.epoch.float = "single";
@@ -43,11 +43,10 @@ o.epoch.baselinePre = -0.2; % Pre-stimulus baseline (secs from stim onset); -.2s
 o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
 
 % Frequency bands
-o.freqIdx = []; %[1 14 20:4:83];
-o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band name
-o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
-o.bandsF = [1 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2"]; % Band name
+o.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)"]; % Band display name
+o.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301]; % Band limits
 
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
@@ -56,9 +55,9 @@ o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as in
 o.pre.hzTarg = 100; % Target sampling rate
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "zscore"; % Normalize trial
-o.pre.trialNormDev = "off"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
+o.pre.trialNorm = "robust"; % Normalize trial
+o.pre.trialNormByBaseline = true; % Divide trial by baseline norm (false = divide my all-trial norm)
+o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear";
 o.pre.badFields = ""; % ["hfo" "mad" "diff" "sns"]
@@ -112,6 +111,8 @@ if ~exist('logs','var')
     logs.name(1) = date+"_ch_"+analName;
     logs.name(2) = date+"_ic_"+analName;
     logs.ICA = [false;true];
+    logs.out(1) = dirs.anal+analFolder+filesep+logs.name(1)+filesep;
+    logs.out(2) = dirs.anal+analFolder+filesep+logs.name(2)+filesep;
 
     logs.i{1} = table;
     logs.i{1}.sbj = string(sbjs);
@@ -123,48 +124,40 @@ if ~exist('logs','var')
     logs.i{1}.error = cell(numel(sbjs),1);
 
     logs.i{2} = logs.i{1};
-
-    for p = 1:2
-        logs.out(p) = dirs.anal+analFolder+filesep+logs.name(p)+filesep;
-        logs.out(p) = dirs.anal+analFolder+filesep+logs.name(p)+filesep;
-        logs.fn(p) = logs.out(p)+"log_"+startTime+".mat";
-        mkdir(logs.out(p));
-    end
 end
 
 
 %% Run sum stats %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-try delete(gcp("nocreate")); catch;end
-try parpool("threads"); catch;end
 for s = 1:height(logs.i{1})
-    for p = 1:2 %:2 %1 %:2
-        if logs.i{p}.stats(s)~=1  % s=1; ii=1;
+    for ii = 1:2 %:2 %1 %:2
+        if logs.i{ii}.stats(s)~=1  % s=1; ii=1;
             % Set options struct per subject
-            o.name = logs.name(p);  
-            o.ICA = logs.ICA(p);
+            o.name = logs.name(ii);  
+            o.ICA = logs.ICA(ii);
+            if o.ICA; o.sfx = "i"+o.sfx; end
 
-            sbj = logs.i{p}.sbj(s);
+            sbj = logs.i{ii}.sbj(s);
             dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
             o.dirs = dirs;
             o.dirIn = dirs.procSbj; %
             o.dirFS = dirs.fsSbj; % Freesurfer subjects dir
-            o.dirOut = logs.out(p);
-            o.dirOutSbj = o.dirOut+"s"+dirs.sbjID+filesep;    
-            
-            %%
+            o.dirOut = logs.out(ii);
+            o.dirOutSbj = o.dirOut+filesep+"s"+dirs.sbjID+filesep;    
+            logsFn = logs.out(ii)+"log_"+startTime+".mat";
+
+            %% Run
             try
-                disp("STARTING SUMMARY STATS: "+sbj);
-                logs.i{p}.o{s} = ec_summaryCh_spec(sbj,proj,task,o);
-                logs.i{p}.stats(s) = 1;
+                disp("STARTING "+logs.name(ii)+": "+sbj);
+                logs.i{ii}.o{s} = ec_classifyChSpec_HMM(sbj,proj,task,o);
+                logs.i{ii}.stats(s) = 1;
             catch ME; getReport(ME)
-                logs.i{p}.error{s} = ME;
-                logs.i{p}.stats(s) = 0;
+                logs.i{ii}.error{s} = ME;
+                logs.i{ii}.stats(s) = 0;
             end
 
-            %%
-            logs.i{p}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(logs.fn(p),'logs','-v7');
-
+            %% Save
+            logs.i{ii}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(logsFn,'logs','logsFn','-v7');
         else
             disp("SKIPPING: "+o.name);
         end
@@ -174,29 +167,27 @@ end
 
 
 %% Run plotting %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-try delete(gcp("nocreate")); catch;end
-try parpool("local12"); catch;end
+try delete(gcp('nocreate')); catch;end
+try parpool('local12'); catch;end
 for s = 1:height(logs.i{1})
-    for p = 1:2 %1 %:2
-        if logs.i{p}.plot(s)~=1 %&& isempty(statusP.error{s})
+    for ii = 1:2 %1 %:2
+        %%
+        if logs.i{ii}.plot(s)~=1 %&& isempty(statusP.error{s})
             %%
             try
-                disp("STARTING SUMMARY PLOTS: "+logs.i{p}.sbj(s));
-                ec_summaryCh_specPlot(logs.i{p}.o{s});
-                logs.i{p}.plot(s) = 1;
+                disp("STARTING SUMMARY PLOTS: "+logs.i{ii}.sbj(s));
+                ec_summaryCh_specPlot(logs.i{ii}.o{s});
+                logs.i{ii}.plot(s) = 1;
             catch ME; getReport(ME)
-                logs.i{p}.error{s} = ME;
-                logs.i{p}.plot(s) = 0;
+                logs.i{ii}.error{s} = ME;
+                logs.i{ii}.plot(s) = 0;
             end
 
             %%
-            logs.i{p}.time(s,p) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(logs.fn(p),'logs','-v7');
+            logs.i{ii}.time(s,ii) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+            save(logsFn,'logs','logsFn','-v7');
         else
             disp("SKIPPING PLOTS: "+o.name);
         end
     end
 end
-
-% try parfevalOnAll(@gpuDevice,0,[]); catch;end
-% try reset(gpuDevice(1)); catch;end

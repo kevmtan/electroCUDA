@@ -55,6 +55,8 @@ else
     load(fn,"psy");
 end
 
+%% Resample
+
 %% Finalize
 n.hz = hz; % changed if downsampled
 n.errorPsy = errors;

@@ -10,24 +10,18 @@ if o.test
     disp("TESTING sumStats: "+sbj);
     dbstop if error
 end
+if o.ICA; o.sfx = "i"+o.sfx; end
 % a.plot=0; o.test=1;
-%% Load
-if contains(o.sfx,"i"); o.ICA = true; end
-if o.ICA && ~contains(o.sfx,"i"); o.sfx = o.sfx + "i"; end
-dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
-o.dirs = dirs;
-o.dirIn = dirs.procSbj; %
-o.dirFS = dirs.fsSbj; % Freesurfer subjects dir
-o.dirOut = dirs.anal+"summary/"+o.name+"/";
-o.dirOutSbj = dirs.anal+"summary/"+o.name+"/s"+dirs.sbjID+"/";
 
-% Load
+
+%% Load
 tic;
-[ns,xs,psy,trialNfo,chNfo] =...
-    ec_loadSbj(dirs,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo"]);
+[ns,xs,psy,trialNfo,chNfo,dirs] =...
+    ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo" "dirs"]);
 xs = single(xs);
 if o.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;
+
 
 %% Initialize
 sbj = ns.sbj;
@@ -57,6 +51,7 @@ for i = 1:nBands
     B.freqs{i} = ns.freqs(B.id(i,:));
 end
 B.Properties.RowNames = B.name;
+
 
 %% Get mean evoked magnitude per freq & cond
 fAvg = nan(numel(conds),nChs,numel(ns.freqs),"like",xs);
@@ -339,6 +334,3 @@ ss.sbjCh = sbjChs;
 ss.Properties.RowNames = sbjChs;
 disp(band+" summary stats: "+sbj);
 end
-
-
-

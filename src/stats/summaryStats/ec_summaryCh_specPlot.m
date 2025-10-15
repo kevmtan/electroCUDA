@@ -17,6 +17,7 @@ if ~exist("xe","var")
     fn = o.dirOut+"plot_s"+sbjID+".mat";
     load(fn,"xe","xhe","fAvg","B","trialNfo"); disp("LOADED: "+fn);
 end
+try mkdir(o.dirOutSbj); catch;end
 
 %% Get plot options & electrode plotting data
 [o,d,xNfo,nChs,icWts] = mk_oP_chDat(o,ns,chNfo,trialNfo);
@@ -26,7 +27,7 @@ try parpool('Processes'); catch; end
 parfor ch = 1:nChs
     % Load channel/IC info
     dCh = d;
-    if o.ICA; dCh.wts(dCh.ica) = icWts(ch,:); end %#ok<PFBNS>
+    if o.ICA; dCh.wts(dCh.ica) = icWts(ch,:); end 
 
     % Load EEG stats/recordings
     xN = xNfo(ch,:);
@@ -65,8 +66,8 @@ nConds = numel(conds);
 oP = o.oP;
 
 %% Initialize figure
-% h = figure('Position',[0 0 1920 1080],'Theme','light','color','white','MenuBar','none','ToolBar','none');
-h = figure('Position',[0 0 1920 1080],'Theme','light','color','white','MenuBar','none','ToolBar','none','Visible','off');
+h = figure('Position',[0 0 1920 1080],'Theme','light','color','white','MenuBar','none','ToolBar','none');
+%h = figure('Position',[0 0 1920 1080],'Theme','light','color','white','Visible','off');
 hl = tiledlayout(h,5,8,'TileSpacing','tight','Padding','tight');
 
 %% Legends
@@ -168,7 +169,8 @@ end
 
 %% Save fig
 fn = o.dirOutSbj+sbjCh+"_spec.jpg";
-exportgraphics(hl,fn,"Resolution",150);
+%exportgraphics(hl,fn,"Resolution",150);
+print(h,fn,"-djpeg","-r150");
 disp("SAVED: "+fn);
 close all; % IMPORTANT I guess
 end
@@ -328,9 +330,7 @@ end
 
 % Plot averaged timecourses %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function plotFrameAvg_lfn(dat,band,conds,oP)
-warning('off','MATLAB:Figure:UnableToSetRendererToOpenGL');
 nConds = numel(conds);
-
 lats = unique(dat.latency)';
 lats = repmat(lats,nConds,1);
 y = nan(nConds,length(lats));

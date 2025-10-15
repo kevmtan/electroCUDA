@@ -73,7 +73,7 @@ o.doBadFrames = true; % outlier/noise detection
 o.thrHFO = 2; % threshold for epileptic HFO detection (default=2)
 o.thrMAD = 20; % z-threshold relative to all data points to exclude timepoints (default=5)
 o.thrDiff = 20; % z-threshold for amplitude difference of consecutive timepoints (default=5)
-o.thrSNS = 3;
+o.thrSNS = 3; % Threshold for low-freq spikes; Sensor-specific noise thresh (try 5)
 
 % Interpolate missing frames (within run & channel)
 o.missingInterp = "linear";

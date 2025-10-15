@@ -179,9 +179,9 @@ for i = 1:numel(hems)
         elseif any(isgraphics(h))
             hi = h;
         elseif o.visible
-            hi = figure("Position",o.figPos,"Renderer","opengl","WindowStyle","docked"); %#ok<*FGREN> 
+            hi = figure("Position",o.figPos,"WindowStyle","docked");
         else
-            hi = figure("Position",o.figPos,"Renderer","opengl","Visible","off");
+            hi = figure("Position",o.figPos,"Visible","off");
         end
 
         % Plot cortex

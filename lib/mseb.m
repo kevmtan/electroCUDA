@@ -163,11 +163,11 @@ for c = C:-1:1
     if transparent
         faceAlpha=patchSaturation;
         patchColor=col;
-        set(gcf,'renderer','openGL')
+        % set(gcf,'renderer','openGL')
     else
         faceAlpha=1;
         patchColor=col+(1-col)*(1-patchSaturation);
-        set(gcf,'renderer','painters')
+        % set(gcf,'renderer','painters')
     end
     
     %Calculate the y values at which we will place the error bars
