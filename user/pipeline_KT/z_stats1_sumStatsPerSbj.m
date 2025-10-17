@@ -11,7 +11,6 @@ proj = "lbcn";
 task = "MMR"; % task name
 
 sfx = ""; %"";
-plotType = "spec"; % "hfb-lfp"; % "spec";
 doICA = false;
 isTest = true;
 
@@ -135,7 +134,7 @@ end
 
 
 %%
-sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/summary/summarySbj_'...
+sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/summary/stimBL_lme_'...
     char(datetime('now','TimeZone','local','Format','yyMMdd_HHmm')) '_errors.mat'];
 if ~exist('statusSum','var')
     statusSum = table;
