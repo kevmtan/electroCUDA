@@ -1,29 +1,25 @@
-function [psy,trialNfo] = ec_concatRunsBehav_MMR(sbj,task,proj,a)
+function [psy,trialNfo,n] = ec_concatRunsBehav_MMR(n,a)
+%% Input validation
 arguments
-    sbj (1,1) string
-    task (1,1) string
-    proj (1,1) string
+    n struct
     a.hzTarget (1,1) double = 0
     a.test (1,1) logical = false;
 end
-% sbj="S12_38_LK"; sbj="S15_87_RL";
-% task="MMR"; proj="lbcn"; a.test=1; a.hzTarget=100; r=1;
+% a.test=1; a.hzTarget=100; r=1;
 
 
 %% Prep
-dirs = ec_getDirs(proj,task,sbj);
-blocks = string(BlockBySubj(sbj,task));
-runs = extractAfter(blocks,asManyOfPattern(wildcardPattern + "_"));
+runs = extractAfter(n.blocks,asManyOfPattern(wildcardPattern + "_"));
 runs = extractAfter(runs,asManyOfPattern(wildcardPattern + "-"));
 runs = uint8(str2double(runs));
 
 
-%% Loop across runs
+%% Concactenate behavioral data cross runs
 for r = 1:numel(runs)
     run = runs(r);
-    sbjRun = "s"+compose("%03d",dirs.sbjID)+"_r"+compose("%02d",run);
-    load(fullfile(dirs.origSbj,"trialNfo_"+sbjRun+".mat"), "trialNfo");
-    load(fullfile(dirs.origSbj,"psy_"+sbjRun+".mat"), "psy");
+    sbjRun = "s"+compose("%03d",n.sbjID)+"_r"+compose("%02d",run);
+    load(fullfile(n.dirs.origSbj,"trialNfo_"+sbjRun+".mat"), "trialNfo");
+    load(fullfile(n.dirs.origSbj,"psy_"+sbjRun+".mat"), "psy");
     trialNfo(:,["conds_math_memory" "isCalc" "Operand1" "Operand2"...
         "OperandMin" "OperandMax" "Operator" "CorrectResult" "PresResult"...
         "Deviant" "AbsDeviant" "RT_og" "key_og" "StimulusOnsetTime"]) = [];
@@ -85,6 +81,8 @@ for r = 1:numel(runs)
     end
 end
 
+
+
 %% Finalize
 psy = psy2;
 psy = movevars(psy,"tr","After","run");
@@ -94,6 +92,27 @@ psy = movevars(psy,"idx","After",width(psy));
 trialNfo = trialNfo2;
 trialNfo = movevars(trialNfo,"tr","Before","trial");
 trialNfo.Properties.RowNames = "r"+trialNfo.run+"_t"+trialNfo.tr+"_"+trialNfo.cond;
+
+% Save info to n
+n.nFrames = height(psy);
+n.nRuns = numel(unique(trialNfo.run));
+n.nTrials = height(trialNfo);
+n.runs = unique(trialNfo.run);
+n.runIdx = nan(n.nRuns,2);
+n.runIdxOg = nan(n.nRuns,1);
+n.runTimes = seconds(nan(n.nRuns,2));
+n.runTimesOg = seconds(nan(n.nRuns,1));
+for r = 1:n.nRuns
+    run = n.runs(r);
+    idx = psy.idx(psy.run==run);
+    n.runIdx(r,:) = [min(idx) max(idx)];
+    n.runIdxOg(r) = psy.idr(max(idx));
+    n.runTimes(r,:) = [psy.Time(min(idx)) psy.Time(max(idx))];
+    n.runTimesOg(r) = psy.timeR(max(idx));
+end
+n.conds = unique(trialNfo.cond);
+disp(sbj+": updated 'n"+o.suffix+"' with info from 'trialNfo' & 'psy'");
+
 
 
 

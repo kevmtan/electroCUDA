@@ -17,7 +17,7 @@ task = "MMR"; % task name
 o = struct;
 o.suffix = "s";
 o.sfx_src = "";
-o.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+o.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]

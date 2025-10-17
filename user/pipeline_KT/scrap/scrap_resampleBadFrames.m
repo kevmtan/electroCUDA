@@ -11,11 +11,10 @@ task = "MMR";
 doSave = true;
 
 statusDate = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
-statusFn = "/01/lbcn/logs/preproc/pre41_behav/"+statusDate;
+statusFn = "/01/lbcn/logs/preproc/resampleBadFrames_"+statusDate;
 
 status = table;
 status.sbj = sbjs;
-status.hz1000(:) = false;
 status.hz100(:) = false;
 status.error = cell(height(status),1);
 
@@ -30,36 +29,13 @@ parfor s = 1:height(status)
     sbj = stat.sbj;
     o = struct;
 
-    % No resampling (1000 hz)
-    if ~stat.hz1000
-        hz = 1000; 
-        try
-            o.suffix = "";
-            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                save=doSave,saveN=doSave,hzTarget=hz,redoBeh=1);
-
-            o.suffix = "i";
-            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                saveN=doSave,hzTarget=hz);
-
-            o.suffix = "z";
-            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                saveN=doSave,hzTarget=hz);
-
-            stat.hz1000 = true;
-        catch ME
-            stat.error{1} = ME;
-            getReport(ME)
-        end
-    end
-
     % Resample (100 hz)
     if ~stat.hz100
         hz = 100;
         try
             o.suffix = "s";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                save=doSave,saveN=doSave,hzTarget=hz,redoBeh=1);
+                save=doSave,saveN=doSave,hzTarget=hz);
 
             o.suffix = "is";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
@@ -74,9 +50,3 @@ parfor s = 1:height(status)
     status(s,:) = stat;
 end
 if doSave; save(statusFn+".mat","status"); diary off; end
-
-
-
-
-
-

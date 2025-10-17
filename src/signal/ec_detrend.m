@@ -84,7 +84,7 @@ if isany(o.missing)
 end
 
 %% Detrend
-rIdx = n.runIdxOg(:,2); % run end indices
+rIdx = n.runIdxOg; % run end indices
 
 if o.gpu % && length(dims)<=2 && ~any(win,"all") % TODO: 3d detrend
     if o.gpu==1     % Matlab gpuArray

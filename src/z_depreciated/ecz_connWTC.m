@@ -57,7 +57,7 @@ if ~isstruct(dirs); dirs = ec_getDirs(dirs,sbj,task); end
 if ~isfield(o,'fName');       o.fName="spec"; end     % Name of frequency analysis
 if ~isfield(o,'fLims');       o.fLims=[1 300]; end    % Frequency limits in hz; HFB=[70 200]
 if ~isfield(o,'fVoices');     o.fVoices=12; end       % Voices per octave (default=10, HFB=18)
-if ~isfield(o,'dsTarg');      o.dsTarg=[]; end        % Downsample target in Hz (default=[]: no downsample)
+if ~isfield(o,'hzTarget');      o.hzTarget=[]; end        % Downsample target in Hz (default=[]: no downsample)
 if ~isfield(o,'single');      o.single=true; end      % Run & save as single (single much faster on GPU)
 if ~isfield(o,'singleOut');   o.halfOut=true; end     % Save as half-precision float (16-bit) to save memory
 if ~isfield(o,'doCUDA');      o.doCUDA=false; end     % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
@@ -89,8 +89,8 @@ if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename endin
 
 % Get downsampling factor & anti-aliasing filter
 ds = [1 1];
-if ~isempty(o.dsTarg)
-    [ds(1),ds(2)] = rat(o.dsTarg/n.fs);
+if ~isempty(o.hzTarget)
+    [ds(1),ds(2)] = rat(o.hzTarget/n.fs);
     if ds(1)>ds(2); error(sbj+" downsampling target > iEEG sampling rate"); end
 end
 
@@ -125,7 +125,7 @@ else
 end
 
 % Reshape per run
-x = mat2cell(x,n.runIdxOg(:,2));
+x = mat2cell(x,n.runIdxOg);
 y = cell(nRuns,1);
 cwtHz = cell(nRuns,1);
 disp("[ec_wtc] Starting WTC: s"+n.sbjID+" time="+toc);

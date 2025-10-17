@@ -22,7 +22,7 @@ if isnumeric(n)
     minIdx(:) = true;
     hz=n;
 else
-    hz=n.hz; [~,id]=min(n.runIdxOg(:,2));
+    hz=n.hz; [~,id]=min(n.runIdxOg);
     minIdx(n.runIdx(id,1):n.runIdx(id,2)) = true;
 end
 
@@ -63,7 +63,7 @@ if isnumeric(n) % HPF all data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     disp("[ec_HPF] Finished: time="+toc(tt));
 
 else % HPF within-run to avoid edge artifacts %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    x = mat2cell(x,n.runIdxOg(:,2));
+    x = mat2cell(x,n.runIdxOg);
     for r = 1:n.nRuns
         xr = x{r};
 

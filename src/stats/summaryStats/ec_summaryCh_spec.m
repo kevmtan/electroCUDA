@@ -37,8 +37,8 @@ if o.ICA
     sbjChs = icNfo.sbjIC;
 end
 % Target sampling rate
-if ~isany(o.pre.hzTarg) || ns.hz<o.pre.hzTarg
-    o.pre.hzTarg = ns.hz;
+if ~isany(o.pre.hzTarget) || ns.hz<o.pre.hzTarget
+    o.pre.hzTarget = ns.hz;
 end
 
 % Band indices

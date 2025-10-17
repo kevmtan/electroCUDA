@@ -131,7 +131,7 @@ o.fName = "hfb"; % name of frequency analysis
 o.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
 o.fMean = true; % average across freq bands: output if TRUE=[time,ch]; FALSE=[time,ch,freq]
 o.fVoices = 32; % voices per octave (default=10, HFB=20)
-o.dsTarg = []; % downsample target in Hz (leave empty if no downsampling)
+o.hzTarget = []; % downsample target in Hz (leave empty if no downsampling)
 o.single = false; % Convert to double to single (if doGPU=true)
 o.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
 o.doGPUarray = true; % Use arrayfun for GPU (faster, requires more VRAM)
@@ -242,7 +242,7 @@ for s = 1:height(statusPP) % Subject loop
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
         oSpec.fVoices = 10; % Voices per octave (default=10, HFB=32)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = true; % Convert to double to single (if doGPU=true)
         oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oSpec.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
@@ -271,7 +271,7 @@ for s = 1:height(statusPP) % Subject loop
         oHFB.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
         oHFB.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oHFB.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
@@ -355,7 +355,7 @@ for s = 1:height(statusPP) % subject loop
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
         oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = true; % Convert to double to single (if doGPU=true)
         oSpec.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oSpec.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
@@ -385,7 +385,7 @@ for s = 1:height(statusPP) % subject loop
         oHFB.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
         oHFB.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
         oHFB.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)
@@ -456,7 +456,7 @@ for s = 1:height(statusPP) % Subject loop
     oICA.fLims = [60 180]; % frequency limits in hz; HFB=[70 200]
     oICA.fMean = true; % Collapse across frequency bands (for 1d vector output)
     oICA.fVoices = 32; % Voices per octave (default=10, HFB=18)
-    oICA.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+    oICA.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
     oICA.single = false; % Convert to double to single (single much faster on GPU)
     oICA.doGPU = false; % Run on GPU, see MATLAB gpuArray requirements (default=false)
     oICA.doGPUarray = false; % Use arrayfun for GPU (faster, more memory)

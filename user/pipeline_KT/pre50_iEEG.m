@@ -59,7 +59,7 @@ o = struct;
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-o.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+o.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
 o.suffix = "";
 
 % Bad channel identification

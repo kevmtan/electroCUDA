@@ -72,8 +72,8 @@ else
 end
 
 % Segregate data by run
-x = mat2cell(x,n.runIdxOg(:,2));
-w = mat2cell(w,n.runIdxOg(:,2));
+x = mat2cell(x,n.runIdxOg);
+w = mat2cell(w,n.runIdxOg);
 
 %% Interpolate missing (CPU only)
 for ir = 1:nRuns

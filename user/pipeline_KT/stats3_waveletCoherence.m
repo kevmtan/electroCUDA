@@ -30,7 +30,7 @@ o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 
 % Timing (in seconds)
-o.dsTarg = 20; % Downsample target in Hz (default=[]: no downsample)
+o.hzTarget = 20; % Downsample target in Hz (default=[]: no downsample)
 o.BLpre = [-0.2 0]; % Pre-stimulus baseline start/end (secs from stim onset); ex=[-0.2 0]
 o.BLend = []; % Post-stimulus baseline start/end (secs from next stim onset); ex=[-0.1 0]
 o.bin = 0.02; % Latency bin width (seconds)

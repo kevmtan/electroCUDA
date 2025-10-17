@@ -61,7 +61,7 @@ end
 % if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
 % if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
 % if ~isfield(o,'fVoices');     o.fVoices=32; end        % Voices per octave (default=10, HFB=18)
-% if ~isfield(o,'dsTarg');      o.dsTarg=[]; end         % Downsample target in Hz (default=[]: no downsample)
+% if ~isfield(o,'hzTarget');      o.hzTarget=[]; end         % Downsample target in Hz (default=[]: no downsample)
 % if ~isfield(o,'single');      o.single=true; end      % Run & save as single (single much faster on GPU)
 % if ~isfield(o,'singleOut');   o.halfOut=true; end     % Save as half-precision float (16-bit) to save memory
 % if o.doCUDA; o.doGPU=false; end % CUDA supersedes gpuArray
@@ -94,8 +94,8 @@ if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename endin
 
 % Get downsampling factor & anti-aliasing filter
 ds = 0;
-if isany(o.dsTarg)
-    [ds(1),ds(2)] = rat(o.dsTarg/n.hz);
+if isany(o.hzTarget)
+    [ds(1),ds(2)] = rat(o.hzTarget/n.hz);
     % Errors
     if ds(1) > ds(2) 
         errors{end+1} = "[ec_preprocTimeFreq] "+sbj+" downsampling target > sampling rate";
@@ -117,7 +117,7 @@ else
 end
 
 % Reshape per run
-x = mat2cell(x,n.runIdxOg(:,2));
+x = mat2cell(x,n.runIdxOg);
 
 
 %% Continuous Wavelet Transform (within-run to avoid edge artifacts)
@@ -140,9 +140,6 @@ n.nFreqs = size(x,3);
 n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
 
-% Resample behavioral data
-[err,n] = ec_resampleBeh(n,dsTarg=o.dsTarg,save=arg.save);
-if isany(err); errors{end+1}=err; end
 
 %% Robust detrending
 if nnz(o.detrendOrder)
@@ -150,11 +147,13 @@ if nnz(o.detrendOrder)
         missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,sfx=sfx);
 end
 
+
 %% High-pass filtering
 if nnz(o.hiPass)
     [x,n] = ec_HPF(x,n,o.hiPass,tt,missing=o.missingInterp,gpu=o.hiPassGPU,...
         steepness=o.hiPassSteep);
 end
+
 
 %% Identify bad frames per chan
 if o.doBadFrames && ~arg.ica
@@ -162,7 +161,8 @@ if o.doBadFrames && ~arg.ica
     if any(n.xBad.Properties.VariableNames=="hfo")
         x_bad = n.xBad(:,"hfo");
         if ds(2)>1
-            hfo = resample(double(full(x_bad.hfo)),ds(1),ds(2),'Dimension',1);
+            hfo = resample(double(full(x_bad.hfo)),ds(1),ds(2),max([ds 10]),...
+                Dimension=1);
             x_bad.hfo = sparse(hfo>=0.5);
         end
     else
@@ -177,6 +177,7 @@ elseif o.doBadFrames
     [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,sfx,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per IC: "+sbj+" time="+toc(tt));
 end
+
 
 %% Covariance
 sfx = o.suffix;
@@ -193,7 +194,8 @@ if fMean
     end
 end
 
-%% Finalize
+
+%% Save
 
 % Reset GPU
 if ismember(o.gpu,["matlab" "cuda"])
@@ -218,6 +220,9 @@ if arg.save
     savefast(fn,'x'); disp("SAVED: "+fn+" time="+toc(tt));
 end
 
+
+%% Resample behavioral data
+ec_initialize(sbj,proj,task,o,n,hzTarget=o.hzTarget);
 
 
 

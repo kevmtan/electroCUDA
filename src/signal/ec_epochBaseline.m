@@ -18,7 +18,7 @@ arguments
     op.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
     op.typeProc (1,1) string = "double"         % processing FP precision ("double"|"single"|""=same as input)
     op.typeOut (1,1) string = class(x)          % output FP precision ("double"|"single"|""=same as input)
-    op.hzTarg (1,1) double = nan                % Target sampling rate
+    op.hzTarget (1,1) double = nan                % Target sampling rate
     % Within-run preprocessing
     op.log (1,1) logical = false;               % Log transform
     op.runNorm string = "zscore";               % Normalize run
@@ -87,8 +87,8 @@ idx = varfun(@(v) isa(v,"half"),psy,OutputFormat="uniform");
 psy = convertvars(psy,idx,"single");
 
 % Get downsampling factor & anti-aliasing filter
-if isany(op.hzTarg)
-    [ds(1),ds(2)] = rat(op.hzTarg/n.hz);
+if isany(op.hzTarget)
+    [ds(1),ds(2)] = rat(op.hzTarget/n.hz);
     % Errors
     if ds(1) > ds(2)
         error("[ec_epochBaseline] downsampling target > sampling rate"); end

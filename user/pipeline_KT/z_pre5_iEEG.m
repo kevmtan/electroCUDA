@@ -68,7 +68,7 @@ o = struct;
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-o.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+o.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
 
 % Bad channel identification
 o.doBadCh = true;
@@ -273,7 +273,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oSpec.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oSpec.hiPassGPU = false; % GPU slower than CPU??
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = false; % Run & save as single (single much faster on GPU)
         oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
         oSpec.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
@@ -314,7 +314,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oSpec.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oSpec.hiPassGPU = false; % GPU slower than CPU??
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = false; % Run & save as single (single much faster on GPU)
         oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
         oSpec.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
@@ -355,7 +355,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oHFB.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oHFB.hiPassGPU = false; % GPU slower than CPU??
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Run & save as single (single much faster on GPU)
         oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
         oHFB.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)
@@ -397,7 +397,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
         oHFB.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
         oHFB.hiPassGPU = false; % GPU slower than CPU??
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Run & save as single (single much faster on GPU)
         oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
         oHFB.doCUDA = true; % Run on CUDA GPU binary - must be compiled 1st! (ecu_compileThese)

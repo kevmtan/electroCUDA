@@ -81,8 +81,8 @@ if a.ICA
     sbjChs = icNfo.sbjIC;
 end
 % Target sampling rate
-if ~isany(o.pre.hzTarg) || ns.hz<o.pre.hzTarg
-    o.pre.hzTarg = ns.hz;
+if ~isany(o.pre.hzTarget) || ns.hz<o.pre.hzTarget
+    o.pre.hzTarget = ns.hz;
 end
 
 % Band indices
@@ -390,7 +390,7 @@ if a.ICA
     sbjChs = icNfo.sbjIC;
 end
 % Add sampling rate info to 'o' struct
-if o.dsTarg>0; o.hzTarg=o.dsTarg; else; o.hzTarg=fs; end
+if o.hzTarget>0; o.hzTarget=o.hzTarget; else; o.hzTarget=fs; end
 
 % Band indices
 B = table;
@@ -489,7 +489,7 @@ function hfbL_runPlots(a,o,dirs,ss,xe,xhe,B,trialNfo)
 % Load
 n = ec_loadSbj(dirs,a.sfx,"n");
 sbjID = n.sbjID;
-%fs = ns.hz; if o.dsTarg>0; fs=o.dsTarg; end
+%fs = ns.hz; if o.hzTarget>0; fs=o.hzTarget; end
 chNfo = ec_loadSbj(dirs,a.sfx,"chNfo");
 if nargin<=3
     if a.ICA; fn=o.dirOut+"s"+sbjID+"_icSumStats_"+o.name+".mat";
@@ -657,7 +657,7 @@ if a.ICA
     sbjChs = icNfo.sbjIC;
 end
 % Add sampling rate info to 'o' struct
-if o.dsTarg>0; o.hzTarg=o.dsTarg; else; o.hzTarg=fs; end
+if o.hzTarget>0; o.hzTarget=o.hzTarget; else; o.hzTarget=fs; end
 
 % Band indices
 B = table;

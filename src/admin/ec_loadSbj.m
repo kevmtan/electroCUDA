@@ -27,14 +27,21 @@ task = dirs.task;
 if isnumeric(sbjID); sbjID = "s"+sbjID; end
 if ~startsWith(sbjID,"s"); sbjID = "s"+sbjID; end
 
-% Check sampling rate
-if ~a.hz && any(ismember(a.vars,["n" "psy" "trialNfo"]))
-    fpath = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
-    load(fpath,"n"); disp("[ec_loadSbj] Check sampling rate: "+fpath); % Load
-    if ~a.hz; a.hz=n.hz; end
+% Preload metadata "n" struct
+if any(ismember(a.vars,["n" "psy" "trialNfo"]))
+    fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
+    load(fn,"n");
 end
-if a.hz==1000; a.hz=""; else; a.hz=string(a.hz); end % Default sampling rate not appended
 
+% Check sampling rate
+if ~a.hz && any(ismember(a.vars,["psy" "trialNfo"]))
+    a.hz = n.hz;
+    disp("[ec_loadSbj] Verified sampling rate: "+a.hz+"hz"); % Load
+end
+
+% Original sampling rate not appended on filenames
+if a.hz==n.hz_og
+    a.hz=""; end 
 
 % Loop through requested vars
 for v = 1:numel(a.vars)
@@ -42,36 +49,36 @@ for v = 1:numel(a.vars)
 
     % Metadata "n" struct
     if vv=="n" && v<=nOut
-        fpath = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
-        disp("[ec_loadSbj] Loaded: "+fpath); % Load
+        fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
+        disp("[ec_loadSbj] Loaded: "+fn); % Load
         varargout{v} = n;
     end
 
     % EEG data for a.sfx
     if vv=="x" && v<=nOut
-        fpath = dirs.procSbj+"x"+a.sfx+"_"+sbjID+"_"+task;
-        load(fpath,"x"); disp("[ec_loadSbj] Loaded: "+fpath);
+        fn = dirs.procSbj+"x"+a.sfx+"_"+sbjID+"_"+task;
+        load(fn,"x"); disp("[ec_loadSbj] Loaded: "+fn);
         varargout{v} = x;
     end
 
     % Behavioral task data aligned to EEG recordings
     if vv=="psy" && v<=nOut
-        fpath = dirs.procSbj+"psy"+a.hz+"_"+sbjID+"_"+task;
-        load(fpath,"psy");  disp("[ec_loadSbj] Loaded: "+fpath);
+        fn = dirs.procSbj+"psy"+a.hz+"_"+sbjID+"_"+task;
+        load(fn,"psy");  disp("[ec_loadSbj] Loaded: "+fn);
         varargout{v} = psy;
     end
 
     % Trial information
     if vv=="trialNfo" && v<=nOut
-        fpath = dirs.procSbj+"trialNfo"+a.hz+"_"+sbjID+"_"+task;
-        load(fpath,"trialNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
+        fn = dirs.procSbj+"trialNfo"+a.hz+"_"+sbjID+"_"+task;
+        load(fn,"trialNfo"); disp("[ec_loadSbj] Loaded: "+fn);
         varargout{v} = trialNfo;
     end
 
     % Channel information
     if vv=="chNfo" && v<=nOut
-        fpath = dirs.procSbj+"chNfo_"+sbjID+"_"+task;
-        load(fpath,"chNfo"); disp("[ec_loadSbj] Loaded: "+fpath);
+        fn = dirs.procSbj+"chNfo_"+sbjID+"_"+task;
+        load(fn,"chNfo"); disp("[ec_loadSbj] Loaded: "+fn);
         varargout{v} = chNfo;
     end
 

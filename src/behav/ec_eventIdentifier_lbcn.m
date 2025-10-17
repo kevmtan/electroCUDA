@@ -45,7 +45,7 @@ end
 % Basic info
 nTrials = height(trialinfo);
 sbjRun = trialinfo.sbjRun(1);
-hzTarg = a.hzTarget;
+hzTarget = a.hzTarget;
 
 % Photodiode channel
 if dirs.sbjID >= 87
@@ -60,8 +60,8 @@ nFrames = globalVar.chanLength;
 hz = round(globalVar.Pdio_rate);
 if strcmp(task,["Calculia_production" "Calculia_production_addsubmult"])
     hz = 10000; end
-if ~isany(hzTarg) % Match target sampling rate to EEG if not specified
-    hzTarg = round(globalVar.iEEG_rate); end
+if ~isany(hzTarget) % Match target sampling rate to EEG if not specified
+    hzTarget = round(globalVar.iEEG_rate); end
 
 % Load photodiode
 load(sprintf('%s/%s/Pdio%s_%.2d.mat',dirs.origSbj,block,block,pd_ch), "anlg"); % going to be present in the globalVar
@@ -72,10 +72,10 @@ anlg = anlg/max(anlg); % normalize
 %% Make psychophysics table from photodiode signal
 
 % Resample photodiode signal
-if isany(hzTarg) && hzTarg~=round(hz)
-    [ds1,ds2] = rat(hzTarg/hz);
+if isany(hzTarget) && hzTarget~=round(hz)
+    [ds1,ds2] = rat(hzTarget/hz);
     anlg = resample(anlg,ds1,ds2);
-    hz = hzTarg;
+    hz = hzTarget;
 end
 
 % Make psychophysics timetable

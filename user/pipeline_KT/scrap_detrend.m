@@ -22,7 +22,7 @@ xh1g = ecc_filtfilt2_mex64(xh1,hpf1); toc
 %%
 load('n_s38_MMR.mat','n');
 load('x_s38_MMR.mat','x');
-x = mat2cell(x,n.runIdxOg(:,2));
+x = mat2cell(x,n.runIdxOg);
 %%
 
 x1 = x{1}; tic;

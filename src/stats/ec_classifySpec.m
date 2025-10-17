@@ -7,7 +7,7 @@ arguments
     o.proj string = [];
     o.task string = [];
     o.ICA (1,1) logical = false
-    o.dsTarg = []; % Downsampling target
+    o.hzTarget = []; % Downsampling target
     o.sfx string = ""
     o.name string = string(datetime('now','Format','yyMMdd'));
 
@@ -111,7 +111,7 @@ n.xBad = [];
 fs = n.fs;
 
 % Add sampling rate info to 'o' struct
-if o.dsTarg>0; o.fsTarg=o.dsTarg; else; o.fsTarg=fs; end
+if o.hzTarget>0; o.fsTarg=o.hzTarget; else; o.fsTarg=fs; end
 
 % Band indices
 if any(o.freqIdx)

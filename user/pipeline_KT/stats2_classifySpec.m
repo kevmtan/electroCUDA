@@ -20,7 +20,7 @@ o.test = false;
 o.savePrep = true;
 o.save = true; % save summary stats data
 o.gpu = false;
-o.dsTarg = []; % Downsampling target
+o.hzTarget = []; % Downsampling target
 
 % Frequency bands
 o.freqIdx = 60:83; %28:83; % Indices of frequencies to keep: x(:,:,freqIdx)

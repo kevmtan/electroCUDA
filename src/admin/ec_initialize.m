@@ -8,8 +8,8 @@ arguments
     n struct = []
     a.hzTarget double = [] % Downsampling target freq
     a.ica logical = false 
-    a.save logical = false
-    a.saveN logical = false
+    a.save logical = true
+    a.saveN logical = true
     a.redo logical = false
     a.redoN logical = false
     a.redoCh logical = false
@@ -79,10 +79,16 @@ n.fnStr = o.fnStr;
 n.suffix = o.suffix;
 hz = n.hz;
 
+% Target sampling rate
+if ~isany(hzTarget)
+    hzTarget = n.hz; end
+
 % Figure out downsampling factor
+if rem(n.hz_og,hzTarget)~=0
+    error("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": Target sampling rate must be wholey divisible from original");
+end
 if hzTarget>0; ds=floor(n.hz_og/hzTarget); else; ds=1; end
-if ds~=1; hz=hzTarget; disp(sbj+": resampling task events @ "+hzTarget+"hz");
-else; hzTarget=0; disp(sbj+": keeping task events @ "+n.hz_og+"hz"); end
+if ds~=1; hz=hzTarget; end
 if hz==n.hz_og; hz_s=""; else; hz_s=num2str(hz); end
 
 %% EEG channel info
@@ -119,36 +125,25 @@ fn2 = o.dirOut+"psy"+hz_s+"_"+o.fnStr+".mat";
 psy=[]; trialNfo=[];
 
 % Do trialNfo & psy
-if ~isfile(fn) || ~isfile(fn2) || hzTarget>0 || a.redoBeh || a.redo
+if ~isfile(fn) || ~isfile(fn2) || a.redoBeh || a.redo
+    if ds~=1; disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": resampling task events @ "+hz+"hz");
+    else; disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": keeping task events @ "+n.hz_og+"hz");
+    end
+
     % Make trialNfo & psy
-    [psy,trialNfo] = ec_concatRunsBehav_MMR(sbj,task,proj,hzTarget=hzTarget);
-    disp(sbj+": made trialNfo & psy");
+    [psy,trialNfo,n] = ec_concatRunsBehav_MMR(sbj,task,proj,hzTarget=hz);
+    disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": made trialNfo & psy");
 else
     % Load trialNfo & psy
     if nargout>4; load(fn,"trialNfo"); load(fn2,"psy");
         disp("LOADED: "+fn); disp("LOADED: "+fn2); end
 end
 
-% Save info to n
-if ~isempty(psy) && ~isempty(trialNfo)
-    n.nFrames = height(psy);
-    n.nRuns = numel(unique(trialNfo.run));
-    n.nTrials = height(trialNfo);
-    n.runs = unique(trialNfo.run);
-    n.runIdx = nan(n.nRuns,2);
-    n.runIdxOg = nan(n.nRuns,1);
-    n.runTimes = seconds(nan(n.nRuns,2));
-    n.runTimesOg = seconds(nan(n.nRuns,1));
-    for r = 1:n.nRuns
-        run = n.runs(r);
-        idx = psy.idx(psy.run==run);
-        n.runIdx(r,:) = [min(idx) max(idx)];
-        n.runIdxOg(r) = psy.idr(max(idx));
-        n.runTimes(r,:) = [psy.Time(min(idx)) psy.Time(max(idx))];
-        n.runTimesOg(r) = psy.timeR(max(idx));
-    end
-    n.conds = unique(trialNfo.cond);
-    disp(sbj+": updated 'n"+o.suffix+"' with info from 'trialNfo' & 'psy'");
+
+%% Resample bad frames table if needed
+if n.xFrames~=height(n.xBad)
+    n = ec_resampleBadFrames(n,hzTarget=hz);
+    disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": resampled bad frames table @ "+hz+"hz");
 end
 
 

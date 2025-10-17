@@ -52,7 +52,7 @@ if ~isfield(o,'wavelet');     o.wavelet="Morse"; end  % Name of frequency analys
 if ~isfield(o,'fName');       o.fName="spec"; end     % Name of frequency analysis
 if ~isfield(o,'fLims');       o.fLims=[1 300]; end    % Frequency limits in hz; HFB=[70 200]
 if ~isfield(o,'fVoices');     o.fVoices=12; end       % Voices per octave (default=10, HFB=18)
-if ~isfield(o,'dsTarg');      o.dsTarg=[]; end        % Downsample target in Hz (default=[]: no downsample)
+if ~isfield(o,'hzTarget');      o.hzTarget=[]; end        % Downsample target in Hz (default=[]: no downsample)
 if ~isfield(o,'single');      o.single=false; end     % Run & save as single (single much faster on GPU)
 if ~isfield(o,'singleOut');   o.singleOut=true; end   % Save as half-precision float (16-bit) to save memory
 if ~isfield(o,'gpu');         o.gpu="no"; end         % Run on... ["no"|"matlab"|"cuda"]
@@ -88,8 +88,8 @@ if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename endin
 
 % Get downsampling factor & anti-aliasing filter
 ds = 0;
-if isany(o.dsTarg)
-    [ds(1),ds(2)] = rat(o.dsTarg/n.fs);
+if isany(o.hzTarget)
+    [ds(1),ds(2)] = rat(o.hzTarget/n.fs);
     % Errors
     if ds(1) > ds(2) 
         errors{end+1} = "[ec_connWC] "+sbj+" downsampling target > sampling rate";
@@ -131,7 +131,7 @@ end
 % try ppool = parpool; catch;end %#ok<NASGU>
 
 % Reshape per run
-x = mat2cell(x,n.runIdxOg(:,2));
+x = mat2cell(x,n.runIdxOg);
 y=cell(nRuns,1); z=y;
 cwtHz = cell(nRuns,1);
 disp("[ec_wtc] Starting WTC: s"+n.sbjID+" time="+toc(tt));

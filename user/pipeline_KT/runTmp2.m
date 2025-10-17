@@ -43,7 +43,7 @@ o.detrendItr = [];
 o.detrendWin = []; %[]; % detrend window size in seconds, overlap add (default=[], entire block=[])
 
 % Downsamplig
-o.dsTarg = [];
+o.hzTarget = [];
 
 % Bad frames
 o.missingInterp = "linear";

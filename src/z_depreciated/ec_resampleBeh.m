@@ -2,14 +2,14 @@ function [errors,n,trialNfo,psy] = ec_resampleBeh(n,a)
 % Check inputs
 arguments
     n struct
-    a.dsTarg double = [] % Downsampling target freq
+    a.hzTarget double = [] % Downsampling target freq
     a.save logical = false
     a.redo logical = false
 end
 sbj = n.sbj;
 task = n.task;
 dirs = n.dirs;
-dsTarg = a.dsTarg;
+hzTarget = a.hzTarget;
 
 if ~isfield(n,'dirOut'); n.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(n,'fnStr');  n.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending string
@@ -25,9 +25,9 @@ n.suffix = n.suffix;
 hz = n.hz;
 
 % Figure out downsampling factor
-if dsTarg>0; ds=floor(n.hz_og/dsTarg); else; ds=1; end
-if ds~=1; hz=dsTarg; disp(sbj+": downsampling task events...");
-else; dsTarg=0; disp(sbj+": dsT <= 1, not downsampling..."); end
+if hzTarget>0; ds=floor(n.hz_og/hzTarget); else; ds=1; end
+if ds~=1; hz=hzTarget; disp(sbj+": downsampling task events...");
+else; hzTarget=0; disp(sbj+": dsT <= 1, not downsampling..."); end
 if hz==n.hz_og; hz_s=""; else; hz_s=num2str(hz); end
 
 
@@ -35,7 +35,7 @@ if hz==n.hz_og; hz_s=""; else; hz_s=num2str(hz); end
 fn = n.dirOut+"trialNfo"+hz_s+"_"+n.fnStr;
 if ~isfile(fn) || a.redo
     % Run
-    [trialNfo,n,errorsEvent] = ec_getEventIdx(sbj,n,dsTarg);
+    [trialNfo,n,errorsEvent] = ec_getEventIdx(sbj,n,hzTarget);
     if nnz(~cellfun(@isempty,errorsEvent)); errors{end+1,1} = errorsEvent; end
 else
     load(fn,"trialNfo");

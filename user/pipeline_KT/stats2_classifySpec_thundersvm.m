@@ -117,7 +117,7 @@ o.loPassSteep = 0.5;
 o.loPassImpulse = "auto";
 
 % Downsampling
-o.dsTarg = [];
+o.hzTarget = [];
 
 % Bad frames
 o.missingInterp = "linear";

@@ -52,7 +52,7 @@ o.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301]; % Band limits
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
-o.pre.hzTarg = 100; % Target sampling rate
+o.pre.hzTarget = 100; % Target sampling rate
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = "robust"; % Normalize trial

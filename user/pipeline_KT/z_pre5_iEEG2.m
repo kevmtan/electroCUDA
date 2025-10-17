@@ -254,7 +254,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
         oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = false; % Run & save as single (single much faster on GPU)
         oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
         oSpec.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
@@ -294,7 +294,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oSpec.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
         oSpec.fMean = false; % Collapse across frequency bands (for 1d vector output)
         oSpec.fVoices = 10; % Voices per octave (default=10, HFB=18)
-        oSpec.dsTarg = 100; % Downsample target in Hz (default=[]: no downsample)
+        oSpec.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
         oSpec.single = false; % Run & save as single (single much faster on GPU)
         oSpec.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
         oSpec.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
@@ -334,7 +334,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.fLims = [60 200]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
         oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
         oHFB.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)
@@ -375,7 +375,7 @@ for s = 1:height(statusPP) % Subject loop %s=1;
         oHFB.fLims = [60 200]; % frequency limits in hz; HFB=[70 200]
         oHFB.fMean = true; % Collapse across frequency bands (for 1d vector output)
         oHFB.fVoices = 32; % Voices per octave (default=10, HFB=18)
-        oHFB.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+        oHFB.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
         oHFB.single = false; % Convert to double to single (single much faster on GPU)
         oHFB.singleOut = false; % Run as double (accuracy) & save as single (small filesize)
         oHFB.doGPU = true; % Run on GPU, see MATLAB gpuArray requirements (default=false)

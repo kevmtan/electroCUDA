@@ -1,8 +1,8 @@
-function [trialNfo,n,errors] = ec_getEventIdx(sbj,n,dsTarg)
+function [trialNfo,n,errors] = ec_getEventIdx(sbj,n,hzTarget)
 arguments
     sbj string
     n struct
-    dsTarg double = []
+    hzTarget double = []
 end
 
 % Vars
@@ -10,7 +10,7 @@ blocks = n.blocks;
 nBlocks = n.nBlocks;
 dirs = n.dirs;
 task = n.task;
-doDS = dsTarg>1;
+doDS = hzTarget>1;
 
 % Preallocate
 errors = {};
@@ -28,7 +28,7 @@ for b = 1:nBlocks
     fn = dirs.origSbj+"global_"+task+"_"+sbj+"_"+bn+".mat";
     load(fn,'globalVar');
     hz = floor(globalVar.iEEG_rate);
-    if doDS; ds = floor(hz/dsTarg); end
+    if doDS; ds = floor(hz/hzTarget); end
     
     % Load trialNfo
     fn = dirs.psychSbj+filesep+bn+filesep+"trialNfo_"+sbj+"_"+bn+".mat";
@@ -40,7 +40,7 @@ for b = 1:nBlocks
     if doDS
         iDS = 1:ds:globalVar.chanLength; % Downsample
         blockEndIdx(b) = length(iDS);
-        hz = dsTarg;
+        hz = hzTarget;
     else
         blockEndIdx(b) = globalVar.chanLength;
     end

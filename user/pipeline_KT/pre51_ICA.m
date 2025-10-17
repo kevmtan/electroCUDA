@@ -56,7 +56,7 @@ task = "MMR"; % task name
 % NOTE: see individual functions for all inputs, descriptions & defaults
 o = struct;
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
-o.dsTarg = []; % Downsample target in Hz (default=[]: no downsample)
+o.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
 o.suffix = "i";
 o.sfx_src = "";
 o.ica_pca = 0;

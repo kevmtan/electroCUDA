@@ -78,7 +78,7 @@ fs = n.fs;
 trialNfo.condC = categorical(trialNfo.cond,conds);
 
 % Add sampling rate info to 'o' struct
-if o.dsTarg>0; o.fsTarg=o.dsTarg; else; o.fsTarg=fs; end
+if o.hzTarget>0; o.fsTarg=o.hzTarget; else; o.fsTarg=fs; end
 
 % Band indices
 if any(o.freqIdx)
