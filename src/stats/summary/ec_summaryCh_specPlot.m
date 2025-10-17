@@ -34,9 +34,9 @@ parfor ch = 1:nChs
     sc = ss(ch,:);
     fCh = squeeze(fAvg(:,ch,:));
     vars = string(sc.Properties.VariableNames);
-    if any(vars=="ms"); sc.ms{1}.latency = sc.ms{1}.bin2; end
-    if any(vars=="RT"); sc.RT{1}.latency = sc.RT{1}.binRT2; end
-    if any(vars=="pct"); sc.pct{1}.latency = sc.pct{1}.pct2; end
+    if any(vars=="ms"); sc.ms{1}.latency = sc.ms{1}.bin; end
+    if any(vars=="RT"); sc.RT{1}.latency = sc.RT{1}.binRT; end
+    if any(vars=="pct"); sc.pct{1}.latency = sc.pct{1}.binPct; end
     xCh = squeeze(xe(:,ch,:));
     xhCh = squeeze(xhe(:,ch,:));
 
@@ -99,6 +99,7 @@ nexttile; hold on
 for c = 1:nConds
     plot(squeeze(fCh(c,:)),'LineWidth',2,'Color',oP.col(c,:));
 end
+plot(xlim,[0 0],'k-','LineWidth',oP.o1D.width);
 hold off
 xticks(frqTicks); xticklabels(frqDisp); xlim([1 numel(o.freqs)])
 set(gca,'Fontsize',oP.textsize); ylabel("Magnitude");
@@ -169,7 +170,7 @@ end
 
 %% Save fig
 fn = o.dirOutSbj+sbjCh+"_spec.jpg";
-%exportgraphics(hl,fn,"Resolution",150);
+%exportgraphics(h,fn,"Resolution",150);
 print(h,fn,"-djpeg","-r150");
 disp("SAVED: "+fn);
 close all; % IMPORTANT I guess
@@ -191,9 +192,9 @@ if nnz(chNfo.ECoG)/height(chNfo) > 0.75
 else
     o.oP.alpha = 0.25;
 end
-% o.oP.lats = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:o.stats.epoch(2))))';
-% o.oP.lats5 = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin2:5)))';
-% o.oP.latsRT = int16(floor(1000*(o.stats.epochRT(1):o.epoch.bin2:o.stats.epochRT(2))))';
+% o.oP.lats = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin:o.stats.epoch(2))))';
+% o.oP.lats5 = int16(floor(1000*(o.stats.epoch(1):o.epoch.bin:5)))';
+% o.oP.latsRT = int16(floor(1000*(o.stats.epochRT(1):o.epoch.bin:o.stats.epochRT(2))))';
 % o.oP.dirOutSbj = o.dirOutSbj;
 % o.oP.dirFS = o.dirFS;
 

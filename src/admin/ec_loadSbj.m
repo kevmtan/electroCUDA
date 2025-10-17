@@ -28,13 +28,11 @@ if isnumeric(sbjID); sbjID = "s"+sbjID; end
 if ~startsWith(sbjID,"s"); sbjID = "s"+sbjID; end
 
 % Preload metadata "n" struct
-if any(ismember(a.vars,["n" "psy" "trialNfo"]))
-    fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
-    load(fn,"n");
-end
+fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
+load(fn,"n");
 
 % Check sampling rate
-if ~a.hz && any(ismember(a.vars,["psy" "trialNfo"]))
+if ~a.hz && any(ismember(a.vars,["n" "psy" "trialNfo"]))
     a.hz = n.hz;
     disp("[ec_loadSbj] Verified sampling rate: "+a.hz+"hz"); % Load
 end

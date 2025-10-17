@@ -26,19 +26,19 @@ arguments
     %   Epoch baseline period (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
     op.baselinePre {mustBeFloat} = []            % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
     op.baselinePost {mustBeFloat} = []           % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
-    op.trialNorm {mustBeMember(op.trialNorm,["zscore" "robust"])} = "robust"; % Normalize trial
-    op.trialNormDev {mustBeMember(op.trialNormDev,["baseline" "pre" "post" "on" "off" "all"])}...
-        = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-    op.trialBaseline {mustBeMember(op.trialBaseline,["mean" "median"])} = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+    op.trialNorm string {mustBeMember(op.trialNorm,["robust" "zscore" ""])} = "robust"; % Normalize trial (skip="")
+    op.trialNormDev string {mustBeMember(op.trialNormDev,["baseline" "pre" "post" "on" "off" "all"])}...
+        = "baseline"; % Timepoints for StdDev relative to stim ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+    op.trialBaseline string {mustBeMember(op.trialBaseline,["median" "mean" ""])} = "median"; % Subtract trial by mean or median of baseline period (skip="")
     % Bad frames/outliers
-    op.interp {mustBeMember(op.interp,["nearest" "linear" "spline" "pchip" "makima"])}...
+    op.interp string {mustBeMember(op.interp,["nearest" "linear" "spline" "pchip" "makima"])}...
         = "linear";
-    op.badFields {mustBeMember(op.badFields,["" "hfo" "mad" "diff" "sns"])} = "" % skip=""
-    op.olCenter {mustBeMember(op.olCenter,["median" "mean"])} = "median"
+    op.badFields string {mustBeMember(op.badFields,["" "hfo" "mad" "diff" "sns"])} = "" % skip=""
+    op.olCenter string {mustBeMember(op.olCenter,["median" "mean"])} = "median"
     op.olThr (1,1) double = 5;                   % Threshold for outlier
     op.olThr2 (1,1) double = 0;                  % Threshold for outlier
     op.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
-    % PCA (skip=[])
+    % PCA (skip=0)
     op.pca (1,1) double = 0;                     % Components to keep across channels
     op.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
     % Filtering (within-run):
@@ -58,11 +58,13 @@ sbj = n.sbj;
 
 
 %% Prep
-epIdx = ep.idx; % Epoch indices
 
 % Peristimulus indices 
 stim = psy.stim;
 stim = mat2cell(stim,n.runIdxOg); % split per run
+
+% Epoch indices
+epIdx = ep.idx;
 
 % Trial Indices
 trs = groupcounts(ep,["run" "tr"]);
@@ -101,6 +103,7 @@ else
 end
 
 % Filter prep
+hpf=[]; lpf=[];
 if isany(op.hpf) || isany(op.lpf)
     % Get single-channel/freq timeseries from longest run
     [~,idx] = min(n.runIdxOg);
@@ -118,8 +121,6 @@ if isany(op.hpf) || isany(op.lpf)
             steepness=op.lpfSteep,impulse=op.lpfImpulse,coefOut=true);
     end
     clear xTmp
-else
-    hpf=[]; lpf=[];
 end
 
 % Remove bad frames
@@ -202,7 +203,7 @@ xc = vertcat(xc{:});
 xc = xc(epIdx,:); % Match epoched indices
 xc = cellfun(@(tr) xc(tr,:), trs.i,UniformOutput=false); % Reshape by epoch
 
-% Baseline correct within-trial (robust z-score)
+% Baseline correct & zscore within-trial
 for t = 1:numel(xc)
     xc{t} = withinTrial_lfn(xc{t},trs(t,:),op);
 end
@@ -223,6 +224,13 @@ function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,op)
 % Log transform
 if op.log
     xr = log(xr); end
+
+% Z-score
+if op.runNorm=="robust"
+    xr = normalize(xr,1,"zscore","robust");
+elseif isany(op.runNorm)
+    xr = normalize(xr,1,op.runNorm);
+end
 
 % All outliers
 if any(op.olThr)
@@ -254,7 +262,7 @@ if ~isempty(lpf)
 if op.pcaSpec
     [~,xr] = pca(xr,NumComponents=op.pcaSpec,Economy=false); end
 
-% Normalize (z-score)
+% Z-score round 2
 if op.runNorm=="robust"
     xr = normalize(xr,1,"zscore","robust");
 elseif isany(op.runNorm)
@@ -299,6 +307,8 @@ if op.trialBaseline=="median"
     bl = median(xt(iBL,:),1,"omitnan"); % BL median
 elseif op.trialBaseline=="mean"
     bl = mean(xt(iBL,:),1,"omitnan"); % BL median
+else
+    bl = 0;
 end
 
 % Get trial std deviation
@@ -306,6 +316,8 @@ if op.trialNorm=="robust"
     sd = mad(xt(iSD,:),1,1); % BL MAD median absolute deviation
 elseif op.trialNorm=="zscore"
     sd = std(xt(iSD,:),1,1,"omitnan");
+else
+    sd = 1;
 end
 
 % Do baseline correction

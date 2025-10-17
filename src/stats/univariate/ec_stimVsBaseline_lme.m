@@ -1,10 +1,7 @@
-function o = ec_stimVsBaseline_lme(sbj,proj,task,o,a)
+function o = ec_stimVsBaseline_lme(n,o)
 arguments
-    sbj string
-    proj string
-    task string
+    n struct
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
-    a.plot logical = false
 end
 if o.test
     disp("TESTING sumStats: "+sbj);
@@ -16,8 +13,8 @@ if o.ICA; o.sfx = "i"+o.sfx; end
 
 %% Load
 tic;
-[ns,xs,psy,trialNfo,chNfo,dirs] =...
-    ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo" "dirs"]);
+[x,psy,trialNfo,chNfo] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx,...
+    vars=["x" "psy" "trialNfo" "chNfo"]);
 xs = single(xs);
 if o.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;

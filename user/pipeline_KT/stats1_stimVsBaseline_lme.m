@@ -8,7 +8,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "stimBL";
-analName = "band";
+analName = "bandLME";
 
 dirs = ec_getDirs(proj,task);
 o = struct;
@@ -36,15 +36,8 @@ o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
 o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.epoch.baselinePre = -0.2; % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
-o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
-
-% Frequency bands
-o.freqIdx = []; %[1 14 20:4:83];
-o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band name
-o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
-o.bandsF = [1 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+o.epoch.baselinePre = -0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
@@ -53,9 +46,9 @@ o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as in
 o.pre.hzTarget = 100; % Target sampling rate
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "zscore"; % Normalize trial
-o.pre.trialNormDev = "off"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
+o.pre.trialNorm = "robust"; % Normalize trial
+o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear";
 o.pre.badFields = ""; % ["hfo" "mad" "diff" "sns"]
@@ -63,9 +56,6 @@ o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
 o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
 o.pre.olThrBL = 3; % Threshold for baseline outlier (skip=0)
-% PCA (skip=[])
-o.pre.pca = 0; % Components to keep across channels
-o.pre.pcaSpec = 0; % Spectral components to keep per channel
 % Filtering (within-run):
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
@@ -73,12 +63,20 @@ o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.pre.lpfSteep = 0.5; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
+% PCA (skip=0)
+o.pre.pca = 0; % Components to keep across channels
+o.pre.pcaSpec = 0; % Spectral components to keep per channel
+% Frequency bands
+o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2"]; % Band name
+o.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)"]; % Band display name
+o.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
 
 % Stats
 o.stats.epoch = [-.2 3]; % latency range for stats
-o.stats.epochRT = [-1.5 .5]; % latency range for stats (relative to RT)
-o.stats.epochPct = [-10 110]; % latency percentages for stats
-o.stats.trialPlotLats = [-.2 5];
+o.stats.epochRT = []; %[-1.5 .5]; % latency range for stats (relative to RT)
+o.stats.epochPct = []; %[-10 110]; % latency percentages for stats
+%o.stats.trialPlotLats = [-.2 5];
 
 % Plot options
 o.oP = ecu_genPlotParams("ERSP","MMR");
@@ -106,9 +104,10 @@ if ~exist('logs','var')
     startTime = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
 
     logs = table;
-    logs.name(1) = date+"_ch_"+analName;
-    logs.name(2) = date+"_ic_"+analName;
+    logs.name(1) = analName+"_ch_"+date;
+    logs.name(2) = analName+"_ic_"+date;
     logs.ICA = [false;true];
+    logs.sfx = ["s";"is"];
 
     logs.i{1} = table;
     logs.i{1}.sbj = string(sbjs);
@@ -137,14 +136,11 @@ for s = 1:height(logs.i{1})
     for p = 1:2 %:2 %1 %:2
         if logs.i{p}.stats(s)~=1  % s=1; ii=1;
             % Set options struct per subject
-            o.name = logs.name(p);  
-            o.ICA = logs.ICA(p);
-
             sbj = logs.i{p}.sbj(s);
             dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
+            o.name = logs.name(p);  
+            o.ICA = logs.ICA(p);
             o.dirs = dirs;
-            o.dirIn = dirs.procSbj; %
-            o.dirFS = dirs.fsSbj; % Freesurfer subjects dir
             o.dirOut = logs.out(p);
             o.dirOutSbj = o.dirOut+"s"+dirs.sbjID+filesep;    
             

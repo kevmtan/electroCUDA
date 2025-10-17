@@ -10,17 +10,15 @@ arguments
     oe.post (1,1) double = nan % Duration after stim offset [nan = post-stim ITI]
     oe.max (1,1) double = nan  % Max duration after stim onset, supercedes 'post' [nan = no limit]
     % Epoch time bins (secs)
-    oe.bin (1,1) double = 0.01  % Fine latency bin width (secs)
-    oe.bin2 (1,1) double = 0.05 % Coarse latency bin width (secs)
-    oe.pct (1,1) double = 1     % Fine latency percent width (percentile)
-    oe.pct2 (1,1) double = 10   % Coarse latency percent width (percentile)
+    oe.bin (1,1) double = 0.05  % Latency bin width (secs)
+    oe.binPct (1,1) double = 10 % Latency percent bin width (<=100)
     % Task conditions
     oe.conds string = string(unique(psy.cond)) % List of condition names (order by desired categorical order)
     oe.conds2 string = ""                      % List of custom condition names (ordered like 'oe.conds')
     % Epoch baseline period for subsequent processing
     %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-    oe.baselinePre {mustBeFloat} = [] % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
-    oe.baselinePost {mustBeFloat} = [] % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
+    oe.baselinePre {mustBeFloat} = [] % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+    oe.baselinePost {mustBeFloat} = [] % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 end
 % n=ns; oe=o.epoch; oe.conds=o.conds; oe.conds2=o.conds2;
 oe.pre=seconds(abs(oe.pre)); oe.post=seconds(abs(oe.post));
@@ -122,11 +120,11 @@ end
 
 %% Finalize
 ep = vertcat(ep{:});
-ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "idr"]) = [];
+ep(:,["Time" "onHz" "photodiode" "trial" "timeR"]) = [];
 
 % Label pre-stimulus baseline frames
 if abs(oe.baselinePre)==inf
-    ep.BLpre = ep.pre>0;
+    ep.BLpre = ep.pre>0; % ITI any trial
 elseif isany(oe.baselinePre)
     if isscalar(oe.baselinePre)
         ep.BLpre = -abs(oe.baselinePre)<=ep.latency & ep.pre;
@@ -139,7 +137,7 @@ end
 
 % Label post-stimulus baseline frames
 if abs(oe.baselinePost)==inf
-    ep.BLpost = ep.post>0;
+    ep.BLpost = ep.post>0; % ITI any trial
 elseif isany(oe.baselinePost)
     if isscalar(oe.baselinePost)
         ep.BLpost = oe.baselinePost<=ep.latency & ep.post;
@@ -164,20 +162,17 @@ end
 
 % Bin timings
 ep.frame = round(ep.latency*n.hz); % frame within trial
-ep.bin = round(ep.latency/oe.bin) * oe.bin * 1000;
-ep.bin2 = floor(ep.latency/oe.bin2) * oe.bin2 * 1000;
-ep.pct = floor(ep.pct);
-ep.pct2 = floor(ep.pct/oe.pct2) * oe.pct2;
-ep.binRT = round(ep.latRT/oe.bin) * oe.bin * 1000;
-ep.binRT2 = floor(ep.latRT/oe.bin2) * oe.bin2 * 1000;
+ep.bin = floor(ep.latency/oe.bin) * oe.bin * 1000;
+ep.binPct = floor(floor(ep.pct)/oe.binPct) * oe.binPct;
+ep.binRT = floor(ep.latRT/oe.bin) * oe.bin * 1000;
 
 % Convert vars
-ep = convertvars(ep,["frame" "bin" "bin2" "binRT" "binRT2"],"int16");
-ep = convertvars(ep,["pct" "pct2"],"int8");
+ep = convertvars(ep,["frame" "bin" "binRT"],"int16");
+ep = convertvars(ep,"binPct","int8");
 %ep = convertvars(ep,["latency" "pct" "RT" "latRT"],oe.float);
 
 % Reorder vars
-ep = movevars(ep,["frame" "latency" "bin" "bin2" "pct" "pct2" "latRT" "binRT" "binRT2"],...
+ep = movevars(ep,["frame" "latency" "bin" "pct" "binPct" "latRT" "binRT"],...
     "After","cond");
 ep = movevars(ep,["BLpre" "BLpost"],"After","post");
 
@@ -186,7 +181,6 @@ ep.ide = uint32(1:height(ep))';
 
 % Row names
 ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
-
 
 disp("[ec_epochPsy] Made analysis template: "+n.sbj+" time="+toc(tt));
 
