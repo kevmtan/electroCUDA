@@ -39,7 +39,6 @@ arguments
     op.olThr2 (1,1) double = 0;                  % Threshold for outlier
     op.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
     % Spectral dimensionality reduction by PCA (skip=0)
-    op.pca (1,1) double = 0;                     % Components to keep across channels
     op.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
     % Spectral dimensionality reduction into bands (skip=[])
     op.bands = "";                               % Band name
@@ -91,20 +90,6 @@ if isa(x,"half")
 idx = varfun(@(v) isa(v,"half"),psy,OutputFormat="uniform");
 psy = convertvars(psy,idx,"single");
 
-% Get downsampling factor & anti-aliasing filter
-if isany(op.hzTarget)
-    [ds(1),ds(2)] = rat(op.hzTarget/n.hz);
-    % Errors
-    if ds(1) > ds(2)
-        error("[ec_epochBaseline] downsampling target > sampling rate"); end
-    if ds(1) ~= 1
-        error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
-    ds = ds(2);
-    disp("[ec_epochBaseline] downsampling factor = "+ds);
-else
-    ds = 1;
-end
-
 % Filter prep
 hpf=[]; lpf=[];
 if isany(op.hpf) || isany(op.lpf)
@@ -142,6 +127,10 @@ if isany(op.bands)
     disp("[ec_epochBaseline] Gathered spectral band indices: "+n.sbj+" time="+toc(tt));
 end
 
+% Preallocate PCA weights
+if op.pcaSpec
+    pcaWts = cell(1,n.xChs); end
+
 % Remove bad frames
 if isany(op.badFields)
     for f = 1:numel(op.badFields)
@@ -174,12 +163,12 @@ x = ec_dim2cell(x,2);
 if op.gpu
     % Run on GPU (devs: gpuArray table fields?)
     for c = 1:numel(x)
-        x{c} = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,ds,op);
+        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,op);
     end
 else
     % Run on CPU parallel loop (ideally threadpool, initialize before running)
     parfor c = 1:numel(x)
-        x{c} = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,ds,op);
+        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,op);
     end
 end
 
@@ -187,6 +176,8 @@ end
 %% Finalize
 x = cellfun(@(y) permute(y,[1 3 2]),x,'UniformOutput',false);
 x = horzcat(x{:});
+if op.pcaSpec
+    n.pcaWts = pcaWts; end
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
@@ -197,7 +188,7 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
-function xc = withinCh_lfn(xc,n,stim,epIdx,trs,hpf,lpf,ds,op)
+function [xc,chWts] = withinCh_lfn(xc,n,stim,epIdx,trs,hpf,lpf,op)
 %% Compute within-chan %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % xc=x{104};
 
@@ -213,9 +204,16 @@ xc = mat2cell(xc,n.runIdxOg);
 
 % Processing within-run (HPF, norm, outliers, PCA, LPF)
 for r = 1:n.nRuns
-    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,ds,n,op);
+    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,n,op);
 end
 xc = vertcat(xc{:});
+
+% Spectral PCA (use ec_robustPCA??)
+if op.pcaSpec
+    [chWts,xc] = pca(xc,NumComponents=op.pcaSpec,Economy=false);
+else
+    chWts = [];
+end
 
 % Epoch EEG
 xc = xc(epIdx,:); % Match epoched indices
@@ -229,14 +227,16 @@ xc = vertcat(xc{:});
 
 % Get from GPU
 if op.gpu
-    xc = gather(xc); end
+    xc = gather(xc);
+    chWts = gather(chWts);
+end
 
 % Output at specified float precision
 xc = cast(xc,op.typeOut);
 
 
 
-function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,n,op)
+function xr = withinRun_lfn(xr,stimR,hpf,lpf,n,op)
 %% Compute within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Log transform
@@ -261,17 +261,6 @@ xr = fillmissing(xr,"linear",1,EndValues="nearest");
 if ~isempty(hpf)
     xr = ec_filtfilt(xr,hpf); end
 
-% All outliers (2nd round)
-if any(op.olThr2)
-    xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr2); end
-
-% Baseline outliers
-if any(op.olThrBL)
-    xr(~stimR,:) = filloutliers(xr(~stimR,:),nan,op.olCenter,1,ThresholdFactor=op.olThrBL); end
-
-% Interpolate outliers/missing (slower on GPU)
-xr = fillmissing(xr,"linear",1,EndValues="nearest");
-
 % Spectral bands
 if isany(op.bands)
     xrb = nan([size(xr,1) height(n.bands)],class(xr)); % Preallocate
@@ -283,9 +272,16 @@ if isany(op.bands)
     xr = xrb; % Save
 end
 
-% Spectral PCA (use ec_robustPCA??)
-if op.pcaSpec
-    [~,xr] = pca(xr,NumComponents=op.pcaSpec,Economy=false); end
+% All outliers (2nd round)
+if any(op.olThr2)
+    xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr2); end
+
+% Baseline outliers
+if any(op.olThrBL)
+    xr(~stimR,:) = filloutliers(xr(~stimR,:),nan,op.olCenter,1,ThresholdFactor=op.olThrBL); end
+
+% Interpolate outliers/missing (slower on GPU)
+xr = fillmissing(xr,"linear",1,EndValues="nearest");
 
 % Low-pass filter
 if ~isempty(lpf)
@@ -297,10 +293,6 @@ if op.runNorm=="robust"
 elseif isany(op.runNorm)
     xr = normalize(xr,1,op.runNorm);
 end
-
-% Downsample
-if ds > 1
-    xr = xr(1:ds:end,:); end
 
 
 
@@ -353,7 +345,20 @@ end
 xt = (xt-bl)./sd;
 
 
-
+% % Get downsampling factor & anti-aliasing filter
+% if isany(op.hzTarget)
+%     [ds(1),ds(2)] = rat(op.hzTarget/n.hz);
+%     % Errors
+%     if ds(1) > ds(2)
+%         error("[ec_epochBaseline] downsampling target > sampling rate"); end
+%     if ds(1) ~= 1
+%         error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
+%     ds = ds(2);
+%     disp("[ec_epochBaseline] downsampling factor = "+ds);
+% else
+%     ds = 1;
+% end
+%
 % function xc = acrossTrials_lfn(xc,trs,op)
 % %% acrossTrials_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 

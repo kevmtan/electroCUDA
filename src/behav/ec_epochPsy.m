@@ -10,8 +10,8 @@ arguments
     oe.post (1,1) double = nan % Duration after stim offset [nan = post-stim ITI]
     oe.max (1,1) double = nan  % Max duration after stim onset, supercedes 'post' [nan = no limit]
     % Epoch time bins (secs)
-    oe.bin (1,1) double = 0.05  % Latency bin width (secs)
-    oe.binPct (1,1) double = 10 % Latency percent bin width (<=100)
+    oe.bin (1,1) double = 1000/n.hz  % Latency bin width (secs)
+    oe.binPct (1,1) double = 1 % Latency percent bin width (<=100)
     % Task conditions
     oe.conds string = string(unique(psy.cond)) % List of condition names (order by desired categorical order)
     oe.conds2 string = ""                      % List of custom condition names (ordered like 'oe.conds')
@@ -172,7 +172,7 @@ ep.binPct = floor(ep.binPct+eps(ep.binPct)) * oe.binPct;
 % Convert vars
 ep = convertvars(ep,["frame" "bin" "binRT"],"int16");
 ep = convertvars(ep,"binPct","int8");
-%ep = convertvars(ep,["latency" "pct" "RT" "latRT"],oe.float);
+ep = convertvars(ep,["latency" "pct" "RT" "latRT"],oe.float);
 
 % Reorder vars
 ep = movevars(ep,["frame" "latency" "bin" "pct" "binPct" "latRT" "binRT"],...
@@ -185,7 +185,7 @@ ep.ide = uint32(1:height(ep))';
 % Row names
 ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
 
-disp("[ec_epochPsy] Made analysis template: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPsy] Epoched psych/behav task data: "+n.sbj+" time="+toc(tt));
 
 
 

@@ -64,9 +64,8 @@ o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
 o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
 o.pre.olThrBL = 2.5; % Threshold for baseline outlier (skip=0)
-% PCA (skip=[])
-o.pre.pca = 0; % Components to keep across channels
-o.pre.pcaSpec = 0; % Spectral components to keep per channel
+% Spectral dimensionality reduction by PCA (skip=0)
+o.pre.pca = 0; % Spectral components to keep per channel
 % Filtering (within-run):
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
