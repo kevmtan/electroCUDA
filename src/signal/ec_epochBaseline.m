@@ -1,4 +1,4 @@
-function [x,trs] = ec_epochBaseline(x,n,psy,ep,tt,op)
+function [x,n,trs] = ec_epochBaseline(x,n,psy,ep,tt,op)
 % electroCUDA function for preprocessing, epoching & baseline correction
 %   Kevin Tan (2025) | github.com/kevmtan/electroCUDA
 %
@@ -38,9 +38,13 @@ arguments
     op.olThr (1,1) double = 5;                   % Threshold for outlier
     op.olThr2 (1,1) double = 0;                  % Threshold for outlier
     op.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
-    % PCA (skip=0)
+    % Spectral dimensionality reduction by PCA (skip=0)
     op.pca (1,1) double = 0;                     % Components to keep across channels
     op.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
+    % Spectral dimensionality reduction into bands (skip=[])
+    op.bands = "";                               % Band name
+    op.bands2 = "";                              % Band display name
+    op.bandsF = [];                              % Band limits
     % Filtering (within-run):
     op.hpf (1,1) double = 0;                     % HPF cutoff in hertz (skip=0)
     op.hpfSteep (1,1) double = 0.75;              % HPF steepness
@@ -54,7 +58,6 @@ end
 if ~isany(op.typeProc); op.typeProc = class(x); end
 if ~isany(op.typeOut); op.typeOut = class(x); end
 op.fs2 = double(op.lpf*n.hz);
-sbj = n.sbj;
 
 
 %% Prep
@@ -115,12 +118,28 @@ if isany(op.hpf) || isany(op.lpf)
     if isany(op.hpf)
         hpf = ec_designFilt(xTmp,n.hz,op.hpf,"highpass",...
             steepness=op.hpfSteep,impulse=op.hpfImpulse,coefOut=true);
+        disp("[ec_epochBaseline] Created high-pass filter: "+n.sbj+" time="+toc(tt));
     end
     if isany(op.lpf)
         lpf = ec_designFilt(xTmp,n.hz,op.lpf,"lowpass",...
             steepness=op.lpfSteep,impulse=op.lpfImpulse,coefOut=true);
+        disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
     end
     clear xTmp
+end
+
+% Freq Band indices
+if isany(op.bands)
+    n.bands = table;
+    n.bands.name = op.bands';
+    n.bands.disp = op.bands2';
+    n.bands.freqs(:) = {[]};
+    for b = 1:numel(op.bands)
+        n.bands.id(b,:) = (n.freqs>op.bandsF(b,1) & n.freqs<=op.bandsF(b,2))';
+        n.bands.freqs{b} = n.freqs(n.bands.id(b,:));
+    end
+    n.bands.Properties.RowNames = n.bands.name;
+    disp("[ec_epochBaseline] Gathered spectral band indices: "+n.sbj+" time="+toc(tt));
 end
 
 % Remove bad frames
@@ -144,12 +163,11 @@ if isany(op.badFields)
             x(xBad) = nan;
         end
     end
-    disp("Removed bad frames: "+sbj);
+    disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
 end
 
 % Transform to cell by channel
 x = ec_dim2cell(x,2);
-disp("[ec_epochBaseline] Prepared data & filters: "+n.sbj+" time="+toc(tt));
 
 
 %% Main processing (loop across channels)
@@ -195,7 +213,7 @@ xc = mat2cell(xc,n.runIdxOg);
 
 % Processing within-run (HPF, norm, outliers, PCA, LPF)
 for r = 1:n.nRuns
-    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,ds,op);
+    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,ds,n,op);
 end
 xc = vertcat(xc{:});
 
@@ -218,7 +236,7 @@ xc = cast(xc,op.typeOut);
 
 
 
-function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,op)
+function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,n,op)
 %% Compute within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Log transform
@@ -254,13 +272,24 @@ if any(op.olThrBL)
 % Interpolate outliers/missing (slower on GPU)
 xr = fillmissing(xr,"linear",1,EndValues="nearest");
 
+% Spectral bands
+if isany(op.bands)
+    xrb = nan([size(xr,1) height(n.bands)],class(xr)); % Preallocate
+
+    % Get band timecourse from mean of freq range
+    for b = 1:height(n.bands)
+        xrb(:,b) = mean(xr(:,n.bands.id(b,:)),2,"omitmissing");
+    end
+    xr = xrb; % Save
+end
+
+% Spectral PCA (use ec_robustPCA??)
+if op.pcaSpec
+    [~,xr] = pca(xr,NumComponents=op.pcaSpec,Economy=false); end
+
 % Low-pass filter
 if ~isempty(lpf)
     xr = ec_filtfilt(xr,lpf); end
-
-% PCA (use ec_robustPCA??)
-if op.pcaSpec
-    [~,xr] = pca(xr,NumComponents=op.pcaSpec,Economy=false); end
 
 % Z-score round 2
 if op.runNorm=="robust"

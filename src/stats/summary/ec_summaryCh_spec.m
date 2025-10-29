@@ -18,7 +18,6 @@ if o.ICA; o.sfx = "i"+o.sfx; end
 tic;
 [ns,xs,psy,trialNfo,chNfo,dirs] =...
     ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo" "dirs"]);
-xs = single(xs);
 if o.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;
 
@@ -73,7 +72,6 @@ ss = statsSpec_lfn(xs,ns,sbjChs,ep,B,o); toc
 %% LFP: load & initialize
 [n,x,psy1] = ec_loadSbj(dirs,sfx=o.sfx,vars=["n" "x" "psy"]);
 if o.test; x1=x; end %#ok<NASGU>
-x = single(x);
 n.suffix = o.sfx;
 
 %% LFP: denoise, downsample & baseline correction

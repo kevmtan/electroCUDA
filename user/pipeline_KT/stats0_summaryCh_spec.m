@@ -28,7 +28,7 @@ o.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
 o.conds2 = []; % custom condition names
 
 % Epoching (see 'ec_epochPsy')
-o.epoch.float = "single";
+o.epoch.float = "single"; % floating-point precision for task metadata
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = 0.5; % Duration after stim offset [nan = post-stim ITI]
