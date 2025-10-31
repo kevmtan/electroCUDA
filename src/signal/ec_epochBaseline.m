@@ -15,10 +15,11 @@ arguments
     psy timetable                               % Task metadata per timepoint
     ep table                                    % Epoch metadata per timepoint
     tt uint64 = tic                             % Timer
+    op.test (1,1) logical = false               % Running a test? (keeps removed fields)
     op.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
     op.typeProc (1,1) string = "double"         % processing FP precision ("double"|"single"|""=same as input)
     op.typeOut (1,1) string = class(x)          % output FP precision ("double"|"single"|""=same as input)
-    op.hzTarget (1,1) double = nan                % Target sampling rate
+    op.hzTarget (1,1) double = nan              % Target sampling rate
     % Within-run preprocessing
     op.log (1,1) logical = false;               % Log transform
     op.runNorm string = "zscore";               % Normalize run
@@ -89,6 +90,21 @@ if isa(x,"half")
     x = single(x); end
 idx = varfun(@(v) isa(v,"half"),psy,OutputFormat="uniform");
 psy = convertvars(psy,idx,"single");
+
+% Get downsampling factor & anti-aliasing filter
+if isany(op.hzTarget)
+    [ds(1),ds(2)] = rat(op.hzTarget/n.hz);
+    % Errors
+    if ds(1) > ds(2)
+        error("[ec_epochBaseline] downsampling target > sampling rate"); end
+    if ds(1) ~= 1
+        error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
+    ds = ds(2);
+    disp("[ec_epochBaseline] downsampling factor = "+ds);
+else
+    ds = 1;
+end
+
 
 % Filter prep
 hpf=[]; lpf=[];
@@ -163,21 +179,28 @@ x = ec_dim2cell(x,2);
 if op.gpu
     % Run on GPU (devs: gpuArray table fields?)
     for c = 1:numel(x)
-        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,op);
+        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,ds,op);
     end
 else
     % Run on CPU parallel loop (ideally threadpool, initialize before running)
     parfor c = 1:numel(x)
-        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,op);
+        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,ds,op);
     end
 end
 
 
 %% Finalize
+
+% Reformat EEG data as matrix
 x = cellfun(@(y) permute(y,[1 3 2]),x,'UniformOutput',false);
 x = horzcat(x{:});
+
+% Save to nfo struct
+n.specDims = size(x,3);
 if op.pcaSpec
     n.pcaWts = pcaWts; end
+if ~op.test
+    n.xBad = []; end % remove bad frames indices to save memory
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
@@ -188,7 +211,7 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
-function [xc,chWts] = withinCh_lfn(xc,n,stim,epIdx,trs,hpf,lpf,op)
+function [xc,chWts] = withinCh_lfn(xc,n,stim,epIdx,trs,hpf,lpf,ds,op)
 %% Compute within-chan %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % xc=x{104};
 
@@ -204,7 +227,7 @@ xc = mat2cell(xc,n.runIdxOg);
 
 % Processing within-run (HPF, norm, outliers, PCA, LPF)
 for r = 1:n.nRuns
-    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,n,op);
+    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,ds,n,op);
 end
 xc = vertcat(xc{:});
 
@@ -236,7 +259,7 @@ xc = cast(xc,op.typeOut);
 
 
 
-function xr = withinRun_lfn(xr,stimR,hpf,lpf,n,op)
+function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,n,op)
 %% Compute within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Log transform
@@ -293,6 +316,11 @@ if op.runNorm=="robust"
 elseif isany(op.runNorm)
     xr = normalize(xr,1,op.runNorm);
 end
+
+% Downsample
+if ds > 1
+    xr = xr(1:ds:end,:); end
+
 
 
 

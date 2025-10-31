@@ -158,6 +158,8 @@ for s = 1:height(logs.i{1})
             end
 
             %%
+            if ~exist(logs.out(p),"dir")
+                mkdir(logs.out(p)); end
             logs.i{p}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
             save(logs.fn(p),'logs','-v7');
 

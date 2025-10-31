@@ -13,6 +13,8 @@ arguments
     a.hz (1,1) double = 0
     a.vars string...
         {mustBeMember(a.vars,["n" "x" "psy" "trialNfo" "chNfo" "dirs"])} = "dirs"
+    a.compact string...
+        {mustBeMember(a.compact,["n" "x" "psy" "trialNfo" "chNfo" ""])} = ""
 end
 
 
@@ -28,18 +30,19 @@ if isnumeric(sbjID); sbjID = "s"+sbjID; end
 if ~startsWith(sbjID,"s"); sbjID = "s"+sbjID; end
 
 % Preload metadata "n" struct
-fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
-load(fn,"n");
+if any(ismember(a.vars,["n" "psy" "trialNfo"]))
+    % Load
+    fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
+    load(fn,"n");
 
-% Check sampling rate
-if ~a.hz && any(ismember(a.vars,["n" "psy" "trialNfo"]))
-    a.hz = n.hz;
-    disp("[ec_loadSbj] Verified sampling rate: "+a.hz+"hz"); % Load
+    % Check sampling rate
+    if ~a.hz
+        a.hz = n.hz; disp("[ec_loadSbj] Verified sampling rate: "+a.hz+"hz"); end
+
+    % Original sampling rate not appended on filenames
+    if a.hz==n.hz_og
+        a.hz=""; end
 end
-
-% Original sampling rate not appended on filenames
-if a.hz==n.hz_og
-    a.hz=""; end 
 
 % Loop through requested vars
 for v = 1:numel(a.vars)
@@ -49,6 +52,11 @@ for v = 1:numel(a.vars)
     if vv=="n" && v<=nOut
         fn = dirs.procSbj+"n"+a.sfx+"_"+sbjID+"_"+task;
         disp("[ec_loadSbj] Loaded: "+fn); % Load
+
+        if ismember("n",a.compact)
+            n.asr=[]; n.zapline=[];
+            disp("[ec_loadSbj] Compacted: "+fn); % Load
+        end
         varargout{v} = n;
     end
 
@@ -56,6 +64,11 @@ for v = 1:numel(a.vars)
     if vv=="x" && v<=nOut
         fn = dirs.procSbj+"x"+a.sfx+"_"+sbjID+"_"+task;
         load(fn,"x"); disp("[ec_loadSbj] Loaded: "+fn);
+
+        if ismember("x",a.compact) && isdouble(x)
+            x = single(x);
+            disp("[ec_loadSbj] Compacted to single-precision: "+fn); % Load
+        end
         varargout{v} = x;
     end
 

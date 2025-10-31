@@ -110,7 +110,7 @@ for r = 1:n.nRuns
     n.runTimes(r,:) = [psy.Time(min(idx)) psy.Time(max(idx))];
     n.runTimesOg(r) = psy.timeR(max(idx));
 end
-n.conds = unique(trialNfo.cond);
+n.conds = string(categories(trialNfo.cond));
 disp(sbj+": updated 'n"+o.suffix+"' with info from 'trialNfo' & 'psy'");
 
 

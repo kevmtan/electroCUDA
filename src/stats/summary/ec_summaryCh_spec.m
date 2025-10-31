@@ -17,7 +17,8 @@ if o.ICA; o.sfx = "i"+o.sfx; end
 %% Load
 tic;
 [ns,xs,psy,trialNfo,chNfo,dirs] =...
-    ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx+"s",vars=["n" "x" "psy" "trialNfo" "chNfo" "dirs"]);
+    ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx+"s",...
+    vars=["n" "x" "psy" "trialNfo" "chNfo" "dirs"],compact="n");
 if o.test; xs1=xs; trialNfoOg=trialNfo; x_bad=ns.xBad; end %#ok<NASGU>
 toc;
 
@@ -56,7 +57,7 @@ oo = namedargs2cell(o.epoch);
 
 %% Preprocessing: baseline correction, filtering, downsampling
 oo = namedargs2cell(o.pre);
-xs = ec_epochBaseline(xs,ns,psy,ep,oo{:}); toc % ADD DOWNSAMPLING
+xs = ec_epochBaseline(xs,ns,psy,ep,oo{:},test=o.test); toc % ADD DOWNSAMPLING
 
 %% Get mean evoked magnitude per freq & cond
 fAvg = nan(numel(conds),nChs,numel(ns.freqs),"like",xs);
@@ -70,13 +71,13 @@ disp("Calculated mean evoked magnitude per freq & cond: "+sbj); toc;
 ss = statsSpec_lfn(xs,ns,sbjChs,ep,B,o); toc
 
 %% LFP: load & initialize
-[n,x,psy1] = ec_loadSbj(dirs,sfx=o.sfx,vars=["n" "x" "psy"]);
+[n,x,psy1] = ec_loadSbj(dirs,sfx=o.sfx,vars=["n" "x" "psy"],compact="n");
 if o.test; x1=x; end %#ok<NASGU>
 n.suffix = o.sfx;
 
 %% LFP: denoise, downsample & baseline correction
 oo = namedargs2cell(o.pre);
-x = ec_epochBaseline(x,n,psy1,ep,oo{:}); toc
+x = ec_epochBaseline(x,n,psy1,ep,oo{:},test=o.test); toc
 if ~o.test; clear n; clear psy1; clear trialNfo1; end
 
 %% LFP: summary stats

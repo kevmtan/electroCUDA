@@ -3,7 +3,7 @@ function ec_summaryCh_specPlot(o,ss,xe,xhe,fAvg,B,trialNfo)
 % o.oP.visible=1; o.oP.save=0; o.oP.doGPU=0;
 
 % Load
-[ns,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx+"s",vars=["n" "chNfo"]);
+[ns,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx+"s",vars=["n" "chNfo"],compact="n");
 sbjID = ns.sbjID;
 
 % Load summary stats
@@ -53,7 +53,8 @@ end
 
 
 
-%% Main within-ch plot subfunction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% Main within-ch plot subfunction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function spec_plotChan(o,sc,xCh,xhCh,dCh,fCh,trialNfo,B,xN)
 %warning('off','MATLAB:handle_graphics:Layout:NoPositionSetInTiledChartLayout');
 

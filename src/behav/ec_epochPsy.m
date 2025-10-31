@@ -1,4 +1,4 @@
-function [ep,trialNfo] = ec_epochPsy(psy,trialNfo,n,tt,oe)
+function [ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,oe)
 arguments
     psy timetable
     trialNfo table
@@ -149,15 +149,11 @@ else
 end
 
 % Task condition categorical order
-if ~isany(oe.conds2)
-    ep.cond = categorical(ep.cond,oe.conds);
-    trialNfo.cond = categorical(trialNfo.cond,oe.conds);
-else % Custom condition names
-    [~,ci] = max(ep.cond==oe.conds,[],2);
-    ep.cond = oe.conds2(ci)';
-    ep.cond = categorical(ep.cond,oe.conds2);
-    trialNfo.cond = oe.conds2(ci)';
-    trialNfo.cond = categorical(trialNfo.cond,oe.conds2);
+ep.cond = categorical(ep.cond,oe.conds);
+trialNfo.cond = categorical(trialNfo.cond,oe.conds);
+if isany(oe.conds2)
+    ep.cond = renamecats(ep.cond,oe.conds,oe.conds2);
+    trialNfo.cond = renamecats(trialNfo.cond,oe.conds,oe.conds2);
 end
 
 % Bin timings
@@ -184,6 +180,9 @@ ep.ide = uint32(1:height(ep))';
 
 % Row names
 ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
+
+% Save conditions
+n.conds = string(categories(trialNfo.cond));
 
 disp("[ec_epochPsy] Epoched psych/behav task data: "+n.sbj+" time="+toc(tt));
 
