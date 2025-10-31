@@ -4,7 +4,11 @@ arguments
     trialNfo table
     n struct
     tt (1,1) uint64 = tic
-    oe.float (1,1) string = "double" % Floating-point precision [half|single|double]
+    % Bad trial removal
+    oe.rmTrials {islogical,isnumeric} = []; % Trials to remove (numeric array or logical index)
+    oe.badTrials {mustBeMember(oe.badTrials,["noPdio" "noRT" ""])} = ""; % Bad trial criteria to remove
+    % Floating-point precision for variables [half|single|double]
+    oe.float (1,1){mustBeMember(oe.float,["double" "single" "half"])} = "double"
     % Epoch time limits (secs) [nan=variable, 0=none]
     oe.pre (1,1) double = nan  % Duration before stim onset [nan = pre-stim ITI]
     oe.post (1,1) double = nan % Duration after stim offset [nan = post-stim ITI]
@@ -118,9 +122,38 @@ for t = 1:trs
 end
 
 
+%% Remove bad trials
+trialNfo.removed(:) = false;
+
+% Specified trials to remove
+if isany(oe.rmTrials)
+    if islogical(oe.rmTrials) % Logical index
+        if length(oe.rmTrials)==trs
+            trialNfo.removed(oe.rmTrials) = true;
+        else
+            error("[ec_epochPsy] rmTrials input must match height of trialNfo: "+n.sbj);
+        end
+    elseif isnumeric(oe.rmTrials) % Array of trial numbers
+        trialNfo.removed = ismember(trialNfo.tr,oe.rmTrials);
+    end
+end
+
+% Remove if no photodiode signal
+if ismember("noPdio",oe.badTrials)
+    trialNfo.removed = trialNfo.noPdio | trialNfo.removed; end
+
+% Remove if no RT
+if ismember("noRT",oe.badTrials)
+    trialNfo.removed = ~(trialNfo.RT>0) | trialNfo.removed; end
+
+% Remove
+if any(trialNfo.removed)
+ep{trialNfo.removed} = []; end
+
+
 %% Finalize
 ep = vertcat(ep{:});
-ep(:,["Time" "onHz" "photodiode" "trial" "timeR"]) = [];
+ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]) = [];
 
 % Label pre-stimulus baseline frames
 if abs(oe.baselinePre)==inf
@@ -183,6 +216,7 @@ ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
 
 % Save conditions
 n.conds = string(categories(trialNfo.cond));
+n.nConds = numel(n.conds);
 
 disp("[ec_epochPsy] Epoched psych/behav task data: "+n.sbj+" time="+toc(tt));
 

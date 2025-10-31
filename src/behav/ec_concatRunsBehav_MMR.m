@@ -111,6 +111,7 @@ for r = 1:n.nRuns
     n.runTimesOg(r) = psy.timeR(max(idx));
 end
 n.conds = string(categories(trialNfo.cond));
+n.nConds = numel(n.conds);
 disp(sbj+": updated 'n"+o.suffix+"' with info from 'trialNfo' & 'psy'");
 
 

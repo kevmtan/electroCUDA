@@ -39,12 +39,14 @@ arguments
     op.olThr (1,1) double = 5;                   % Threshold for outlier
     op.olThr2 (1,1) double = 0;                  % Threshold for outlier
     op.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
+    % Remove spectral frequencies (indices for dim3)
+    op.rmFreqs {islogical,isnumeric} = [];
     % Spectral dimensionality reduction by PCA (skip=0)
     op.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
     % Spectral dimensionality reduction into bands (skip=[])
-    op.bands = "";                               % Band name
-    op.bands2 = "";                              % Band display name
-    op.bandsF = [];                              % Band limits
+    op.bands string = "";                        % Band name
+    op.bands2 string = "";                       % Band display name
+    op.bandsF = [];                              % Band freq limits
     % Filtering (within-run):
     op.hpf (1,1) double = 0;                     % HPF cutoff in hertz (skip=0)
     op.hpfSteep (1,1) double = 0.75;              % HPF steepness
@@ -105,6 +107,37 @@ else
     ds = 1;
 end
 
+% Remove spectral indices (frequencies)
+if isany(op.rmFreqs)
+    n.freqsOg = n.freqs;
+    if islogical(op.rmFreqs)
+        n.keptFreqIdx = ~op.rmFreqs;
+    else
+        n.keptFreqIdx = ~ismember((1:n.nFreqs)',op.rmFreqs);
+    end
+    n.freqs = n.freqs(n.keptFreqIdx);
+
+    % Remove from EEG data
+    x = x(:,:,n.keptFreqIdx);
+end
+
+% Spectral Band indices
+if isany(op.bands)
+    n.bands = table;
+    n.bands.name = op.bands';
+    n.bands.disp = op.bands2';
+    n.bands.freqs(:) = {[]};
+    for b = 1:numel(op.bands)
+        n.bands.id(b,:) = (n.freqs>op.bandsF(b,1) & n.freqs<=op.bandsF(b,2))';
+        n.bands.freqs{b} = n.freqs(n.bands.id(b,:));
+    end
+    n.bands.Properties.RowNames = n.bands.name;
+    disp("[ec_epochBaseline] Gathered spectral band indices: "+n.sbj+" time="+toc(tt));
+end
+
+% Preallocate PCA weights
+if op.pcaSpec
+    pcaWts = cell(1,n.xChs); end
 
 % Filter prep
 hpf=[]; lpf=[];
@@ -128,24 +161,6 @@ if isany(op.hpf) || isany(op.lpf)
     end
     clear xTmp
 end
-
-% Freq Band indices
-if isany(op.bands)
-    n.bands = table;
-    n.bands.name = op.bands';
-    n.bands.disp = op.bands2';
-    n.bands.freqs(:) = {[]};
-    for b = 1:numel(op.bands)
-        n.bands.id(b,:) = (n.freqs>op.bandsF(b,1) & n.freqs<=op.bandsF(b,2))';
-        n.bands.freqs{b} = n.freqs(n.bands.id(b,:));
-    end
-    n.bands.Properties.RowNames = n.bands.name;
-    disp("[ec_epochBaseline] Gathered spectral band indices: "+n.sbj+" time="+toc(tt));
-end
-
-% Preallocate PCA weights
-if op.pcaSpec
-    pcaWts = cell(1,n.xChs); end
 
 % Remove bad frames
 if isany(op.badFields)
@@ -195,12 +210,27 @@ end
 x = cellfun(@(y) permute(y,[1 3 2]),x,'UniformOutput',false);
 x = horzcat(x{:});
 
-% Save to nfo struct
-n.specDims = size(x,3);
+% Save PCA weights
 if op.pcaSpec
     n.pcaWts = pcaWts; end
+
+% Save spectral info
+n.nSpect = size(x,3);
+n.spect = table;
+if op.pcaSpec
+    n.spect.name = "pc"+(1:n.nSpect)';
+    n.spect.disp = "Spectral PC "+(1:n.nSpect)';
+elseif isany(op.bands)
+    n = renameStructField(n,"bands","spect");
+else
+    n.spect.name = "f"+(1:n.nSpect)';
+    n.spect.disp = round(n.freqs,2) + " hz";
+    n.spect.freq = n.freqs;
+end
+
+% remove bad frames indices to save memory
 if ~op.test
-    n.xBad = []; end % remove bad frames indices to save memory
+    n.xBad = []; end 
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
@@ -251,7 +281,7 @@ xc = vertcat(xc{:});
 % Get from GPU
 if op.gpu
     xc = gather(xc);
-    chWts = gather(chWts);
+    if op.pcaSpec; chWts = gather(chWts); end
 end
 
 % Output at specified float precision

@@ -35,7 +35,7 @@ function withinRun_lfn(sbj,task,block,dirs,a)
 
 % Load trialinfo
 load(fullfile(dirs.origSbj,block,"trialinfo_"+block+".mat"),"trialinfo");
-trialinfo.pdio(:) = false;
+%trialinfo.pdio(:) = false;
 if ismember("nstim",trialinfo.Properties.VariableNames)
     trialinfo.nStim = trialinfo.nstim;
 else
