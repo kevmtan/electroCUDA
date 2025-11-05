@@ -192,11 +192,11 @@ end
 % Bin timings
 ep.frame = round(ep.latency*n.hz); % frame within trial
 ep.bin = ep.latency/oe.bin;
-ep.bin = floor(ep.bin+eps(ep.bin)) * oe.bin * 1000;
+ep.bin = round(ep.bin+eps(ep.bin)) * oe.bin * 1000;
 ep.binRT = ep.latRT/oe.bin;
-ep.binRT = floor(ep.binRT+eps(ep.binRT)) * oe.bin * 1000;
-ep.binPct = floor(ep.pct)/oe.binPct;
-ep.binPct = floor(ep.binPct+eps(ep.binPct)) * oe.binPct;
+ep.binRT = round(ep.binRT+eps(ep.binRT)) * oe.bin * 1000;
+ep.binPct = ep.pct/oe.binPct;
+ep.binPct = round(ep.binPct+eps(ep.binPct)) * oe.binPct;
 
 % Convert vars
 ep = convertvars(ep,["frame" "bin" "binRT"],"int16");

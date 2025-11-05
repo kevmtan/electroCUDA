@@ -393,14 +393,17 @@ end
 % Get trial std deviation
 if op.trialNorm=="robust"
     sd = mad(xt(iSD,:),1,1); % BL MAD median absolute deviation
+    c = 0.6745;
 elseif op.trialNorm=="zscore"
     sd = std(xt(iSD,:),1,1,"omitnan");
+    c = 1;
 else
     sd = 1;
+    c = 1;
 end
 
 % Do baseline correction
-xt = (xt-bl)./sd;
+xt = c*(xt-bl)./sd;
 
 
 % % Get downsampling factor & anti-aliasing filter
