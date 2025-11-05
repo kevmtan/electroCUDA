@@ -4,54 +4,59 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
     "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
     "S15_83_RR";"S16_95_JOB";"S16_96_LF"];
-
+%sbjs = ["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "stimBL";
 analName = "bandLME";
 
 dirs = ec_getDirs(proj,task);
+
+% Create options struct
 o = struct;
+o.name = ""; % Analysis name 
+o.sfx = ""; % Suffix of input data
 
 %% Options
-o.name = ""; % fill later
-o.sfx = "";
 o.test = false;
 o.gpu = false;
 o.plot = true;
 
-% All Conditions
-o.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
-o.conds2 = []; % custom condition names
-
-% Epoching (see 'ec_epochPsy')
-o.epoch.float = "single";
+% Task Epoching (see 'ec_epochPsy')
+o.epoch.float = "single"; % task metadata floating-point precision
+% Bad trial removal
+o.epoch.rmTrials = []; % Trials to remove (numeric array or logical index)
+o.epoch.badTrials = ""; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.epoch.max = nan; % Max duration after stim onset, supercedes 'post' [nan = no limit]
-% Epoch time bins (secs)
-o.epoch.bin = 0.01; % Fine latency bin width (secs)
-o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
-o.epoch.pct2 = 10; % Coarse latency percent width (percentile)
+% Epoch time bins
+o.epoch.bin = 0.05; % latency bin width (secs)
+o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
 o.epoch.baselinePre = -0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
+% Task condition ordering (leave blank for to leave unordered)
+o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
+o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
+%   o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
+%   o.epoch.conds2 = ["Mz" "Mz" "Ab" "Ab" "Math" "Rest"]; % custom condition names (per above order, can repeat)
 
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
-o.pre.hzTarget = 100; % Target sampling rate
+o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "robust"; % Normalize trial
+o.pre.trialNorm = "zscore"; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear";
-o.pre.badFields = ""; % ["hfo" "mad" "diff" "sns"]
+o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
 o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
 o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
@@ -60,42 +65,46 @@ o.pre.olThrBL = 3; % Threshold for baseline outlier (skip=0)
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.5; % LPF steepness
+o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
+o.pre.lpfSteep = 0.85; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
-% PCA (skip=0)
-o.pre.pca = 0; % Components to keep across channels
-o.pre.pcaSpec = 0; % Spectral components to keep per channel
-% Frequency bands
-o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2"]; % Band name
-o.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)"]; % Band display name
-o.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+% Spectral dimensionality reduction by PCA (skip=0)
+o.pre.pca = 0; % Spectral components to keep per channel
+% Spectral dimensionality reduction into bands (skip=[])
+o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 % Stats
-o.stats.epoch = [-.2 3]; % latency range for stats
-o.stats.epochRT = []; %[-1.5 .5]; % latency range for stats (relative to RT)
-o.stats.epochPct = []; %[-10 110]; % latency percentages for stats
+o.stats.alpha = 0.05; % Critical p-value (default=0.05)
+o.stats.binVar = "bin"; % Timebin variable ["bin"|"binPct"|"binRT"]
+o.stats.binRng = [-200 3000]; % Range of timebins to run
+o.stats.fdrBinRng = [0 inf]; % Range of timebins for FDR
+o.stats.contrastBL = false; % Direct contrast of timebin vs. baseline observations (default=false)
+o.stats.singleTrial = true; % Get trial-by-trial stats
+o.stats.randomEffectsOnly = false; % only model single-trial stats
+%o.stats.covPattern = "FullCholesky"; % Covariance pattern (default="FullCholesky",see fitlme)
 %o.stats.trialPlotLats = [-.2 5];
 
-% Plot options
-o.oP = ecu_genPlotParams("ERSP","MMR");
-o.oP.visible = 0;
-o.oP.save = true;
-o.oP.doGPU = false;
-o.oP.clim = [-4 4];
-o.oP.climICA = [];
-o.oP.climICA_z = [-6 6];
-o.oP.alpha = 0.95;
-o.oP.o1D = struct;
-o.oP.o1D.style= '-';
-o.oP.o1D.width = 1;
-o.oP.o1D.edgestyle = ':';
-for c = 1:numel(o.conds)
-    o.oP.o1D.col{c} = o.oP.col(c,:);
-end
-o.oP.textcol = [.8 .8 .8];
-o.oP.textsize = 8;
+% % Plot options
+% o.oP = ecu_genPlotParams("ERSP","MMR");
+% o.oP.visible = 0;
+% o.oP.save = true;
+% o.oP.doGPU = false;
+% o.oP.clim = [-4 4];
+% o.oP.climICA = [];
+% o.oP.climICA_z = [-6 6];
+% o.oP.alpha = 0.95;
+% o.oP.o1D = struct;
+% o.oP.o1D.style= '-';
+% o.oP.o1D.width = 1;
+% o.oP.o1D.edgestyle = ':';
+% for c = 1:numel(o.conds)
+%     o.oP.o1D.col{c} = o.oP.col(c,:);
+% end
+% o.oP.textcol = [.8 .8 .8];
+% o.oP.textsize = 8;
 
 
 %% Logs
@@ -124,7 +133,6 @@ if ~exist('logs','var')
         logs.out(p) = dirs.anal+analFolder+filesep+logs.name(p)+filesep;
         logs.out(p) = dirs.anal+analFolder+filesep+logs.name(p)+filesep;
         logs.fn(p) = logs.out(p)+"log_"+startTime+".mat";
-        mkdir(logs.out(p));
     end
 end
 
@@ -132,29 +140,32 @@ end
 %% Run sum stats %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 try delete(gcp("nocreate")); catch;end
 try parpool("threads"); catch;end
+
+% Loop across subjects
 for s = 1:height(logs.i{1})
-    for p = 1:2 %:2 %1 %:2
-        if logs.i{p}.stats(s)~=1  % s=1; ii=1;
+    for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
+        if logs.i{p}.stats(s)~=1 
             % Set options struct per subject
             sbj = logs.i{p}.sbj(s);
-            dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
-            o.name = logs.name(p);  
+            o.name = logs.name(p);
+            o.sfx = logs.sfx(p);
             o.ICA = logs.ICA(p);
-            o.dirs = dirs;
+            o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
             o.dirOut = logs.out(p);
-            o.dirOutSbj = o.dirOut+"s"+dirs.sbjID+filesep;    
-            
-            %%
+            o.dirOutSbj = o.dirOut+"s"+dirs.sbjID+filesep;
+
+            %% Run subject
+            if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
             try
-                disp("STARTING SUMMARY STATS: "+sbj);
-                logs.i{p}.o{s} = ec_summaryCh_spec(sbj,proj,task,o);
+                disp("STARTING: "+sbj);
+                logs.i{p}.o{s} = ec_stimVsBaseline_lme(o);
                 logs.i{p}.stats(s) = 1;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;
                 logs.i{p}.stats(s) = 0;
             end
 
-            %%
+            %% Save logs
             logs.i{p}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
             save(logs.fn(p),'logs','-v7');
 

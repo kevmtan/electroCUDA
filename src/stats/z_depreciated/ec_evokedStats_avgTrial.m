@@ -1,4 +1,4 @@
-function [completeStats,completePlot,errors] = evokedStats_avgTrial(sbj,blocks,projectN,o)
+function [completeStats,completePlot,errors] = ec_evokedStats_avgTrial(sbj,blocks,projectN,o)
 % diffFromBaseline - Kevin Tan (kevmtan@ucla.edu)
 % DEPENDENCIES: Matlab Statistics & Machine Learning Toolbox
 % UTILITY: Finds significant differences in estimated mean values in prestimulus vs. peristimulus timepoints
