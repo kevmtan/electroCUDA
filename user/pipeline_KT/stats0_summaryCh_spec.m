@@ -6,7 +6,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 % s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
-%sbjs="S12_42_NC";
+sbjs="S12_38_LK";
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -57,16 +57,16 @@ o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as in
 o.pre.hzTarget = 100; % Target sampling rate
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""] (skip="")
+o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""] (skip="")
 o.pre.trialNormDev = "all"; % Timepoints for StdDev relative to stim ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip="")
+o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip="")
 % Bad frames/outliers
 o.pre.interp = "linear";
-o.pre.badFields = ["hfo" "mad"]; % ["hfo" "mad" "diff" "sns"]
+o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
 o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
 o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
-o.pre.olThrBL = 2.5; % Threshold for baseline outlier (skip=0)
+o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 % Spectral dimensionality reduction by PCA (skip=0)
 o.pre.pca = 0; % Spectral components to keep per channel
 % Filtering (within-run):
@@ -74,7 +74,7 @@ o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.pre.lpf = 25; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.5; % LPF steepness
+o.pre.lpfSteep = 0.85; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 
 % Stats

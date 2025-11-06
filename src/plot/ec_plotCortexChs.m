@@ -1,14 +1,14 @@
-function h = ec_plotCortexChs(h,d,o,a)
+function h = ec_plotCortexChs(d,a,h)
 % Plots electrode channels on a freesurfer cortical surface (fsavg or custom)
 % This function is meant to be called with plotCortex
 % If not using plotCortex, you must call plotCortexSurf *before* this function
 %
-% AUTHOR: Kevin Tan, 2022 (github.com/kevmtan/electroCUDA)
+% AUTHOR: Kevin Tan, 2025 (github.com/kevmtan/electroCUDA)
 % LICENSE: GNU GPL - use at your own risk!
 %
 % INPUTS:
 %  d = table of plotting data per electrode channel (see ec_plotCortex)
-%  o = plot options (see ec_plotCortex)
+%  a = plot options (see ec_plotCortex)
 %  h = graphics array, output of ec_plotCortexSurf
 %
 % OUTPUT:
@@ -16,64 +16,25 @@ function h = ec_plotCortexChs(h,d,o,a)
 
 %% Check inputs
 arguments
+    d table
+    a struct
     h {isgraphics,isobject} = gca
-    d {istable,isstruct} = []
-    o struct = struct
-    a.sbj {isstring,ischar} = []
-    a.parallel logical = []
-    a.doGPU logical = []
-    a.figPos {isnumeric} = []
-    a.insPos {isnumeric} = []
-    a.hem {isstring,ischar}  = []
-    a.cView {isstring,ischar} = []
-    a.align logical = []
-    a.visible logical = []
-    a.dataTipVars {isstring,ischar}  = []
 end
 if nargin<1||~istable(d); error("electrode data table needed"); end
 
-% Transfer name-value arguments to options struct
-af = fieldnames(a);
-for i = 1:numel(af)
-    if ~isempty(a.(af{i})); o.(af{i})=a.(af{i}); end
-end
-clear a
-
-% Options struct (missing fields: default vals or prompt)
-if ~isfield(o,'sbj'); o.sbj="fsaverage";
-elseif ~isstring(o.sbj); o.sbj=string(o.sbj); end
-if ~isfield(o,'parallel'); o.parallel=false; end
-if ~isfield(o,'doGPU'); o.doGPU=false; end
-if ~isfield(o,'figPos'); o.figPos=[0 0 800 600]; end
-if ~isfield(o,'insPos'); o.insPos=[0 0.005 0.99 0.995]; end
-if ~isfield(o,'hem'); o.hem="L"; end
-if ~isfield(o,'cView'); o.cView="lateral"; end
-if ~isfield(o,'align'); o.align=true; end
-if ~isfield(o,'visible'); o.visible=false; end
-if ~isfield(o,'dataTipVars'); o.dataTipVars="label"; end
-v = o.cView;
-hem = o.hem;
-nVars = numel(o.dataTipVars);
-alignV = o.align;
-dataTipVars = o.dataTipVars;
+v = a.cView;
+hem = a.hem;
+nVars = numel(a.dataTipVars);
+alignV = a.align;
+dataTipVars = a.dataTipVars;
+dVars = string(d.Properties.VariableNames);
 
 %% Electrode data table
-dVars = string(d.Properties.VariableNames);
-if ~ismember(dVars,"pos"); error("electrode channel coordinates needed: d.pos(ch)=[x y z]"); end
-if ~ismember(dVars,"lat"); d.lat(:)="both"; end
-if ~ismember(dVars,"hem"); d.hem(:)="L"; end
-if ~ismember(dVars,"iEEG"); d.iEEG(:)="ECoG"; end
-if ~ismember(dVars,"GM"); d.GM(:)="GM"; end
-if ~ismember(dVars,"line"); d.line(:)="o"; end
-if ~ismember(dVars,"col"); d.col=zeros(height(d),3); end
-if ~ismember(dVars,"bCol"); d.bCol=zeros(height(d),3); end
-if ~ismember(dVars,"sz"); d.sz(:)=8; end
-if ~ismember(dVars,"bSz"); d.bSz(:)=nan; end
-if ~ismember(dVars,"label"); d.label=string(1:height(d))'; end
-% Get datatipvar sie
+
+% Get datatip var size
 varSz = nan(nVars,1);
 for i = 1:nVars
-    varSz(i) = size(d.(o.dataTipVars(i)),2);
+    varSz(i) = size(d.(a.dataTipVars(i)),2);
 end
 % Sort if ordered
 if ismember(dVars,"order")
@@ -97,7 +58,7 @@ end
 % end
 
 % Get datatip template
-if o.visible
+if a.visible
     row1 = repmat(matlab.graphics.datatip.DataTipTextRow,nVars,1);
 else
     row1 = [];
@@ -113,24 +74,24 @@ end
 
 %% Pull electrode coords out from the brain towards the viewer
 nChs = height(d);
-if nnz(o.pullF)
+if nnz(a.pullF)
     if (hem=="L" && v=="lateral")||(hem=="R" && v=="medial")
-        d.pos(:,1) = d.pos(:,1) - o.pullF;
+        d.pos(:,1) = d.pos(:,1) - a.pullF;
     elseif (hem=="R" && v=="lateral")||(hem=="L" && v=="medial")
-        d.pos(:,1) = d.pos(:,1) + o.pullF;
+        d.pos(:,1) = d.pos(:,1) + a.pullF;
     elseif v=="ventral"
-        d.pos(:,1) = d.pos(:,1) - o.pullF;
+        d.pos(:,3) = d.pos(:,3) - a.pullF;
     else
         camPos = get(h(ax),'cameraposition');
         err = repmat(camPos,nChs,1) - d.pos;
         nrmd = err./repmat(sqrt(sum(err.^2,2)),1,3);
-        d.pos = d.pos + nrmd * o.pullF;
+        d.pos = d.pos + nrmd * a.pullF;
     end
 end
 
 %% Plot electrodes
 hEEG = gobjects(nChs,1);
-if o.parallel && ~o.doGPU
+if a.parallel && ~a.doGPU
     parfor e = 1:nChs
         hEEG(e) = plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
     end
@@ -164,11 +125,11 @@ end
 % Datatips
 if ~isempty(row1)
     row = row1;
-    for i = 1:nVars
-        varN = dataTipVars(i);
+    for v = 1:nVars
+        varN = dataTipVars(v);
         %row(i) = dataTipTextRow(varN,[d{e,varN} d{e,varN}]); %he.UserData.(varN));
-        if varSz(i)>1; row(i) = dataTipTextRow(varN,de.(varN));
-        else; row(i) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end   
+        if varSz(v)>1; row(v) = dataTipTextRow(varN,de.(varN));
+        else; row(v) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end   
     end
     he.DataTipTemplate.DataTipRows(end+1:end+nVars) = row;
 end

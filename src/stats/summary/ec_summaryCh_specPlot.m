@@ -201,7 +201,7 @@ end
 
 % Make ch plotting data table
 d = table;
-d.label = chNfo.sbjCh;
+d.sbjCh = chNfo.sbjCh;
 d = [d,chNfo(:,1:12)];
 d.line(:) = "o";
 d.line(~d.ECoG) = "s";

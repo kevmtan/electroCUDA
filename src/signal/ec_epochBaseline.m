@@ -222,10 +222,13 @@ if op.pcaSpec
     n.spect.disp = "Spectral PC "+(1:n.nSpect)';
 elseif isany(op.bands)
     n = renameStructField(n,"bands","spect");
-else
+elseif n.nSpect > 1
     n.spect.name = "f"+(1:n.nSpect)';
     n.spect.disp = round(n.freqs,2) + " hz";
     n.spect.freq = n.freqs;
+else
+    n.spect.name = "";
+    n.spect.disp = "";
 end
 
 % remove bad frames indices to save memory
@@ -308,7 +311,7 @@ if any(op.olThr)
     xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr); end
 
 % Interpolate outliers/missing (slower on GPU)
-xr = fillmissing(xr,"linear",1,EndValues="nearest");
+xr = fillmissing(xr,op.interp,1,EndValues="nearest");
 
 % High-pass filter
 if ~isempty(hpf)
@@ -334,7 +337,7 @@ if any(op.olThrBL)
     xr(~stimR,:) = filloutliers(xr(~stimR,:),nan,op.olCenter,1,ThresholdFactor=op.olThrBL); end
 
 % Interpolate outliers/missing (slower on GPU)
-xr = fillmissing(xr,"linear",1,EndValues="nearest");
+xr = fillmissing(xr,op.interp,1,EndValues="nearest");
 
 % Low-pass filter
 if ~isempty(lpf)
