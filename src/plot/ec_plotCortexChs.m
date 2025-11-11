@@ -89,21 +89,21 @@ if nnz(a.pullF)
 end
 
 %% Plot electrodes
-hEEG = gobjects(nChs,1);
+%hEEG = gobjects(nChs,1);
 if a.parallel && ~a.doGPU
     parfor e = 1:nChs
-        hEEG(e) = plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
+        plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
     end
 else
     for e = 1:nChs
-        hEEG(e) = plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
+        plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
     end
     %d = table2struct(d);
     %hEEG = arrayfun(@(de) plotCh_lfn(de,h(ax),row1,dataTipVars,nVars,varSz,alignV),d);
 end
 
-% Return graphics array
-h = [h;hEEG];
+% % Return graphics array
+% h = [h;hEEG];
 end
 
 
@@ -129,7 +129,7 @@ if ~isempty(row1)
         varN = dataTipVars(v);
         %row(i) = dataTipTextRow(varN,[d{e,varN} d{e,varN}]); %he.UserData.(varN));
         if varSz(v)>1; row(v) = dataTipTextRow(varN,de.(varN));
-        else; row(v) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end   
+        else; row(v) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end
     end
     he.DataTipTemplate.DataTipRows(end+1:end+nVars) = row;
 end

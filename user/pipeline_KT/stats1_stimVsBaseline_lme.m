@@ -51,7 +51,7 @@ o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as in
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "zscore"; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
@@ -60,7 +60,7 @@ o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
 o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
 o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
-o.pre.olThrBL = 3; % Threshold for baseline outlier (skip=0)
+o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 % Filtering (within-run):
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
@@ -79,7 +79,7 @@ o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 % Stats
 o.stats.alpha = 0.05; % Critical p-value (default=0.05)
 o.stats.binVar = "bin"; % Timebin variable ["bin"|"binPct"|"binRT"]
-o.stats.binRng = [-200 3000]; % Range of timebins to run
+o.stats.binRng = [-200 2000]; % Range of timebins to run
 o.stats.fdrBinRng = [0 inf]; % Range of timebins for FDR
 o.stats.contrastBL = false; % Direct contrast of timebin vs. baseline observations (default=false)
 o.stats.singleTrial = true; % Get trial-by-trial stats
@@ -87,24 +87,48 @@ o.stats.randomEffectsOnly = false; % only model single-trial stats
 %o.stats.covPattern = "FullCholesky"; % Covariance pattern (default="FullCholesky",see fitlme)
 %o.stats.trialPlotLats = [-.2 5];
 
-% % Plot options
-% o.oP = ecu_genPlotParams("ERSP","MMR");
-% o.oP.visible = 0;
-% o.oP.save = true;
-% o.oP.doGPU = false;
-% o.oP.clim = [-4 4];
-% o.oP.climICA = [];
-% o.oP.climICA_z = [-6 6];
-% o.oP.alpha = 0.95;
-% o.oP.o1D = struct;
-% o.oP.o1D.style= '-';
-% o.oP.o1D.width = 1;
-% o.oP.o1D.edgestyle = ':';
-% for c = 1:numel(o.conds)
-%     o.oP.o1D.col{c} = o.oP.col(c,:);
-% end
-% o.oP.textcol = [.8 .8 .8];
-% o.oP.textsize = 8;
+%% Plot cortex options
+opc = struct;
+
+opc.test = false; % TEST??????
+
+opc.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
+opc.statsVar = "sAvg"; % Subject stats variable name in saved data
+opc.chBadFields = "bad";
+opc.condVar = "cond"; % variable for condition, contrast, or test (in stats table)
+opc.conds = []; % conds to do (empty=all)
+opc.timeVar = "bin"; % variable for time (in stats results)
+opc.timeUnit = "ms"; % time unit to display in fig
+opc.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
+opc.frqs = []; % frequency names to plot (empty=all)
+opc.actVar = "b"; % activity variable for electrode plot color (in stats table)
+opc.actUnit = "z"; % activity unit to display in fig
+opc.clim = [-3 3]; % limits for activity colorscale 
+opc.sigVar = "q"; % statistical significance variable (in stats table)
+opc.sigThr = 0.05; % significance threshold (default=0.05)
+opc.posVar = "MNI"; % position variable in chNfo table (should match surfType)
+opc.surfType = "pial_avg"; % surface type (freesurfer naming convention) ["pial_avg"|"inflated_avg"]
+opc.pullF = 15; % Pull factor, view elecs closer to camera (default=15)
+opc.alpha = 0.95; % cortex opacity
+opc.markSz = 5; % marker size for significant chans;
+opc.nsSz = 2; % marker size for nonsignificant chans;
+opc.cmap = "RdBu";
+opc.txtCol = [.8 .8 .8];
+opc.txtSz = 8;
+opc.chLabel = "sbjCh"; % channel label variable (for visible/interactive plots)
+opc.visible = 0;
+opc.save = true;
+opc.doGPU = false;
+
+% Individual plots per cond/time/freq
+opc.indiv.do = false;
+opc.indiv.res = [1980 1080];
+opc.indiv.saveDir = "indiv";
+
+% Condition plots showing subplots per time & freq
+opc.cond.do = true;
+opc.cond.res = [1980 1080];
+opc.cond.saveDir = "cond";
 
 
 %% Logs
@@ -175,3 +199,12 @@ for s = 1:height(logs.i{1})
     end
 end
 
+
+%% Plot cortical timecourses
+if ~exist("logs","var")
+    load("/01/lbcn/anal/stimBL/bandLME_ch_251106/log_251106_0631.mat"); end
+
+for p = 1 %1:2
+    %%
+    ec_plotTimesCortex(logs(p,:),opc);
+end

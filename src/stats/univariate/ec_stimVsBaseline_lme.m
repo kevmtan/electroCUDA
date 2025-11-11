@@ -59,6 +59,7 @@ ep.ide = uint32(1:height(ep))'; % new epoch indices
 %% Analysis-specific EEG preprocessing
 oo = namedargs2cell(o.pre);
 [x,n] = ec_epochBaseline(x,n,psy,ep,oo{:},test=o.test); toc(tt);
+o.n = n;
 o.spect = n.spect;
 
 
@@ -165,6 +166,7 @@ for c = 1:n.nConds
         % Finalize
         cAvg.sbjCh(:) = sbjCh;
         cAvg.cond(:) = n.conds(c);
+        cAvg.cond = categorical(cAvg.cond,n.conds);
         cAvg = movevars(cAvg,["sbjCh" "cond"],Before=tVar);
 
         % Save
@@ -212,6 +214,7 @@ for c = 1:n.nConds
         % Finalize
         cST.sbjCh(:) = sbjCh;
         cST.cond(:) = n.conds(c);
+        cST.cond = categorical(cST.cond,n.conds);
         cST = movevars(cST,["sbjCh" "cond"],Before=tVar);
 
         % Save

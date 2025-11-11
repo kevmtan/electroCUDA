@@ -63,7 +63,7 @@ end
 
 % Get value order & indices 
 vals = (vals-cLim(1))./(cLim(2)-cLim(1));
-cIdx = round(vals.*nCols);
+cIdx = round(vals.*(nCols-1))+1;
 cIdx(cIdx<1) = 1;
 cIdx(cIdx>nCols) = nCols;
 in = ~isnan(cIdx);

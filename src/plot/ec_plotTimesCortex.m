@@ -89,9 +89,15 @@ dp = makePlotData_lfn(stat,chs,opc,o);
 
 
 %% Plot individual
+if opc.indiv.do
+    plotIndiv_lfn(dp,opc,o);
+end
 
 
-%% Gallery of times & freqs per condition
+%% Plot gallery of times & freqs (separate per cond)
+if opc.cond.do
+    conds_lfn(dp,opc,o);
+end
 
 
 
@@ -233,7 +239,7 @@ if ~exist(dirOut,"dir")
 %% Loop across plots
 for p = 1:height(dp)
     % Title text
-    txt = dp.frqD(p)+" | "+dp.cond(p)+" | "+dp.time(p)+opc.timeUnit;
+    txt = dp.frqD(p)+" | "+string(dp.cond(p))+" | "+dp.time(p)+opc.timeUnit;
     
     % Initialize figure
     h = figure(Position=[0 0 opc.indiv.res],Theme="light",Color="w",Visible=opc.test);
@@ -243,8 +249,8 @@ for p = 1:height(dp)
 
     %% Save
     if opc.save
-        fn = dirOut+dp.cond(p)+"_"+dp.frq(p)+"_"+dp.time(p)+".png";
-        exportgraphics(fn,Resolution=150);
+        fn = dirOut+string(dp.cond(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
+        exportgraphics(h,fn,Resolution=150);
         close all
     end
 
@@ -255,42 +261,18 @@ end
 
 
 %%% Plot per condition showing times & freqs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function makeCond_lfn(dp,opc,o)
-conds = string(categories(dp.cond));
-frqs = string(categories(dp.frq));
-times = unique(dp.time,"stable");
-
-
+function conds_lfn(dp,opc,o)
 % Make directory
 dirOut = o.dirOut+opc.cond.saveDir+filesep;
 if ~exist(dirOut,"dir")
     mkdir(dirOut); end
 
+conds = string(categories(dp.cond));
+
 %% Loop across plots
-for p = 1:height(dp)
-    % Title text
-    txt = dp.frqD(p)+" | "+dp.cond(p)+" | "+dp.time(p)+opc.timeUnit;
-    
-    % Initialize figure
-    h = figure(Position=[0 0 opc.indiv.res],Theme="light",Color="w",Visible=opc.test);
-
-    % Plot cortex
-    plotCortex_lfn(h,dp.d{p},opc,o.dirs.freesurfer,txt);
-
-   
-
-    %% Save
-    if opc.save
-        fn = dirOut+dp.cond(p)+"_"+dp.frq(p)+"_"+dp.time(p)+".png";
-        exportgraphics(fn,Resolution=150);
-        close all
-    end
-
+for c = 1:numel(conds)
+    plotCond_lfn(dp(dp.cond==conds(c),:),opc,o,dirOut);
 end
-
-
-
-
 
 
 
@@ -302,12 +284,55 @@ end
 
 
 
+%%% Plot condition (subplots of times & freqs) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function plotCond_lfn(dc,opc,o,dirOut)
+% dc = dp(dp.cond=="Other",:);
+times = unique(dc.time);
+frqs = string(categories(dc.frq));
+timesN=numel(times); frqN=numel(frqs);
 
-%%% Make individual plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCortex_lfn(h,d,opc,dirFS,txt)
+% Order by tiledorder
+dc = sortrows(dc,["time" "frq"],"ascend");
+
+% Initialize figure
+h = figure(Position=[0 0 opc.cond.res],Theme="light",Color="w",Visible=opc.test);
+ht = tiledlayout(h,timesN,frqN,TileSpacing="compact",padding="tight");
+title(ht,dc.cond(1));
+
+
+%% Loop across subplots
+for p = 1:height(dc)
+    %%     
+    txt = dc.frqD(p)+" | "+dc.time(p)+opc.timeUnit; % Title text
+
+    % Sig elecs only
+    d = dc.d{p};
+    d(~d.bSz,:) = [];
+    
+    % Plot cortex
+    plotCortex_lfn(ht,d,opc,o.dirs.freesurfer,txt,p);
+end
+
+%% Save
+if opc.save
+    fn = dirOut+string(dc.cond(1))+".png";
+    exportgraphics(h,fn,Resolution=150);
+    close all
+end
+
+
+
+
+
+%%% Plot electrodes on cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function plotCortex_lfn(h,d,opc,dirFS,txt,p)
 
 % Make tiledlayout for lateral/medial
 hi = tiledlayout(h,1,2,TileSpacing="none",padding="tight");
+if nargin>5
+    hi.Layout.Tile = p;
+    hi.Layout.TileSpan = [1 1];
+end
 
 % Lateral
 ha = nexttile(hi);
