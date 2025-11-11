@@ -34,12 +34,11 @@ dVars = string(d.Properties.VariableNames);
 % Get datatip var size
 varSz = nan(nVars,1);
 for i = 1:nVars
-    varSz(i) = size(d.(a.dataTipVars(i)),2);
-end
+    varSz(i) = size(d.(a.dataTipVars(i)),2); end
+
 % Sort if ordered
-if ismember(dVars,"order")
-    d = sortrows(d,'order','ascend');
-end
+if isany(a.order)
+    d = sortrows(d,'order',a.order); end
 
 % % Convert to gpuArray
 % if o.doGPU
@@ -111,15 +110,16 @@ end
 %% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function he = plotCh_lfn(de,hAx,row1,dataTipVars,nVars,varSz,alignV)
 % Plot electrode on cortex
-if ~isnan(de.bSz) && de.bSz>0 && ~isnan(de.bCol(1,1)) 
+if ~isnan(de.bSz) && de.bSz>0 && ~isnan(de.bCol(1,1))
     % With edge border
     he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.line,...
-        'MarkerSize',de.sz,'MarkerFaceColor',de.col,'AlignVertexCenters',alignV,...
-        'LineWidth',de.bSz,'MarkerEdgeColor',de.bCol);
-else 
+        MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=alignV,...
+        LineWidth=de.bSz,MarkerEdgeColor=de.bCol);
+else
     % Without edge border
     he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.line,...
-        'MarkerSize',de.sz,'MarkerFaceColor',de.col,'AlignVertexCenters',alignV);
+        MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=alignV,...
+        MarkerEdgeColor=de.col);
 end
 
 % Datatips

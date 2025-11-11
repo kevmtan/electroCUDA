@@ -43,6 +43,7 @@ arguments
     a.flip logical = false % flip all elecs to viewed hemisphere
     a.align logical = true % align vertices to smooth (see plot.AlignVertexCenters; MATLAB line properties)
     a.dataTipVars string = "sbjCh" % chan variables for datatips (interactive plots only) 
+    a.order {mustBeMember(a.order,["ascend" "descend" ""])} = "descend";
     a.figPos double = [0 0 800 600] % figure positon: [top left width height] -- see MATLAB figure properties
     a.insPos double = [0 0.005 0.99 0.995] % axis inset: [top left width height] -- see MATLAB axes properties
     a.doGPU logical = false % use GPU processing (BROKEN)
@@ -107,6 +108,7 @@ if ~isempty(d)
     if ~ismember(dVars,"bCol"); d.bCol=zeros(height(d),3); end
     if ~ismember(dVars,"sz"); d.sz(:)=8; end
     if ~ismember(dVars,"bSz"); d.bSz(:)=nan; end 
+    if ~ismember(dVars,"order"); d.order(:)=1; end 
     %d.align(:) = a.align;
 
     % Flip all chs to single hemisphere 
@@ -139,9 +141,9 @@ for i = 1:numel(hems)
         elseif any(isgraphics(h))
             hi = h;
         elseif a.visible
-            hi = figure("Position",a.figPos,"WindowStyle","docked");
+            hi = figure(Position=a.figPos,WindowStyle="docked",Color="w");
         else
-            hi = figure("Position",a.figPos,"Visible","off");
+            hi = figure(Position=a.figPos,WindowStyle="docked",Color="w",Visible="off");
         end
 
         % Plot cortex
@@ -153,7 +155,7 @@ for i = 1:numel(hems)
             iCh = find(~isnan(d.pos(:,1))); % Can only plot chs with coordinates
             % Select hemisphere if multiple
             if numel(hems)>1 
-                iCh = iCh(d.hem(iCh)==hems(i)); end
+                iCh = iCh(d.hem(iCh)==a.hem); end
             % Select medial/lateral
             if ismember(a.cView,["lateral","medial"])
                 iCh = iCh(ismember(d.lat(iCh),[a.cView "both" ""])); end
