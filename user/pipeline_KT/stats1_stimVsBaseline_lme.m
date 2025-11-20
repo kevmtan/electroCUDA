@@ -88,52 +88,50 @@ o.stats.randomEffectsOnly = false; % only model single-trial stats
 %o.stats.trialPlotLats = [-.2 5];
 
 %% Plot cortex options
-opc = struct;
+op = struct;
 
-opc.test = true; % TEST??????
+op.test = false; % TEST??????
 
-opc.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
-opc.statsVar = "sAvg"; % Subject stats variable name in saved data
-opc.chBadFields = "bad";
-opc.condVar = "cond"; % variable for condition, contrast, or test (in stats table)
-opc.conds = []; % conds to do (empty=all)
-opc.timeVar = "bin"; % variable for time (in stats results)
-opc.timeUnit = "ms"; % time unit to display in fig
-opc.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
-opc.frqs = []; % frequency names to plot (empty=all)
-opc.actVar = "b"; % activity variable for electrode plot color (in stats table)
-opc.actUnit = "z"; % activity unit to display in fig
-opc.clim = [-2.5 2.5]; % limits for activity colorscale 
-opc.sigVar = "q"; % statistical significance variable (in stats table)
-opc.sigThr = 0.05; % significance threshold (default=0.05, none=0)
-opc.posVar = "MNI"; % position variable in chNfo table (should match surfType)
-opc.surfType = "pial_avg"; % surface type (freesurfer naming convention) ["pial_avg"|"inflated_avg"]
-opc.pullF = 15; % Pull factor, view elecs closer to camera (default=15)
-opc.alpha = 0.95; % cortex opacity
-opc.marker = "o"; % marker type (see Matlab marker symbols)
-opc.nsMark = "o"; % marker type for nonsignificant chans (see Matlab marker symbols)
-opc.markSz = 5; % marker size for significant chans;
-opc.nsSz = 1; % marker size for nonsignificant chans;
-opc.bSz = 0; % marker border size
-opc.cmap = "RdBu"; % colormap (see ec_colorsFromValues)
-opc.nsCol = [0 0 0]; % marker color for nonsignificant chans: [R G B]
-opc.bCol = [0 0 0]; % marker border color: [R G B]
-opc.txtCol = [.8 .8 .8]; % Text color: [R G B]
-opc.txtSz = 8; % text size
-opc.chLabel = ["sbjCh" "b" "q"]; % channel label variable (for visible/interactive plots)
-opc.visible = 0;
-opc.save = true;
-opc.doGPU = false;
+op.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
+op.statsVar = "sAvg"; % Subject stats variable name in saved data
+op.chBadFields = "bad";
+op.condVar = "cond"; % variable for condition, contrast, or test (in stats table)
+op.conds = []; % conds to do (empty=all)
+op.timeVar = "bin"; % variable for time (in stats results)
+op.timeUnit = "ms"; % time unit to display in fig
+op.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
+op.frqs = []; % frequency names to plot (empty=all)
+op.actVar = "b"; % activity variable for electrode plot color (in stats table)
+op.actUnit = "z"; % activity unit to display in fig
+op.clim = [-2 2]; % limits for activity colorscale 
+op.sigVar = "q"; % statistical significance variable (in stats table)
+op.sigThr = 0.05; % significance threshold (default=0.05, none=0)
+op.posVar = "MNI"; % position variable in chNfo table (should match surfType)
+op.surfType = "pial_avg"; % surface type (freesurfer naming convention) ["pial_avg"|"inflated_avg"]
+op.pullF = 15; % Pull factor, view elecs closer to camera (default=15)
+op.alpha = 0.95; % cortex opacity
+op.marker = "o"; % marker type (see Matlab marker symbols)
+op.nsMark = "o"; % marker type for nonsignificant chans (see Matlab marker symbols)
+op.markSz = 6; % marker size for significant chans;
+op.nsSz = 1; % marker size for nonsignificant chans;
+op.bSz = 0; % marker border size
+op.cmap = "RdBu"; % colormap (see ec_colorsFromValues)
+op.nsCol = [0 0 0]; % marker color for nonsignificant chans: [R G B]
+op.bCol = [0 0 0]; % marker border color: [R G B]
+op.txtCol = [.8 .8 .8]; % Text color: [R G B]
+op.txtSz = 6; % text size
+op.labelVars = ["sbjCh" op.actVar op.sigVar]; % channel label variable (for visible/interactive plots)
+op.save = true;
 
 % Individual plots per cond/time/freq
-opc.indiv.do = false;
-opc.indiv.res = [1980 1080];
-opc.indiv.saveDir = "indiv";
+op.indiv.do = false;
+op.indiv.res = [1980 1080];
+op.indiv.saveDir = "indiv";
 
 % Condition plots showing subplots per time & freq
-opc.cond.do = true;
-opc.cond.res = [1980 1080];
-opc.cond.saveDir = "cond";
+op.cond.do = true;
+op.cond.res = [1980 1080];
+op.cond.saveDir = "cond";
 
 
 %% Logs
@@ -211,5 +209,5 @@ if ~exist("logs","var")
 
 for p = 1 %1:2
     %%
-    ec_plotTimesCortex(logs(p,:),opc);
+    ec_plotTimesCortex(logs(p,:),op);
 end

@@ -1,4 +1,4 @@
-function h = ec_plotCortex(hems,views,d,a)
+function h = ec_plotCortex(hems,views,d,h,a)
 % Plot electrodes on cortical surfaces
 %   Wrapper for ec_plotCortexSurf & ec_plotCortexChs (use this to call those functions)
 %
@@ -28,31 +28,39 @@ function h = ec_plotCortex(hems,views,d,a)
 % OUPUT:
 %  h = graphics handles (graphics array *or* struct of graphics arrays)
 %     If 1 hemisphere & view: h = [figure;axis;cortex;light;electrodes]
-%     If multiple hemispheres/views: h.hemisphere_view = [figure;axis;cortex;light;electrodes]
+%     If multiple hemispheres/views:  h.tiledLayout = TiledLayOutChart
+%                                     h.hemisphere_view = [axis;cortex;light;electrodes]
+%                                    
+%       
 
 %% Input arguments
 arguments
     hems (1,:) string = ["L","R"] % cortical hemispheres to plot: ["L"|"R"]
-    views (1,:) string = ["medial","lateral"] % cortical views to plot (see ec_plotCortexSurf for views)
+    views (1,:) string = ["lateral","medial"] % cortical views to plot (see ec_plotCortexSurf for views)
     d table = []
+    h = [] % Figure or TiledLayout handle
     a.sbj string = "fsaverage" % freesurfer subject name (string), "fsaverage" for standardized cortex
     a.sbjDir string = "" % freesurfer subject dir, eg: ~/freesurferInstallDir/subjects/*
     a.surfType string  = "pial_avg" % freesurfer surface type: "inflated"|"pial"|"pial_avg"|...
     a.opacity double = 0.9 % Cortex alpha opacity 
     a.pullF double = 15 % Pull factor for obscured electrodes (more info below)
     a.flip logical = false % flip all elecs to viewed hemisphere
-    a.dataTipVars (1,:) string = "sbjCh" % chan variables for datatips (interactive plots only) 
-    a.order {mustBeMember(a.order,["ascend" "descend" ""])} = "descend";
-    a.figPos (1,:) double = [0 0 800 600] % figure positon: [top left width height] -- see MATLAB figure properties
-    a.insPos (1,:) double = [0 0.005 0.99 0.995] % axis inset: [top left width height] -- see MATLAB axes properties
-    a.doGPU logical = false % use GPU processing (NOTE: GPU disabled no performance gain)
-    a.parallel logical = false % use parallel processing
+    a.labelVars (1,:) string = "sbjCh" % chan variables for datatips (interactive plots only) 
+    a.order (1,1){mustBeMember(a.order,["ascend" "descend" ""])} = "ascend";
+    a.figPos (1,:) double = [0 0 800 600] % figure positon: [top left width height]: see MATLAB figure properties
+    a.insPos (1,:) double = [0 0 1 1] % axis inset: [top left width height]: see MATLAB axes properties [0 0.005 0.99 0.995] 
+    a.rmHidden logical = true % don't plot electrodes hidden from view
+    a.lightColor = "w"
+    a.lightStyle = "infinite"
+    a.title string = "" % figure title
+    a.titleSz (1,1) double = 8 % title text size
     a.visible logical = false % visible/interactive plot
     a.save logical = false % save figure
     a.saveDir string = "" % directory to save figure images 
     a.saveName string = "" % base name for image files (string)
-    a.cort = {}; % custom cortical surfaces per hemisphere (more info below)
-    a.h {isgraphics,isobject,isstruct} = gobjects
+    a.cort cell = []; % custom cortical surfaces per hemisphere (more info below)
+    a.tile (1,1) double = nan % Tile number if placed within tiledchart
+    a.tilespan (1,2) double = [1 1] % Tile span if placed within tiledlayout
 end
 % MORE INFO:
 %  pullF = Pull factor for obscured electrodes (numeric): pullF(hems,views)
@@ -66,6 +74,7 @@ end
 %     cort{i} = fullpath/struct/triangulation cortex data for hems
 
 %% Input validation
+hemN=numel(hems); viewN=numel(views); cort=a.cort;
 
 % Check dirs
 if a.save && ~a.visible
@@ -74,10 +83,10 @@ if a.save && ~a.visible
 end
 if ~isany(a.sbjDir); a.sbjDir=string(uigetdir("freesurfer subjects dir: ~/freesurferInstallDir/subjects/*")); end
 
-% Check plotting options
-pullF=a.pullF; cort=a.cort; h=a.h;
-if numel(pullF) < numel(hems)*numel(views)
-    pullF = repmat(pullF(1),numel(hems),numel(views));
+% Pull factor
+pullF = a.pullF;
+if numel(pullF) < hemN*viewN
+    pullF = repmat(pullF(1),hemN,viewN);
 end
 
 % Check subject freesurfer dir
@@ -110,68 +119,104 @@ if ~isempty(d)
     d(isnan(d.pos(:,1)),:) = [];
 
     % Remove "_" from sbjCh for datatips
-    if a.visible && ismember("sbjCh",a.dataTipVars)
+    if a.visible && ismember("sbjCh",a.labelVars)
         d.sbjCh = erase(d.sbjCh,"_"); end
 end
 
+
+%% Initialize figure
+if ~any(isgraphics(h))
+    % Initialize figure if no input graphics handle
+    if op.test
+        h = figure(Position=a.figPos,Visible=a.visible,WindowStyle="docked",...
+            Theme="light",Color="w",AutoResizeChildren="on");
+    else
+        h = figure(Position=a.figPos,Visible=a.visible,WindowState="normal",...
+            Theme="light",Color="w",DockControls="off");
+    end
+elseif any(isgraphics(h,"TiledLayout"))
+    % Isolate tiledlayout handle if exist
+    h = h(isgraphics(h,"TiledLayout"));
+else 
+    % Get current figure if input is graphics
+    h = gcf;
+end
+
+% Create tiled layout if multiple hems/views
+if hemN>1 || viewN>1
+    ht = tiledlayout(h,hemN,viewN,TileSpacing="none",padding="tight");
+    if isgraphics(h,"TiledLayout") && any(a.tile)
+        ht.Layout.Tile = a.tile;
+        ht.Layout.TileSpan = a.tilespan;
+    end
+end
+p = 0; % initialize plot index
+
 %% Plot each hemisphere & view combination
-for l = 1:numel(hems)
+
+% Loop across hemispheres
+for l = 1:hemN
     hem = hems(l);
-    for v = 1:numel(views)
-        view = views(v);
-        fn = hem+"_"+view;
+    if ~isempty(cort); a.cort = cort{l}; end % Custom cortex
 
-        % Load varying options
-        a.hem = hem;
-        a.cView = view;
-        a.pullF = pullF(l,v);
-        if ~isempty(cort)
-            a.cort = cort{l};
-        end
+    %% Loop across views    
+    for v = 1:viewN
+        view = views(v); % current view name
+        p = p+1; % plot index
+        a.pullF = pullF(l,v); % load pull factor
 
-        % Initialize figure
-        if isstruct(h) && isfield(h,fn)
-            hi = h.(fn);
-        elseif any(isgraphics(h))
-            hi = h;
-        elseif a.visible
-            hi = figure(Position=a.figPos,WindowStyle="docked",Color="w");
+        % Axis
+        if hemN>1 || viewN>1
+            ha = nexttile(ht,p);
         else
-            hi = figure(Position=a.figPos,WindowStyle="docked",Color="w",Visible="off");
+            ha = gca;
+            ha.Position = a.insPos; % inset position
         end
+        axis tight; axis equal; axis off;
+        hold on;
 
         % Plot cortex
-        hi = ec_plotCortexSurf(hem,view,a,hi);
+        ec_plotCortexSurf(hem,view,a,ha);
 
         % Electrode channels
         if ~isempty(d)
-            iCh = 1:height(d);
-            % Select hemisphere if multiple
-            if numel(hems)>1 
-                iCh = iCh(d.hem(iCh)==a.hem); end
-            % Select medial/lateral
-            if ismember(a.cView,["lateral","medial"])
-                iCh = iCh(ismember(d.lat(iCh),[a.cView "both" ""])); end
-            if ~nnz(iCh); warning("no electrodes for "+fn); continue; end
+            iCh = true(height(d),1);
+
+            % Remove chs hidden from view/hemisphere
+            if a.rmHidden
+                % Select hemisphere
+                if ~a.flip
+                    iCh = ismember(d.hem,[hem "both" ""]); end
+                % Select medial/lateral
+                if ismember(view,["lateral","medial"])
+                    iCh(iCh) = ismember(d.lat(iCh),[view "both" ""]); end
+                % Skip elec plots if no elecs left
+                if ~any(iCh); warning("no electrodes for: "+hem+" "+view); continue; end
+            end
 
             % Plot electrode channels
-            hi = ec_plotCortexChs(hem,view,d(iCh,:),a,hi);
+            ec_plotCortexChs(hem,view,d(iCh,:),a,ha);
         end
-
-        % Save images
-        if a.save
-            figFn = a.saveDir+filesep+a.saveName+"_"+fn+".png";
-            print(figFn,'-dpng','-image','-r300');
-            %print(h.(fn)(isgraphics(h.(fn),'Figure')),figFn,'-dpng','-image','-r300');
-            disp("SAVED: "+a.saveName+"_"+fn); 
-        end
-        
-
-        % Collate figure handles
-        if isscalar(hems) && isscalar(views) || isgraphics(h)
-            h = hi;
-        else
-            h.(fn) = hi;
-        end
+        hold off;
     end
 end
+
+% Title
+if any(a.titleSz) && isany(a.title)
+    if p > 1
+        title(ht,a.title,FontSize=a.titleSz);
+    else
+        title(ha,a.title,FontSize=a.titleSz);
+    end
+end
+
+
+%% Save image
+if a.save
+    figFn = a.saveDir+filesep+a.saveName+".png";
+    exportgraphics(h,figFn);
+    %print(h,figFn,'-dpng','-image','-r300');
+    disp("SAVED: "+figFn);
+    %delete(h);
+end
+        

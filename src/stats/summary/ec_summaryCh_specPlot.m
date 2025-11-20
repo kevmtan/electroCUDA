@@ -315,8 +315,8 @@ end
 
 % Plot cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function plotCortex_lfn(h,dCh,lat,surf,o,hem)
-ec_plotCortex(hem,lat,dCh,sbj=o.dirs.sbj,sbjDir=o.dirFS,surfType=surf,...
-    visible=o.oP.visible,opacity=o.oP.alpha,h=h,pullF=15);
+ec_plotCortex(hem,lat,dCh,h,sbj=o.dirs.sbj,sbjDir=o.dirFS,surfType=surf,...
+    visible=o.oP.visible,opacity=o.oP.alpha,pullF=15);
 end
 
 

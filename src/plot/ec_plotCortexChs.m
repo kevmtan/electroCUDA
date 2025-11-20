@@ -1,4 +1,4 @@
-function h = ec_plotCortexChs(hem,view,d,a,h)
+function hCh = ec_plotCortexChs(hem,view,d,a,ha)
 % Plots electrode channels on a freesurfer cortical surface (fsavg or custom)
 % This function is meant to be called with plotCortex
 % If not using plotCortex, you must call plotCortexSurf *before* this function
@@ -20,7 +20,7 @@ arguments
     view % cortical view
     d table % electrode data table (see ec_plotCortex)
     a struct % plot options from ec_plotCortex
-    h {isgraphics,isobject} = gca
+    ha = gca % axis handle
 end
 
 %% Prep
@@ -32,22 +32,14 @@ if isany(a.order)
 % Flip all chs to single hemisphere
 if a.flip
     if hem=="L"
-        d.pos(d.hem=="R",1) = -d.pos(d.hem=="R",1);
+        d.pos(:,1) = -abs(d.pos(:,1));
     elseif hem=="R"
-        d.pos(d.hem=="L",1) = -d.pos(d.hem=="L",1);
+        d.pos(:,1) = abs(d.pos(:,1));
     end
 end
 
-% Get axis
-ax = isgraphics(h,'axes');
-if ~nnz(ax)
-    h(end+1) = gca;
-    ax = height(h);
-end
-
 % Pull electrode coords out from the brain towards the viewer
-nChs = height(d);
-if nnz(a.pullF)
+if a.pullF
     if (hem=="L" && view=="lateral")||(hem=="R" && view=="medial")
         d.pos(:,1) = d.pos(:,1) - a.pullF;
     elseif (hem=="R" && view=="lateral")||(hem=="L" && view=="medial")
@@ -55,8 +47,8 @@ if nnz(a.pullF)
     elseif view=="ventral"
         d.pos(:,3) = d.pos(:,3) - a.pullF;
     else
-        camPos = get(h(ax),"cameraposition");
-        err = repmat(camPos,nChs,1) - d.pos;
+        camPos = get(ha,"cameraposition");
+        err = repmat(camPos,height(d),1) - d.pos;
         nrmd = err./repmat(sqrt(sum(err.^2,2)),1,3);
         d.pos = d.pos + nrmd * a.pullF;
     end
@@ -64,37 +56,37 @@ end
 
 %% Plot electrodes
 markers = unique(d.marker,"stable")'; % Get marker/line styles
+markN = numel(markers);
+hCh = gobjects(markN,1);
 
 % Plot each marker style separately (Matlab limitation for vectorized 'scatter3')
-for m = markers
+for m = 1:markN
     % Row indices of current marker style
-    r = d.marker==m;
+    r = d.marker==markers(m);
 
     % 3D scatterplot of electrodes (vectorized)
-    he = scatter3(h(ax),d.pos(r,1),d.pos(r,2),d.pos(r,3),d.sz(r),d.col(r),"filled");
+    hCh(m) = scatter3(ha,d.pos(r,1),d.pos(r,2),d.pos(r,3),d.sz(r),d.col(r,:),...
+        markers(m),"filled");
 
     % Marker edge properties (same per marker style - Matlab limitation)
     if isany(d.bSz(r))
-        he.LineWidth = unique(d.bSz(r),"last");
-        he.MarkerEdgeColor = unique(d.bCol(r,:),"last");
+        hCh(m).LineWidth = unique(d.bSz(r),"last");
+        hCh(m).MarkerEdgeColor = unique(d.bCol(r,:),"last");
     end
 
     % Datatips
-    if a.visible && isany(a.dataTipVars)
-        for v = 1:numel(a.dataTipVars)
-            dv = a.dataTipVars(v);
+    if a.visible && isany(a.labelVars)
+        for v = 1:numel(a.labelVars)
+            dv = a.labelVars(v);
             if v==1
-                he.DataTipTemplate.DataTipRows =...
+                hCh(m).DataTipTemplate.DataTipRows =...
                     dataTipTextRow(dv,d.(dv)(r));
             else
-                he.DataTipTemplate.DataTipRows(end+1) =...
+                hCh(m).DataTipTemplate.DataTipRows(end+1) =...
                     dataTipTextRow(dv,d.(dv)(r));
             end
         end
     end
-
-    % Return graphics array
-    h = [h;he]; %#ok<AGROW>
 end
 
 

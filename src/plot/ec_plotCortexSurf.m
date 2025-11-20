@@ -1,4 +1,4 @@
-function h = ec_plotCortexSurf(hem,view,a,h)
+function [hCort,hLight] = ec_plotCortexSurf(hem,view,a,ha)
 % Plots a freesurfer cortical surface (fsAvg or custom surface)
 % See plotCortex.m for full description of input options
 % Call this function using plotCortex for single or multiple views (separate figs per view)
@@ -20,8 +20,8 @@ function h = ec_plotCortexSurf(hem,view,a,h)
 arguments
     hem % hemisphere
     view % cortical view
-    a struct
-    h {isgraphics,isobject} = [gcf;gca]
+    a struct % options struct from plotCortex
+    ha {isgraphics(ha,"axes")} = gca % axis handle
 end
 
 %% Prep
@@ -71,10 +71,6 @@ else
     error("[ec_plotCortexSurf] hemisphere must be 'L' or 'R' (hem)");
 end
 
-% Get axis
-ax = isgraphics(h,'axes');
-if ~nnz(ax); h(end+1,1)=gca; ax=height(h); end
-
 
 %% Get cortical surface
 
@@ -89,7 +85,7 @@ if ~isa(a.cort,'triangulation'); a.cort = ec_readSurfTri(a.cort); end
 
 % Cortical curvature shading (distinguish sulci/gyri for inflated)
 if contains(a.surfType,"inflated")
-    if a.sbj=="fsaverage"
+    if contains(a.surfType,"avg")
         if hem=="R"; curvFn = fullfile(a.sbjDir,"surf","rh.avg_curv");
         else; curvFn = fullfile(a.sbjDir,"surf","lh.avg_curv"); end
     else
@@ -105,25 +101,18 @@ if contains(a.surfType,"inflated")
 else
     curvCol = ones(height(a.cort.Points),3)*0.9;
 end
-%if doGPU; curvCol = gpuArray(curvCol); end
-
 
 %% Plot cortical surface
-hCort = trisurf(a.cort,'FaceVertexCData',curvCol,'Parent',h(ax));
-alpha(a.opacity); % set cortex opacity
-
-% Axis properties
-if ~isa(h(ax).Parent,'matlab.graphics.layout.TiledChartLayout')
-    set(h(ax),'Position',a.insPos); end
-axis tight; axis equal; axis off;
-hold on; rotate3d on;
+hCort = trisurf(a.cort,'FaceVertexCData',curvCol,'Parent',ha);
+hCort.FaceAlpha = a.opacity; % cortex opacity
+shading(ha,"interp"); % cortex shading
 
 % Optimize lighting
-material dull; shading interp; lighting gouraud; 
-hLight = ec_locView(theta,phi,h(ax),a);
+hLight = ec_locView(theta,phi,ha,color=a.lightColor,style=a.lightStyle);
+lighting(ha,"gouraud"); % axis lighting
+material(hCort,"dull"); % cortex material
 
-% Return graphics array
-h = [h;hCort;hLight];
+
 
 
 %% Deprec

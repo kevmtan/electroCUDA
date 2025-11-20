@@ -1,5 +1,4 @@
-function hLight = ec_locView(theta,phi,o,hAx)
-% function loc_view(axis,theta,phi,lightProperties) 
+function hLight = ec_locView(theta,phi,ha,ol)
 % this function orients the brain and always puts the lighting behind you
 % theta and phi are in degrees, not radians
 % make sure the brain plot is your current axis
@@ -14,22 +13,23 @@ function hLight = ec_locView(theta,phi,o,hAx)
 % Copyright (C) 2009 K.J. Miller, Dept of Neurology and Neurosurgery, University Medical Center Utrecht
 % Edited by Kevin Tan, 2022 (https://github.com/kevmtan/electroCUDA)
 
-% Check inputs
-if nargin<3 || ~isfield(o,'lightStyle')
-    lightStyle = "infinite";
-else
-    lightStyle = o.lightStyle;
+%% Arguments
+arguments
+    theta (1,1) double
+    phi (1,1) double
+    ha {isgraphics(ha,"axes")} = gca
+    ol.color = "w"
+    ol.style = "infinite"
 end
-if nargin<4 || ~isgraphics(hAx)
-    hAx = gca;
-end
+
+%% Main
     
 % Get optimal lighting position (straight behind camera)
 view(theta,phi);
-view_pt = [cosd(theta-90)*cosd(phi) sind(theta-90)*cosd(phi) sind(phi)];
+viewPos = [cosd(theta-90)*cosd(phi) sind(theta-90)*cosd(phi) sind(phi)];
 
 % Let there be light
-hLight = light(hAx,'Position',view_pt,'Style',lightStyle);
+hLight = light(ha,Color=ol.color,Style=ol.style,Position=viewPos);
 
 % % If you want to go the other way
 % [th,phi,r]=cart2sph(view_pt(1),view_pt(1),view_pt(1)); %in radians, but "view" uses degrees with different origin

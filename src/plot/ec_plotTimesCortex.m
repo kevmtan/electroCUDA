@@ -1,10 +1,10 @@
-function ec_plotTimesCortex(logp,opc)
+function ec_plotTimesCortex(logp,op)
 % Plot cortical timecourses from statistical results
 
 %% Input validation
 arguments
     logp table % Log output from statistical analysis
-    opc struct % Plot options
+    op struct % Plot options
 end
 
 
@@ -29,9 +29,9 @@ for s = 1:sbjN
     end
 
     % Load stats data
-    fn = fn+"s"+sbjs.sbjID(s)+"_"+opc.statsFn+".mat";
-    stat{s} = load(fn,opc.statsVar);
-    stat{s} = stat{s}.(opc.statsVar);
+    fn = fn+"s"+sbjs.sbjID(s)+"_"+op.statsFn+".mat";
+    stat{s} = load(fn,op.statsVar);
+    stat{s} = stat{s}.(op.statsVar);
     disp("Loaded: "+fn);
 
     % Load channel info
@@ -49,7 +49,7 @@ end
 % Concactenate sbj data
 stat = vertcat(stat{:}); % stats data
 chs = vertcat(chs{:}); % channel info
-if opc.test; statOg=stat; chsOg=chs; end %#ok<NASGU>
+if op.test; statOg=stat; chsOg=chs; end %#ok<NASGU>
 
 % Remove channels not in stats data
 chs(~ismember(chs.sbjCh,stat.sbjCh),:) = [];
@@ -70,8 +70,8 @@ chs(idx,:) = [];
 stat(idx,:) = [];
 
 % Remove bad chans
-for v = 1:numel(opc.chBadFields)
-    idx = chs.bad.(opc.chBadFields(v));
+for v = 1:numel(op.chBadFields)
+    idx = chs.bad.(op.chBadFields(v));
     chs(idx,:) = [];
     stat(idx,:) = [];
 end
@@ -80,41 +80,43 @@ end
 stat = vertcat(stat.s{:});
 
 % Rename target vars
-chs = renamevars(chs,opc.posVar,"pos"); % electrode position
-stat = renamevars(stat,[opc.timeVar opc.condVar],["t" "c"]); % time & condition/contrast/test
+chs = renamevars(chs,op.posVar,"pos"); % electrode position
+stat = renamevars(stat,[op.timeVar op.condVar],["t" "c"]); % time & condition/contrast/test
 
 
 %% Make plot data
-dp = makePlotData_lfn(stat,chs,opc,o);
+dp = makePlotData_lfn(stat,chs,op,o);
 
 
 %% Plot individual
-if opc.indiv.do
-    plotIndiv_lfn(dp,opc,o);
+if op.indiv.do
+    indiv_lfn(dp,op,o);
 end
 
 
 %% Plot gallery of times & freqs (separate per cond)
-if opc.cond.do
-    conds_lfn(dp,opc,o);
+if op.cond.do
+    conds_lfn(dp,op,o);
 end
 
 
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%% Routine subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%% Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 
 
 
 
 %%% Make plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function dp = makePlotData_lfn(stat,chs,opc,o)
+function dp = makePlotData_lfn(stat,chs,op,o)
 
 % Get conds/contrasts/tests to plot
-if isany(opc.conds)
-    conds = opc.conds;
+if isany(op.conds)
+    conds = op.conds;
 elseif iscategorical(stat.c)
     conds = string(categories(stat.c));
 else
@@ -122,15 +124,15 @@ else
 end
 
 % Get times to plot
-if isany(opc.times)
-    times = opc.times;
+if isany(op.times)
+    times = op.times;
 else
     times = unique(stat.t);
 end
 
 % Get freqs to plot
-if isany(opc.frqs)
-    [~,idx] = ismember(opc.frqs,o.spect.name);
+if isany(op.frqs)
+    [~,idx] = ismember(op.frqs,o.spect.name);
     frqs = o.spect(idx,:);
 else
     frqs = o.spect;
@@ -150,33 +152,30 @@ dp.frq(:) = "";
 dp.frqD(:) = "";
 dp.d = cell(plotN,1);
 
-% Plot data table template (see 'd' vars in 'ec_plotCortex')
-d0 = chs(:,["sbjCh" "pos" "hem" "lat" "gyrus" "ECoG"]);
-d0.marker(:) = opc.nsMark(:); % marker shape/line style (string) -- see LineStyle in MATLAB line properties
-d0.col = repmat(opc.nsCol,height(d0),1); % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
-d0.bCol = repmat(opc.bCol,height(d0),1); % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
-d0.sz(:) = opc.nsSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
-d0.bSz(:) = 0; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
-d0.order(:) = inf;
-
 
 %% Main: loop across conds/times/freqs
 for c = 1:condN % conds loop
     for t = 1:timeN % times loop
-        % Load template data
-        d = d0;
+        % Plot data table template (see 'd' vars in 'ec_plotCortex')
+        d0 = chs(:,["sbjCh" "pos" "hem" "lat" "gyrus" "ECoG"]);
+        d0.marker(:) = op.nsMark(:); % marker shape/line style (string) -- see LineStyle in MATLAB line properties
+        d0.col = repmat(op.nsCol,height(d0),1); % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
+        d0.bCol = repmat(op.bCol,height(d0),1); % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
+        d0.sz(:) = op.nsSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
+        d0.bSz(:) = 0; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
+        d0.order(:) = -inf;
 
         % Get stats data for plot
         sp = stat(stat.c==conds(c) & stat.t==times(t),:);
-        if height(sp)~=height(d)
+        if height(sp)~=height(d0)
             warning("[ec_plotTimesCortex] Unequal heights for plot stats & channel tables: "+...
             "c="+conds(c)+" t="+times(t));
         end
         
         % Remove missing stats chans from plot table
-        d(~ismember(d.sbjCh,sp.sbjCh),:) = [];
+        d0(~ismember(d0.sbjCh,sp.sbjCh),:) = [];
         % Order stats data by chs
-        [~,idx] = ismember(d.sbjCh,sp.sbjCh);
+        [~,idx] = ismember(d0.sbjCh,sp.sbjCh);
         sp = sp(idx,:);
 
         %% Loop across freqs
@@ -199,19 +198,28 @@ for c = 1:condN % conds loop
             end
 
             % Find significant chans
-            if isany(opc.sigVar) && isany(opc.sigThr)
-                idx = sp.(opc.sigVar+frqV) <= opc.sigThr;
+            if isany(op.sigVar) && isany(op.sigThr)
+                idx = sp.(op.sigVar+frqV) <= op.sigThr;
             else
-                idx = true(height(d),1);
+                idx = true(height(d0),1);
             end
             
             %% Make plot data
+            d = d0;
 
-            % Get colors from colormap (significant)
+            % Get colors from colormap (sig chans)
             [d.col(idx,:),d.order(idx)] = ec_colorsFromValues(...
-                sp.(opc.actVar+frqV)(idx),opc.cmap,opc.clim);
-            d.marker(idx) = opc.marker; % marker type
-            d.sz(idx) = opc.markSz; % marker size
+                sp.(op.actVar+frqV)(idx),op.cmap,op.clim);
+
+            % Other properties (sig chans)
+            d.marker(idx) = op.marker; % marker type
+            d.sz(idx) = op.markSz; % marker size
+
+            % Add activation & significance
+            if op.test
+                d.(op.actVar) = sp.(op.actVar+frqV);
+                d.(op.sigVar) = sp.(op.sigVar+frqV);
+            end
 
             % Save
             dp.d{p} = d;
@@ -231,29 +239,40 @@ dp.frq = categorical(dp.frq,frqs.name,Ordinal=true);
 
 
 
+
 %%% Make individual images per plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotIndiv_lfn(dp,opc,o)
+function indiv_lfn(dp,op,o)
 % Make directory
-dirOut = o.dirOut+opc.indiv.saveDir+filesep;
+dirOut = o.dirOut+op.indiv.saveDir+filesep;
 if ~exist(dirOut,"dir")
     mkdir(dirOut); end
 
 %% Loop across plots
 for p = 1:height(dp)
     % Title text
-    txt = dp.frqD(p)+" | "+string(dp.cond(p))+" | "+dp.time(p)+opc.timeUnit;
-    
-    % Initialize figure
-    h = figure(Position=[0 0 opc.indiv.res],Theme="light",Color="w",Visible=opc.test);
+    if isany(dp.frq); txt = dp.frqD(p)+" | "; else; txt = ""; end
+    txt = txt + string(dp.cond(p))+" | "+dp.time(p)+op.timeUnit;
 
+    % Initialize figure
+    if op.test
+        h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+            Theme="light",Color="w",AutoResizeChildren="on");
+    else
+        h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
+            Theme="light",Color="w",DockControls="off");
+    end
+    
     % Plot cortex
-    plotCortex_lfn(h,dp.d{p},opc,o.dirs.freesurfer,txt);
+    ec_plotCortex("L",["lateral","medial"],dp.d{p},h,sbjDir=o.dirs.freesurfer,...
+        surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
+        title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
 
     %% Save
-    if opc.save
+    if op.save
         fn = dirOut+string(dp.cond(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
         exportgraphics(h,fn,Resolution=150);
-        close all
+        disp("[ec_PlotTimesCortex] saved: "+fn);
+        delete(h);
     end
 
 end
@@ -262,10 +281,11 @@ end
 
 
 
+
 %%% Plot per condition showing times & freqs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function conds_lfn(dp,opc,o)
+function conds_lfn(dp,op,o)
 % Make directory
-dirOut = o.dirOut+opc.cond.saveDir+filesep;
+dirOut = o.dirOut+op.cond.saveDir+filesep;
 if ~exist(dirOut,"dir")
     mkdir(dirOut); end
 
@@ -273,7 +293,7 @@ conds = string(categories(dp.cond));
 
 %% Loop across plots
 for c = 1:numel(conds)
-    plotCond_lfn(dp(dp.cond==conds(c),:),opc,o,dirOut);
+    plotCond_lfn(dp(dp.cond==conds(c),:),op,o,dirOut);
 end
 
 
@@ -281,13 +301,8 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%% Plot subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-
 %%% Plot condition (subplots of times & freqs) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCond_lfn(dc,opc,o,dirOut)
+function plotCond_lfn(dc,op,o,dirOut)
 % dc = dp(dp.cond=="Other",:);
 times = unique(dc.time);
 frqs = string(categories(dc.frq));
@@ -297,57 +312,70 @@ timesN=numel(times); frqN=numel(frqs);
 dc = sortrows(dc,["time" "frq"],"ascend");
 
 % Initialize figure
-h = figure(Position=[0 0 opc.cond.res],Theme="light",Color="w",Visible=opc.test);
-ht = tiledlayout(h,timesN,frqN,TileSpacing="compact",padding="tight");
-title(ht,dc.cond(1));
+if op.test
+    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+        Theme="light",Color="w",AutoResizeChildren="on");
+else
+    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
+        Theme="light",Color="w",DockControls="off");
+end
+
+% Initialize tiledlayout
+ht = tiledlayout(h,timesN,frqN,TileSpacing="compact",padding="tight"); % tiledlayout
+
+% Title
+if any(op.txtSz)
+    title(ht,dc.cond(1),FontSize=op.txtSz*1.5,FontWeight="bold"); end
 
 
 %% Loop across subplots
 for p = 1:height(dc)
-    %%     
-    txt = dc.frqD(p)+" | "+dc.time(p)+opc.timeUnit; % Title text
+    %%
+    if frqN>1; txt = dc.frqD(p)+" | "; else; txt = ""; end
+    txt = txt + dc.time(p)+op.timeUnit; % Title text
 
     % Sig elecs only
     d = dc.d{p};
-    d(isnan(d.bCol(:,1)),:) = [];
+    d(d.order==-inf,:) = [];
     
     % Plot cortex
-    plotCortex_lfn(ht,d,opc,o.dirs.freesurfer,txt,p);
+    ec_plotCortex("L",["lateral","medial"],d,ht,tile=p,sbjDir=o.dirs.freesurfer,...
+        surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
+        title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
 end
 
 %% Save
-if opc.save
+if op.save
     fn = dirOut+string(dc.cond(1))+".png";
     exportgraphics(h,fn,Resolution=150);
-    close all
+    disp("[ec_PlotTimesCortex] saved: "+fn);
+    delete(h);
 end
 
 
 
 
 
-%%% Plot electrodes on cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCortex_lfn(h,d,opc,dirFS,txt,p)
-
-% Make tiledlayout for lateral/medial
-hi = tiledlayout(h,1,2,TileSpacing="none",padding="tight");
-if nargin>5
-    hi.Layout.Tile = p;
-    hi.Layout.TileSpan = [1 1];
-end
-
-% Lateral
-ha = nexttile(hi);
-ec_plotCortex("L","lateral",d,sbjDir=dirFS,surfType=opc.surfType,...
-    opacity=opc.alpha,doGPU=opc.doGPU,save=0,flip=1,pullF=opc.pullF,align=1,...
-    parallel=0,order="descend",visible=opc.test,h=ha);
-
-% Medial
-ha = nexttile(hi);
-ec_plotCortex("L","medial",d,sbjDir=dirFS,surfType=opc.surfType,...
-    opacity=opc.alpha,doGPU=opc.doGPU,save=0,flip=1,pullF=opc.pullF,align=1,...
-    parallel=0,order="descend",visible=opc.test,h=ha);
-
-if nargin>4 && isany(txt)
-    title(hi,txt); end
-
+% %%% Plot electrodes on cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function plotCortex_lfn(h,d,op,dirFS,txt,p)
+% 
+% % Make tiledlayout for lateral/medial
+% hi = tiledlayout(h,1,2,TileSpacing="none",padding="tight");
+% if nargin>5
+%     hi.Layout.Tile = p;
+%     hi.Layout.TileSpan = [1 1];
+% end
+% 
+% % Lateral
+% ha = nexttile(hi);
+% ec_plotCortex("L","lateral",d,ha,sbjDir=dirFS,surfType=op.surfType,...
+%     opacity=op.alpha,flip=true,pullF=op.pullF,visible=op.test,order="ascend");
+% 
+% % Medial
+% ha = nexttile(hi);
+% ec_plotCortex("L","medial",d,ha,sbjDir=dirFS,surfType=op.surfType,...
+%     opacity=op.alpha,flip=true,pullF=op.pullF,visible=op.test,order="ascend");
+% 
+% if nargin>4 && isany(txt)
+%     title(hi,txt); end
+% 
