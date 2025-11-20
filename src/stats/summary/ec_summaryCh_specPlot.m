@@ -203,8 +203,8 @@ end
 d = table;
 d.sbjCh = chNfo.sbjCh;
 d = [d,chNfo(:,1:12)];
-d.line(:) = "o";
-d.line(~d.ECoG) = "s";
+d.marker(:) = "o";
+d.marker(~d.ECoG) = "s";
 d.sz(:) = 2;
 d.bSz(:) = 1;
 d.col(:,1:3) = 0;
@@ -240,7 +240,7 @@ if o.ICA
     % Color by ICA weights
     %dCh.wts = normalize(dCh.wts,"range",oP.climICA);
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdBu',o.oP.climICA,zscore=o.oP.climICA_z);
+        ec_colorsFromValues(dCh.wts,'RdBu',o.oP.climICA,zscore=o.oP.climICA_z);
     ch = xN.ic;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];

@@ -103,7 +103,7 @@ opc.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
 opc.frqs = []; % frequency names to plot (empty=all)
 opc.actVar = "b"; % activity variable for electrode plot color (in stats table)
 opc.actUnit = "z"; % activity unit to display in fig
-opc.clim = [-3 3]; % limits for activity colorscale 
+opc.clim = [-2.5 2.5]; % limits for activity colorscale 
 opc.sigVar = "q"; % statistical significance variable (in stats table)
 opc.sigThr = 0.05; % significance threshold (default=0.05)
 opc.posVar = "MNI"; % position variable in chNfo table (should match surfType)
@@ -111,11 +111,12 @@ opc.surfType = "pial_avg"; % surface type (freesurfer naming convention) ["pial_
 opc.pullF = 15; % Pull factor, view elecs closer to camera (default=15)
 opc.alpha = 0.95; % cortex opacity
 opc.markSz = 5; % marker size for significant chans;
-opc.nsSz = 2; % marker size for nonsignificant chans;
-opc.cmap = "RdBu";
-opc.txtCol = [.8 .8 .8];
-opc.txtSz = 8;
-opc.chLabel = "sbjCh"; % channel label variable (for visible/interactive plots)
+opc.nsSz = 1; % marker size for nonsignificant chans;
+opc.bSz = 0; % border size
+opc.cmap = "RdBu"; % colormap (see ec_
+opc.txtCol = [.8 .8 .8]; % Text color
+opc.txtSz = 8; % text size
+opc.chLabel = ["sbjCh" "b" "q"]; % channel label variable (for visible/interactive plots)
 opc.visible = 0;
 opc.save = true;
 opc.doGPU = false;

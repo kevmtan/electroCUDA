@@ -16,52 +16,19 @@ function h = ec_plotCortexChs(d,a,h)
 
 %% Check inputs
 arguments
-    d table
-    a struct
+    d table % electrode data table (see ec_plotCortex)
+    a struct % plot options from ec_plotCortex
     h {isgraphics,isobject} = gca
 end
-if nargin<1||~istable(d); error("electrode data table needed"); end
 
-v = a.cView;
-hem = a.hem;
-nVars = numel(a.dataTipVars);
-alignV = a.align;
-dataTipVars = a.dataTipVars;
-dVars = string(d.Properties.VariableNames);
+% Expand align vertex argument for plot3
+alignV = repmat(a.align,height(d),1);
 
-%% Electrode data table
-
-% Get datatip var size
-varSz = nan(nVars,1);
-for i = 1:nVars
-    varSz(i) = size(d.(a.dataTipVars(i)),2); end
+%% Prep
 
 % Sort if ordered
 if isany(a.order)
     d = sortrows(d,'order',a.order); end
-
-% % Convert to gpuArray
-% if o.doGPU
-%     idx = structfun(@(o) isnumeric(o)||islogical(o),o);
-%     oFields = string(fieldnames(o));
-%     oFields = oFields(idx);
-%     for i = 1:numel(oFields)
-%         o.(oFields(i)) = gpuArray(o.(oFields(i)));
-%     end
-%     idx = varfun(@(d) isa(d,"double"),d(1,:),"OutputFormat","uniform");
-%     d = convertvars(d,idx,"single");
-%     idx = varfun(@(d) isnumeric(d)||islogical(d),d(1,:),"OutputFormat","uniform");
-%     d = convertvars(d,idx,"gpuArray");
-%     nVars = gpuArray(nVars);
-%     varSz = gpuArray(varSz);
-% end
-
-% Get datatip template
-if a.visible
-    row1 = repmat(matlab.graphics.datatip.DataTipTextRow,nVars,1);
-else
-    row1 = [];
-end
 
 % Get axis
 ax = isgraphics(h,'axes');
@@ -70,15 +37,14 @@ if ~nnz(ax)
     ax = height(h);
 end
 
-
-%% Pull electrode coords out from the brain towards the viewer
+% Pull electrode coords out from the brain towards the viewer
 nChs = height(d);
 if nnz(a.pullF)
-    if (hem=="L" && v=="lateral")||(hem=="R" && v=="medial")
+    if (a.hem=="L" && a.cView=="lateral")||(a.hem=="R" && a.cView=="medial")
         d.pos(:,1) = d.pos(:,1) - a.pullF;
-    elseif (hem=="R" && v=="lateral")||(hem=="L" && v=="medial")
+    elseif (a.hem=="R" && a.cView=="lateral")||(a.hem=="L" && a.cView=="medial")
         d.pos(:,1) = d.pos(:,1) + a.pullF;
-    elseif v=="ventral"
+    elseif a.cView=="ventral"
         d.pos(:,3) = d.pos(:,3) - a.pullF;
     else
         camPos = get(h(ax),'cameraposition');
@@ -88,56 +54,96 @@ if nnz(a.pullF)
     end
 end
 
-%% Plot electrodes
-%hEEG = gobjects(nChs,1);
-if a.parallel && ~a.doGPU
-    parfor e = 1:nChs
-        plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
+%% Plot
+markers = unique(d.marker,"stable")'; % Get marker/line styles
+
+% Plot elecs of each marker style
+for m = markers
+    % Row indices of current marker style
+    r = d.marker==m;
+
+    % Plot electrodes
+    he = scatter3(h(ax),d.pos(r,1),d.pos(r,2),d.pos(r,3),d.sz(r),d.col(r),"filled");
+
+    % Marker edge color (only one color per marker style)
+    if any(~isnan(d.bCol(r,1)))
+        he.MarkerEdgeColor = unique(d.bCol(r,:),"first");
     end
-else
-    for e = 1:nChs
-        plotCh_lfn(d(e,:),h(ax),row1,dataTipVars,nVars,varSz,alignV);
+
+    % Datatips
+    if a.visible && isany(a.dataTipVars)
+        for v = 1:numel(a.dataTipVars)
+            dv = a.dataTipVars(v);
+            if v==1
+                he.DataTipTemplate.DataTipRows =...
+                    dataTipTextRow(dv,d.(dv)(r));
+            else
+                he.DataTipTemplate.DataTipRows(end+1) =...
+                    dataTipTextRow(dv,d.(dv)(r));
+            end
+        end
     end
-    %d = table2struct(d);
-    %hEEG = arrayfun(@(de) plotCh_lfn(de,h(ax),row1,dataTipVars,nVars,varSz,alignV),d);
+
+    % Return graphics array
+    h = [h;he];
 end
 
-% % Return graphics array
-% h = [h;hEEG];
-end
+
+% Plot electrodes
+he = scatter3(h(ax),d.pos(:,1),d.pos(:,2),d.pos(:,3),d.sz,d.col,"filled");
 
 
-%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function he = plotCh_lfn(de,hAx,row1,dataTipVars,nVars,varSz,alignV)
-% Plot electrode on cortex
-if ~isnan(de.bSz) && de.bSz>0 && ~isnan(de.bCol(1,1))
+he.Marker = d.marker;
+
+
+
+if isany(d.bSz)
     % With edge border
-    he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.line,...
-        MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=alignV,...
-        LineWidth=de.bSz,MarkerEdgeColor=de.bCol);
+    he = scatter3(h(ax),d.pos(:,1),d.pos(:,2),d.pos(:,3),d.marker,...
+        MarkerSize=d.sz,MarkerFaceColor=d.col,AlignVertexCenters=alignV,...
+        LineWidth=d.bSz,MarkerEdgeColor=d.bCol);
 else
     % Without edge border
-    he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.line,...
-        MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=alignV,...
-        MarkerEdgeColor=de.col);
+    he = scatter3(h(ax),d.pos(:,1),d.pos(:,2),d.pos(:,3),d.marker,...
+        MarkerSize=d.sz,MarkerFaceColor=d.col,AlignVertexCenters=alignV,...
+        MarkerEdgeColor=d.col);
 end
 
-% Datatips
-if ~isempty(row1)
-    row = row1;
-    for v = 1:nVars
-        varN = dataTipVars(v);
-        %row(i) = dataTipTextRow(varN,[d{e,varN} d{e,varN}]); %he.UserData.(varN));
-        if varSz(v)>1; row(v) = dataTipTextRow(varN,de.(varN));
-        else; row(v) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end
-    end
-    he.DataTipTemplate.DataTipRows(end+1:end+nVars) = row;
+
 end
 
+
+% %% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function he = plotCh_lfn(de,hAx,row1,dataTipVars,nVars,varSz,a.align)
+% % Plot electrode on cortex
+% if ~isnan(de.bSz) && de.bSz>0 && ~isnan(de.bCol(1,1))
+%     % With edge border
+%     he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.marker,...
+%         MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=a.align,...
+%         LineWidth=de.bSz,MarkerEdgeColor=de.bCol);
+% else
+%     % Without edge border
+%     he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.marker,...
+%         MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=a.align,...
+%         MarkerEdgeColor=de.col);
+% end
+% 
+% % Datatips
+% if ~isempty(row1)
+%     row = row1;
+%     for a.cView = 1:nVars
+%         varN = dataTipVars(a.cView);
+%         %row(i) = dataTipTextRow(varN,[d{e,varN} d{e,varN}]); %he.UserData.(varN));
+%         if varSz(a.cView)>1; row(a.cView) = dataTipTextRow(varN,de.(varN));
+%         else; row(a.cView) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end
+%     end
+%     he.DataTipTemplate.DataTipRows(end+1:end+nVars) = row;
+% end
+% 
 % % Line parameters
 % if ~isnan(de.bCol(1,1))
 %     he.MarkerEdgeColor=de.bCol;
 % else; he.MarkerEdgeColor="none";
 % end
 % if ~isnan(de.bSz) && de.bSz>0; he.LineWidth=de.bSz; end
-end
+% end

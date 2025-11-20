@@ -1,4 +1,4 @@
-function [cols,cIdx,cMap,vals] = ec_colorbarFromValues(vals,cMapName,cLim,a)
+function [cols,cIdx,cMap,vals] = ec_colorsFromValues(vals,cMapName,cLim,a)
 % Get a colormap from a set of values. Enter range for z-score to distinguish
 % raw value & z-score operations
 %

@@ -16,11 +16,11 @@ function h = ec_plotCortex(hems,views,d,a)
 %     d.gyrus = on gyrus? (logical)
 %     d.ECoG = electrode type (logical): TRUE for subdural, FALSE for depth
 %     d.GM = grey or white matter (logical)
-%     d.line = marker shape/line style (string) -- see LineStyle in MATLAB line properties
-%     d.col = marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
-%     d.bCol = marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
-%     d.sz = marker size (numeric) -- see MarkerSize in MATLAB line properties
-%     d.bSz = marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
+%     d.marker = marker symbol (string): see Matlab scatter chart properties
+%     d.col = MarkerFaceColor [R G B]: see Matlab scatter chart properties
+%     d.bCol = MarkerEdgeColor [R G B]: only one color per marker symbol
+%     d.sz = marker size: see Matlab scatter chart properties
+%     d.bSz = marker edge size: see Matlab scatter chart properties
 %     d.label = electrode label (string): eg. "sbj10 ch24"
 %
 % NAME-VALUE INPUTS: see 'arguments' section below
@@ -32,8 +32,8 @@ function h = ec_plotCortex(hems,views,d,a)
 
 %% Arguments
 arguments
-    hems string = ["L","R"]
-    views string = ["medial","lateral"]
+    hems (1,:) string = ["L","R"]
+    views (1,:) string = ["medial","lateral"]
     d table = []
     a.sbj string = "fsaverage" % freesurfer subject name (string), "fsaverage" for standardized cortex
     a.sbjDir string = "" % freesurfer subject dir, eg: ~/freesurferInstallDir/subjects/*
@@ -42,18 +42,18 @@ arguments
     a.pullF double = 15 % Pull factor for obscured electrodes (more info below)
     a.flip logical = false % flip all elecs to viewed hemisphere
     a.align logical = true % align vertices to smooth (see plot.AlignVertexCenters; MATLAB line properties)
-    a.dataTipVars string = "sbjCh" % chan variables for datatips (interactive plots only) 
+    a.dataTipVars (1,:) string = "sbjCh" % chan variables for datatips (interactive plots only) 
     a.order {mustBeMember(a.order,["ascend" "descend" ""])} = "descend";
-    a.figPos double = [0 0 800 600] % figure positon: [top left width height] -- see MATLAB figure properties
-    a.insPos double = [0 0.005 0.99 0.995] % axis inset: [top left width height] -- see MATLAB axes properties
-    a.doGPU logical = false % use GPU processing (BROKEN)
+    a.figPos (1,:) double = [0 0 800 600] % figure positon: [top left width height] -- see MATLAB figure properties
+    a.insPos (1,:) double = [0 0.005 0.99 0.995] % axis inset: [top left width height] -- see MATLAB axes properties
+    a.doGPU logical = false % use GPU processing (NOTE: GPU disabled no performance gain)
     a.parallel logical = false % use parallel processing
     a.visible logical = false % visible/interactive plot
     a.save logical = false % save figure
     a.saveDir string = "" % directory to save figure images 
     a.saveName string = "" % base name for image files (string)
     a.cort = {}; % custom cortical surfaces per hemisphere (more info below)
-    a.h {isgraphics,isobject,isstruct} = struct;
+    a.h {isgraphics,isobject,isstruct} = gobjects
 end
 % MORE INFO:
 %  pullF = Pull factor for obscured electrodes (numeric): pullF(hems(i),views(v))
@@ -103,13 +103,16 @@ if ~isempty(d)
     if ~ismember(dVars,"gyrus"); d.gyrus(:)=true; end
     if ~ismember(dVars,"ECoG"); d.ECoG(:)=true; end
     %if ~ismember(dVars,"GM"); d.GM(:)="GM"; end
-    if ~ismember(dVars,"line"); d.line(:)="o"; end
+    if ~ismember(dVars,"marker"); d.marker(:)="o"; end
     if ~ismember(dVars,"col"); d.col=zeros(height(d),3); end
     if ~ismember(dVars,"bCol"); d.bCol=zeros(height(d),3); end
     if ~ismember(dVars,"sz"); d.sz(:)=8; end
     if ~ismember(dVars,"bSz"); d.bSz(:)=nan; end 
     if ~ismember(dVars,"order"); d.order(:)=1; end 
     %d.align(:) = a.align;
+
+    % Remove elecs without positions
+    d(isnan(d.pos(:,1)),:) = [];
 
     % Flip all chs to single hemisphere 
     if doFlip
@@ -122,17 +125,16 @@ if ~isempty(d)
 end
 
 %% Plot each hemisphere & view combination
-for i = 1:numel(hems)
+for l = 1:numel(hems)
     for v = 1:numel(views)
-        tic;
-        fn = hems(i)+"_"+views(v);
+        fn = hems(l)+"_"+views(v);
 
         % Load varying options
-        a.hem = hems(i);
+        a.hem = hems(l);
         a.cView = views(v);
-        a.pullF = pullF(i,v);
+        a.pullF = pullF(l,v);
         if ~isempty(cort)
-            a.cort = cort{i};
+            a.cort = cort{l};
         end
 
         % Initialize figure
@@ -151,8 +153,7 @@ for i = 1:numel(hems)
 
         % Electrode channels
         if ~isempty(d)
-            % Get channel indices
-            iCh = find(~isnan(d.pos(:,1))); % Can only plot chs with coordinates
+            iCh = 1:height(d);
             % Select hemisphere if multiple
             if numel(hems)>1 
                 iCh = iCh(d.hem(iCh)==a.hem); end

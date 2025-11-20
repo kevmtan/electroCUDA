@@ -120,8 +120,14 @@ elseif iscategorical(stat.c)
 else
     conds = unique(stat.c,"stable");
 end
+
 % Get times to plot
-if isany(opc.times); times = opc.times; else; times = unique(stat.t); end
+if isany(opc.times)
+    times = opc.times;
+else
+    times = unique(stat.t);
+end
+
 % Get freqs to plot
 if isany(opc.frqs)
     [~,idx] = ismember(opc.frqs,o.spect.name);
@@ -144,38 +150,40 @@ dp.frq(:) = "";
 dp.frqD(:) = "";
 dp.d = cell(plotN,1);
 
-%% Main
+% Plot data table template (see 'd' vars in 'ec_plotCortex')
+d0 = chs(:,["sbjCh" "pos" "hem" "lat" "gyrus" "ECoG"]);
+d0.marker(:) = "o"; % marker shape/line style (string) -- see LineStyle in MATLAB line properties
+d0.col(:,1:3) = opc.nsSz; % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
+d0.bCol(:,1:3) = nan; % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
+d0.sz(:) = opc.markSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
+d0.bSz(:) = 0; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
+d0.order(:) = inf;
 
-% Loop across conds
-for c = 1:condN
-    cond = conds(c);
 
-    %% Loop across times
-    for t = 1:timeN 
-        time = times(t);
-
-        % Plot data template (see 'd' vars in 'ec_plotCortex')
-        d0 = chs(:,["sbjCh" "pos" "hem" "lat" "gyrus" "ECoG"]);
-        d0.line(:) = "."; % marker shape/line style (string) -- see LineStyle in MATLAB line properties
-        d0.col(:,1:3) = 0; % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
-        d0.bCol(:,1:3) = nan; % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
-        d0.sz(:) = opc.markSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
-        d0.bSz(:) = 0; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
-        d0.order(:) = inf;
+%% Main: loop across conds/times/freqs
+for c = 1:condN % conds loop
+    for t = 1:timeN % times loop
+        % Load template data
+        d = d0;
 
         % Get stats data for plot
-        sp = stat(stat.c==cond & stat.t==time,:);
-        if height(sp)~=height(d0)
-            warning("[ec_plotTimesCortex] Unequal heights for plot stats & channel tables: c="+cond+" t="+time); end
+        sp = stat(stat.c==conds(c) & stat.t==times(t),:);
+        if height(sp)~=height(d)
+            warning("[ec_plotTimesCortex] Unequal heights for plot stats & channel tables: "+...
+            "c="+conds(c)+" t="+times(t));
+        end
         
-        % Remove
-        d0(~ismember(d0.sbjCh,sp.sbjCh),:) = [];
+        % Remove missing stats chans from plot table
+        d(~ismember(d.sbjCh,sp.sbjCh),:) = [];
         % Order stats data by chs
-        [~,idx] = ismember(d0.sbjCh,sp.sbjCh);
+        [~,idx] = ismember(d.sbjCh,sp.sbjCh);
         sp = sp(idx,:);
 
         %% Loop across freqs
         for f = 1:frqN
+            % Get plot number
+            p = sub2ind([timeN frqN condN],t,f,c);
+
             % Get freq info
             frq = frqs.name(f); % freq name
             if frqN > 1
@@ -190,9 +198,6 @@ for c = 1:condN
                 frqD = frq;
             end
 
-            d = d0; % Load template plot data
-            p = sub2ind([timeN frqN condN],t,f,c); % Get plot number
-
             % Find significant chans
             if isany(opc.sigVar)
                 idx = sp.(opc.sigVar+frqV) <= opc.sigThr;
@@ -200,19 +205,18 @@ for c = 1:condN
                 idx = true(height(d),1);
             end
             
-
             %% Make plot data
 
             % Get colors from colormap
-            [d.col(idx,:),d.order(idx)] = ec_colorbarFromValues(...
+            [d.col(idx,:),d.order(idx)] = ec_colorsFromValues(...
                 sp.(opc.actVar+frqV)(idx),opc.cmap,opc.clim);
-            d.line(idx) = "o"; % marker type
+            d.marker(idx) = "o"; % marker type
             d.sz(idx) = opc.markSz; % marker size
 
             % Save
             dp.d{p} = d;
-            dp.cond(p) = cond;
-            dp.time(p) = time;
+            dp.cond(p) = conds(c);
+            dp.time(p) = times(t);
             dp.frq(p) = frq;
             dp.frqD(p) = frqD;
         end
@@ -227,10 +231,8 @@ dp.frq = categorical(dp.frq,frqs.name,Ordinal=true);
 
 
 
-%%% Make individual plots %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Make individual images per plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function plotIndiv_lfn(dp,opc,o)
-% Makes individual images for each plot:
-
 % Make directory
 dirOut = o.dirOut+opc.indiv.saveDir+filesep;
 if ~exist(dirOut,"dir")
@@ -307,7 +309,7 @@ for p = 1:height(dc)
 
     % Sig elecs only
     d = dc.d{p};
-    d(~d.bSz,:) = [];
+    d(isnan(d.bCol(:,1)),:) = [];
     
     % Plot cortex
     plotCortex_lfn(ht,d,opc,o.dirs.freesurfer,txt,p);

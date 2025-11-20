@@ -1125,7 +1125,7 @@ if a.ICA
     % Color by ICA weights
     %dCh.wts = normalize(dCh.wts,"range",oP.climICA);
     [dCh.col,~,~,dCh.order] =...
-        ec_colorbarFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
+        ec_colorsFromValues(dCh.wts,'RdBu',oP.climICA,zscore=oP.climICA_z);
     ch = xN.ic;
     sbjCh = xN.sbjIC;
     dCh.sz(ch)=13; dCh.bSz(ch)=2; dCh.bCol(ch,:)=[0 .8 0];
