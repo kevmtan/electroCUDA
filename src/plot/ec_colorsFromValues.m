@@ -1,4 +1,4 @@
-function [cols,cIdx,cMap,vals] = ec_colorsFromValues(vals,cMapName,cLim,a)
+function [rgb,id,cmap,x] = ec_colorsFromValues(x,name,clim,a)
 % Get a colormap from a set of values. Enter range for z-score to distinguish
 % raw value & z-score operations
 %
@@ -15,96 +15,94 @@ function [cols,cIdx,cMap,vals] = ec_colorsFromValues(vals,cMapName,cLim,a)
 
 %% Inputs
 arguments
-    vals {isnumeric} % Vector of numeric values
-    cMapName {ischar,isstring} = "RdBu" % Name of colormap
-    cLim {isnumeric} = [] % Raw/z-score value limits to clip: [lowerLimit,upperLimit]
-    a.center {isnumeric,istext} = [] % Center raw/zscored values at this number
-    a.zscore {isnumeric,islogical} = false % do z-transform (true|false), zscore limits [lowerZ,upperZ]
+    x double % Vector of numeric values
+    name char = 'RdBu' % Name of colormap
+    clim (1,2) double = [nan nan] % Raw/z-score value limits to clip: [lowerLimit,upperLimit]
+    a.center (1,1) double = nan % Center raw/zscored values at this number
+    a.zscore (1,:) double = false % do z-transform (true|false), zscore limits [lowerZ,upperZ]
 end
+
+%% Get colormap
+
+% Get number of colors
+n = numel(x);
+if n<256
+    n = 256; end
+
+% Generate colormap with n colors
+switch name
+    case 'parula'
+        cmap = parula(n);
+    case 'viridis'
+        cmap = viridis(n);
+    case 'jet'
+        cmap = jet(n);
+    case 'turbo'
+        cmap = turbo(n);
+    case 'hot'
+        cmap = hot(n);
+    case 'RedBlue'
+        cmap = cmRedBlue(n);
+        cmap = flip(cmap);
+    case 'VioletGreen'
+        cmap = cmVioletGreen(n);
+    case 'PinkGreen'
+        cmap = cmPinkGreen(n);
+    case 'YellowGreen'
+        cmap = cmYellowGreen(n);
+    case 'RedsWhite'
+        cmap = cmRedsWhite(n);
+    case 'BluesWhite'
+        cmap = cmBluesWhite(n);
+    otherwise
+        cmap = cbrewer2(name,n);
+        cmap = flip(cmap);
+end
+
 
 %% Scale values
 
-% Get number of colors
-nCols = length(vals);
-if nCols<256
-    nCols = 256;
-end
-
 % Set value limits
-if numel(cLim)==2
-    vals(vals<cLim(1)) = cLim(1);
-    vals(vals>cLim(2)) = cLim(2);
+if all(~isnan(clim))
+    x(x<clim(1)) = clim(1);
+    x(x>clim(2)) = clim(2);
 end
 
 % Z-score values
 if any(a.zscore)
-    if any(a.center)
-        vals = normalize(vals,center=a.center,scale="std");
+    if ~isnan(a.center)
+        x = normalize(x,center=a.center,scale="std");
     else
-        vals = normalize(vals,"zscore");
+        x = normalize(x,"zscore");
     end
 
     % Clip z-scores at limits
     if numel(a.zscore)==2
-        cLim = a.zscore;
-        vals(vals<cLim(1)) = cLim(1);
-        vals(vals>cLim(2)) = cLim(2);
+        clim = a.zscore;
+        x(x<clim(1)) = clim(1);
+        x(x>clim(2)) = clim(2);
     end 
-elseif ~isempty(a.center) % Center colorbar
-    vals = normalize(vals,"center",a.center);
-    cLim = [min(vals) max(vals)];
-    cLim = [-max(abs(cLim(1)),abs(cLim(2))) max(abs(cLim(1)),abs(cLim(2)))];
+elseif ~isnan(a.center) % Center colorbar
+    x = normalize(x,"center",a.center);
+    clim = [min(x) max(x)];
+    clim = [-max(abs(clim(1)),abs(clim(2))) max(abs(clim(1)),abs(clim(2)))];
 end
 
 % Use range if no specified clim
-if numel(cLim)<2
-    cLim = [min(vals) max(vals)];
+if all(isnan(clim))
+    clim = [min(x) max(x)];
 end
 
-% Get value order & indices 
-vals = (vals-cLim(1))./(cLim(2)-cLim(1));
-cIdx = round(vals.*(nCols-1))+1;
-cIdx(cIdx<1) = 1;
-cIdx(cIdx>nCols) = nCols;
-in = ~isnan(cIdx);
-
-%% Colormap the values
-switch cMapName
-    case 'parula'
-        cMap = parula(nCols);
-    case 'viridis'
-        cMap = viridis(nCols);
-    case 'jet'
-        cMap = jet(nCols);
-    case 'turbo'
-        cMap = turbo(nCols);
-    case 'hot'
-        cMap = hot(nCols);
-    case 'RedBlue'
-        cMap = cmRedBlue(nCols);
-        cMap = flip(cMap);
-    case 'VioletGreen'
-        cMap = cmVioletGreen(nCols);
-    case 'PinkGreen'
-        cMap = cmPinkGreen(nCols);
-    case 'YellowGreen'
-        cMap = cmYellowGreen(nCols);
-    case 'RedsWhite'
-        cMap = cmRedsWhite(nCols);
-    case 'BluesWhite'
-        cMap = cmBluesWhite(nCols);
-    otherwise
-        cMap = cbrewer2(cMapName, nCols);
-        cMap = flip(cMap);
-end
+% Get color index
+id = fix((x-clim(1))./(clim(2)-clim(1)) * (n-1)) + 1;
 
 % Get colors of each value
-cols = nan(length(vals),3);
-cols(in,:) = cMap(cIdx(in),:);
+rgb = ind2rgb(id,cmap);
+rgb = squeeze(rgb);
 
-if nargout>3
-    vals(~in) = -Inf;
-end
+% NaN colors for NaN values
+q = isnan(id);
+rgb(q,:) = nan;
 end
 
 %% Depreciated
