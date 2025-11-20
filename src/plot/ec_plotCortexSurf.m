@@ -1,4 +1,4 @@
-function h = ec_plotCortexSurf(a,h)
+function h = ec_plotCortexSurf(hem,view,a,h)
 % Plots a freesurfer cortical surface (fsAvg or custom surface)
 % See plotCortex.m for full description of input options
 % Call this function using plotCortex for single or multiple views (separate figs per view)
@@ -18,6 +18,8 @@ function h = ec_plotCortexSurf(a,h)
 
 %% Check inputs
 arguments
+    hem % hemisphere
+    view % cortical view
     a struct
     h {isgraphics,isobject} = [gcf;gca]
 end
@@ -25,8 +27,8 @@ end
 %% Prep
 
 % View angle
-if a.hem=="L"
-    switch a.cView
+if hem=="L"
+    switch view
         case 'medial'; theta=90; phi=0;
         case 'lateral'; theta=270; phi=0;
         case 'anterior'; theta=180; phi=0;
@@ -45,8 +47,8 @@ if a.hem=="L"
         case 'frontal'; theta=-120; phi=10;
         case 'parietal'; theta=-70; phi=10;
     end
-elseif a.hem=="R"
-    switch a.cView
+elseif hem=="R"
+    switch view
         case 'medial'; theta=270; phi=0;
         case 'lateral'; theta=90; phi=0;
         case 'anterior'; theta=180; phi=0;
@@ -66,7 +68,7 @@ elseif a.hem=="R"
         case 'parietal'; theta=70; phi=10;
     end
 else
-    error("[ec_plotCortexSurf] hemisphere must be 'L' or 'R' (a.hem)");
+    error("[ec_plotCortexSurf] hemisphere must be 'L' or 'R' (hem)");
 end
 
 % Get axis
@@ -78,7 +80,7 @@ if ~nnz(ax); h(end+1,1)=gca; ax=height(h); end
 
 % Get filename
 if isempty(a.cort)
-    if a.hem=="R"; a.cort=fullfile(a.sbjDir,"surf","rh."+a.surfType);
+    if hem=="R"; a.cort=fullfile(a.sbjDir,"surf","rh."+a.surfType);
     else; a.cort=fullfile(a.sbjDir,"surf","lh."+a.surfType); end
 end
 
@@ -88,10 +90,10 @@ if ~isa(a.cort,'triangulation'); a.cort = ec_readSurfTri(a.cort); end
 % Cortical curvature shading (distinguish sulci/gyri for inflated)
 if contains(a.surfType,"inflated")
     if a.sbj=="fsaverage"
-        if a.hem=="R"; curvFn = fullfile(a.sbjDir,"surf","rh.avg_curv");
+        if hem=="R"; curvFn = fullfile(a.sbjDir,"surf","rh.avg_curv");
         else; curvFn = fullfile(a.sbjDir,"surf","lh.avg_curv"); end
     else
-        if a.hem=="R"; curvFn = fullfile(a.sbjDir,"surf","rh.curv");
+        if hem=="R"; curvFn = fullfile(a.sbjDir,"surf","rh.curv");
         else; curvFn = fullfile(a.sbjDir,"surf","lh.curv"); end
     end
     curv = read_curv(curvFn);
@@ -131,8 +133,8 @@ h = [h;hCort;hLight];
 %     a.sbj {isstring,ischar} = []
 %     a.sbjDir {isstring,ischar} = []
 %     a.doGPU logical = []
-%     a.hem {isstring,ischar} = []
-%     a.cView {isstring,ischar} = []
+%     hem {isstring,ischar} = []
+%     view {isstring,ischar} = []
 %     a.surfType {isstring,ischar}  = []
 %     a.opacity {isnumeric} = []
 %     a.insPos {isnumeric} = []

@@ -90,7 +90,7 @@ o.stats.randomEffectsOnly = false; % only model single-trial stats
 %% Plot cortex options
 opc = struct;
 
-opc.test = false; % TEST??????
+opc.test = true; % TEST??????
 
 opc.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
 opc.statsVar = "sAvg"; % Subject stats variable name in saved data
@@ -105,16 +105,20 @@ opc.actVar = "b"; % activity variable for electrode plot color (in stats table)
 opc.actUnit = "z"; % activity unit to display in fig
 opc.clim = [-2.5 2.5]; % limits for activity colorscale 
 opc.sigVar = "q"; % statistical significance variable (in stats table)
-opc.sigThr = 0.05; % significance threshold (default=0.05)
+opc.sigThr = 0.05; % significance threshold (default=0.05, none=0)
 opc.posVar = "MNI"; % position variable in chNfo table (should match surfType)
 opc.surfType = "pial_avg"; % surface type (freesurfer naming convention) ["pial_avg"|"inflated_avg"]
 opc.pullF = 15; % Pull factor, view elecs closer to camera (default=15)
 opc.alpha = 0.95; % cortex opacity
+opc.marker = "o"; % marker type (see Matlab marker symbols)
+opc.nsMark = "o"; % marker type for nonsignificant chans (see Matlab marker symbols)
 opc.markSz = 5; % marker size for significant chans;
 opc.nsSz = 1; % marker size for nonsignificant chans;
-opc.bSz = 0; % border size
-opc.cmap = "RdBu"; % colormap (see ec_
-opc.txtCol = [.8 .8 .8]; % Text color
+opc.bSz = 0; % marker border size
+opc.cmap = "RdBu"; % colormap (see ec_colorsFromValues)
+opc.nsCol = [0 0 0]; % marker color for nonsignificant chans: [R G B]
+opc.bCol = [0 0 0]; % marker border color: [R G B]
+opc.txtCol = [.8 .8 .8]; % Text color: [R G B]
 opc.txtSz = 8; % text size
 opc.chLabel = ["sbjCh" "b" "q"]; % channel label variable (for visible/interactive plots)
 opc.visible = 0;

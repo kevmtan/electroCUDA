@@ -1,4 +1,4 @@
-function h = ec_plotCortexChs(d,a,h)
+function h = ec_plotCortexChs(hem,view,d,a,h)
 % Plots electrode channels on a freesurfer cortical surface (fsavg or custom)
 % This function is meant to be called with plotCortex
 % If not using plotCortex, you must call plotCortexSurf *before* this function
@@ -16,19 +16,27 @@ function h = ec_plotCortexChs(d,a,h)
 
 %% Check inputs
 arguments
+    hem % hemisphere
+    view % cortical view
     d table % electrode data table (see ec_plotCortex)
     a struct % plot options from ec_plotCortex
     h {isgraphics,isobject} = gca
 end
 
-% Expand align vertex argument for plot3
-alignV = repmat(a.align,height(d),1);
-
 %% Prep
 
 % Sort if ordered
 if isany(a.order)
-    d = sortrows(d,'order',a.order); end
+    d = sortrows(d,order=a.order); end
+
+% Flip all chs to single hemisphere
+if a.flip
+    if hem=="L"
+        d.pos(d.hem=="R",1) = -d.pos(d.hem=="R",1);
+    elseif hem=="R"
+        d.pos(d.hem=="L",1) = -d.pos(d.hem=="L",1);
+    end
+end
 
 % Get axis
 ax = isgraphics(h,'axes');
@@ -40,34 +48,35 @@ end
 % Pull electrode coords out from the brain towards the viewer
 nChs = height(d);
 if nnz(a.pullF)
-    if (a.hem=="L" && a.cView=="lateral")||(a.hem=="R" && a.cView=="medial")
+    if (hem=="L" && view=="lateral")||(hem=="R" && view=="medial")
         d.pos(:,1) = d.pos(:,1) - a.pullF;
-    elseif (a.hem=="R" && a.cView=="lateral")||(a.hem=="L" && a.cView=="medial")
+    elseif (hem=="R" && view=="lateral")||(hem=="L" && view=="medial")
         d.pos(:,1) = d.pos(:,1) + a.pullF;
-    elseif a.cView=="ventral"
+    elseif view=="ventral"
         d.pos(:,3) = d.pos(:,3) - a.pullF;
     else
-        camPos = get(h(ax),'cameraposition');
+        camPos = get(h(ax),"cameraposition");
         err = repmat(camPos,nChs,1) - d.pos;
         nrmd = err./repmat(sqrt(sum(err.^2,2)),1,3);
         d.pos = d.pos + nrmd * a.pullF;
     end
 end
 
-%% Plot
+%% Plot electrodes
 markers = unique(d.marker,"stable")'; % Get marker/line styles
 
-% Plot elecs of each marker style
+% Plot each marker style separately (Matlab limitation for vectorized 'scatter3')
 for m = markers
     % Row indices of current marker style
     r = d.marker==m;
 
-    % Plot electrodes
+    % 3D scatterplot of electrodes (vectorized)
     he = scatter3(h(ax),d.pos(r,1),d.pos(r,2),d.pos(r,3),d.sz(r),d.col(r),"filled");
 
-    % Marker edge color (only one color per marker style)
-    if any(~isnan(d.bCol(r,1)))
-        he.MarkerEdgeColor = unique(d.bCol(r,:),"first");
+    % Marker edge properties (same per marker style - Matlab limitation)
+    if isany(d.bSz(r))
+        he.LineWidth = unique(d.bSz(r),"last");
+        he.MarkerEdgeColor = unique(d.bCol(r,:),"last");
     end
 
     % Datatips
@@ -85,31 +94,7 @@ for m = markers
     end
 
     % Return graphics array
-    h = [h;he];
-end
-
-
-% Plot electrodes
-he = scatter3(h(ax),d.pos(:,1),d.pos(:,2),d.pos(:,3),d.sz,d.col,"filled");
-
-
-he.Marker = d.marker;
-
-
-
-if isany(d.bSz)
-    % With edge border
-    he = scatter3(h(ax),d.pos(:,1),d.pos(:,2),d.pos(:,3),d.marker,...
-        MarkerSize=d.sz,MarkerFaceColor=d.col,AlignVertexCenters=alignV,...
-        LineWidth=d.bSz,MarkerEdgeColor=d.bCol);
-else
-    % Without edge border
-    he = scatter3(h(ax),d.pos(:,1),d.pos(:,2),d.pos(:,3),d.marker,...
-        MarkerSize=d.sz,MarkerFaceColor=d.col,AlignVertexCenters=alignV,...
-        MarkerEdgeColor=d.col);
-end
-
-
+    h = [h;he]; %#ok<AGROW>
 end
 
 
@@ -131,11 +116,11 @@ end
 % % Datatips
 % if ~isempty(row1)
 %     row = row1;
-%     for a.cView = 1:nVars
-%         varN = dataTipVars(a.cView);
+%     for view = 1:nVars
+%         varN = dataTipVars(view);
 %         %row(i) = dataTipTextRow(varN,[d{e,varN} d{e,varN}]); %he.UserData.(varN));
-%         if varSz(a.cView)>1; row(a.cView) = dataTipTextRow(varN,de.(varN));
-%         else; row(a.cView) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end
+%         if varSz(view)>1; row(view) = dataTipTextRow(varN,de.(varN));
+%         else; row(view) = dataTipTextRow(varN,[de.(varN) de.(varN)]); end
 %     end
 %     he.DataTipTemplate.DataTipRows(end+1:end+nVars) = row;
 % end

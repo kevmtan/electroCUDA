@@ -30,10 +30,10 @@ function h = ec_plotCortex(hems,views,d,a)
 %     If 1 hemisphere & view: h = [figure;axis;cortex;light;electrodes]
 %     If multiple hemispheres/views: h.hemisphere_view = [figure;axis;cortex;light;electrodes]
 
-%% Arguments
+%% Input arguments
 arguments
-    hems (1,:) string = ["L","R"]
-    views (1,:) string = ["medial","lateral"]
+    hems (1,:) string = ["L","R"] % cortical hemispheres to plot: ["L"|"R"]
+    views (1,:) string = ["medial","lateral"] % cortical views to plot (see ec_plotCortexSurf for views)
     d table = []
     a.sbj string = "fsaverage" % freesurfer subject name (string), "fsaverage" for standardized cortex
     a.sbjDir string = "" % freesurfer subject dir, eg: ~/freesurferInstallDir/subjects/*
@@ -41,7 +41,6 @@ arguments
     a.opacity double = 0.9 % Cortex alpha opacity 
     a.pullF double = 15 % Pull factor for obscured electrodes (more info below)
     a.flip logical = false % flip all elecs to viewed hemisphere
-    a.align logical = true % align vertices to smooth (see plot.AlignVertexCenters; MATLAB line properties)
     a.dataTipVars (1,:) string = "sbjCh" % chan variables for datatips (interactive plots only) 
     a.order {mustBeMember(a.order,["ascend" "descend" ""])} = "descend";
     a.figPos (1,:) double = [0 0 800 600] % figure positon: [top left width height] -- see MATLAB figure properties
@@ -56,15 +55,15 @@ arguments
     a.h {isgraphics,isobject,isstruct} = gobjects
 end
 % MORE INFO:
-%  pullF = Pull factor for obscured electrodes (numeric): pullF(hems(i),views(v))
+%  pullF = Pull factor for obscured electrodes (numeric): pullF(hems,views)
 %     Separate factors per hemisphere (rows) & view (columns):
 %                       [leftView1 leftView2; rightView1 rightView2;...]
 %     pullF is added to coordinates for standard views (lateral/medial/ventral/dorsal)
 %     pullF is a coordinate transform factor for other views (see ec_plotCortexChs)
-%  cort = custom cortical surfaces per hemisphere (cell array ordered by hems(i))
+%  cort = custom cortical surfaces per hemisphere (cell array ordered by hems)
 %     Use when cortical surface files not found here 'a.sbjDir'...
 %     cort = cell vector with same indexing as 'hems' input (see description above)
-%     cort{i} = fullpath/struct/triangulation cortex data for hems(i)
+%     cort{i} = fullpath/struct/triangulation cortex data for hems
 
 %% Input validation
 
@@ -76,10 +75,7 @@ end
 if ~isany(a.sbjDir); a.sbjDir=string(uigetdir("freesurfer subjects dir: ~/freesurferInstallDir/subjects/*")); end
 
 % Check plotting options
-pullF=a.pullF; doFlip=a.flip; cort=a.cort; h=a.h;
-if isempty(doFlip)
-    if numel(hems)>1 || height(d)==1; doFlip=false; else; doFlip=true; end 
-end
+pullF=a.pullF; cort=a.cort; h=a.h;
 if numel(pullF) < numel(hems)*numel(views)
     pullF = repmat(pullF(1),numel(hems),numel(views));
 end
@@ -96,42 +92,38 @@ end
 % Check electrode data
 if ~isempty(d)
     dVars = string(d.Properties.VariableNames);
-    if ~ismember(dVars,"sbjCh"); d.label=string(1:height(d))'; end
-    if ~ismember(dVars,"pos"); error("electrode coordinates needed: d.pos(ch)=[x y z]"); end
-    if ~ismember(dVars,"hem"); d.hem(:)="L"; end
-    if ~ismember(dVars,"lat"); d.lat(:)="both"; end
-    if ~ismember(dVars,"gyrus"); d.gyrus(:)=true; end
-    if ~ismember(dVars,"ECoG"); d.ECoG(:)=true; end
-    %if ~ismember(dVars,"GM"); d.GM(:)="GM"; end
-    if ~ismember(dVars,"marker"); d.marker(:)="o"; end
-    if ~ismember(dVars,"col"); d.col=zeros(height(d),3); end
-    if ~ismember(dVars,"bCol"); d.bCol=zeros(height(d),3); end
-    if ~ismember(dVars,"sz"); d.sz(:)=8; end
-    if ~ismember(dVars,"bSz"); d.bSz(:)=nan; end 
-    if ~ismember(dVars,"order"); d.order(:)=1; end 
-    %d.align(:) = a.align;
+    if ~ismember("sbjCh",dVars); d.label=string(1:height(d))'; end
+    if ~ismember("pos",dVars); error("electrode coordinates needed: d.pos(ch)=[x y z]"); end
+    if ~ismember("hem",dVars); d.hem(:)="L"; end
+    if ~ismember("lat",dVars); d.lat(:)="both"; end
+    if ~ismember("gyrus",dVars); d.gyrus(:)=true; end
+    if ~ismember("ECoG",dVars); d.ECoG(:)=true; end
+    %if ~ismember("GM",dVars); d.GM(:)="GM"; end
+    if ~ismember("marker",dVars); d.marker(:)="o"; end
+    if ~ismember("col",dVars); d.col=zeros(height(d),3); end
+    if ~ismember("bCol",dVars); d.bCol=zeros(height(d),3); end
+    if ~ismember("sz",dVars); d.sz(:)=8; end
+    if ~ismember("bSz",dVars); d.bSz(:)=nan; end 
+    if ~ismember("order",dVars); d.order(:)=1; end 
 
     % Remove elecs without positions
     d(isnan(d.pos(:,1)),:) = [];
 
-    % Flip all chs to single hemisphere 
-    if doFlip
-        if hems=="L"
-            d.pos(d.hem=="R",1) = -d.pos(d.hem=="R",1);
-        elseif hems=="R"
-            d.pos(d.hem=="L",1) = -d.pos(d.hem=="L",1);
-        end
-    end
+    % Remove "_" from sbjCh for datatips
+    if a.visible && ismember("sbjCh",a.dataTipVars)
+        d.sbjCh = erase(d.sbjCh,"_"); end
 end
 
 %% Plot each hemisphere & view combination
 for l = 1:numel(hems)
+    hem = hems(l);
     for v = 1:numel(views)
-        fn = hems(l)+"_"+views(v);
+        view = views(v);
+        fn = hem+"_"+view;
 
         % Load varying options
-        a.hem = hems(l);
-        a.cView = views(v);
+        a.hem = hem;
+        a.cView = view;
         a.pullF = pullF(l,v);
         if ~isempty(cort)
             a.cort = cort{l};
@@ -149,7 +141,7 @@ for l = 1:numel(hems)
         end
 
         % Plot cortex
-        hi = ec_plotCortexSurf(a,hi);
+        hi = ec_plotCortexSurf(hem,view,a,hi);
 
         % Electrode channels
         if ~isempty(d)
@@ -163,7 +155,7 @@ for l = 1:numel(hems)
             if ~nnz(iCh); warning("no electrodes for "+fn); continue; end
 
             % Plot electrode channels
-            hi = ec_plotCortexChs(d(iCh,:),a,hi);
+            hi = ec_plotCortexChs(hem,view,d(iCh,:),a,hi);
         end
 
         % Save images

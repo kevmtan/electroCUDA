@@ -316,8 +316,7 @@ end
 % Plot cortex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function plotCortex_lfn(h,dCh,lat,surf,o,hem)
 ec_plotCortex(hem,lat,dCh,sbj=o.dirs.sbj,sbjDir=o.dirFS,surfType=surf,...
-    visible=o.oP.visible,opacity=o.oP.alpha,doGPU=o.oP.doGPU,h=h,...
-    save=0,flip=0,pullF=15,parallel=0);
+    visible=o.oP.visible,opacity=o.oP.alpha,h=h,pullF=15);
 end
 
 

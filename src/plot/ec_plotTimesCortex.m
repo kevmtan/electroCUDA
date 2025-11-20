@@ -152,10 +152,10 @@ dp.d = cell(plotN,1);
 
 % Plot data table template (see 'd' vars in 'ec_plotCortex')
 d0 = chs(:,["sbjCh" "pos" "hem" "lat" "gyrus" "ECoG"]);
-d0.marker(:) = "o"; % marker shape/line style (string) -- see LineStyle in MATLAB line properties
-d0.col(:,1:3) = opc.nsSz; % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
-d0.bCol(:,1:3) = nan; % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
-d0.sz(:) = opc.markSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
+d0.marker(:) = opc.nsMark(:); % marker shape/line style (string) -- see LineStyle in MATLAB line properties
+d0.col = repmat(opc.nsCol,height(d0),1); % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
+d0.bCol = repmat(opc.bCol,height(d0),1); % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
+d0.sz(:) = opc.nsSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
 d0.bSz(:) = 0; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
 d0.order(:) = inf;
 
@@ -199,7 +199,7 @@ for c = 1:condN % conds loop
             end
 
             % Find significant chans
-            if isany(opc.sigVar)
+            if isany(opc.sigVar) && isany(opc.sigThr)
                 idx = sp.(opc.sigVar+frqV) <= opc.sigThr;
             else
                 idx = true(height(d),1);
@@ -207,10 +207,10 @@ for c = 1:condN % conds loop
             
             %% Make plot data
 
-            % Get colors from colormap
+            % Get colors from colormap (significant)
             [d.col(idx,:),d.order(idx)] = ec_colorsFromValues(...
                 sp.(opc.actVar+frqV)(idx),opc.cmap,opc.clim);
-            d.marker(idx) = "o"; % marker type
+            d.marker(idx) = opc.marker; % marker type
             d.sz(idx) = opc.markSz; % marker size
 
             % Save
