@@ -178,7 +178,7 @@ fprintf('%d Subdural electrodes\n',length(sduralIds));
 %% Initialize Coordinate Variables
 leptoRAS=ctRAS;
 leptoVOX=zeros(nElec,3);
-infRAS=zeros(nElec,3)*NaN;
+infRAS=nan(nElec,3);
 pialRAS=ctRAS;
 pialVOX=zeros(nElec,3);
 
