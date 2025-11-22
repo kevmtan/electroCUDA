@@ -9,6 +9,12 @@ end
 
 
 %% Prep
+
+% Determine if running within a function
+stack = dbstack;
+if numel(stack) <= 1
+    op.test = true; end
+
 sbjs = logp.i{:}; % get subjects from analysis
 sbjN = height(sbjs); % number of subjects
 o = sbjs.o{1}; % options from stats
@@ -246,6 +252,7 @@ function indiv_lfn(dp,op,o)
 dirOut = o.dirOut+op.indiv.saveDir+filesep;
 if ~exist(dirOut,"dir")
     mkdir(dirOut); end
+conds = string(categories(dp.cond));
 
 %% Loop across plots
 for p = 1:height(dp)
@@ -269,7 +276,8 @@ for p = 1:height(dp)
 
     %% Save
     if op.save
-        fn = dirOut+string(dp.cond(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
+        c = find(conds==dp.cond(p));
+        fn = dirOut+c+"_"+string(dp.cond(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
         exportgraphics(h,fn,Resolution=150);
         disp("[ec_PlotTimesCortex] saved: "+fn);
         delete(h);
@@ -293,7 +301,7 @@ conds = string(categories(dp.cond));
 
 %% Loop across plots
 for c = 1:numel(conds)
-    plotCond_lfn(dp(dp.cond==conds(c),:),op,o,dirOut);
+    plotCond_lfn(dp(dp.cond==conds(c),:),op,o,c,dirOut);
 end
 
 
@@ -302,7 +310,7 @@ end
 
 
 %%% Plot condition (subplots of times & freqs) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCond_lfn(dc,op,o,dirOut)
+function plotCond_lfn(dc,op,o,c,dirOut)
 % dc = dp(dp.cond=="Other",:);
 times = unique(dc.time);
 frqs = string(categories(dc.frq));
@@ -310,6 +318,8 @@ timesN=numel(times); frqN=numel(frqs);
 
 % Order by tiledorder
 dc = sortrows(dc,["time" "frq"],"ascend");
+dc.cond = string(dc.cond);
+dc.frq = string(dc.frq);
 
 % Initialize figure
 if op.test
@@ -346,7 +356,7 @@ end
 
 %% Save
 if op.save
-    fn = dirOut+string(dc.cond(1))+".png";
+    fn = dirOut+c+"_"+dc.cond(1)+".png";
     exportgraphics(h,fn,Resolution=150);
     disp("[ec_PlotTimesCortex] saved: "+fn);
     delete(h);
