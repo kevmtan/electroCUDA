@@ -86,7 +86,7 @@ if ~o.stats.randomEffectsOnly
 end
 
 % Single-trial
-if ~o.stats.randomEffectsOnly
+if o.stats.singleTrial
     sTr = cell2table(sTr,VariableNames="s");
     sTr.sbjID(:) = n.sbjID;
     sTr.sbjCh = sbjChs;
@@ -155,6 +155,7 @@ for c = 1:n.nConds
 
         % Run FDR
         cAvg.q(id) = fdr_BH(cAvg.p(id),o.stats.alpha);
+        cAvg.q(~id) = nan;
 
         % Unstack by freq (wide-format) to save memory
         if n.nSpect>1

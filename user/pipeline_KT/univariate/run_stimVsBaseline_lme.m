@@ -101,9 +101,9 @@ op.timeVar = "bin"; % variable for time (in stats results)
 op.timeUnit = "ms"; % time unit to display in fig
 op.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
 op.frqs = []; % frequency names to plot (empty=all)
-op.actVar = "b"; % activity variable for electrode plot color (in stats table)
+op.actVar = "t"; % activity variable for electrode plot color (in stats table)
 op.actUnit = "z"; % activity unit to display in fig
-op.clim = [-2 2]; % limits for activity colorscale 
+op.clim = [-6 6]; % limits for activity colorscale 
 op.sigVar = "q"; % statistical significance variable (in stats table)
 op.sigThr = 0.05; % significance threshold (default=0.05, none=0)
 op.posVar = "MNI"; % position variable in chNfo table (should match surfType)
@@ -112,14 +112,14 @@ op.pullF = 15; % Pull factor, view elecs closer to camera (default=15)
 op.alpha = 0.95; % cortex opacity
 op.marker = "o"; % marker type (see Matlab marker symbols)
 op.nsMark = "o"; % marker type for nonsignificant chans (see Matlab marker symbols)
-op.markSz = 6; % marker size for significant chans;
-op.nsSz = 1; % marker size for nonsignificant chans;
+op.markSz = 8; % marker size for significant chans;
+op.nsSz = 3; % marker size for nonsignificant chans;
 op.bSz = 0; % marker border size
 op.cmap = "RdBu"; % colormap (see ec_colorsFromValues)
 op.nsCol = [0 0 0]; % marker color for nonsignificant chans: [R G B]
 op.bCol = [0 0 0]; % marker border color: [R G B]
 op.txtCol = [.8 .8 .8]; % Text color: [R G B]
-op.txtSz = 6; % text size
+op.txtSz = 10; % text size
 op.labelVars = ["sbjCh" op.actVar op.sigVar]; % channel label variable (for visible/interactive plots)
 op.save = true;
 
@@ -131,7 +131,7 @@ op.indiv.saveDir = "indiv";
 % Condition plots showing subplots per time & freq
 op.cond.do = true;
 op.cond.res = [1980 1080];
-op.cond.saveDir = "cond";
+op.cond.saveDir = "cond_t";
 
 
 %% Logs

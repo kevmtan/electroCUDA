@@ -10,7 +10,7 @@ function [x,n,trs] = ec_epochBaseline(x,n,psy,ep,tt,op)
 
 %% Input validation
 arguments
-    x {mustBeFloat}                             % Neuronal data, 2D/3D matrix = [time,channel,freq]
+    x {mustBeFloat}                             % Ephysio data, 2D/3D matrix = [time,channel,freq]
     n struct                                    % Info struct
     psy timetable                               % Task metadata per timepoint
     ep table                                    % Epoch metadata per timepoint

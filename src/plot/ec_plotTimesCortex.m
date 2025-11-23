@@ -1,5 +1,5 @@
 function ec_plotTimesCortex(logp,op)
-% Plot cortical timecourses from statistical results
+% Plot cortical timecourses from statistical results per channel.
 
 %% Input validation
 arguments
