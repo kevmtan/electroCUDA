@@ -69,6 +69,7 @@ o.spect = n.spect;
 
 %% Run stats per channel
 parfor ch = 1:n.xChs
+    if ismember(ch,chBad); continue; end
     %%
     stats{ch} = withinCh_lfn(squeeze(x(:,ch,:)),sbjChs(ch),ep,n,o,tt);
 end
