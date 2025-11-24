@@ -149,8 +149,8 @@ epc.con(:) = false;
 epc.con(ismember(epc.cond,cond1)) = true;
 
 % Get bin info
-bins = groupcounts(epc,["t" "con"]);
-binL = unique(bins.t(bins.GroupCount<15)); % Bins without enough samples
+bins = groupcounts(epc,["t" "con"],IncludeEmptyGroups=true);
+binL = unique(bins.t(bins.GroupCount < o.stats.minN)); % Bins without enough samples
 bins = unique(bins.t);
 bins(ismember(bins,binL)) = []; % exclude bins with too small samples
 nBins = numel(bins);
@@ -176,7 +176,7 @@ for t = 1:nBins
         ept.x = xCh(ept.ide,f);
 
         % Run model
-        lm = fitlm(ept,'x ~ con');
+        lm = fitlm(ept,'x ~ con',RobustOpts=o.stats.robust);
 
         %% Extract & organize results
         id = sub2ind([nBins nFrq],t,f); % get index for results
@@ -202,7 +202,7 @@ else
 end
 
 % Run FDR
-sc.q(id) = fdr_BH(sc.pValue(id),o.stats.alpha);
+sc.q(id) = fdr_BY(sc.pValue(id),o.stats.alpha);
 sc.q(~id) = nan;
 
 % Finalize
