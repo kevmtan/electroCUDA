@@ -22,6 +22,17 @@ o.test = false;
 o.gpu = false;
 o.plot = true;
 
+% Stats options
+o.alpha = 0.05; % Critical p-value (default=0.05)
+o.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+o.timeRng = [-200 2000]; % Range of times to run
+o.fdrTimeRng = [0 inf]; % Range of times for FDR
+o.minN = 15; % minimum observations per sample
+o.contrastBL = false; % Direct contrast of time vs. baseline observations (default=false)
+o.singleTrial = true; % Get trial-by-trial stats
+o.randomEffectsOnly = false; % only model single-trial stats
+%o.covPattern = "FullCholesky"; % Covariance pattern (default="FullCholesky",see fitlme)
+%o.trialPlotLats = [-.2 5];
 % Task Epoching (see 'ec_epochPsy')
 o.epoch.float = "single"; % task metadata floating-point precision
 % Bad trial removal
@@ -75,18 +86,6 @@ o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
 o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
-
-% Stats options
-o.stats.alpha = 0.05; % Critical p-value (default=0.05)
-o.stats.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-o.stats.timeRng = [-200 2000]; % Range of times to run
-o.stats.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.stats.minN = 15; % minimum observations per sample
-o.stats.contrastBL = false; % Direct contrast of time vs. baseline observations (default=false)
-o.stats.singleTrial = true; % Get trial-by-trial stats
-o.stats.randomEffectsOnly = false; % only model single-trial stats
-%o.stats.covPattern = "FullCholesky"; % Covariance pattern (default="FullCholesky",see fitlme)
-%o.stats.trialPlotLats = [-.2 5];
 
 
 %% Plot options (for ec_plotTimesCortex)

@@ -12,14 +12,52 @@ analName = "mzAutoMath";
 
 dirs = ec_getDirs(proj,task);
 
-% Create options struct
+% Initialize options struct
 o = struct;
-o.name = ""; % Analysis name 
-o.sfx = ""; % Suffix of input data
+o.name = ""; % Analysis name (filled in subject loop)
+o.sfx = ""; % Suffix of input data (filled in subject loop)
 
 %% Options
 o.test = false;
+o.save = true;
 o.chBadFields = "bad"; % fields from n.chBad that exclude chans from stats
+
+% Stats contrast names (eg. cond1-cond0)
+o.contrasts = [...
+    "Other-Self"...
+    "Episodic-Semantic"...
+    "Mz-Autobio"...
+    "Mz-Math"...
+    "Autobio-Math"]; % 
+% Reference conditions (coded as 0) - leave blank for cond vs. baseline
+o.cond0 = {...
+    "Self",...
+    "Semantic",...
+    ["Semantic" "Episodic"],...
+    "Math",...
+    "Math"}; 
+% Comparison conditions (coded as 1)
+o.cond1 = {...
+    "Other",...
+    "Episodic",...
+    ["Self" "Other"],....
+    ["Self" "Other"],...
+    ["Episodic" "Semantic"]};
+% DOUBLE CHECK CONTRAST CONDITION FIELDS ARE RIGHT
+
+% Stats options
+o.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+o.timeRng = [-200 2000]; % Range of times to run
+o.alpha = 0.05; % Critical p-value (default=0.05)
+o.fdrTimeRng = [0 inf]; % Range of times for FDR
+o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
+o.minN = 15; % minimum observations per sample per contrast per chan
+o.robust = true; % use robust regression
+
+% Stats processing options
+o.gpu = false;
+o.typeProc = "double"; % processing floating-point precision ("double"|"single")
+o.typeOut = "single"; % output floating-point precision ("double"|"single")
 
 % Task Epoching (see 'ec_epochPsy')
 o.epoch.float = "single"; % task metadata output floating-point precision
@@ -74,41 +112,6 @@ o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
 o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
-
-% Stats contrast names (eg. cond1-cond0)
-o.stats.contrasts = [...
-    "Other-Self"...
-    "Episodic-Semantic"...
-    "Mz-Autobio"...
-    "Mz-Math"...
-    "Autobio-Math"]; % 
-% Reference conditions (coded as 0) - leave blank for cond vs. baseline
-o.stats.cond0 = {...
-    "Self",...
-    "Semantic",...
-    ["Semantic" "Episodic"],...
-    "Math",...
-    "Math"}; 
-% Comparison conditions (coded as 1)
-o.stats.cond1 = {...
-    "Other",...
-    "Episodic",...
-    ["Self" "Other"],....
-    ["Self" "Other"],...
-    ["Episodic" "Semantic"]};
-% DOUBLE CHECK CONTRAST CONDITION FIELDS ARE RIGHT
-
-% Stats options
-o.stats.alpha = 0.05; % Critical p-value (default=0.05)
-o.stats.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-o.stats.timeRng = [-200 2000]; % Range of times to run
-o.stats.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.stats.minN = 15; % minimum observations per sample per contrast per chan
-o.stats.robust = true; % robust regression
-% Stats processing options
-o.stats.gpu = false;
-o.stats.typeProc = "double"; % processing floating-point precision ("double"|"single"|""=same as input)
-o.stats.typeOut = "single"; % output floating-point precision ("double"|"single"|""=same as input)
 
 
 %% Plot options (for ec_plotTimesCortex)
@@ -224,7 +227,7 @@ for s = 1:height(logs.i{1})
             if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
             try
                 disp("STARTING: "+sbj);
-                logs.i{p}.o{s} = ec_condVsCondChs_lm(o);
+                logs.i{p}.o{s} = ec_condConChs_lm(o);
                 logs.i{p}.stats(s) = 1;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;

@@ -45,9 +45,9 @@ oo = namedargs2cell(o.epoch);
 ep.Properties.RowNames = {};
 
 % Prep regressor for time variable
-ep.t = string(ep.(o.stats.timeVar));
-if numel(o.stats.timeRng) == 2
-    ep.t(ep.(o.stats.timeVar)<o.stats.timeRng(1) | ep.(o.stats.timeVar)>o.stats.timeRng(2))...
+ep.t = string(ep.(o.timeVar));
+if numel(o.timeRng) == 2
+    ep.t(ep.(o.timeVar)<o.timeRng(1) | ep.(o.timeVar)>o.timeRng(2))...
         = ""; % Clear excluded times
 end
 
@@ -73,7 +73,7 @@ end
 %% Finalize
 
 % Trial-averaged
-if ~o.stats.randomEffectsOnly
+if ~o.randomEffectsOnly
     sAvg = cell2table(sAvg,VariableNames="s");
     sAvg.sbjID(:) = n.sbjID;
     sAvg.sbjCh = sbjChs;
@@ -86,7 +86,7 @@ if ~o.stats.randomEffectsOnly
 end
 
 % Single-trial
-if o.stats.singleTrial
+if o.singleTrial
     sTr = cell2table(sTr,VariableNames="s");
     sTr.sbjID(:) = n.sbjID;
     sTr.sbjCh = sbjChs;
@@ -112,7 +112,7 @@ end
 %%% Within-channel routines %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [chAvg,chST] = withinCh_lfn(xCh,sbjCh,ep,n,o,tt)
 % ch=104; xCh=squeeze(x(:,ch,:)); sbjCh=sbjChs(ch);
-tVar = o.stats.timeVar;
+tVar = o.timeVar;
 
 % Preallocate chan results
 chAvg = cell(n.nConds,1);
@@ -123,7 +123,7 @@ chST = cell(n.nConds,1);
 % unstack from long to wider format to save memory
 for c = 1:n.nConds
     % Run LME model(s)
-    if o.stats.contrastBL
+    if o.contrastBL
         [cAvg,cST] = lme_TvsBL_lfn(xCh,ep,n,o,c); % paired contrast (time vs. baseline)
     else
         [cAvg,cST] = lme_Tvs0_lfn(xCh,ep,n,o,c); % one-sample (time - baseline mean)
@@ -132,7 +132,7 @@ for c = 1:n.nConds
     %% Organize & FDR 
 
     % Trial-averaged results
-    if ~o.stats.randomEffectsOnly
+    if ~o.randomEffectsOnly
         % Organize
         cAvg.Name = cast(str2double(extractAfter(cAvg.Name,"t_")),...
             like=ep.(tVar));
@@ -147,14 +147,14 @@ for c = 1:n.nConds
         cAvg = movevars(cAvg,"q",After="p");
         
         % Get peristimulus times to FDR
-        if numel(o.stats.fdrTimeRng)==2
-            id = cAvg.(tVar)>=o.stats.fdrTimeRng(1) & cAvg.(tVar)<=o.stats.fdrTimeRng(2);
+        if numel(o.fdrTimeRng)==2
+            id = cAvg.(tVar)>=o.fdrTimeRng(1) & cAvg.(tVar)<=o.fdrTimeRng(2);
         else
             id = true(height(cAvg),1);
         end
 
         % Run FDR
-        cAvg.q(id) = ec_fdr(cAvg.p(id),o.stats.alpha);
+        cAvg.q(id) = ec_fdr(cAvg.p(id),o.alpha);
         cAvg.q(~id) = nan;
 
         % Unstack by freq (wide-format) to save memory
@@ -175,7 +175,7 @@ for c = 1:n.nConds
     end
 
     % Single-trial results
-    if o.stats.singleTrial
+    if o.singleTrial
         % Organize
         cST.Name = cast(str2double(extractAfter(cST.Name,"t_")),...
             like=ep.(tVar));
@@ -194,15 +194,15 @@ for c = 1:n.nConds
         % Loop across trials to run FDR in each
         for tr = trs'
             % Get peristimulus times to FDR
-            if numel(o.stats.fdrTimeRng)==2
-                id = cST.tr==tr & cST.(tVar)>=o.stats.fdrTimeRng(1) &...
-                    cST.(tVar)<=o.stats.fdrTimeRng(2);
+            if numel(o.fdrTimeRng)==2
+                id = cST.tr==tr & cST.(tVar)>=o.fdrTimeRng(1) &...
+                    cST.(tVar)<=o.fdrTimeRng(2);
             else
                 id = cST.tr==tr;
             end
 
             % Run FDR
-            cST.q(id) = ec_fdr(cST.p(id),o.stats.alpha);
+            cST.q(id) = ec_fdr(cST.p(id),o.alpha);
         end
 
         % Unstack by freq (wide-format) to save memory
@@ -260,7 +260,7 @@ for t = 1:nTimes
         ep1.x = double(xCh(ep1.ide,f));
 
         % Run model
-        if ~o.stats.randomEffectsOnly
+        if ~o.randomEffectsOnly
             % Linear mixed-effects model (trial-averaged & single-trial)
             lme = fitlme(ep1,"x ~ t + (t|tr)",FitMethod="REML");
         else
@@ -272,7 +272,7 @@ for t = 1:nTimes
         id = sub2ind([nTimes n.nSpect],t,f); % get index for results
 
         % Get trial-averaged stats (fixed effects)
-        if ~o.stats.randomEffectsOnly
+        if ~o.randomEffectsOnly
             fe = dataset2table(lme.Coefficients);
             fe(fe.Name=="(Intercept)",:) = []; % remove intercept
             fe(fe.tStat==0 & fe.pValue==1,:) = []; % remove empty times
@@ -282,7 +282,7 @@ for t = 1:nTimes
         end
 
         % Get single-trial stats (random effects)
-        if o.stats.singleTrial
+        if o.singleTrial
             [~,~,re] = randomEffects(lme);
             re = dataset2table(re);
             re(re.Name=="(Intercept)",:) = []; % remove intercept
@@ -327,7 +327,7 @@ for t = 1:nTimes
         ep1.x = double(xCh(ep1.ide,f));
 
         % Run model
-        if ~o.stats.randomEffectsOnly
+        if ~o.randomEffectsOnly
             % Linear mixed-effects model (trial-averaged & single-trial)
             lme = fitlme(ep1,"x ~ -1+t + (-1+t|tr)",DummyVarCoding="full",...
                 FitMethod="REML");
@@ -341,7 +341,7 @@ for t = 1:nTimes
         id = sub2ind([nTimes n.nSpect],t,f); % get index for results
 
         % Get trial-averaged stats (fixed effects)
-        if ~o.stats.randomEffectsOnly
+        if ~o.randomEffectsOnly
             fe = dataset2table(lme.Coefficients);
             fe(fe.tStat==0 & fe.pValue==1,:) = []; % remove empty times
             fe = convertvars(fe,2:8,"single"); % convert to single for memory
@@ -350,7 +350,7 @@ for t = 1:nTimes
         end
 
         % Get single-trial stats (random effects)
-        if o.stats.singleTrial
+        if o.singleTrial
             [~,~,re] = randomEffects(lme);
             re = dataset2table(re);
             re(re.tStat==0 & re.pValue==1,:) = []; % remove empty times
@@ -369,18 +369,18 @@ cST = vertcat(cST{:});
 
 
 % % Random effects covariance pattern (baseline vs. times)
-% if o.stats.covPattern=="PAT"
+% if o.covPattern=="PAT"
 %     % Estimate: all variances & baseline-time covariances
 %     % Constrain to 0: time-time covariances
-%     o.stats.covPAT = eye(numel(unique(ep.t))+1,"logical");
-%     o.stats.covPAT(1,:) = true;
-%     o.stats.covPAT(:,1) = true;
+%     o.covPAT = eye(numel(unique(ep.t))+1,"logical");
+%     o.covPAT(1,:) = true;
+%     o.covPAT(:,1) = true;
 % end
 
 % % Random effects covariance pattern (baseline vs. times)
-% if o.stats.covPattern=="PAT"
+% if o.covPattern=="PAT"
 %     nTimes = numel(unique(epC.t));
-%     covPAT = o.stats.covPAT(1:nTimes,1:nTimes);
+%     covPAT = o.covPAT(1:nTimes,1:nTimes);
 % else
-%     covPAT = o.stats.covPattern;
+%     covPAT = o.covPattern;
 % end
