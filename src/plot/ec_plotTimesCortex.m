@@ -13,8 +13,12 @@ end
 % Determine if running within a function
 stack = dbstack;
 if numel(stack) <= 1
-    op.test = true; end
+    op.test = true;
+else
+    op.test = false;
+end
 
+% Info
 sbjs = logp.i{:}; % get subjects from analysis
 sbjN = height(sbjs); % number of subjects
 o = sbjs.o{1}; % options from stats
@@ -26,12 +30,13 @@ chs = cell(sbjN,1); % channel info
 % Load subject data
 for s = 1:sbjN
     % Get directory of subject stats data
-    if isany(sbjs.o{s}.dirOutSbj)
+    if isfield(sbjs.o{s},"dirOutSbj") && exist(sbjs.o{s}.dirOutSbj,"dir")
         fn = sbjs.o{s}.dirOutSbj;
-    elseif isany(sbjs.o{s}.dirOut)
+    elseif isfield(sbjs.o{s},"dirOut") && exist(sbjs.o{s}.dirOut,"dir")
         fn = sbjs.o{s}.dirOut;
     else
-        error("No stats output directory: s"+sbjs.sbjID(s));
+        warning("NO STATS OUTPUT: s"+sbjs.sbjID(s));
+        continue
     end
 
     % Load stats data
@@ -261,13 +266,15 @@ for p = 1:height(dp)
     txt = txt + string(dp.cond(p))+" | "+dp.time(p)+op.timeUnit;
 
     % Initialize figure
-    if op.test
-        h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
-            Theme="light",Color="w",AutoResizeChildren="on");
-    else
-        h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
-            Theme="light",Color="w",DockControls="off");
-    end
+    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+            Theme="light",Color="w");
+    %if op.test
+    %    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+    %        Theme="light",Color="w");
+    %else
+    %    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
+    %        Theme="light",Color="w",DockControls="off");
+    %end
     
     % Plot cortex
     ec_plotCortex("L",["lateral","medial"],dp.d{p},h,sbjDir=o.dirs.freesurfer,...
@@ -275,7 +282,7 @@ for p = 1:height(dp)
         title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
 
     %% Save
-    if op.save
+    if op.save && ~op.test
         c = find(conds==dp.cond(p));
         fn = dirOut+c+"_"+string(dp.cond(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
         exportgraphics(h,fn,Resolution=150);
@@ -301,6 +308,7 @@ conds = string(categories(dp.cond));
 
 %% Loop across plots
 for c = 1:numel(conds)
+    %%
     plotCond_lfn(dp(dp.cond==conds(c),:),op,o,c,dirOut);
 end
 
@@ -322,13 +330,15 @@ dc.cond = string(dc.cond);
 dc.frq = string(dc.frq);
 
 % Initialize figure
-if op.test
-    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
-        Theme="light",Color="w",AutoResizeChildren="on");
-else
-    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
-        Theme="light",Color="w",DockControls="off");
-end
+h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+        Theme="light",Color="w");
+% if op.test
+%     h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+%         Theme="light",Color="w",AutoResizeChildren="on");
+% else
+%     h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
+%         Theme="light",Color="w",DockControls="off");
+% end
 
 % Initialize tiledlayout
 ht = tiledlayout(h,timesN,frqN,TileSpacing="compact",padding="tight"); % tiledlayout
@@ -355,7 +365,7 @@ for p = 1:height(dc)
 end
 
 %% Save
-if op.save
+if op.save && ~op.test
     fn = dirOut+c+"_"+dc.cond(1)+".png";
     exportgraphics(h,fn,Resolution=150);
     disp("[ec_PlotTimesCortex] saved: "+fn);

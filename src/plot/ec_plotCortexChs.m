@@ -66,10 +66,10 @@ for m = 1:markN
 
     % 3D scatterplot of electrodes (vectorized)
     hCh(m) = scatter3(ha,d.pos(r,1),d.pos(r,2),d.pos(r,3),d.sz(r),d.col(r,:),...
-        d.marker(r),"filled");
+        markers(m),"filled");
 
     % Marker edge properties (same per marker style - Matlab limitation)
-    if isany(d.bSz(r))
+    if any(d.bSz(r))
         hCh(m).LineWidth = unique(d.bSz(r),"last");
         hCh(m).MarkerEdgeColor = unique(d.bCol(r,:),"last");
     end
