@@ -1,6 +1,11 @@
 function y = isany(x,dim)
 % isany: Matlab's "any" function with expanded functionality
-%   convenient for input validation (like 'arguments' section in functions)
+% convenient for input validation (like 'arguments' section in functions)
+%
+% This function is part of the electroCUDA package:
+% https://kevmtan.github.io/electroCUDA
+%
+% Kevin Tan, 2025
 
 %% Input validation
 arguments
@@ -17,7 +22,7 @@ end
 %% Main
 
 % Convert to cell
-if istable(x)
+if istable(x) || istimetable(x)
     x = table2cell(x);
 elseif isstruct(x)
     x = struct2cell(x);

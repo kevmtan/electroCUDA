@@ -1,4 +1,5 @@
 function T = ec_tableSplit(T,var,o)
+% Splits table by unique groups in variable
 arguments
     T table
     var string

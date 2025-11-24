@@ -1,4 +1,6 @@
-function y = istext(x)
+function y = isNumOrLogical(x)
+% Is numeric or logical?
+%
 % This function is part of the electroCUDA package:
 % https://kevmtan.github.io/electroCUDA
 %
@@ -18,7 +20,7 @@ end
 
 %%
 function y = lfn(x)
-if ischar(x) || isstring(x) || iscellstr(x)
+if isnumeric(x) || islogical(x)
     y = true;
 else
     y = false;
