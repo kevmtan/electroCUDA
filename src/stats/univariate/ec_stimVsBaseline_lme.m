@@ -44,14 +44,14 @@ oo = namedargs2cell(o.epoch);
 [ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,oo{:}); toc(tt); %#ok<ASGLU>
 ep.Properties.RowNames = {};
 
-% Prep regressor for timebin variable
-ep.t = string(ep.(o.stats.binVar));
-if numel(o.stats.binRng) == 2
-    ep.t(ep.(o.stats.binVar)<o.stats.binRng(1) | ep.(o.stats.binVar)>o.stats.binRng(2))...
-        = ""; % Clear excluded timebins
+% Prep regressor for time variable
+ep.t = string(ep.(o.stats.timeVar));
+if numel(o.stats.timeRng) == 2
+    ep.t(ep.(o.stats.timeVar)<o.stats.timeRng(1) | ep.(o.stats.timeVar)>o.stats.timeRng(2))...
+        = ""; % Clear excluded times
 end
 
-% Remove excluded timebins that aren't in baseline
+% Remove excluded times that aren't in baseline
 ep(ep.t=="" & ~(ep.BLpre|ep.BLpost),:) = [];
 ep.ide = uint32(1:height(ep))'; % new epoch indices
 
@@ -112,7 +112,7 @@ end
 %%% Within-channel routines %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [chAvg,chST] = withinCh_lfn(xCh,sbjCh,ep,n,o,tt)
 % ch=104; xCh=squeeze(x(:,ch,:)); sbjCh=sbjChs(ch);
-tVar = o.stats.binVar;
+tVar = o.stats.timeVar;
 
 % Preallocate chan results
 chAvg = cell(n.nConds,1);
@@ -124,9 +124,9 @@ chST = cell(n.nConds,1);
 for c = 1:n.nConds
     % Run LME model(s)
     if o.stats.contrastBL
-        [cAvg,cST] = lme_TvsBL_lfn(xCh,ep,n,o,c); % paired contrast (timebin vs. baseline)
+        [cAvg,cST] = lme_TvsBL_lfn(xCh,ep,n,o,c); % paired contrast (time vs. baseline)
     else
-        [cAvg,cST] = lme_Tvs0_lfn(xCh,ep,n,o,c); % one-sample (timebin - baseline mean)
+        [cAvg,cST] = lme_Tvs0_lfn(xCh,ep,n,o,c); % one-sample (time - baseline mean)
     end
 
     %% Organize & FDR 
@@ -146,15 +146,15 @@ for c = 1:n.nConds
         cAvg.q(:) = single(nan);
         cAvg = movevars(cAvg,"q",After="p");
         
-        % Get peristimulus bins to FDR
-        if numel(o.stats.fdrBinRng)==2
-            id = cAvg.(tVar)>=o.stats.fdrBinRng(1) & cAvg.(tVar)<=o.stats.fdrBinRng(2);
+        % Get peristimulus times to FDR
+        if numel(o.stats.fdrTimeRng)==2
+            id = cAvg.(tVar)>=o.stats.fdrTimeRng(1) & cAvg.(tVar)<=o.stats.fdrTimeRng(2);
         else
             id = true(height(cAvg),1);
         end
 
         % Run FDR
-        cAvg.q(id) = fdr_BH(cAvg.p(id),o.stats.alpha);
+        cAvg.q(id) = ec_fdr(cAvg.p(id),o.stats.alpha);
         cAvg.q(~id) = nan;
 
         % Unstack by freq (wide-format) to save memory
@@ -193,16 +193,16 @@ for c = 1:n.nConds
         
         % Loop across trials to run FDR in each
         for tr = trs'
-            % Get peristimulus bins to FDR
-            if numel(o.stats.fdrBinRng)==2
-                id = cST.tr==tr & cST.(tVar)>=o.stats.fdrBinRng(1) &...
-                    cST.(tVar)<=o.stats.fdrBinRng(2);
+            % Get peristimulus times to FDR
+            if numel(o.stats.fdrTimeRng)==2
+                id = cST.tr==tr & cST.(tVar)>=o.stats.fdrTimeRng(1) &...
+                    cST.(tVar)<=o.stats.fdrTimeRng(2);
             else
                 id = cST.tr==tr;
             end
 
             % Run FDR
-            cST.q(id) = fdr_BH(cST.p(id),o.stats.alpha);
+            cST.q(id) = ec_fdr(cST.p(id),o.stats.alpha);
         end
 
         % Unstack by freq (wide-format) to save memory
@@ -232,27 +232,27 @@ disp("[ec_stimVsBaseline] Ran: "+sbjCh+" time="+toc(tt));
 
 
 
-%%% Run model: timebin vs baseline %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% paired contast of timebin vs. baseline observations
+%%% Run model: time vs baseline %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% paired contast of time vs. baseline observations
 function [cAvg,cST] = lme_TvsBL_lfn(xCh,ep,n,o,c)
 cond = n.conds(c);
 idc = ep.cond==cond;
-bins = unique(ep.t(idc),"stable");
-nBins = numel(bins);
+times = unique(ep.t(idc),"stable");
+nTimes = numel(times);
 
 % Preallocate cond results
-cAvg = cell(nBins*n.nSpect,1);
-cST = cell(nBins*n.nSpect,1);
+cAvg = cell(nTimes*n.nSpect,1);
+cST = cell(nTimes*n.nSpect,1);
 
 % Get baseline timepoints
 ep0 = ep(idc & (ep.BLpre|ep.BLpost),:);
-ep0.t(:) = "BL"; % Mark baseline in timebin regressor
+ep0.t(:) = "BL"; % Mark baseline in time regressor
 
-%% Loop across timebins
-for t = 1:nBins
-    % Get epoch timebin
-    ep1 = [ep0; ep(idc & ep.t==bins(t),:)];
-    if nnz(ep1.t==bins(t))<15; continue; end
+%% Loop across times
+for t = 1:nTimes
+    % Get epoch time
+    ep1 = [ep0; ep(idc & ep.t==times(t),:)];
+    if nnz(ep1.t==times(t))<15; continue; end
 
     %% Loop across spectral columns (freqs/bands/PCs)
     for f = 1:n.nSpect
@@ -269,13 +269,13 @@ for t = 1:nBins
         end
 
         %% Extract & organize results
-        id = sub2ind([nBins n.nSpect],t,f); % get index for results
+        id = sub2ind([nTimes n.nSpect],t,f); % get index for results
 
         % Get trial-averaged stats (fixed effects)
         if ~o.stats.randomEffectsOnly
             fe = dataset2table(lme.Coefficients);
             fe(fe.Name=="(Intercept)",:) = []; % remove intercept
-            fe(fe.tStat==0 & fe.pValue==1,:) = []; % remove empty timebins
+            fe(fe.tStat==0 & fe.pValue==1,:) = []; % remove empty times
             fe = convertvars(fe,2:8,"single"); % convert to single for memory
             fe.frq(:) = n.spect.name(f);
             cAvg{id} = fe; % save to cond results array
@@ -286,7 +286,7 @@ for t = 1:nBins
             [~,~,re] = randomEffects(lme);
             re = dataset2table(re);
             re(re.Name=="(Intercept)",:) = []; % remove intercept
-            re(re.tStat==0 & re.pValue==1,:) = []; % remove empty timebins
+            re(re.tStat==0 & re.pValue==1,:) = []; % remove empty times
             re(:,["Group" "DF" "Lower" "Upper"]) = []; % remove extraneous vars   
             re = convertvars(re,3:6,"single"); % convert to single for memory
             re.frq(:) = n.spect.name(f);
@@ -303,23 +303,23 @@ cST = vertcat(cST{:});
 
 
 %%% Run model: one-sample test %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% tests timebins vs. 0, where 0 is the baseline mean per trial
+% tests times vs. 0, where 0 is the baseline mean per trial
 function [cAvg,cST] = lme_Tvs0_lfn(xCh,ep,n,o,c)
 cond = n.conds(c);
 idc = ep.cond==cond;
-bins = unique(ep.t(idc),"stable");
-nBins = numel(bins);
+times = unique(ep.t(idc),"stable");
+nTimes = numel(times);
 
 % Preallocate cond results
-cAvg = cell(nBins*n.nSpect,1);
-cST = cell(nBins*n.nSpect,1);
+cAvg = cell(nTimes*n.nSpect,1);
+cST = cell(nTimes*n.nSpect,1);
 
 
-%% Loop across timebins
-for t = 1:nBins
-    % Get epoch timebin
-    ep1 = ep(idc & ep.t==bins(t),:);
-    if nnz(ep1.t==bins(t))<15; continue; end
+%% Loop across times
+for t = 1:nTimes
+    % Get epoch time
+    ep1 = ep(idc & ep.t==times(t),:);
+    if nnz(ep1.t==times(t))<15; continue; end
 
     %% Loop across spectral columns (freqs/bands/PCs)
     for f = 1:n.nSpect
@@ -338,12 +338,12 @@ for t = 1:nBins
         end
 
         %% Extract & organize results
-        id = sub2ind([nBins n.nSpect],t,f); % get index for results
+        id = sub2ind([nTimes n.nSpect],t,f); % get index for results
 
         % Get trial-averaged stats (fixed effects)
         if ~o.stats.randomEffectsOnly
             fe = dataset2table(lme.Coefficients);
-            fe(fe.tStat==0 & fe.pValue==1,:) = []; % remove empty timebins
+            fe(fe.tStat==0 & fe.pValue==1,:) = []; % remove empty times
             fe = convertvars(fe,2:8,"single"); % convert to single for memory
             fe.frq(:) = n.spect.name(f);
             cAvg{id} = fe; % save to cond results array
@@ -353,7 +353,7 @@ for t = 1:nBins
         if o.stats.singleTrial
             [~,~,re] = randomEffects(lme);
             re = dataset2table(re);
-            re(re.tStat==0 & re.pValue==1,:) = []; % remove empty timebins
+            re(re.tStat==0 & re.pValue==1,:) = []; % remove empty times
             re(:,["Group" "DF" "Lower" "Upper"]) = []; % remove extraneous vars   
             re = convertvars(re,3:6,"single"); % convert to single for memory
             re.frq(:) = n.spect.name(f);
@@ -368,19 +368,19 @@ cST = vertcat(cST{:});
 
 
 
-% % Random effects covariance pattern (baseline vs. timebins)
+% % Random effects covariance pattern (baseline vs. times)
 % if o.stats.covPattern=="PAT"
-%     % Estimate: all variances & baseline-timebin covariances
-%     % Constrain to 0: timebin-timebin covariances
+%     % Estimate: all variances & baseline-time covariances
+%     % Constrain to 0: time-time covariances
 %     o.stats.covPAT = eye(numel(unique(ep.t))+1,"logical");
 %     o.stats.covPAT(1,:) = true;
 %     o.stats.covPAT(:,1) = true;
 % end
 
-% % Random effects covariance pattern (baseline vs. timebins)
+% % Random effects covariance pattern (baseline vs. times)
 % if o.stats.covPattern=="PAT"
-%     nBins = numel(unique(epC.t));
-%     covPAT = o.stats.covPAT(1:nBins,1:nBins);
+%     nTimes = numel(unique(epC.t));
+%     covPAT = o.stats.covPAT(1:nTimes,1:nTimes);
 % else
 %     covPAT = o.stats.covPattern;
 % end

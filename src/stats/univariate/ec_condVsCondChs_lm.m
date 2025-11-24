@@ -17,7 +17,14 @@ end
 %% Prep
 tt = tic;
 if o.test; disp("[ec_condVsCondChs_lm] TESTING: "+o.dirs.sbj); end
+
+% Options validation
 o.nCons = numel(o.stats.contrasts);
+if isempty(o.stats.cond0)
+    o.stats.cond0 = cell(1,o.nCons);
+elseif isscalar(o.stats.cond0)
+    o.stats.cond0 = repmat(o.stats.cond0,1,o.nCons);
+end
 
 % Load
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
@@ -25,10 +32,14 @@ o.nCons = numel(o.stats.contrasts);
 if o.test && isempty(dbstack); nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU>
 toc(tt);
 
-% Channel/IC names
-sbjChs = chNfo.sbjCh;
-if o.ICA
-    sbjChs = n.icNfo.sbjIC; end
+% Channels/ICs
+if ~o.ICA
+    sbjChs = chNfo.sbjCh; % chan names
+    chBad = find(any(n.chBad{:,o.chBadFields},2)); % chans to include in stats
+else
+    sbjChs = n.icNfo.sbjIC; % IC names
+    chBad = find(any(n.icBad{:,o.chBadFields},2)); % ICs to include in stats
+end
 
 % Preallocate results
 stats = cell(size(sbjChs)); % Trial-averaged results 
@@ -41,11 +52,11 @@ oo = namedargs2cell(o.epoch);
 [ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,oo{:}); toc(tt); %#ok<ASGLU>
 ep.Properties.RowNames = {};
 
-% Rename timebin variable
-ep = renamevars(ep,o.stats.binVar,"t");
+% Rename time variable
+ep = renamevars(ep,o.stats.timeVar,"t");
 
-% Remove excluded timebins
-ep(ep.t<o.stats.binRng(1) | ep.t>o.stats.binRng(2),:) = [];
+% Remove excluded times
+ep(ep.t<o.stats.timeRng(1) | ep.t>o.stats.timeRng(2),:) = [];
 ep.ide = uint32(1:height(ep))'; % new epoch indices
 
 
@@ -63,14 +74,34 @@ parfor ch = 1:n.xChs
 end
 
 
+%% Multiple comparisons correction (FDR-BY)
+stats = vertcat(stats{:}); % concactenate results
+stats.q = nan(height(stats),n.nSpect,o.stats.typeOut);
+
+% Find rows within FDR timerange
+if numel(o.stats.fdrTimeRng)==2
+    id = stats.(o.stats.timeVar) >= o.stats.fdrTimeRng(1) &...
+        stats.(o.stats.timeVar) <= o.stats.fdrTimeRng(2);
+end
+if ~exist("id","var") && ~any(id)
+    id = true(height(stats),1); end
+
+% Run FDR
+stats.q(id,:) = ec_fdr(stats.p(id,:),o.stats.alpha);
+stats = movevars(stats,"q",After="p"); % move
+stats = convertvars(stats,"p",o.stats.typeOut); % convert to output FP precision
+
 %% Finalize
-stats = cell2table(stats,VariableNames="s");
-stats.sbjID(:) = n.sbjID;
-stats.sbjCh = sbjChs;
-stats = movevars(stats,["sbjID" "sbjCh"],Before="s");
+stats.sbjID(:) = n.sbjID; % add subject number
+stats.con = categorical(stats.con,o.stats.contrasts); % categorize contrasts
+stats = movevars(stats,["sbjID" "sbjCh"],Before="con");
+
+% Add properties to results table (TODO: variable units)
+stats = addprop(stats,"spect","table");
+stats.Properties.CustomProperties.spect = o.spect;
 
 % Save
-fn = o.dirOut+"s"+n.sbjID+"_avg.mat";
+fn = o.dirOut+"s"+n.sbjID+"_stats.mat";
 save(fn,"stats");
 disp("[ec_condVsCond] Saved (time="+toc(tt)+"): "+fn);
 
@@ -99,32 +130,14 @@ statCh = cell(n.nConds,1); % Preallocate chan results
 
 %% Loop across contrasts
 for c = 1:o.nCons
-    statCh{c} = contrast_lfn(xCh,ep,o,c); % Run contrast across timebins & freqs
+    statCh{c} = contrast_lfn(xCh,ep,o,c); % Run contrast across times & freqs
 end
 
 %% Finalize
-statCh = vertcat(statCh{:}); % concactenate to table
-statCh = renamevars(statCh,["Estimate" "tStat" "pValue"],["b" "t" "p"]);
-statCh.frq = categorical(statCh.frq,o.spect.name); % for unstack order!
-
-% Gather data from GPU
-if o.stats.gpu
-    statCh = convertvars(statCh,@isgpuarray,@gather); end
-
-% Convert to specified FP precision
-statCh = convertvars(statCh,["b" "SE" "t" "p" "q"],o.stats.typeOut);
-
-% Unstack by freq (wide-format) to save memory
-if o.n.nSpect > 1
-    statCh = unstack(statCh,["b" "SE" "t" "p" "q"],"frq");
-else
-    statCh.frq = []; % Remove frq only one spectral column
-end
-
-% Finalize
-statCh.sbjCh(:) = sbjCh;
-statCh.con = categorical(statCh.con,o.stats.contrasts);
-statCh = movevars(statCh,["sbjCh" "con"],Before=o.stats.binVar);
+statCh = vertcat(statCh{:}); % concactenate contrasts
+statCh = convertvars(statCh,@isgpuarray,@gather); % gather results from GPU
+statCh = convertvars(statCh,["b" "SE" "t" "qc"],o.stats.typeOut); % convert to specified FP precision
+statCh.sbjCh(:) = sbjCh; % add channel name
 disp("[ec_condVsCondChs_lm] Ran: "+sbjCh+" time="+toc(tt)); 
 
 
@@ -138,7 +151,7 @@ function sc = contrast_lfn(xCh,ep,o,c)
 con = o.stats.contrasts(c); % contrast name
 cond0 = o.stats.cond0{c};
 cond1 = o.stats.cond1{c};
-tVar = o.stats.binVar;
+tVar = o.stats.timeVar;
 nFrq = o.n.nSpect;
 
 % Epochs for conditions in contrast
@@ -148,27 +161,34 @@ epc = ep(ismember(ep.cond,[cond0 cond1]),["t" "cond" "ide"]);
 epc.con(:) = false;
 epc.con(ismember(epc.cond,cond1)) = true;
 
-% Get bin info
-bins = groupcounts(epc,["t" "con"],IncludeEmptyGroups=true);
-binL = unique(bins.t(bins.GroupCount < o.stats.minN)); % Bins without enough samples
-bins = unique(bins.t);
-bins(ismember(bins,binL)) = []; % exclude bins with too small samples
-nBins = numel(bins);
-
-% Preallocate cond results
-sc = cell(nBins*nFrq,1);
+% Get time info
+times = groupcounts(epc,["t" "con"],IncludeEmptyGroups=isany(cond0));
+timeL = unique(times.t(times.GroupCount < o.stats.minN)); % Times without enough samples
+times = unique(times.t);
+times(ismember(times,timeL)) = []; % exclude times with too small samples
+nTimes = numel(times);
 
 % Move to GPU
 if o.stats.gpu
-    epc = convertvars(epc,@isnumeric,@gpuArray);
-    bins=gpuArray(bins); nBins=gpuArray(nBins); nFrq=gpuArray(nFrq);
+    epc = convertvars(epc,@isNumOrLogical,@gpuArray);
+    times=gpuArray(times); nTimes=gpuArray(nTimes); nFrq=nFrq(nFrq);
 end
 
+% Preallocate cond results
+sc = table;
+sc.con(1:nTimes) = con;
+sc.(tVar) = times;
+sc.b = nan(nTimes,nFrq,like=xCh);
+sc.SE = nan(nTimes,nFrq,like=xCh);
+sc.t = nan(nTimes,nFrq,like=xCh);
+sc.p = nan(nTimes,nFrq,like=xCh);
+sc.qc = nan(nTimes,nFrq,like=xCh);
 
-%% Loop across timebins
-for t = 1:nBins
-    bin = bins(t);
-    ept = epc(epc.t==bin,["ide" "con"]);
+
+%% Loop across times
+for t = 1:nTimes
+    time = times(t);
+    ept = epc(epc.t==time,["ide" "con"]);
 
     %% Loop across spectral columns (freqs/bands/PCs)
     for f = 1:nFrq
@@ -178,32 +198,23 @@ for t = 1:nBins
         % Run model
         lm = fitlm(ept,'x ~ con',RobustOpts=o.stats.robust);
 
-        %% Extract & organize results
-        id = sub2ind([nBins nFrq],t,f); % get index for results
-
-        % Get trial-averaged stats (fixed effects)
-        fe = lm.Coefficients(2,:);
-        fe.Properties.RowNames = {};
-        fe.(o.stats.binVar) = bin;
-        fe.frq = o.spect.name(f);
-        sc{id} = fe; % save to cond results array
+        %% Extract results
+        sc.b(t,f) = lm.Coefficients.Estimate(end);
+        sc.SE(t,f) = lm.Coefficients.SE(end);
+        sc.t(t,f) = lm.Coefficients.tStat(end);
+        sc.p(t,f) = lm.Coefficients.pValue(end);
     end
 end
 
 
-%% Organize & FDR
-sc = vertcat(sc{:}); % Concactenate within-cond results
+%% Within-contrast FDR
 
-% Get peristimulus bins to FDR
-if numel(o.stats.fdrBinRng)==2
-    id = sc.(tVar)>=o.stats.fdrBinRng(1) & sc.(tVar)<=o.stats.fdrBinRng(2);
+% Find rows within FDR timerange
+if numel(o.stats.fdrTimeRng)==2
+    id = sc.(tVar)>=o.stats.fdrTimeRng(1) & sc.(tVar)<=o.stats.fdrTimeRng(2);
 else
-    id = true(height(sc),1);
+    id = true(height(sc),1,like=ept.con);
 end
 
 % Run FDR
-sc.q(id) = fdr_BY(sc.pValue(id),o.stats.alpha);
-sc.q(~id) = nan;
-
-% Finalize
-sc.con(:) = con;
+sc.qc(id,:) = ec_fdr(sc.p(id,:),o.stats.alpha);

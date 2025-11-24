@@ -8,7 +8,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "condContrast";
-analName = "mzAutoMathR";
+analName = "mzAutoMath";
 
 dirs = ec_getDirs(proj,task);
 
@@ -19,9 +19,10 @@ o.sfx = ""; % Suffix of input data
 
 %% Options
 o.test = false;
+o.chBadFields = "bad"; % fields from n.chBad that exclude chans from stats
 
 % Task Epoching (see 'ec_epochPsy')
-o.epoch.float = "single"; % task metadata floating-point precision
+o.epoch.float = "single"; % task metadata output floating-point precision
 % Bad trial removal
 o.epoch.rmTrials = []; % Trials to remove (numeric array or logical index)
 o.epoch.badTrials = ""; % Bad trial removal criteria
@@ -45,7 +46,7 @@ o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
-o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
+o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
@@ -63,7 +64,7 @@ o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
+o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.pre.lpfSteep = 0.85; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral dimensionality reduction by PCA (skip=0)
@@ -81,7 +82,7 @@ o.stats.contrasts = [...
     "Mz-Autobio"...
     "Mz-Math"...
     "Autobio-Math"]; % 
-% Reference conditions (coded as 0)
+% Reference conditions (coded as 0) - leave blank for cond vs. baseline
 o.stats.cond0 = {...
     "Self",...
     "Semantic",...
@@ -99,11 +100,11 @@ o.stats.cond1 = {...
 
 % Stats options
 o.stats.alpha = 0.05; % Critical p-value (default=0.05)
-o.stats.binVar = "bin"; % Timebin variable ["bin"|"binPct"|"binRT"]
-o.stats.binRng = [-200 2000]; % Range of timebins to run
-o.stats.fdrBinRng = [0 inf]; % Range of timebins for FDR
-o.stats.minN = 15; % minimum observations per sample
-o.stats.robust = true;
+o.stats.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+o.stats.timeRng = [-200 2000]; % Range of times to run
+o.stats.fdrTimeRng = [0 inf]; % Range of times for FDR
+o.stats.minN = 15; % minimum observations per sample per contrast per chan
+o.stats.robust = true; % robust regression
 % Stats processing options
 o.stats.gpu = false;
 o.stats.typeProc = "double"; % processing floating-point precision ("double"|"single"|""=same as input)
@@ -116,7 +117,7 @@ op = struct;
 op.save = true;
 
 % Filename
-op.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
+op.statsFn = "stats"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
 op.statsVar = "stats"; % Subject stats variable name in saved data
 
 % Channels to exclude
@@ -128,7 +129,6 @@ op.conds = []; % conds to do (empty=all)
 
 % Timing
 op.timeVar = "bin"; % variable for time (in stats results)
-op.timeUnit = "ms"; % time unit to display in fig
 op.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
 
 % Spectral
@@ -136,7 +136,6 @@ op.frqs = []; % frequency names to plot (empty=all)
 
 % Activation metric
 op.actVar = "b"; % activity variable for electrode plot color (in stats table)
-op.actUnit = "z"; % activity unit to display in fig
 op.clim = [-1 1]; %[-7 7] % limits for activity colorscale
 
 % Statistical significance
@@ -162,13 +161,15 @@ op.labelVars = ["sbjCh" op.actVar op.sigVar]; % channel label variable (for visi
 
 % Individual plots per cond/time/freq
 op.indiv.do = false;
-op.indiv.res = [1980 1080];
 op.indiv.saveDir = "indiv";
+op.indiv.res = [1980 1080];
+op.indiv.title = true; % add titles?
 
 % Condition plots showing subplots per time & freq
 op.cond.do = true;
-op.cond.res = [1980 1080];
 op.cond.saveDir = "con_b";
+op.cond.res = [1980 1080];
+op.cond.title = true; % add titles?
 
 
 %% Logs

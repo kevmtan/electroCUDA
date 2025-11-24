@@ -54,13 +54,16 @@ if ~exist("op","var")
 
     % Individual plots per cond/time/freq
     op.indiv.do = false;
-    op.indiv.res = [1980 1080];
     op.indiv.saveDir = "indiv";
+    op.indiv.res = [1980 1080];
+    op.indiv.title = true; % add titles?
 
     % Condition plots showing subplots per time & freq
     op.cond.do = true;
-    op.cond.res = [1980 1080];
     op.cond.saveDir = "con_b";
+    op.cond.res = [1980 1080];
+    op.cond.title = true; % add titles?
+    
 end
 
 %% Run

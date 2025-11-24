@@ -4,11 +4,11 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
     "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
     "S15_83_RR";"S16_95_JOB";"S16_96_LF"];
-%sbjs = ["S12_38_LK";"S12_42_NC"];
+%sbjs = "S12_38_LK"; %["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "stimBL";
-analName = "bandLME";
+analName = "bandLM";
 
 dirs = ec_getDirs(proj,task);
 
@@ -19,11 +19,10 @@ o.sfx = ""; % Suffix of input data
 
 %% Options
 o.test = false;
-o.gpu = false;
-o.plot = true;
+o.chBadFields = "bad"; % fields from n.chBad that exclude chans from stats
 
 % Task Epoching (see 'ec_epochPsy')
-o.epoch.float = "single"; % task metadata floating-point precision
+o.epoch.float = "single"; % task metadata output floating-point precision
 % Bad trial removal
 o.epoch.rmTrials = []; % Trials to remove (numeric array or logical index)
 o.epoch.badTrials = ""; % Bad trial removal criteria
@@ -38,7 +37,7 @@ o.epoch.binPct = 5; % latency percentage bin width (<=100)
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
 o.epoch.baselinePre = -0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
-% Task condition ordering (leave blank for to leave unordered)
+% Task condition ordering - all conds in data (leave blank for to leave unordered)
 o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
 o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 %   o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -47,11 +46,11 @@ o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
-o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
+o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.pre.trialNorm = "zscore"; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
@@ -65,7 +64,7 @@ o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
+o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.pre.lpfSteep = 0.85; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral dimensionality reduction by PCA (skip=0)
@@ -76,17 +75,37 @@ o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)
     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
 o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
+% Stats contrast names (eg. cond1-cond0)
+o.stats.contrasts = [...
+    "Other"...
+    "Self"...
+    "Semantic"...
+    "Episodic"...
+    "Math"...
+    "Rest"]; % 
+% Reference conditions (coded as 0) - leave blank for cond vs baseline
+o.stats.cond0 = {}; 
+% Comparison conditions (coded as 1)
+o.stats.cond1 = {...
+    "Other",...
+    "Self",...
+    "Semantic",...
+    "Episodic",...
+    "Math",...
+    "Rest"};
+% DOUBLE CHECK CONTRAST CONDITION FIELDS ARE RIGHT
+
 % Stats options
 o.stats.alpha = 0.05; % Critical p-value (default=0.05)
 o.stats.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
 o.stats.timeRng = [-200 2000]; % Range of times to run
 o.stats.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.stats.minN = 15; % minimum observations per sample
-o.stats.contrastBL = false; % Direct contrast of time vs. baseline observations (default=false)
-o.stats.singleTrial = true; % Get trial-by-trial stats
-o.stats.randomEffectsOnly = false; % only model single-trial stats
-%o.stats.covPattern = "FullCholesky"; % Covariance pattern (default="FullCholesky",see fitlme)
-%o.stats.trialPlotLats = [-.2 5];
+o.stats.minN = 15; % minimum observations per sample per contrast per chan
+o.stats.robust = true; % robust regression
+% Stats processing options
+o.stats.gpu = false;
+o.stats.typeProc = "double"; % processing floating-point precision ("double"|"single"|""=same as input)
+o.stats.typeOut = "single"; % output floating-point precision ("double"|"single"|""=same as input)
 
 
 %% Plot options (for ec_plotTimesCortex)
@@ -95,28 +114,26 @@ op = struct;
 op.save = true;
 
 % Filename
-op.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
-op.statsVar = "sAVg"; % Subject stats variable name in saved data
+op.statsFn = "stats"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
+op.statsVar = "stats"; % Subject stats variable name in saved data
 
 % Channels to exclude
 op.chBadFields = "bad";
 
 % Condition/contrast
-op.condVar = "cond"; % variable for condition, contrast, or test (in stats table)
+op.condVar = "con"; % variable for condition, contrast, or test (in stats table)
 op.conds = []; % conds to do (empty=all)
 
 % Timing
 op.timeVar = "bin"; % variable for time (in stats results)
-op.timeUnit = "ms"; % time unit to display in fig
 op.times = [50 250 500 750 1000 2000]; % times to plot (empty=all)
 
 % Spectral
 op.frqs = []; % frequency names to plot (empty=all)
 
 % Activation metric
-op.actVar = "t"; % activity variable for electrode plot color (in stats table)
-op.actUnit = "t"; % activity unit to display in fig
-op.clim = [-6 6]; %[-7 7] % limits for activity colorscale
+op.actVar = "b"; % activity variable for electrode plot color (in stats table)
+op.clim = [-1 1]; %[-7 7] % limits for activity colorscale
 
 % Statistical significance
 op.sigVar = "q"; % statistical significance variable (in stats table)
@@ -197,13 +214,14 @@ for s = 1:height(logs.i{1})
             o.ICA = logs.ICA(p);
             o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
             o.dirOut = logs.out(p);
-            %o.dirOutSbj = o.dirOut+"s"+dirs.sbjID+filesep;
+            sbjID = logs.i{p}.sbjID(s);
+            %o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
 
             %% Run subject
             if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
             try
                 disp("STARTING: "+sbj);
-                logs.i{p}.o{s} = ec_stimVsBaseline_lme(o);
+                logs.i{p}.o{s} = ec_condVsCondChs_lm(o);
                 logs.i{p}.stats(s) = 1;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;

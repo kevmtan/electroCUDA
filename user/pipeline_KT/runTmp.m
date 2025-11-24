@@ -1,3 +1,3 @@
-pre52_spectralDecomposition;
-clear all; close all; 
-pre53_spectralDecompositionICA;
+do_stimVsBaseline_lm;
+clear all; close all;
+do_condContrast_withinCh_lm;
