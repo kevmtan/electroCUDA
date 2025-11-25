@@ -324,8 +324,9 @@ end
 %%% Plot per condition showing times & freqs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function conds_lfn(dp,op)
 % Make directory
-if ~exist(op.dirOut+op.cond.saveDir,"dir")
-    mkdir(op.dirOut+op.cond.saveDir); end
+dirOut = op.dirOut+op.cond.saveDir+filesep;
+if ~exist(dirOut,"dir")
+    mkdir(dirOut); end
 
 conds = categories(dp.cnd);
 
@@ -341,7 +342,7 @@ end
 
 
 %%% Plot condition (subplots of times & freqs) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCond_lfn(dc,c,op)
+function plotCond_lfn(dc,c,dirOut,op)
 % dc = dp(dp.cnd=="Other",:);
 times = unique(dc.time);
 frqs = string(categories(dc.frq));
@@ -383,10 +384,10 @@ end
 
 %% Save
 if op.save && ~op.test
-    fn = op.dirOut+c+"_"+dc.cnd(1)+".png";
+    fn = dirOut+c+"_"+dc.cnd(1)+".png";
     exportgraphics(h,fn,Resolution=150);
     disp("[ec_PlotTimesCortex] saved: "+fn);
-    delete(h);
+    delete(ht); delete(h);
 end
 
 

@@ -88,11 +88,11 @@ for p = 1 %1:2
     op.ICA = logs.ICA(p);
 
     %% Run plot function
-    ec_plotTimesCortex(logs(p,:),op);
+    ec_plotTimesCortex(op,logs(p,:));
 end
 
 
 %%
 if 0
-    ec_plotTimesCortex(op,[],stats,chs); %#ok<UNRCH>
+    ec_plotTimesCortex(op,[],stats,chs) %#ok<UNRCH>
 end
