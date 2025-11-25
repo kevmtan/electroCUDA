@@ -1,113 +1,89 @@
-function ec_plotTimesCortex(logp,op)
+function ec_plotTimesCortex(op,logp,stats,chs)
 % Plot cortical timecourses from statistical results per channel.
 
 %% Input validation
 arguments
-    logp table % Log output from statistical analysis
     op struct % Plot options
+    logp table = table % Log output from statistical analysis (to load stats results)
+    stats table = table % Stats results (leave empty to load from logp)
+    chs table = table % Channel info (leave empty to load in function)
 end
 
 
-%% Prep
+%% Load data
 
-% Determine if running within a function
-stack = dbstack;
-if numel(stack) <= 1
-    op.test = true;
-else
-    op.test = false;
+% Function call or running from editor?
+if numel(dbstack)<2; op.test=true; else; op.test=false; end 
+
+% Stats results
+if (~exist("stats","var") || isempty(stats)) && ~isempty(logp)
+    % Load
+    [stats,sbjs] = loadStats_lfn(logp,op);
+elseif ~isempty(stats)
+    % Get subjects from stats
+    sbjs = table(unique(stats.sbjID,"stable"),VariableNames="sbjID");
+elseif isempty(logp)
+    error("[ec_plotTimesCortex] Must input stats log or stats results")
 end
 
-% Info
-sbjs = logp.i{:}; % get subjects from analysis
-sbjN = height(sbjs); % number of subjects
-o = sbjs.o{1}; % options from stats
-
-% Preallocate
-stat = cell(sbjN,1); % stats data
-chs = cell(sbjN,1); % channel info
-
-% Load subject data
-for s = 1:sbjN
-    % Get directory of subject stats data
-    if isfield(sbjs.o{s},"dirOutSbj") && exist(sbjs.o{s}.dirOutSbj,"dir")
-        fn = sbjs.o{s}.dirOutSbj;
-    elseif isfield(sbjs.o{s},"dirOut") && exist(sbjs.o{s}.dirOut,"dir")
-        fn = sbjs.o{s}.dirOut;
-    else
-        warning("NO STATS OUTPUT: s"+sbjs.sbjID(s));
-        continue
-    end
-
-    % Load stats data
-    fn = fn+"s"+sbjs.sbjID(s)+"_"+op.statsFn+".mat";
-    stat{s} = load(fn,op.statsVar);
-    stat{s} = stat{s}.(op.statsVar);
-    disp("Loaded: "+fn);
-
-    % Load channel info
-    if sbjs.o{s}.ICA
-        n = ec_loadSbj(sbjs.o{s}.dirs,vars="n",compact="n");
-        chs{s} = n.icNfo;
-        chs{s}.bad = n.icBad;
-        chs{s}.sbjID(:) = n.sbjID;
-        % TODO: concactenate fsNfo
-    else
-        chs{s} = ec_loadSbj(sbjs.o{s}.dirs,vars="chNfo");
-    end
+% Load channel info
+if ~exist("chs","var") || isempty(chs)
+    chs = loadChs_lfn(sbjs,op);
 end
+% Save originals if testing
+if op.test; statsOg=stats; chsOg=chs; end %#ok<NASGU>
 
-% Concactenate sbj data
-stat = vertcat(stat{:}); % stats data
-chs = vertcat(chs{:}); % channel info
-if op.test; statOg=stat; chsOg=chs; end %#ok<NASGU>
 
-% Remove channels not in stats data
-chs(~ismember(chs.sbjCh,stat.sbjCh),:) = [];
+%% Prep stats & channel info
 
-% Order channels
+% Order channel info
 if logp.ICA
     chs = sortrows(chs,["sbjID" "ic"]);
 else
     chs = sortrows(chs,["sbjID" "ch"]);
 end
-% Order dat by chs
-[~,idx] = ismember(chs.sbjCh,stat.sbjCh);
-stat = stat(idx,:);
+% % Order stats results
+% [~,idx] = ismember(chs.sbjCh,stats.sbjCh);
+% stats = stats(idx,:);
 
-% Remove chans with no MNI coords
-idx = isnan(chs.MNI(:,1));
-chs(idx,:) = [];
-stat(idx,:) = [];
+% Rename electrode position var
+if ~any(chs.Properties.VariableNames=="pos")
+    chs = renamevars(chs,op.posVar,"pos"); end
+% Rename stats time var
+if ~any(stats.Properties.VariableNames=="time")
+    stats = renamevars(stats,op.timeVar,"time"); end
+% Rename stats condition/contrast var
+if ~any(stats.Properties.VariableNames=="cnd")
+    stats = renamevars(stats,op.condVar,"cnd"); end
+
+% Remove channels not in stats data
+chs(~ismember(chs.sbjCh,stats.sbjCh),:) = [];
+
+% Remove chans with no position coords
+id = isnan(chs.pos(:,1));
+chs(id,:) = [];
+stats(ismember(stats.sbjCh,chs.sbjCh(id)),:) = [];
 
 % Remove bad chans
-for v = 1:numel(op.chBadFields)
-    idx = chs.bad.(op.chBadFields(v));
-    chs(idx,:) = [];
-    stat(idx,:) = [];
-end
+id = any(chs.bad{:,op.chBadFields},2);
+chs(id,:) = [];
+stats(ismember(stats.sbjCh,chs.sbjCh(id)),:) = [];
 
-% Concactenate stats data across chans
-stat = vertcat(stat.s{:});
-
-% Rename target vars
-chs = renamevars(chs,op.posVar,"pos"); % electrode position
-stat = renamevars(stat,[op.timeVar op.condVar],["t" "c"]); % time & condition/contrast/test
 
 
 %% Make plot data
-dp = makePlotData_lfn(stat,chs,op,o);
+dp = makePlotData_lfn(stats,chs,op);
 
 
 %% Plot individual
 if op.indiv.do
-    indiv_lfn(dp,op,o);
+    indiv_lfn(dp,op);
 end
 
 
 %% Plot gallery of times & freqs (separate per cond)
 if op.cond.do
-    conds_lfn(dp,op,o);
+    conds_lfn(dp,op);
 end
 
 
@@ -122,31 +98,92 @@ end
 
 
 
+%%% Load stats results %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [stats,sbjs] = loadStats_lfn(logp,op)
+% Prep
+sbjs = logp.i{:}; % get subjects from analysis
+sbjN = height(sbjs); % number of subjects
+stats = cell(sbjN,1); % preallocate stats data
+
+% Loop across sbjs
+for s = 1:sbjN
+    % Get directory of subject stats data
+    if isfield(sbjs.o{s},"dirOutSbj") && exist(sbjs.o{s}.dirOutSbj,"dir")
+        fn = sbjs.o{s}.dirOutSbj;
+    elseif isfield(sbjs.o{s},"dirOut") && exist(sbjs.o{s}.dirOut,"dir")
+        fn = sbjs.o{s}.dirOut;
+    else
+        warning("NO STATS OUTPUT: s"+sbjs.sbjID(s));
+        continue
+    end
+
+    % Load stats data
+    fn = fn+"s"+sbjs.sbjID(s)+"_"+op.statsFn+".mat";
+    stats{s} = load(fn,op.statsVar);
+    stats{s} = stats{s}.(op.statsVar);
+    disp("Loaded: "+fn);
+end
+stats = vertcat(stats{:}); % concactenate across sbjs
+
+
+
+
+
+
+%%% Load channel info %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function chs = loadChs_lfn(sbjs,op)
+% Prep
+sbjN = height(sbjs);
+chs = cell(sbjN,1); % Preallocate
+
+% Loop across sbjs
+for s = 1:sbjN
+    if op.ICA
+        n = ec_loadSbj(sbj=sbjs.sbjID(s),proj=op.proj,task=op.task,...
+            vars="n",compact="n");
+        chs{s} = n.icNfo;
+        chs{s}.bad = n.icBad;
+        chs{s}.sbjID(:) = n.sbjID;
+        % TODO: concactenate fsNfo
+    else
+        chs{s} = ec_loadSbj(sbj=sbjs.sbjID(s),proj=op.proj,task=op.task,...
+            vars="chNfo");
+    end
+end
+chs = vertcat(chs{:}); % concactenate across sbjs
+
+
+
+
+
+
 %%% Make plot data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function dp = makePlotData_lfn(stat,chs,op,o)
+function dp = makePlotData_lfn(stats,chs,op)
+% Get spectral info
+spect = stats.Properties.CustomProperties.spect;
 
 % Get conds/contrasts/tests to plot
 if isany(op.conds)
     conds = op.conds;
-elseif iscategorical(stat.c)
-    conds = string(categories(stat.c));
+elseif iscategorical(stats.cnd)
+    conds = string(categories(stats.cnd));
 else
-    conds = unique(stat.c,"stable");
+    conds = unique(stats.cnd,"stable");
 end
 
 % Get times to plot
 if isany(op.times)
     times = op.times;
 else
-    times = unique(stat.t);
+    times = unique(stats.time);
 end
 
 % Get freqs to plot
 if isany(op.frqs)
-    [~,idx] = ismember(op.frqs,o.spect.name);
-    frqs = o.spect(idx,:);
+    [~,idx] = ismember(op.frqs,spect.name);
+    frqs = spect(idx,:);
 else
-    frqs = o.spect;
+    frqs = spect;
 end
 
 % Get counts
@@ -157,7 +194,7 @@ plotN = condN * timeN * frqN;
 
 % Preallocate plot info
 dp = table;
-dp.cond(1:plotN) = "";
+dp.cnd(1:plotN) = "";
 dp.time(:) = nan;
 dp.frq(:) = "";
 dp.frqD(:) = "";
@@ -173,11 +210,11 @@ for c = 1:condN % conds loop
         d0.col = repmat(op.nsCol,height(d0),1); % marker face color (numeric): [R G B]  -- see MarkerFaceColor in MATLAB line properties
         d0.bCol = repmat(op.bCol,height(d0),1); % marker border color (numeric): [R G B] -- see MarkerEdgeColor in MATLAB line properties)
         d0.sz(:) = op.nsSz; % marker size (numeric) -- see MarkerSize in MATLAB line properties
-        d0.bSz(:) = 0; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
+        d0.bSz(:) = op.bSz; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
         d0.order(:) = -inf;
 
         % Get stats data for plot
-        sp = stat(stat.c==conds(c) & stat.t==times(t),:);
+        sp = stats(stats.cnd==conds(c) & stats.time==times(t),:);
         if height(sp)~=height(d0)
             warning("[ec_plotTimesCortex] Unequal heights for plot stats & channel tables: "+...
             "c="+conds(c)+" t="+times(t));
@@ -196,12 +233,6 @@ for c = 1:condN % conds loop
 
             % Get freq info
             frq = frqs.name(f); % freq name
-            if frqN > 1
-                frqV = "_"+frq; % freq var
-            else
-                frq = "";
-                frqV = "";
-            end
             if ismember("disp",frqs.Properties.VariableNames)
                 frqD = frqs.disp(f); % freq display name
             else
@@ -210,7 +241,7 @@ for c = 1:condN % conds loop
 
             % Find significant chans
             if isany(op.sigVar) && isany(op.sigThr)
-                idx = sp.(op.sigVar+frqV) <= op.sigThr;
+                idx = sp.(op.sigVar)(:,f) <= op.sigThr;
             else
                 idx = true(height(d0),1);
             end
@@ -220,7 +251,7 @@ for c = 1:condN % conds loop
 
             % Get colors from colormap (sig chans)
             [d.col(idx,:),d.order(idx)] = ec_colorsFromValues(...
-                sp.(op.actVar+frqV)(idx),op.cmap,op.clim);
+                sp.(op.actVar)(idx,f),op.cmap,op.clim);
 
             % Other properties (sig chans)
             d.marker(idx) = op.marker; % marker type
@@ -228,13 +259,13 @@ for c = 1:condN % conds loop
 
             % Add activation & significance
             if op.test
-                d.(op.actVar) = sp.(op.actVar+frqV);
-                d.(op.sigVar) = sp.(op.sigVar+frqV);
+                d.(op.actVar) = sp.(op.actVar)(:,f);
+                d.(op.sigVar) = sp.(op.sigVar)(:,f);
             end
 
             % Save
             dp.d{p} = d;
-            dp.cond(p) = conds(c);
+            dp.cnd(p) = conds(c);
             dp.time(p) = times(t);
             dp.frq(p) = frq;
             dp.frqD(p) = frqD;
@@ -243,7 +274,7 @@ for c = 1:condN % conds loop
 end
 
 % Finalize
-dp.cond = categorical(dp.cond,conds,Ordinal=true);
+dp.cnd = categorical(dp.cnd,conds,Ordinal=true);
 dp.frq = categorical(dp.frq,frqs.name,Ordinal=true);
 
 
@@ -252,39 +283,32 @@ dp.frq = categorical(dp.frq,frqs.name,Ordinal=true);
 
 
 %%% Make individual images per plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function indiv_lfn(dp,op,o)
+function indiv_lfn(dp,op)
 % Make directory
-dirOut = o.dirOut+op.indiv.saveDir+filesep;
+dirOut = op.dirOut+op.indiv.saveDir+filesep;
 if ~exist(dirOut,"dir")
     mkdir(dirOut); end
-conds = string(categories(dp.cond));
+conds = categories(dp.cnd);
 
 %% Loop across plots
 for p = 1:height(dp)
     % Title text
     if isany(dp.frq); txt = dp.frqD(p)+" | "; else; txt = ""; end
-    txt = txt + string(dp.cond(p))+" | "+dp.time(p)+op.timeUnit;
+    txt = txt + string(dp.cnd(p))+" | "+dp.time(p)+op.timeUnit;
 
     % Initialize figure
     h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
             Theme="light",Color="w");
-    %if op.test
-    %    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
-    %        Theme="light",Color="w");
-    %else
-    %    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
-    %        Theme="light",Color="w",DockControls="off");
-    %end
     
     % Plot cortex
-    ec_plotCortex("L",["lateral","medial"],dp.d{p},h,sbjDir=o.dirs.freesurfer,...
+    ec_plotCortex("L",["lateral","medial"],dp.d{p},h,sbj=op.fsSbj,sbjDir=op.fsDir,...
         surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
         title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
 
     %% Save
     if op.save && ~op.test
-        c = find(conds==dp.cond(p));
-        fn = dirOut+c+"_"+string(dp.cond(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
+        c = find(conds==dp.cnd(p));
+        fn = dirOut+c+"_"+string(dp.cnd(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
         exportgraphics(h,fn,Resolution=150);
         disp("[ec_PlotTimesCortex] saved: "+fn);
         delete(h);
@@ -298,18 +322,17 @@ end
 
 
 %%% Plot per condition showing times & freqs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function conds_lfn(dp,op,o)
+function conds_lfn(dp,op)
 % Make directory
-dirOut = o.dirOut+op.cond.saveDir+filesep;
-if ~exist(dirOut,"dir")
-    mkdir(dirOut); end
+if ~exist(op.dirOut+op.cond.saveDir,"dir")
+    mkdir(op.dirOut+op.cond.saveDir); end
 
-conds = string(categories(dp.cond));
+conds = categories(dp.cnd);
 
 %% Loop across plots
 for c = 1:numel(conds)
     %%
-    plotCond_lfn(dp(dp.cond==conds(c),:),op,o,c,dirOut);
+    plotCond_lfn(dp(dp.cnd==conds(c),:),c,op);
 end
 
 
@@ -318,34 +341,27 @@ end
 
 
 %%% Plot condition (subplots of times & freqs) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotCond_lfn(dc,op,o,c,dirOut)
-% dc = dp(dp.cond=="Other",:);
+function plotCond_lfn(dc,c,op)
+% dc = dp(dp.cnd=="Other",:);
 times = unique(dc.time);
 frqs = string(categories(dc.frq));
 timesN=numel(times); frqN=numel(frqs);
 
 % Order by tiledorder
 dc = sortrows(dc,["time" "frq"],"ascend");
-dc.cond = string(dc.cond);
+dc.cnd = string(dc.cnd);
 dc.frq = string(dc.frq);
 
 % Initialize figure
 h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
         Theme="light",Color="w");
-% if op.test
-%     h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
-%         Theme="light",Color="w",AutoResizeChildren="on");
-% else
-%     h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowState="normal",...
-%         Theme="light",Color="w",DockControls="off");
-% end
 
 % Initialize tiledlayout
 ht = tiledlayout(h,timesN,frqN,TileSpacing="compact",padding="tight"); % tiledlayout
 
 % Title
 if any(op.txtSz)
-    title(ht,dc.cond(1),FontSize=op.txtSz*1.5,FontWeight="bold"); end
+    title(ht,dc.cnd(1),FontSize=op.txtSz*1.5,FontWeight="bold"); end
 
 
 %% Loop across subplots
@@ -357,16 +373,17 @@ for p = 1:height(dc)
     % Sig elecs only
     d = dc.d{p};
     d(d.order==-inf,:) = [];
-    
+
     % Plot cortex
-    ec_plotCortex("L",["lateral","medial"],d,ht,tile=p,sbjDir=o.dirs.freesurfer,...
+    ec_plotCortex("L",["lateral","medial"],d,ht,sbj=op.fsSbj,sbjDir=op.fsDir,......
         surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
-        title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
+        title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend",...
+        tile=p);
 end
 
 %% Save
 if op.save && ~op.test
-    fn = dirOut+c+"_"+dc.cond(1)+".png";
+    fn = op.dirOut+c+"_"+dc.cnd(1)+".png";
     exportgraphics(h,fn,Resolution=150);
     disp("[ec_PlotTimesCortex] saved: "+fn);
     delete(h);

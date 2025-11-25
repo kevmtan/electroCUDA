@@ -1,15 +1,30 @@
+%% Load stats processing log
 if ~exist("logs","var")
-    load("/01/lbcn/anal/condContrast/mzAutoMathR_ch_251123/log_251123_0806.mat"); end
+    load("/01/lbcn/anal/stimBL/bandLM_ch_251124/log_251124_0940.mat"); end
 
 %% Plot cortex options
+proj = "lbcn";
+task = "MMR"; % task name
+dirs = ec_getDirs(proj,task);
+
+% Options struct
 if ~exist("op","var")
+    %% Options
     op = struct;
+    op.proj = proj;
+    op.task = task;
 
     op.save = true;
+    op.ICA = false; % loading ICA data? (filled below)
 
-    % Filename
-    op.statsFn = "avg"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
+    % Files & directories
+    op.statsFn = "stats"; % Subject stats filename suffix: s[sbjID]_[statsFn].mat
     op.statsVar = "stats"; % Subject stats variable name in saved data
+    op.dirOut = logs.out(1); % blank to fill later
+
+    % Freesurfer
+    op.fsDir = dirs.freesurfer;
+    op.fsSbj = "fsaverage";
 
     % Channels to exclude
     op.chBadFields = "bad";
@@ -60,14 +75,24 @@ if ~exist("op","var")
 
     % Condition plots showing subplots per time & freq
     op.cond.do = true;
-    op.cond.saveDir = "con_b";
+    op.cond.saveDir = "cond_b_q05";
     op.cond.res = [1980 1080];
-    op.cond.title = true; % add titles?
-    
+    op.cond.title = true; % add titles? 
 end
 
-%% Run
+
+%% Loop across channel vs IC data
 for p = 1 %1:2
-    %%
+    % Analysis info
+    op.dirOut = logs.out(p);
+    op.ICA = logs.ICA(p);
+
+    %% Run plot function
     ec_plotTimesCortex(logs(p,:),op);
+end
+
+
+%%
+if 0
+    ec_plotTimesCortex(op,[],stats,chs); %#ok<UNRCH>
 end

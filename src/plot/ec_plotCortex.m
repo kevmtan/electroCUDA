@@ -61,6 +61,7 @@ arguments
     a.cort cell = []; % custom cortical surfaces per hemisphere (more info below)
     a.tile (1,1) double = nan % Tile number if placed within tiledchart
     a.tilespan (1,2) double = [1 1] % Tile span if placed within tiledlayout
+    a.image (1,1) logical = false  % Convert graphics objects to RGB image data
 end
 % MORE INFO:
 %  pullF = Pull factor for obscured electrodes (numeric): pullF(hems,views)
@@ -125,15 +126,14 @@ end
 
 
 %% Initialize figure
-if ~any(isgraphics(h))
+if a.image || ~any(isgraphics(h))
+    % Copy input graphics handle
+    if any(isgraphics(h,"axes"))
+        hin = h(isgraphics(h,"axes")); end
+
     % Initialize figure if no input graphics handle
-    if op.test
-        h = figure(Position=a.figPos,Visible=a.visible,WindowStyle="docked",...
+    h = figure(Position=a.figPos,Visible=a.visible,WindowStyle="docked",...
             Theme="light",Color="w",AutoResizeChildren="on");
-    else
-        h = figure(Position=a.figPos,Visible=a.visible,WindowState="normal",...
-            Theme="light",Color="w",DockControls="off");
-    end
 elseif any(isgraphics(h,"TiledLayout"))
     % Isolate tiledlayout handle if exist
     h = h(isgraphics(h,"TiledLayout"));
@@ -211,12 +211,39 @@ if any(a.titleSz) && isany(a.title)
 end
 
 
-%% Save image
-if a.save
+%% Convert to image
+if a.image
+    rgb = print(h,"-RGBImage","-r150"); % convert figure to RGB triplet
+    delete(h); % delete figure objects
+
+    if exist("hin","var") % If axes is input
+        % Show image
+        h = imshow(rgb,Parent=hin,Border="tight",InitialMagnification="fit");
+    elseif a.visible || (nargout==0 && ~a.save)
+        % Initialize image figure
+        figure(Position=a.figPos,Visible=a.visible,WindowStyle="docked",...
+                Theme="light",Color="w",AutoResizeChildren="on");
+
+        % Show image
+        h = imshow(rgb,Parent=gca,Border="tight",InitialMagnification="fit");
+    end
+
+    % Output RGB triplet if image not shown
+    if ~exist("h","var")
+        h = rgb;
+    end
+end
+
+
+%% Save/export
+if a.save && ~a.image
     figFn = a.saveDir+filesep+a.saveName+".png";
     exportgraphics(h,figFn);
-    %print(h,figFn,'-dpng','-image','-r300');
     disp("SAVED: "+figFn);
-    %delete(h);
+    if nargout==0 && ~a.visible; delete(h); end
+elseif a.save && a.image
+    figFn = a.saveDir+filesep+a.saveName+".mat";
+    save(figFn,"rgb");
+    disp("SAVED: "+figFn);
 end
         
