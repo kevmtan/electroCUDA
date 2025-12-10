@@ -333,7 +333,7 @@ conds = categories(dp.cnd);
 %% Loop across plots
 for c = 1:numel(conds)
     %%
-    plotCond_lfn(dp(dp.cnd==conds(c),:),c,op);
+    plotCond_lfn(dp(dp.cnd==conds(c),:),c,dirOut,op);
 end
 
 

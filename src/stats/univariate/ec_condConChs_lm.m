@@ -29,16 +29,20 @@ end
 % Load
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
-if o.test && isempty(dbstack); nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU>
+if o.test && numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU>
 
 % Channels/ICs
 if ~o.ICA
     sbjChs = chNfo.sbjCh; % chan names
-    chBad = find(any(n.chBad{:,o.chBadFields},2)); % chans to include in stats
+    o.chBad = find(any(n.chBad{:,o.chBadFields},2)); % chans to include in stats
 else
     sbjChs = n.icNfo.sbjIC; % IC names
-    chBad = find(any(n.icBad{:,o.chBadFields},2)); % ICs to include in stats
+    o.chBad = find(any(n.icBad{:,o.chBadFields},2)); % ICs to include in stats
 end
+
+% Remove bad chans/ICs
+x(:,chBad,:) = [];
+sbjChs(chBad,:) = [];
 
 
 %% Analysis template
@@ -67,8 +71,7 @@ o.spect = n.spect;
 stats = cell(size(sbjChs)); % preallocate results
 
 % Parfor across chans
-parfor ch = 1:n.xChs
-    if ismember(ch,chBad); continue; end
+parfor ch = 1:width(x)
     %% run ch
     stats{ch} = withinCh_lfn(squeeze(x(:,ch,:)),sbjChs(ch),ep,n,o,tt);
 end
