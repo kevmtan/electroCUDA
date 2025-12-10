@@ -1,4 +1,4 @@
-function [rs,ra] = ec_classifySpec_thundersvm(dirs,o,oi)
+function [rs,ra] = ec_classifyChSpec_thundersvm(dirs,o,oi)
 arguments
     dirs struct = []
     o struct = struct % preprocessing options struct (description below in "Options struct validation" ection)
