@@ -6,6 +6,7 @@ arguments
     tt (1,1) uint64 = tic
     % Bad trial removal
     oe.rmTrials {islogical,isnumeric} = []; % Trials to remove (numeric array or logical index)
+    oe.rmTrialsFun = {} % Function for removing trials (using trialNfo vars)
     oe.badTrials {mustBeMember(oe.badTrials,["noPdio" "noRT" ""])} = ""; % Bad trial criteria to remove
     % Floating-point precision for variables [half|single|double]
     oe.float (1,1){mustBeMember(oe.float,["double" "single" "half"])} = "double"
@@ -125,7 +126,7 @@ end
 %% Remove bad trials
 trialNfo.removed(:) = false;
 
-% Specified trials to remove
+% Specified trials numbers to remove
 if isany(oe.rmTrials)
     if islogical(oe.rmTrials) % Logical index
         if length(oe.rmTrials)==trs
@@ -138,6 +139,10 @@ if isany(oe.rmTrials)
     end
 end
 
+if ~isempty(oe.rmTrialsFun)
+    trialNfo.removed = oe.rmTrialsFun(trialNfo) | trialNfo.removed; end
+
+
 % Remove if no photodiode signal
 if ismember("noPdio",oe.badTrials)
     trialNfo.removed = trialNfo.noPdio | trialNfo.removed; end
@@ -148,7 +153,10 @@ if ismember("noRT",oe.badTrials)
 
 % Remove
 if any(trialNfo.removed)
-ep{trialNfo.removed} = []; end
+    rmTrials = trialNfo.tr(trialNfo.removed);
+    ep(ismember(ep.tr,rmTrials),:) = [];
+    disp("[ec_epochPsy] removed bad trials: "+n.sbj);
+end
 
 
 %% Finalize
