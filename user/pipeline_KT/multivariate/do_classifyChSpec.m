@@ -21,33 +21,60 @@ o.sfx = ""; % Suffix of input data (filled in subject loop)
 o.test = false;
 o.save = true;
 o.chBadFields = "bad"; % fields from n.chBad that exclude chans from stats
+o.psyVars = ["frame" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
 
 % Classifier processing options
 o.gpu = false; % do GPU
 o.typeProc = "single"; % processing floating-point precision ("double"|"single")
 o.typeOut = "single"; % output floating-point precision ("double"|"single")
 
-% Stats options
+% Timing for classification
 o.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-o.timeRng = [-200 2000]; % Range of times to run
+o.timeRng = [-200 2000]; % Range of times to run (indlude baseline)
+
+% Conditions for classification
+o.condVar = "cond";
+o.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
+o.condx = ["Self" "Other"];       % Coditions to cross-classify (test only)
+
+% Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
-o.minN = 15; % minimum observations per sample per contrast per chan
 
 % Classifier basic options
-o.fun = "fitclinear";             % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
-o.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
-o.condx = ["Self" "Other"];       % Coditions to cross-classify (test only)
-o.ol = "median";                  % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
-o.olFill = "clip";                % Outlier fill method
-o.olThrAll = 7.5;                 % Outlier threshold (all observations)
-o.olThrCond = 5;                  % Outlier threshold (within-condition)
-o.pca = false;                    % Number of spectral PCA components (0 = no PCA)
-o.std = false;                    % Standardize predictors (z-score)
+o.fun = "fitclinear"; % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
+o.minN = 15; % minimum observations per sample per contrast per chan
+o.ol = "median"; % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
+o.olFill = "clip"; % Outlier fill method
+o.olThrAll = 7.5; % Outlier threshold (all observations)
+o.olThrCond = 5; % Outlier threshold (within-condition)
+o.pca = 0; % Number of spectral PCA components (0 = no PCA)
+o.std = ""; % Standardize predictors (z-score)
 
 % Classifier hyperparameters
-if o.fun == "fitcknn"
+if o.fun == "fitcsvm"
+    % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
+    o.hyper.KernelFunction = "linear";
+    o.hyper.BoxConstraint = 1;
+    o.hyper.KernelScale = "auto";
+    o.hyper.Prior = "empirical";
+    o.hyper.Standardize = false;
+    o.hyper.Solver = "SMO";
+    o.hyper.CacheSize = "maximal";
+    o.hyper.Verbose = 0;
+elseif o.fun == "fitclinear"
+    % Linear SVM hyperparameters (mathworks.com/help/stats/fitclinear.html)
+    o.hyper.Learner = "svm";
+    o.hyper.Lambda = "auto";
+    o.hyper.Regularization = "ridge";
+    o.hyper.Solver = "lbfgs";
+    o.hyper.Prior = "empirical";
+    o.hyper.FitBias = true;
+    o.hyper.PostFitBias = false;
+    o.hyper.OptimizeLearnRate = true;
+    o.hyper.Verbose = 0;
+elseif o.fun == "fitcknn"
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
     o.hyper.Distance = "euclidean";
     o.hyper.NumNeighbors = 25;
@@ -55,18 +82,6 @@ if o.fun == "fitcknn"
     o.hyper.Prior = "empirical";
     o.hyper.std = true;
     % o.hyper.ScoreTransform = "invlogit";
-
-elseif o.fun == "fitclinear"
-    % SVM hyperparameters (mathworks.com/help/stats/fitclinear.html)
-    o.hyper.Learner = "svm";
-    o.hyper.Lambda = "auto";
-    o.hyper.Regularization = "ridge";
-    o.hyper.Solver = "dual";
-    o.hyper.Prior = "empirical";
-    o.hyper.FitBias = true;
-    o.hyper.PostFitBias = false;
-    o.hyper.OptimizeLearnRate = true;
-    o.hyper.Verbose = 0;
 end
 
 % Cross-validation parameters (mathworks.com/help/stats/crossval.html)
@@ -74,7 +89,13 @@ o.crossval.KFold = 10;
 % o.crossval.Leaveout = "on";
 
 % Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
-o.bayes.OptimizeHyperparameters = "Lambda"; % "none","Lambda"
+if o.fun == "fitcsvm"
+    o.bayes.OptimizeHyperparameters = "BoxConstraint"; % "KernelScale" 
+elseif o.fun == "fitclinear"
+    o.bayes.OptimizeHyperparameters = "Lambda"; % "Learner"
+elseif o.fun == "fitcknn"
+    o.bayes.OptimizeHyperparameters = ["Distance" "NumNeighbors"]; 
+end
 o.bayes.HyperparameterOptimizationOptions =...
     struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
     AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
@@ -83,6 +104,7 @@ o.bayes.HyperparameterOptimizationOptions =...
 o.epoch.float = "single"; % task metadata output floating-point precision
 % Bad trial removal
 o.epoch.rmTrials = []; % Trials to remove (numeric array or logical index)
+o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function for removing trials
 o.epoch.badTrials = ""; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
