@@ -71,8 +71,11 @@ stim = mat2cell(stim,n.runIdxOg); % split per run
 % Epoch indices
 epIdx = ep.idx;
 
-% Trial Indices
+% Get trials
 trs = groupcounts(ep,["run" "tr"]);
+n.nTrials = height(trs);
+
+% Trial indices
 trs.i = cell(n.nTrials,1);
 for t = 1:n.nTrials
     trs.i{t} = sparse(ep.tr==trs.tr(t)); end

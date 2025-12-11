@@ -139,9 +139,9 @@ if isany(oe.rmTrials)
     end
 end
 
+% Remove trials by user-defined function handle
 if ~isempty(oe.rmTrialsFun)
     trialNfo.removed = oe.rmTrialsFun(trialNfo) | trialNfo.removed; end
-
 
 % Remove if no photodiode signal
 if ismember("noPdio",oe.badTrials)

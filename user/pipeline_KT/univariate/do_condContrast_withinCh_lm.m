@@ -47,7 +47,7 @@ o.cond1 = {...
 
 % Stats options
 o.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-o.timeRng = [-200 2000]; % Range of times to run
+o.timeRng = [-200 2000]; % Range of times to run (include baseline)
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
