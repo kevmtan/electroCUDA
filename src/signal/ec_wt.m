@@ -23,6 +23,9 @@ arguments
         {mustBeMember(a.wavelet,["morse" "amor" "bump"])} = "morse"
     a.ds (1,1) double = 0             % Downsampling factor (see https://www.mathworks.com/help/signal/ref/downsample.html)
     a.mem (1,1) double = nan          % Memory to use
+    a.lpfFilt {isfloat,isa(a.lpfFilt,"digitalFilter")} = [] % Anti-aliasing filter (LPF for downsampling)
+    a.lpfImpulse {mustBeMember(a.lpfImpulse,["fir" "iir" "auto"])} = "auto" % Anti-aliasing impulse response
+    a.lpfSteep (1,1) double = 0.85    % Anti-aliasing filter steepness
     a.single (1,1) logical = false    % Run as single-precision?
     a.singleOut (1,1) logical = false % Output single-precision?
     a.cell (1,1) logical = false      % Output as cell (matrix otherwise)
@@ -41,18 +44,24 @@ if isa(x,"single"); a.single = true; % Input data type is single
 elseif a.single; x = single(x); % Convert to single if specified
 elseif ~isa(x,"double"); x = double(x); % Convert to double if not
 end 
-if a.single; a.singleOut=false; end % Remove redundancy
 
 % Make logical arguments
 if a.out=="complex"; a.real=false; else; a.real=true; end
 if a.out=="power"; a.pwr=true; else; a.pwr=false; end
 
-% Generate wavelet filter
+% Generate wavelet
 fb = cwtfilterbank(Wavelet=a.wavelet,SamplingFrequency=a.hz,SignalLength=height(x),...
     VoicesPerOctave=a.voices,FrequencyLimits=a.lims);
 frqs = fb.centerFrequencies; % CWT frequencies
 scales = fb.scales; % CWT scales
-if a.ds; scales = scales.*a.ds; end % Downsample scales 
+if a.ds; scales = scales.*a.ds; end % Downsample scales
+
+% Make anti-aliasing LPF filter for downsampling (Nyquist freq)
+if ds && a.gpu~="cuda" && isempty(a.lpfFilt)
+    a.lpfFilt = ec_designFilt(x,a.hz,floor((a.hz/ds)/2),"lowpass",...
+        steepness=op.lpfSteep,impulse="fir",coefOut=true);
+    disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
+end
 
 % Sizes
 nFrqs = numel(frqs);
@@ -65,7 +74,6 @@ if a.ds; memIn = memIn/a.ds; end
 if a.singleOut; memIn = memIn/2; end
 a.memIn = memIn/nChs;
 
-% Get wavelet scales
 
 %% Run CWT
 if a.gpu=="cuda" && ~a.avg && ismember(a.wavelet,["morse" "amor"])
@@ -82,13 +90,13 @@ if a.gpu=="cuda" && ~a.avg && ismember(a.wavelet,["morse" "amor"])
     disp("[ec_wt] Finished on CUDA binary: time="+toc(a.tic));
 else
     % Matlab CPU or GPU
-    x = arrayfun(@(ch) x(:,ch), 1:nChs, UniformOutput=false); % Convert to cell
+    x = ec_dim2cell(x,2); % convert to cell
 
     % Call
-    if a.gpu=="no"
-        x = cpu_lfn(fb,x,a); % CPU parfor
-    else
+    if a.gpu=="matlab"
         x = gpu_lfn(fb,x,a); % GPU arrayfun
+    else
+        x = cpu_lfn(fb,x,a); % CPU parfor
     end
 end
 
@@ -103,12 +111,14 @@ end
 
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
+
+% Run on GPU arrayfun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function x = gpu_lfn(fb,x,a)
-%% Run on GPU arrayfun
 nChs = numel(x);
 if ~isany(a.mem); a.mem=ec_ramAvail(true); end % Get memory
 
@@ -121,16 +131,16 @@ disp("[ec_wt] Start GPU arrayFun: memChs="+memChs+"/"+nChs+" time="+toc(a.tic));
 
 % Copy to GPU
 fAvg=gpuArray(a.avg); fReal=gpuArray(a.real); fPwr=gpuArray(a.pwr); 
-ds=gpuArray(a.ds); sOut=gpuArray(a.singleOut);
+ds=gpuArray(a.ds); lpf=gpuArray(a.lpf); sOut=gpuArray(a.singleOut);
 
-% Loop gpuArrayFun iterations (simultaneous chans that fit in VRAM)
+%% Loop gpuArrayFun iterations (simultaneous chans that fit in VRAM)
 for v = 1:memItr
     % Prep
     idx = find(~chFin,memChs); % Find iteration chans
     x(idx) = cellfun(@gpuArray,x(idx),UniformOutput=false); % Copy data to GPU
 
     % Run CWT
-    x(idx) = arrayfun(@(x) cwt_lfn(fb,x{:},fAvg,fReal,fPwr,ds,sOut),...
+    x(idx) = cellfun(@(xi) cwt_lfn(fb,xi,fAvg,fReal,fPwr,ds,lpf,sOut),...
         x(idx),UniformOutput=false);
 
     % Move data to CPU
@@ -143,46 +153,47 @@ disp("[ec_wt] Finished GPU arrayfun: time="+toc(a.tic));
 
 
 
+% Run on CPU %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function x = cpu_lfn(fb,x,a)
-%% Run on CPU
-nChs=numel(x); fAvg=a.avg; fReal=a.real; fPwr=a.pwr; ds=a.ds; sOut=a.singleOut;
+% Extract struct fields
+fAvg=a.avg; fReal=a.real; fPwr=a.pwr; ds=a.ds; lpf=a.lpf; sOut=a.singleOut;
+nChs = numel(x); % Num chans
 
 % Parallel loop across chans
 parfor ch = 1:nChs
-    x{ch} = cwt_lfn(fb,x{ch},fAvg,fReal,fPwr,ds,sOut);
+    %% Run CWT for chan
+    x{ch} = cwt_lfn(fb,x{ch},fAvg,fReal,fPwr,ds,lpf,sOut);
 end
 disp("[ec_wt] Finished CPU parfor: time="+toc(a.tic));
 
 
 
 
-
-function xc = cwt_lfn(fb,xc,fAvg,fReal,fPwr,ds,sOut)
-%% Continuous wavelet transform
-if fAvg
-    % Scale-averaged output
+% Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function xc = cwt_lfn(fb,xc,fAvg,fReal,fPwr,ds,lpf,sOut)
+if fAvg % Scale-averaged output
     if fPwr
         xc = fb.scaleSpectrum(xc)'; % Power
     else
         xc = fb.scaleSpectrum(xc,SpectrumType="density")'; % Magnitude
     end
-else
-    % Continuous output
-    xc = fb.wt(xc)'; % complex
-    if fReal
-        xc = abs(xc); % Magnitude
-        if fPwr
-            xc = xc.^2; % Power
-        end
-    end
+else    % Full-spectrum output
+    xc = fb.wt(xc)';
 end
 
-% Downsample
+%% Downsample
 if ds
-    xc = resample(xc,1,ds);
+    xc = ec_filtfilt(xc,lpf); % apply anti-aliasing filter
+    xc = xc(1:ds:end,:); % decimate
+end
+
+%% Convert
+if ~fAvg && fReal
+    xc = abs(xc); % magnitude (amplitude)
+    if fPwr
+        xc = xc.^2; end % power
 end
 
 % Convert to single
 if sOut
-    xc = single(xc);
-end
+    xc = single(xc); end

@@ -1,42 +1,28 @@
-function d = ec_designFilt(x,fs,hz,dType,arg)
+function [d,a] = ec_designFilt(x,fs,hz,dType,arg)
 % Input validation
 arguments
-    x {mustBeFloat}
+    x {mustBeFloat} % Data to filter (faster if data sample: full-length vector)
     fs (1,1) double
     hz (1,:) double
     dType {mustBeMember(dType,["lowpass" "highpass" "bandpass"])} = "highpass"
-    arg.steepness {mustBeLessThanOrEqual(arg.steepness,1)} = 0.75 % Passband to stopband multiplier
+    arg.steepness {mustBeLessThanOrEqual(arg.steepness,1)} = 0.85 % Passband to stopband multiplier
     arg.impulse {mustBeMember(arg.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
     arg.coefOut (1,1) logical = true
 end
 if numel(hz)>1; dType = "bandpass"; end
-x = double(x(:,1,1));
+% if arg.impulse=="auto"; x = double(x(:,1,1)); end % Get sample vector
 
 %% Make filter object
-if dType=="highpass"
-    if arg.impulse=="auto"
-        [~,d] = highpass(x,hz,fs,ImpulseResponse=arg.impulse,Steepness=arg.steepness);
-    else
-        hz(2) = hz * arg.steepness;
-        if arg.impulse=="fir"; arg.design="kaiserwin"; else; arg.design="ellip"; end
-        d = designfilt(dType+arg.impulse,StopbandFrequency=hz(2),PassbandFrequency=hz(1),...
-            PassbandRipple=0.1,DesignMethod=arg.design,SampleRate=fs);
-    end
-elseif dType=="lowpass"
-    if arg.impulse=="auto"
-        [~,d] = lowpass(x,hz,fs,ImpulseResponse=arg.impulse,Steepness=arg.steepness);
-    else
-        d = signal.internal.filteringfcns.parseAndValidateInputs(x,char(dType),...
-            {hz,fs,'Steepness',arg.steepness,'ImpulseResponse',arg.impulse});
-        d = designFilter_lpf(d);
-    end
-elseif dType=="bandpass"
-    [~,d] = bandpass(x,hz,fs,ImpulseResponse=arg.impulse,Steepness=arg.steepness);
-end
+d = signal.internal.filteringfcns.parseAndValidateInputs(x,char(dType),...
+    {hz,fs,'Steepness',arg.steepness,'ImpulseResponse',arg.impulse});
+d = designFilter_lfn(d);
 
 % Finalize
 if arg.coefOut
-    d = d.Coefficients;
+    if d.ImpulseResponse=="iir" && nargout<2
+        error("[ec_designFilt] Second output needed: IIR coef denominator"); end
+    a = d.Denominator;
+    d = d.Numerator;
 end
 
 
@@ -46,7 +32,7 @@ end
 
 
 %% designFilter_lpf %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [d,opts] = designFilter_lpf(opts)
+function [d,opts] = designFilter_lfn(opts)
 opts.IsFIR = true;
 Fs = opts.Fs;
 Wpass = opts.Wpass;
@@ -81,12 +67,11 @@ opts.WstopNormalized = WstopNormalized;
 % then try an IIR filter.
 
 % Calculate the required min FIR order from the parameters
-NreqFir = kaiserord([Wpass Wstop], [1 0], [opts.PassbandRippleLinear opts.StopbandAttenuationLinear], Fs);
-% if opts.Response=="lowpass"
-%     NreqFir = kaiserord([Wpass Wstop], [1 0], [opts.PassbandRippleLinear opts.StopbandAttenuationLinear], Fs);
-% else
-%     NreqFir = kaiserord([Wstop Wpass], [1 0], [opts.PassbandRippleLinear opts.StopbandAttenuationLinear], Fs);
-% end
+if opts.Response=="lowpass"
+    NreqFir = kaiserord([Wpass Wstop], [1 0], [opts.PassbandRippleLinear opts.StopbandAttenuationLinear], Fs);
+else
+    NreqFir = kaiserord([Wstop Wpass], [1 0], [opts.PassbandRippleLinear opts.StopbandAttenuationLinear], Fs);
+end
 impRespType = signal.internal.filteringfcns.selectImpulseResponse(NreqFir, opts);    
 
 if strcmp(impRespType,'iir')

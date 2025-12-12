@@ -1,12 +1,12 @@
 %% Task info
-
-% Subject Names
-sbjs = {'S12_38_LK','S12_42_NC','S12_33_DA','S12_34_TC','S12_35_LM','S12_36_SrS',...
-    'S12_39_RT','S12_40_MJ','S12_41_KS','S12_45_LR','S13_46_JDB','S13_47_JT2','S13_50_LGM',...
-    'S13_51_MTL','S13_52_FVV','S13_53_KS2','S13_54_KDH','S13_56_THS','S13_57_TVD',...
-    'S13_59_SRR','S13_60_DY','S14_62_JW','S14_66_CZ','S14_67_RH','S14_74_OD',...
-    'S14_75_TB','S14_76_AA','S14_78_RS','S15_81_RM','S15_82_JB','S15_83_RR','S15_87_RL',...
-    'S16_95_JOB','S16_96_LF'}';
+sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
+    "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
+    "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
+    "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
+    "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
+    "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
+% s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
+sbjs="S12_38_LK";
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -20,7 +20,7 @@ o.sfx_src = "";
 o.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
+o.gpu = "no"; % Run on... ["no"|"matlab"|"cuda"]
 
 % Wavelet coherence
 o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
@@ -45,6 +45,7 @@ o.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireR
 o.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
 o.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
 o.hiPassGPU = false; % GPU slower than CPU??
+
 
 %% Log
 sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc/spec_'...

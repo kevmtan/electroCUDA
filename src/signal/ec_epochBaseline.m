@@ -59,7 +59,6 @@ end
 % Conditional validation
 if ~isany(op.typeProc); op.typeProc = class(x); end
 if ~isany(op.typeOut); op.typeOut = class(x); end
-op.fs2 = double(op.lpf*n.hz);
 
 
 %% Prep
@@ -162,7 +161,6 @@ if isany(op.hpf) || isany(op.lpf)
             steepness=op.lpfSteep,impulse=op.lpfImpulse,coefOut=true);
         disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
     end
-    clear xTmp
 end
 
 % Remove bad frames

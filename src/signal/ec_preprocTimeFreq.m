@@ -69,9 +69,6 @@ end
 %% Setup & initialize
 tt=tic; errors={};
 
-% Make workspace vars
-fMean=logical(o.fMean);
-
 % Load EEG data
 if isempty(x)
     [n,x,chNfo,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
@@ -83,7 +80,7 @@ if arg.test; xOg = x; end %#ok<NASGU>
 sbjID = n.sbjID;
 nRuns = n.nRuns;
 blocks = string(n.blocks);
-hzOg = floor(n.hz);
+n.hz= floor(n.hz);
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
 
@@ -100,6 +97,19 @@ if isany(o.hzTarget)
         error(errors{end});
     end
     ds = ds(2);
+end
+
+% Anti-aliasing LPF filter for downsampling (Nyquist freq)
+if ds && o.gpu~="cuda"
+    % Get single-channel/freq timeseries from longest run
+    [~,idx] = min(n.runIdxOg);
+    xTmp = x(psy.run==n.runs(idx),1,1);
+    if o.gpu; xTmp = gpuArray(xTmp); end
+
+    % Make AA LPF
+    lpfFilt = ec_designFilt(xTmp,n.hz,floor(o.hzTarget/2),"lowpass",...
+        steepness=o.lpfSteep,impulse="fir",coefOut=true);
+    disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
 end
 
 % Reset GPU & get free VRAM
@@ -119,15 +129,15 @@ x = mat2cell(x,n.runIdxOg);
 cwtHz = cell(nRuns,1);
 for r = 1:nRuns
     %% CWT on run
-    [x{r},cwtHz{r}] = ec_wt(x{r},hz=hzOg,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
-    wavelet=o.wavelet,ds=ds,single=o.single,singleOut=o.singleOut,mem=memMax,...
-    gpu=o.gpu,tic=tt);
+    [x{r},cwtHz{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
+        wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
+        mem=memMax,gpu=o.gpu,tic=tt);
     disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+blocks(r)+" time="+toc(tt));
 end
 
 %% Organize
 x = vertcat(x{:});
-if ~fMean
+if ~o.fMean
     x = flip(x,3); end % Sort freqs from low to high
 
 %%
@@ -141,31 +151,32 @@ n.freqsRun = vertcat(cwtHz{:});
 
 %% Identify bad frames per chan
 if o.doBadFrames && ~arg.ica
+    % Channel bad frames
+    xBad = table;
+
     % Retain HFO
     if any(n.xBad.Properties.VariableNames=="hfo")
-        x_bad = n.xBad(:,"hfo");
-        if ds(2)>1
-            hfo = resample(double(full(x_bad.hfo)),ds(1),ds(2),max([ds 10]),...
-                Dimension=1);
-            x_bad.hfo = sparse(hfo>=0.5);
+        if ds
+            xBad.hfo = resample(double(full(n.xBad.hfo)),1,ds,max([ds 10]),Dimension=1);
+            xBad.hfo = sparse(xBad.hfo>=0.5);
         end
-    else
-        x_bad = table;
     end
 
     % Identify
-    [n.chBad,n.xBad] = ec_findBadFrames(x,chNfo.bad,x_bad,...
+    [n.chBad,n.xBad] = ec_findBadFrames(x,chNfo.bad,xBad,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per chan: "+sbj+" time="+toc(tt));
 elseif o.doBadFrames
+    % ICs/sources bad frames
     [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per IC: "+sbj+" time="+toc(tt));
+    % FIGURE OUT how to deal HFO to ICs
 end
 
 
 %% Covariance
 n.("o"+o.suffix) = o;
-if fMean
+if o.fMean
     if ~arg.ica
         n.chCov = cov(x,'partialrows');
         n.chVar = diag(n.chCov);
