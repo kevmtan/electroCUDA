@@ -128,7 +128,7 @@ o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
-o.pre.log = false; % Log transform
+o.pre.log = true; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")

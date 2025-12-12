@@ -89,6 +89,7 @@ o.spect = n.spect;
 u0 = cast(0,like=n.chNfo.ch); % integer type
 s0 = cast(nan,o.typeProc); % float type
 nCond = numel(o.cond);
+nCondx = numel(o.condx);
 
 % Get vars from 'ep' to include in analysis template (to save for further analysis)
 psyVars = ismember(ep.Properties.VariableNames,...
@@ -103,59 +104,57 @@ a.pp1(:) = s0; % posterior probability difference
 a.acc(:) = false; % accurate prediction?
 a.ch(:) = u0;
 a.sbjCh(:) = "";
+% Organize analysis template
+a = movevars(a,"sbjCh","Before",1);
+a = movevars(a,["ch" "sbjID" "ide"],"After","wt");
+a.Properties.RowNames = {};
 
 % Make stats template
-r = groupcounts(a,"t");
-r.t = unique(a.t);
+r = table;
+r.t = unique(a.t,"stable");
 r.acc(:) = s0; % Cross-validation (CV) mean accuracy
 r.acc_p(:) = s0; % p-value above chance
 r.acc_q(:) = s0; % FDR-corrected sig
-r.auc(:,1:numel(o.cond)) = s0; % CV ROC AUC per cond
+r.accBal(:) = s0; % Balanced accuracy (handles class imbalance)
+r.auc(:,1:nCond) = s0; % CV ROC AUC per cond
 r.auc1(:) = s0; % AUC mean
 r.auc1_CI(:,1:2) = s0; % AUC confidence interval
-r.pp(:,1:numel(o.cond)) = s0; % mean posterior probability (PP)
+r.pp(:,1:nCond) = s0; % mean posterior probability (PP)
 r.pp1(:) = s0; % PP difference
 r.pp1_SD(:) = s0; % PP diff std dev
 r.pp1_p(:) = s0; % PP not equal p-value
 r.pp1_q(:) = s0; % FDR-corrected sig
-if isany(o.condx)
+if any(nCondx)
     % Cross-classification (CC) stats
-    r.ppx(:,1:numel(o.cond)) = s0; % CC PP
+    r.ppx(:,1:nCondx) = s0; % CC PP
     r.ppx1(:) = s0; % CC PP diff
     r.ppx1_SD(:) = s0; % CC PP diff SD
     r.ppx1_p(:) = s0;
     r.ppx1_q(:) = s0;
 end
-r.n(:,1:numel(o.cond)) = uint16(0); % samples per class
-r.wt = r.n; % class weight
+r.n(:,1:nCond) = uint32(0); % samples per training cond
+r.wt(:,1:nCond) = s0; % class weight
+if isany(nCondx)
+    r.nx(:,1:nCondx) = uint32(0); end % samples per cross-classification cond
 r.cvLoss(:,1:o.crossval.KFold) = s0; % accuracy per fold
 r.sbjCh(:) = "";
 r.sbjID(:) = n.sbjID;
 r.ch(:) = u0;
 r = movevars(r,"sbjCh",Before=1);
-r = movevars(r,["GroupCount" "Percent"],Before="aucCV");
 
-% Weights to deal with unbalanced classes
+% Find sample counts per training & CC cond
 for t = 1:height(r)
     for c = 1:nCond
-        r.n(t,c) = nnz(a.t==r.t(t) & a.cnd==o.cond(c));
-    end
-end
-r.wt = cast(r.n,o.typeProc);
-r.wt = r.wt ./ min(r.wt,[],2);
-
-% Add weights to analysis template
-for t = 1:height(r)
-    for c = 1:nCond
-        id = a.t==r.t(t) & a.cnd==o.cond(c);
-        a.wt(id) = r.wt(t,c);
+        r.n(t,c) = nnz(a.t==r.t(t) & a.cnd==o.cond(c)); end
+    if any(nCondx)
+        for c = 1:nCondx
+            r.nx(t,c) = nnz(a.t==r.t(t) & a.cnd==o.condx(c)); end
     end
 end
 
-% Finalize
-a = movevars(a,"sbjCh","Before",1);
-a = movevars(a,["ch" "sbjID" "ide"],"After","wt");
-a.Properties.RowNames = {};
+% Weights for unbalanced classes: minority class gets higher weight
+r.wt = max(r.n,[],2) ./ r.n;  % Inverse frequency weighting: max_count / class_count
+r.wt = cast(r.wt,o.typeProc);
 
 
 
@@ -291,10 +290,21 @@ else
     error("Unknown classifier function: "+o.fun);
 end
 
+% Compute cost matrix for unbalanced classes
+costMat = [];
+if ~all(rc.wt(:)==rc.wt(1))
+    costMat = zeros(nCond, nCond);
+    for i = 1:nCond
+        for j = 1:nCond
+            if i ~= j
+                costMat(i,j) = rc.wt(j);  % Penalty for predicting i when true is j
+            end
+        end
+    end
+end
 
 %% Train & optimize
-oo = namedargs2cell(o.hyper);
-mdl = classifier(xc(idt,:),ac.y(idt),oo{:},...
+mdl = classifier(xc(idt,:),ac.y(idt),namedargs2cell(o.hyper),'Cost',costMat,...
     'OptimizeHyperparameters',o.bayes.OptimizeHyperparameters,...
     'HyperparameterOptimizationOptions',o.bayes.HyperparameterOptimizationOptions);
 
@@ -305,15 +315,23 @@ if any(idx)
 end
 
 
-%% Cross-validate
+%% Cross-validate (with stratified CV to handle unbalanced classes)
+
+% Create stratified partition to ensure balanced folds
+cvp = cvpartition(ac.y(idt),namedargs2cell(o.crossval),'Stratify',true);
+
 if o.fun=="fitclinear"
     % For fitclinear: extract optimized hyperparameters and use for CV
     o = extractHyperparams_lfn(mdl,o);
-    oo = horzcat(namedargs2cell(o.hyper),namedargs2cell(o.crossval));
+    oo = horzcat(namedargs2cell(o.hyper));
+    % Add cost matrix if available
+    if ~isempty(costMat)
+        oo = [oo {'Cost', costMat}];
+    end
+    oo = [oo {'CVPartition', cvp}];
     mdlCV = classifier(xc(idt,:),ac.y(idt),oo{:});
 else
-    oo = namedargs2cell(o.crossval);
-    mdlCV = mdl.crossval(oo{:});
+    mdlCV = mdl.crossval(CVPartition=cvp);
 end
 
 % Predict CV data
@@ -321,10 +339,7 @@ end
 
 % Get CV performance
 [rc.auc,aucL,aucU] = auc(rocmetrics(mdlCV,alpha=o.alpha));
-rc.auc1 = mean(rc.auc,"omitmissing");
-rc.auc1_ci = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
-% FIGURE OUT AUC p-value???
-% OR USE f1-score & its p-value??
+
 
 %% Calculate classifier metrics
 ac.acc = ac.pred==ac.y;
@@ -333,6 +348,12 @@ ac.pp1 = diff(ac.pp,1,2);
 % CV accuracy
 rc.acc = mean(ac.acc(idt),1,"omitmissing");
 rc.acc_p = 1 - binocdf(nnz(ac.acc(idt))-1, nnz(idt), 0.5);
+
+% CV balanced accuracy (ROC AUC)
+rc.auc1 = mean(rc.auc,"omitmissing");
+rc.auc1_ci = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
+% figure out AUC p-value???
+% **OR** USE f1-score & its p-value?? (fit to binomial dist?)
 
 % CV posterior probability
 rc.pp = mean(ac.pp(idt),1,"omitmissing");
