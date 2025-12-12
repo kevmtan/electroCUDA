@@ -78,17 +78,12 @@ if isempty(x)
         vars=["n" "x" "chNfo"]);
 end
 if arg.test; xOg = x; end %#ok<NASGU>
-if o.single; x = single; end
-
 
 % Load metadata
 sbjID = n.sbjID;
 nRuns = n.nRuns;
 blocks = string(n.blocks);
 hzOg = floor(n.hz);
-n.task = task;
-n.suffix = o.suffix;
-if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
 
@@ -123,6 +118,7 @@ x = mat2cell(x,n.runIdxOg);
 %% Continuous Wavelet Transform (within-run to avoid edge artifacts)
 cwtHz = cell(nRuns,1);
 for r = 1:nRuns
+    %% CWT on run
     [x{r},cwtHz{r}] = ec_wt(x{r},hz=hzOg,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
     wavelet=o.wavelet,ds=ds,single=o.single,singleOut=o.singleOut,mem=memMax,...
     gpu=o.gpu,tic=tt);
@@ -132,27 +128,15 @@ end
 %% Organize
 x = vertcat(x{:});
 if ~fMean
-    x = flip(x,3); % Sort freqs from low to high
-end
+    x = flip(x,3); end % Sort freqs from low to high
+
+%%
+n.suffix = o.suffix;
 n.xFrames = size(x,1);
 n.xChs = size(x,2);
 n.nFreqs = size(x,3);
 n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
-
-
-%% Robust detrending
-if nnz(o.detrendOrder)
-    [x,n] = ec_detrend(x,n,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,win=o.detrendWin,...
-        missing=o.missingInterp,gpu=o.detrendGPU,single=o.detrendSingle,sfx=sfx);
-end
-
-
-%% High-pass filtering
-if nnz(o.hiPass)
-    [x,n] = ec_HPF(x,n,o.hiPass,tt,missing=o.missingInterp,gpu=o.hiPassGPU,...
-        steepness=o.hiPassSteep);
-end
 
 
 %% Identify bad frames per chan
@@ -170,18 +154,17 @@ if o.doBadFrames && ~arg.ica
     end
 
     % Identify
-    [n.chBad,n.xBad] = ec_findBadFrames(x,chNfo.bad,x_bad,sfx,...
+    [n.chBad,n.xBad] = ec_findBadFrames(x,chNfo.bad,x_bad,...
         mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per chan: "+sbj+" time="+toc(tt));
 elseif o.doBadFrames
-    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,sfx,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per IC: "+sbj+" time="+toc(tt));
 end
 
 
 %% Covariance
-sfx = o.suffix;
-n.("o"+sfx) = o;
+n.("o"+o.suffix) = o;
 if fMean
     if ~arg.ica
         n.chCov = cov(x,'partialrows');
@@ -212,11 +195,11 @@ if arg.save
     end
 
     % Save n struct
-    fn = o.dirOut+"n"+sfx+"_"+o.fnStr;
+    fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr;
     save(fn,"n","-v7"); disp("SAVED: "+fn);
 
     % Save processed iEEG data
-    fn = o.dirOut+"x"+sfx+"_"+o.fnStr;
+    fn = o.dirOut+"x"+o.suffix+"_"+o.fnStr;
     savefast(fn,'x'); disp("SAVED: "+fn+" time="+toc(tt));
 end
 

@@ -148,8 +148,8 @@ end
 
 %% Identify bad frames per IC
 if o.doBadFrames
-    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,...
-        [],sfx1,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,mad=o.thrMAD,diff=o.thrDiff,...
+        sns=o.thrSNS);
     disp("Identified bad frames per IC: "+sbj); toc(tt);
 end
 
