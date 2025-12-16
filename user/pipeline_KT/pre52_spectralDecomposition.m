@@ -17,10 +17,12 @@ task = "MMR"; % task name
 o = struct;
 o.suffix = "s";
 o.sfx_src = "";
+
+o.gpu = "no"; % Run on... ["no"|"matlab"|"cuda"]
 o.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
-o.gpu = "no"; % Run on... ["no"|"matlab"|"cuda"]
+o.lpfSteep = 0.85;
 
 % Wavelet coherence
 o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
@@ -28,14 +30,7 @@ o.fName = "spec"; % Name of frequency analysis
 o.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
 o.fMean = false; % Collapse across frequency bands (for 1d vector output)
 o.fVoices = 10; % Voices per octave (default=10, HFB=18)
-o.fOut = "magnitude";
-
-% Frequency bands
-o.freqIdx = []; %[1 14 20:4:83];
-o.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb" "hfb2" "lfp"]; % Band name
-o.bands2 = ["Delta (1-4hz)" "Theta (4-8hz)" "Alpha (8-13hz)" "Beta (13-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-180hz)" "HFB+ (180-300hz)" "LFP (ERP)"]; % Band display name
-o.bandsF = [1 4; 4 8; 8 13; 13 30; 30 60; 60 180; 180 301; 0 0]; % Band limits
+o.fOut = "decibel";
 
 % Other
 o.doBadFrames = false;

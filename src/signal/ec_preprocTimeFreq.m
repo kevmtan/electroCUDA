@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,task,o,n,x,arg)
+function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,task,o,arg)
 %% electroCUDA: time-frequency decomposition
 % This function performs time-frequency decomposition on channel or IC timecourses
 % (output of 'ec_preproc' or 'ec_preprocICA'). Decomposition is performed via
@@ -45,8 +45,8 @@ arguments
     proj string
     task string
     o struct = struct % options struct (see "Options struct validation" below)
-    n struct = [] % preloaded 'n' struct from ec_preproc (OPTIONAL)
-    x (:,:) {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
+    % n struct = [] % preloaded 'n' struct from ec_preproc (OPTIONAL)
+    % x (:,:) {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
     arg.dirs struct = [] % Directory paths struct
     arg.ica (1,1) logical = false
     arg.raw (1,1) logical = false
@@ -70,10 +70,8 @@ end
 tt=tic; errors={};
 
 % Load EEG data
-if isempty(x)
-    [n,x,chNfo,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
-        vars=["n" "x" "chNfo"]);
-end
+[n,x,chNfo,psy,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
+    vars=["n" "x" "chNfo" "psy"]);
 if arg.test; xOg = x; end %#ok<NASGU>
 
 % Load metadata
@@ -104,7 +102,6 @@ if ds && o.gpu~="cuda"
     % Get single-channel/freq timeseries from longest run
     [~,idx] = min(n.runIdxOg);
     xTmp = x(psy.run==n.runs(idx),1,1);
-    if o.gpu; xTmp = gpuArray(xTmp); end
 
     % Make AA LPF
     lpfFilt = ec_designFilt(xTmp,n.hz,floor(o.hzTarget/2),"lowpass",...
@@ -131,7 +128,7 @@ for r = 1:nRuns
     %% CWT on run
     [x{r},cwtHz{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
         wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
-        mem=memMax,gpu=o.gpu,tic=tt);
+        mem=memMax,gpu=o.gpu);
     disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+blocks(r)+" time="+toc(tt));
 end
 
@@ -147,6 +144,8 @@ n.xChs = size(x,2);
 n.nFreqs = size(x,3);
 n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
+n.("o"+o.suffix) = o;
+n.spectOpts = o;
 
 
 %% Identify bad frames per chan
@@ -175,7 +174,6 @@ end
 
 
 %% Covariance
-n.("o"+o.suffix) = o;
 if o.fMean
     if ~arg.ica
         n.chCov = cov(x,'partialrows');

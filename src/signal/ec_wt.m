@@ -18,7 +18,7 @@ arguments
     a.voices (1,1) double = 10        % Voices per octave
     a.avg (1,1) logical = false       % Scale-average transform?
     a.out (1,1) string...             % Output coefficient type
-        {mustBeMember(a.out,["magnitude" "power" "complex"])} = "magnitude"
+        {mustBeMember(a.out,["decibel" "magnitude" "power" "complex"])} = "decibel"
     a.wavelet (1,1) string...         % Wavelet type ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
         {mustBeMember(a.wavelet,["morse" "amor" "bump"])} = "morse"
     a.ds (1,1) double = 0             % Downsampling factor (see https://www.mathworks.com/help/signal/ref/downsample.html)
@@ -47,6 +47,7 @@ end
 
 % Make logical arguments
 if a.out=="complex"; a.real=false; else; a.real=true; end
+if a.out=="decibel"; a.db=true; else; a.db=false; end
 if a.out=="power"; a.pwr=true; else; a.pwr=false; end
 
 % Generate wavelet
@@ -57,7 +58,7 @@ scales = fb.scales; % CWT scales
 if a.ds; scales = scales.*a.ds; end % Downsample scales
 
 % Make anti-aliasing LPF filter for downsampling (Nyquist freq)
-if ds && a.gpu~="cuda" && isempty(a.lpfFilt)
+if a.ds && a.gpu~="cuda" && isempty(a.lpfFilt)
     a.lpfFilt = ec_designFilt(x,a.hz,floor((a.hz/ds)/2),"lowpass",...
         steepness=op.lpfSteep,impulse="fir",coefOut=true);
     disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
@@ -130,8 +131,8 @@ chFin = false(nChs,1);
 disp("[ec_wt] Start GPU arrayFun: memChs="+memChs+"/"+nChs+" time="+toc(a.tic));
 
 % Copy to GPU
-fAvg=gpuArray(a.avg); fReal=gpuArray(a.real); fPwr=gpuArray(a.pwr); 
-ds=gpuArray(a.ds); lpf=gpuArray(a.lpf); sOut=gpuArray(a.singleOut);
+fAvg=gpuArray(a.avg); fReal=gpuArray(a.real); fPwr=gpuArray(a.pwr); fDb=gpuArray(a.db);
+ds=gpuArray(a.ds); lpf=gpuArray(a.lpfFilt); sOut=gpuArray(a.singleOut);
 
 %% Loop gpuArrayFun iterations (simultaneous chans that fit in VRAM)
 for v = 1:memItr
@@ -140,7 +141,7 @@ for v = 1:memItr
     x(idx) = cellfun(@gpuArray,x(idx),UniformOutput=false); % Copy data to GPU
 
     % Run CWT
-    x(idx) = cellfun(@(xi) cwt_lfn(fb,xi,fAvg,fReal,fPwr,ds,lpf,sOut),...
+    x(idx) = cellfun(@(xi) cwt_lfn(fb,xi,fAvg,fReal,fDb,fPwr,ds,lpf,sOut),...
         x(idx),UniformOutput=false);
 
     % Move data to CPU
@@ -156,13 +157,13 @@ disp("[ec_wt] Finished GPU arrayfun: time="+toc(a.tic));
 % Run on CPU %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function x = cpu_lfn(fb,x,a)
 % Extract struct fields
-fAvg=a.avg; fReal=a.real; fPwr=a.pwr; ds=a.ds; lpf=a.lpf; sOut=a.singleOut;
+fAvg=a.avg; fReal=a.real; fPwr=a.pwr; fDb=a.db; ds=a.ds; lpf=a.lpfFilt; sOut=a.singleOut;
 nChs = numel(x); % Num chans
 
 % Parallel loop across chans
 parfor ch = 1:nChs
     %% Run CWT for chan
-    x{ch} = cwt_lfn(fb,x{ch},fAvg,fReal,fPwr,ds,lpf,sOut);
+    x{ch} = cwt_lfn(fb,x{ch},fAvg,fReal,fDb,fPwr,ds,lpf,sOut);
 end
 disp("[ec_wt] Finished CPU parfor: time="+toc(a.tic));
 
@@ -170,7 +171,7 @@ disp("[ec_wt] Finished CPU parfor: time="+toc(a.tic));
 
 
 % Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xc = cwt_lfn(fb,xc,fAvg,fReal,fPwr,ds,lpf,sOut)
+function xc = cwt_lfn(fb,xc,fAvg,fReal,fDb,fPwr,ds,lpf,sOut)
 if fAvg % Scale-averaged output
     if fPwr
         xc = fb.scaleSpectrum(xc)'; % Power
@@ -181,17 +182,21 @@ else    % Full-spectrum output
     xc = fb.wt(xc)';
 end
 
-%% Downsample
-if ds
-    xc = ec_filtfilt(xc,lpf); % apply anti-aliasing filter
-    xc = xc(1:ds:end,:); % decimate
-end
 
 %% Convert
 if ~fAvg && fReal
     xc = abs(xc); % magnitude (amplitude)
     if fPwr
         xc = xc.^2; end % power
+end
+if fDb
+    xc = mag2db(xc);
+end
+
+%% Downsample
+if ds
+    xc = ec_filtfilt(xc,lpf); % apply anti-aliasing filter
+    xc = xc(1:ds:end,:); % decimate
 end
 
 % Convert to single
