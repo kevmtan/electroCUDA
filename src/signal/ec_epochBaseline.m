@@ -1,5 +1,5 @@
 function [x,n,trs] = ec_epochBaseline(x,n,psy,ep,tt,op)
-% electroCUDA function for preprocessing, epoching & baseline correction
+% Analysis-specific preprocessing, epoching & baseline correction
 %   Kevin Tan (2025) | github.com/kevmtan/electroCUDA
 %
 % Inputs: see next section
@@ -21,8 +21,9 @@ arguments
     op.typeOut (1,1) string = class(x)          % output FP precision ("double"|"single"|""=same as input)
     op.hzTarget (1,1) double = nan              % Target sampling rate
     % Within-run preprocessing
-    op.log (1,1) logical = false;               % Log transform
     op.runNorm string = "zscore";               % Normalize run
+    op.log (1,1) logical = false;               % Log transform
+    op.mag2db (1,1) logical = false;            % Spectral magnitude to decibel
     % Within-trial preprocessing (baseline correction)
     %   Epoch baseline period (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
     op.baselinePre {mustBeFloat} = []            % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
@@ -163,6 +164,8 @@ if isany(op.hpf) || isany(op.lpf)
     end
 end
 
+%% All-chan processing
+
 % Remove bad frames
 if isany(op.badFields)
     for f = 1:numel(op.badFields)
@@ -185,6 +188,15 @@ if isany(op.badFields)
         end
     end
     disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
+end
+
+% Log-transform
+if op.log || op.mag2db
+    idNeg = x<0;
+    if any(idNeg,"all")
+        warning("[ec_preprocBaseline] Negative values found in 'x' ("+...
+            (nnz(idNeg)/numel(x))*100+"%). Converting to nans for log-transform & interpolating");
+    end
 end
 
 % Transform to cell by channel
@@ -256,10 +268,23 @@ xc = cast(xc,op.typeProc);
 if op.gpu
     xc = gpuArray(xc); end
 
+% Log-transform
+if op.log || op.mag2db
+    % Find negative numbers & convert to nan
+    idNeg = xc<0;
+    xc(idNeg) = nan;
+
+    if op.mag2db
+        xc = mag2db(xc); % Magnitude to decible 
+    elseif op.log
+        xc = log(xc); % Natural log
+    end
+end
+
 % Reshape per run
 xc = mat2cell(xc,n.runIdxOg);
 
-% Processing within-run (HPF, norm, outliers, PCA, LPF)
+% Processing within-run (z-score, outliers, spectral processing, etc)
 for r = 1:n.nRuns
     xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,ds,n,op);
 end
@@ -295,10 +320,6 @@ xc = cast(xc,op.typeOut);
 
 function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,n,op)
 %% Compute within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Log transform
-if op.log
-    xr = log(xr); end
 
 % Z-score
 if op.runNorm=="robust"
