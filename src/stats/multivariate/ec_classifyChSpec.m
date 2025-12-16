@@ -15,16 +15,18 @@ end
 
 
 %% Preprocessing
-[x,a,s,n,tt] = prep_lfn(o);
-% x = EEG data
+tt = tic; % start timer
+[x,ep,n,o] = preproc_lfn(o,tt); % analysis-specific preprocessing
+
+
+%% Make classifier templates
+[a,r] = makeTemplates_lfn(n,ep,o,tt);
 % a = analysis template
 % r = results & statistics template
-% n = subject info
-% tt = timer
 
 
 %% Classification
-[stats,obs] = classify_lfn(x,a,s,n,o,tt);
+[stats,obs] = classify_lfn(x,a,r,n,o,tt);
 % stats = classification statistics per channel & timebin
 % obs = classification of observations
 
@@ -33,16 +35,20 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%% Preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [x,a,r,n,tt] = prep_lfn(o)
-%% Initialize
-tt = tic;
-if o.test; disp("[ec_classifyChSpec] TESTING: "+o.dirs.sbj); end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Prep %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+% Preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,ep,n,o] = preproc_lfn(o,tt)
 
 % Load data 
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
-if o.test && numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU> % Copy origs for testing
+if numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU> % Copy origs for testing
 disp("[ec_classifyChSpec] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
 
 % Channel/IC info
@@ -60,7 +66,7 @@ x(:,chBad,:) = [];
 n.chNfo(chBad,:) = [];
 
 
-%% Analysis template
+%% Behavioral / recording metadata
 
 % Epoch psych/behav task data
 oo = namedargs2cell(o.epoch);
@@ -85,7 +91,13 @@ o.n = n;
 o.spect = n.spect;
 
 
-%% Organize data for classifier
+
+
+
+
+% Make templates for classifier %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [a,r] = makeTemplates_lfn(n,ep,o,tt)
+% Prep
 u0 = cast(0,like=n.chNfo.ch); % integer type
 s0 = cast(nan,o.typeProc); % float type
 nCond = numel(o.cond);
@@ -95,7 +107,8 @@ nCondx = numel(o.condx);
 psyVars = ismember(ep.Properties.VariableNames,...
     ["run" "tr" "cnd" "t" "sbjID" "ide" o.psyVars]);
 
-% Make analysis template
+
+%% Make analysis template
 a = ep(:,psyVars);
 a.y = categorical(a.cnd,o.cond,Ordinal=true); % class (e.g. condition)
 a.pred(:) = categorical("",o.cond,Ordinal=true); % predicted class
@@ -106,10 +119,11 @@ a.ch(:) = u0;
 a.sbjCh(:) = "";
 % Organize analysis template
 a = movevars(a,"sbjCh","Before",1);
-a = movevars(a,["ch" "sbjID" "ide"],"After","wt");
+a = movevars(a,["ch" "sbjID" "ide"],"After","acc");
 a.Properties.RowNames = {};
 
-% Make stats template
+
+%% Make stats template
 r = table;
 r.t = unique(a.t,"stable");
 r.acc(:) = s0; % Cross-validation (CV) mean accuracy
@@ -132,7 +146,7 @@ if any(nCondx)
     r.ppx1_p(:) = s0;
     r.ppx1_q(:) = s0;
 end
-r.n(:,1:nCond) = uint32(0); % samples per training cond
+r.n(:,1:nCond) = double(nan); % samples per training cond
 r.wt(:,1:nCond) = s0; % class weight
 if isany(nCondx)
     r.nx(:,1:nCondx) = uint32(0); end % samples per cross-classification cond
@@ -141,6 +155,9 @@ r.sbjCh(:) = "";
 r.sbjID(:) = n.sbjID;
 r.ch(:) = u0;
 r = movevars(r,"sbjCh",Before=1);
+
+
+%% Deal with unbalanced classes
 
 % Find sample counts per training & CC cond
 for t = 1:height(r)
@@ -155,6 +172,9 @@ end
 % Weights for unbalanced classes: minority class gets higher weight
 r.wt = max(r.n,[],2) ./ r.n;  % Inverse frequency weighting: max_count / class_count
 r.wt = cast(r.wt,o.typeProc);
+r.n = uint32(r.n);
+
+disp("[ec_classifyChSpec] Made classifier templates: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
 
@@ -168,28 +188,38 @@ r.wt = cast(r.wt,o.typeProc);
 
 
 
-% Call classification functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [stats,obs] = classify_lfn(x,a,r,n,o,tt)
 chs = n.chNfo.ch;
 sbjChs = n.chNfo.sbjCh;
-if numel(dbstack)<2; x1=x; r1=r; end %#ok<NASGU> % Copy unshaped for testing
+chsN = numel(chs);
+%a = arrayfun(@(b) a(a.t==b,:), r.t, UniformOutput=false);
 
-% Reshape data by timebins
-x = arrayfun(@(b) x(a.t==b,:,:), r.t, UniformOutput=false);
-a = arrayfun(@(b) a(a.t==b,:), r.t, UniformOutput=false);
+% Get classifier function handle
+if o.fun=="fitcsvm"
+    classif = @fitcsvm;
+elseif o.fun=="fitclinear"
+    classif = @fitclinear;
+elseif o.fun=="fitcdiscr"
+    classif = @fitcdiscr;
+elseif o.fun=="fitcknn"
+    classif = @fitcknn;
+else
+    error("Unknown classifier function: "+o.fun);
+end
 
 % Preallocate
-stats = cell(height(r),1);
+stats = cell(chsN,1);
 obs = stats;
 
 %% Compute across timebins
 if o.gpu
-    for t = 1:height(r)
-        [stats{t},obs{t}] = classifyTime_lfn(x{t},a{t},r(t,:),chs,sbjChs,o,tt);
+    for c = 1:chsN
+        [stats{c},obs{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chs(c),sbjChs(c),tt);
     end
 else
-    parfor t = 1:height(r)
-        [stats{t},obs{t}] = classifyTime_lfn(x{t},a{t},r(t,:),chs,sbjChs,o,tt);
+    parfor c = 1:chsN
+        [stats{c},obs{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chs(c),sbjChs(c),tt);
     end
 end
 
@@ -208,32 +238,32 @@ disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
 
 
 
-% Compute within timebin %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rs,ra] = classifyTime_lfn(xt,at,rt,chs,sbjChs,o,tt)
-% t=25; xt=x{t}; at=a{t}; rt=r(t,:);
-nChs = numel(chs);
-rs = cell(nChs,1); ra=rs; % Preallocate
+% Compute within channel/IC/source %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [rc,ac] = classifyCh_lfn(xc,ac,rc,o,classif,ch,sbjCh,tt)
+% c=92; xc=x(:,c,:); ac=a; rc=r; ch=chs(c); sbjCh=sbjChs(c);
+xc = squeeze(xc);
+ac.ch(:)=ch; rc.ch(:)=ch;
+ac.sbjCh(:)=sbjCh; rc.sbjCh(:)=sbjCh;
 
 % Move to gpu
 if o.gpu
-    xt = gpuArray(xt); end
+    xc = gpuArray(xc); end
 
 %% Loop across channels/ICs
-for ch = cast(1:nChs,like=xt)
-    [rs{ch},ra{ch}] = preClassifier_lfn(xt(:,ch,:),at,rt,o,chs(ch),sbjChs(ch));
-    if ~o.gpu && ~rem(ch,20)
-       disp("[ec_classifyChSpec] Ran "+o.fun+" "+sbjChs(ch)+" "+o.timeVar+"="+rt.t+" toc="+toc(tt));
-    end
+for t = 1:height(rc)
+    % Indices for timepoint
+    id = ac.t==rc.t(t);
+
+    % Compute within timepoint
+    [rc(t,:),ac(id,:)] = classifyTime_lfn(xc(id,:),ac(id,:),rc(t,:),classif,o);
 end
 
 %% Finalize
-rs = vertcat(rs{:});
-ra = vertcat(ra{:});
 if o.gpu
-    rs = convertvars(rs,@isgpuarray,@gather);
-    ra = convertvars(ra,@isgpuarray,@gather);
+    rc = convertvars(rc,@isgpuarray,@gather);
+    ac = convertvars(ac,@isgpuarray,@gather);
 end
-disp("[ec_classifyChSpec] Finished "+o.fun+" classifier: s"+o.sbjID+" "+o.timeVar+"="+rt.t+" toc="+toc(tt));
+disp("[ec_classifyChSpec] Finished "+o.fun+": "+sbjCh+" toc="+toc(tt));
 
 
 
@@ -241,32 +271,27 @@ disp("[ec_classifyChSpec] Finished "+o.fun+" classifier: s"+o.sbjID+" "+o.timeVa
 
 
 % Compute within channel/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rc,ac] = preClassifier_lfn(xc,ac,rc,o,ch,sbjCh)
-% c=92; xc=xt(:,c,:); ac=at; rc=rt; ch=chs(c); sbjCh=sbjChs(c);
-xc = squeeze(xc);
-rc.ch=ch; rc.sbjCh=sbjCh; ac.ch(:)=ch; ac.sbjCh(:)=sbjCh;
+function [rct,act] = classifyTime_lfn(xct,act,rct,classif,o)
+% t=29; id=ac.t==rc.t(t); xct=xc(id,:); act=ac(id,:); rct=rc(t,:);
 
 % Outlier detection (all data)
 if o.olThrAll
-    xc = filloutliers(xc,o.olFill,o.ol,1,ThresholdFactor=o.olThrAll);
+    xct = filloutliers(xct,o.olFill,o.ol,1,ThresholdFactor=o.olThrAll);
 end
 
 % Outlier detection (within-condition)
-for c = unique(ac.cnd)'
-    id = ac.cnd==c;
-    xc(id,:) = filloutliers(xc(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
+for c = unique(act.cnd)'
+    id = act.cnd==c;
+    xct(id,:) = filloutliers(xct(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
 end
 
 % PCA
 if o.pca
-    [~,xc] = pca(xc,NumComponents=o.pca,Economy=false); end
+    [~,xct] = pca(xct,NumComponents=o.pca,Economy=false); end
 
-% Standardize data
-if o.std
-    xc = normalize(xc,1,"zscore"); end 
 
 %% Run classifier algorithm
-[rc,ac] = runClassifier_lfn(xc,ac,rc,o);
+[rct,act] = runClassifier_lfn(xct,act,rct,classif,o);
 
 
 
@@ -274,52 +299,41 @@ if o.std
 
 
 % Run classifier (unified) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rc,ac] = runClassifier_lfn(xc,ac,rc,o)
+function [rct,act] = runClassifier_lfn(xct,act,rct,classif,o)
 % Get training indices
-idt = ismember(ac.cnd,o.cond);
-idx = ismember(ac.cnd,o.condx);
+idt = ismember(act.cnd,o.cond);
+idx = ismember(act.cnd,o.condx);
+nCond = numel(o.cond);
 
-% Get classifier function handle
-if o.fun=="fitcsvm"
-    classifier = @fitcsvm;
-elseif o.fun=="fitclinear"
-    classifier = @fitclinear;
-elseif o.fun=="fitcknn"
-    classifier = @fitcknn;
-else
-    error("Unknown classifier function: "+o.fun);
-end
-
-% Compute cost matrix for unbalanced classes
-costMat = [];
-if ~all(rc.wt(:)==rc.wt(1))
-    costMat = zeros(nCond, nCond);
-    for i = 1:nCond
-        for j = 1:nCond
-            if i ~= j
-                costMat(i,j) = rc.wt(j);  % Penalty for predicting i when true is j
-            end
+% Create cost matrix for unbalanced classes
+costMat = zeros(nCond,nCond);
+for i = 1:nCond
+    for j = 1:nCond
+        if i ~= j
+            costMat(i,j) = rct.wt(j);  % Penalty for predicting i when true is j
         end
     end
 end
 
+% Create stratified partition to ensure balanced folds
+cvp = cvpartition(act.y(idt),KFold=o.crossval.KFold,Stratify=true); % GroupingVariable=at.tr(idt)
+o.bayes.HyperparameterOptimizationOptions.CVPartition = cvp;
+
+
 %% Train & optimize
-mdl = classifier(xc(idt,:),ac.y(idt),namedargs2cell(o.hyper),'Cost',costMat,...
+oo = namedargs2cell(o.hyper);
+mdl = classif(xct(idt,:),act.y(idt),oo{:},'Cost',costMat,...
     'OptimizeHyperparameters',o.bayes.OptimizeHyperparameters,...
     'HyperparameterOptimizationOptions',o.bayes.HyperparameterOptimizationOptions);
 
 
 %% Cross-classify 
 if any(idx)
-    [ac.pred(idx),ac.pp(idx,:)] = mdl.predict(xc(idx,:));
+    [act.pred(idx),act.pp(idx,:)] = mdl.predict(xct(idx,:));
 end
 
 
 %% Cross-validate (with stratified CV to handle unbalanced classes)
-
-% Create stratified partition to ensure balanced folds
-cvp = cvpartition(ac.y(idt),namedargs2cell(o.crossval),'Stratify',true);
-
 if o.fun=="fitclinear"
     % For fitclinear: extract optimized hyperparameters and use for CV
     o = extractHyperparams_lfn(mdl,o);
@@ -329,44 +343,44 @@ if o.fun=="fitclinear"
         oo = [oo {'Cost', costMat}];
     end
     oo = [oo {'CVPartition', cvp}];
-    mdlCV = classifier(xc(idt,:),ac.y(idt),oo{:});
+    mdlCV = classif(xct(idt,:),act.y(idt),oo{:});
 else
     mdlCV = mdl.crossval(CVPartition=cvp);
 end
 
 % Predict CV data
-[ac.pred(idt),ac.pp(idt,:)] = mdlCV.kfoldPredict;
+[act.pred(idt),act.pp(idt,:)] = mdlCV.kfoldPredict;
 
 % Get CV performance
-[rc.auc,aucL,aucU] = auc(rocmetrics(mdlCV,alpha=o.alpha));
+[rct.auc,aucL,aucU] = auc(rocmetrics(mdlCV,alpha=o.alpha));
 
 
 %% Calculate classifier metrics
-ac.acc = ac.pred==ac.y;
-ac.pp1 = diff(ac.pp,1,2);
+act.acc = act.pred==act.y;
+act.pp1 = diff(act.pp,1,2);
 
 % CV accuracy
-rc.acc = mean(ac.acc(idt),1,"omitmissing");
-rc.acc_p = 1 - binocdf(nnz(ac.acc(idt))-1, nnz(idt), 0.5);
+rct.acc = mean(act.acc(idt),1,"omitmissing");
+rct.acc_p = 1 - binocdf(nnz(act.acc(idt))-1, nnz(idt), 0.5);
 
 % CV balanced accuracy (ROC AUC)
-rc.auc1 = mean(rc.auc,"omitmissing");
-rc.auc1_ci = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
+rct.auc1 = mean(rct.auc,"omitmissing");
+rct.auc1_ci = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
 % figure out AUC p-value???
 % **OR** USE f1-score & its p-value?? (fit to binomial dist?)
 
 % CV posterior probability
-rc.pp = mean(ac.pp(idt),1,"omitmissing");
-rc.pp1 = mean(ac.pp1(idt),1,"omitmissing");
-rc.pp1_SD = std(ac.pp1(idt),1,1,"omitmissing");
-[~,rc.pp1_p] = ttest(ac.pp1(idt));
+rct.pp = mean(act.pp(idt),1,"omitmissing");
+rct.pp1 = mean(act.pp1(idt),1,"omitmissing");
+rct.pp1_SD = std(act.pp1(idt),1,1,"omitmissing");
+[~,rct.pp1_p] = ttest(act.pp1(idt));
 
 % CC posterior probability
 if any(idx)
-    rc.ppx = mean(ac.pp(idx),1,"omitmissing");
-    rc.ppx1 = mean(ac.pp1(idx),1,"omitmissing");
-    rc.ppx1_SD = std(ac.ppa(idx),1,1,"omitmissing");
-    [~,rc.ppx1_p] = ttest(ac.pp1(idx));
+    rct.ppx = mean(act.pp(idx),1,"omitmissing");
+    rct.ppx1 = mean(act.pp1(idx),1,"omitmissing");
+    rct.ppx1_SD = std(act.ppa(idx),1,1,"omitmissing");
+    [~,rct.ppx1_p] = ttest(act.pp1(idx));
 end
 
 

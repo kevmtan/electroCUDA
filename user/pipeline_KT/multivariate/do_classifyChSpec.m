@@ -43,14 +43,14 @@ o.fdrTimeRng = [0 inf]; % Range of times for FDR
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
 
 % Classifier basic options
-o.fun = "fitclinear"; % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
+o.fun = "fitcdiscr"; % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
 o.minN = 15; % minimum observations per sample per contrast per chan
 o.ol = "median"; % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
 o.olFill = "clip"; % Outlier fill method
 o.olThrAll = 7.5; % Outlier threshold (all observations)
 o.olThrCond = 5; % Outlier threshold (within-condition)
 o.pca = 0; % Number of spectral PCA components (0 = no PCA)
-o.std = ""; % Standardize predictors (z-score)
+%o.std = ""; % Standardize predictors (z-score)
 
 % Classifier hyperparameters
 if o.fun == "fitcsvm"
@@ -58,7 +58,7 @@ if o.fun == "fitcsvm"
     o.hyper.KernelFunction = "linear";
     o.hyper.BoxConstraint = 1;
     o.hyper.KernelScale = "auto";
-    o.hyper.Prior = "empirical";
+    %o.hyper.Prior = "empirical";
     o.hyper.Standardize = false;
     o.hyper.Solver = "SMO";
     o.hyper.CacheSize = "maximal";
@@ -74,12 +74,14 @@ elseif o.fun == "fitclinear"
     o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
+elseif o.fun == "fitcdiscr"
+    o.hyper.DiscrimType = "linear";
 elseif o.fun == "fitcknn"
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
     o.hyper.Distance = "euclidean";
     o.hyper.NumNeighbors = 25;
     o.hyper.DistanceWeight = "inverse";
-    o.hyper.Prior = "empirical";
+   % o.hyper.Prior = "empirical";
     o.hyper.std = true;
     % o.hyper.ScoreTransform = "invlogit";
 end
@@ -90,11 +92,13 @@ o.crossval.KFold = 10;
 
 % Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
 if o.fun == "fitcsvm"
-    o.bayes.OptimizeHyperparameters = "BoxConstraint"; % "KernelScale" 
+    o.bayes.OptimizeHyperparameters = "BoxConstraint"; % "KernelScale"
 elseif o.fun == "fitclinear"
     o.bayes.OptimizeHyperparameters = "Lambda"; % "Learner"
+elseif o.fun == "fitcdiscr"
+    o.bayes.OptimizeHyperparameters = "Delta"; % "Gamma"
 elseif o.fun == "fitcknn"
-    o.bayes.OptimizeHyperparameters = ["Distance" "NumNeighbors"]; 
+    o.bayes.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
 o.bayes.HyperparameterOptimizationOptions =...
     struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
@@ -128,7 +132,8 @@ o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
-o.pre.log = true; % Log transform
+o.pre.log = false; % Log transform
+o.pre.mag2db = true; % Log-transform magnitude to decibel
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
