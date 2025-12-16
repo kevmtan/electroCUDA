@@ -10,9 +10,10 @@ end
 
 %% Main
 sz = size(x);
+
 if dim==2 && length(sz)<=3
     y = cell(1,sz(2));
-    parfor c = 1:sz(2)
+    for c = 1:sz(2)
         y{c} = squeeze(x(:,c,:));
     end
 else
