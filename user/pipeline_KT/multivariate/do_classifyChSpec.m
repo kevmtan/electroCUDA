@@ -48,7 +48,7 @@ o.minN = 15; % minimum observations per sample per contrast per chan
 o.ol = "median"; % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
 o.olFill = "clip"; % Outlier fill method
 o.olThrAll = 7.5; % Outlier threshold (all observations)
-o.olThrCond = 5; % Outlier threshold (within-condition)
+o.olThrCond = 3; % Outlier threshold (within-condition)
 o.pca = 0; % Number of spectral PCA components (0 = no PCA)
 %o.std = ""; % Standardize predictors (z-score)
 
@@ -92,11 +92,11 @@ o.crossval.KFold = 10;
 
 % Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
 if o.fun == "fitcsvm"
-    o.bayes.OptimizeHyperparameters = "BoxConstraint"; % "KernelScale"
+    o.bayes.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
 elseif o.fun == "fitclinear"
-    o.bayes.OptimizeHyperparameters = "Lambda"; % "Learner"
+    o.bayes.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif o.fun == "fitcdiscr"
-    o.bayes.OptimizeHyperparameters = "Delta"; % "Gamma"
+    o.bayes.OptimizeHyperparameters = ["Gamma" "Delta"]; % "Gamma" "Delta"
 elseif o.fun == "fitcknn"
     o.bayes.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
@@ -135,7 +135,7 @@ o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
 o.pre.mag2db = true; % Log-transform magnitude to decibel
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers

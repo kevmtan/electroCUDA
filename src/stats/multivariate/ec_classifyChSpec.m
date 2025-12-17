@@ -150,7 +150,8 @@ r.n(:,1:nCond) = double(nan); % samples per training cond
 r.wt(:,1:nCond) = s0; % class weight
 if isany(nCondx)
     r.nx(:,1:nCondx) = uint32(0); end % samples per cross-classification cond
-r.cvLoss(:,1:o.crossval.KFold) = s0; % accuracy per fold
+r.cost = cell(height(r),1);
+r.loss(:) = s0; % average loss per fold CV
 r.sbjCh(:) = "";
 r.sbjID(:) = n.sbjID;
 r.ch(:) = u0;
@@ -169,11 +170,25 @@ for t = 1:height(r)
     end
 end
 
-% Weights for unbalanced classes: minority class gets higher weight
-r.wt = max(r.n,[],2) ./ r.n;  % Inverse frequency weighting: max_count / class_count
+% Cost matrix weights: minority class gets higher weight
+r.wt = max(r.n,[],2) ./ r.n;  % inverse frequency weighting: max_count / class_count
 r.wt = cast(r.wt,o.typeProc);
 r.n = uint32(r.n);
 
+% Create cost matrix for unbalanced classes
+for t = 1:height(r)
+    costMat = zeros(nCond,nCond);
+    for i = 1:nCond
+        for j = 1:nCond
+            if i ~= j
+                costMat(i,j) = r.wt(t,j);  % Penalty for predicting i when true is j
+            end
+        end
+    end
+    r.cost{t} = costMat;
+end
+
+%a = arrayfun(@(b) a(a.t==b,:), r.t, UniformOutput=false);
 disp("[ec_classifyChSpec] Made classifier templates: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
@@ -190,10 +205,8 @@ disp("[ec_classifyChSpec] Made classifier templates: "+o.dirs.sbj+" | toc="+toc(
 
 % Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [stats,obs] = classify_lfn(x,a,r,n,o,tt)
-chs = n.chNfo.ch;
-sbjChs = n.chNfo.sbjCh;
-chsN = numel(chs);
-%a = arrayfun(@(b) a(a.t==b,:), r.t, UniformOutput=false);
+chNfo = n.chNfo(:,["ch" "sbjCh"]);
+chsN = height(chNfo);
 
 % Get classifier function handle
 if o.fun=="fitcsvm"
@@ -215,11 +228,11 @@ obs = stats;
 %% Compute across timebins
 if o.gpu
     for c = 1:chsN
-        [stats{c},obs{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chs(c),sbjChs(c),tt);
+        [obs{c},stats{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chNfo(c,:),tt);
     end
 else
     parfor c = 1:chsN
-        [stats{c},obs{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chs(c),sbjChs(c),tt);
+        [obs{c},stats{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chNfo(c,:),tt);
     end
 end
 
@@ -239,24 +252,26 @@ disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
 
 
 % Compute within channel/IC/source %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rc,ac] = classifyCh_lfn(xc,ac,rc,o,classif,ch,sbjCh,tt)
-% c=92; xc=x(:,c,:); ac=a; rc=r; ch=chs(c); sbjCh=sbjChs(c);
+function [rc,ac] = classifyCh_lfn(xc,ac,rc,o,classif,cNfo,tt)
+% c=92; xc=x(:,c,:); ac=a; rc=r; cNfo=chNfo(c,:);
 xc = squeeze(xc);
-ac.ch(:)=ch; rc.ch(:)=ch;
-ac.sbjCh(:)=sbjCh; rc.sbjCh(:)=sbjCh;
+ac.ch(:)=cNfo.ch; rc.ch(:)=cNfo.ch;
+ac.sbjCh(:)=cNfo.sbjCh; rc.sbjCh(:)=cNfo.sbjCh;
 
 % Move to gpu
 if o.gpu
     xc = gpuArray(xc); end
 
 %% Loop across channels/ICs
+tic;
 for t = 1:height(rc)
     % Indices for timepoint
     id = ac.t==rc.t(t);
 
     % Compute within timepoint
-    [rc(t,:),ac(id,:)] = classifyTime_lfn(xc(id,:),ac(id,:),rc(t,:),classif,o);
+    [ac(id,:),rc(t,:)] = classifyTime_lfn(xc(id,:),ac(id,:),rc(t,:),classif,o);
 end
+toc;
 
 %% Finalize
 if o.gpu
@@ -271,8 +286,8 @@ disp("[ec_classifyChSpec] Finished "+o.fun+": "+sbjCh+" toc="+toc(tt));
 
 
 % Compute within channel/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rct,act] = classifyTime_lfn(xct,act,rct,classif,o)
-% t=29; id=ac.t==rc.t(t); xct=xc(id,:); act=ac(id,:); rct=rc(t,:);
+function [act,rct] = classifyTime_lfn(xct,act,rct,classif,o)
+% t=35; id=ac.t==rc.t(t); xct=xc(id,:); act=ac(id,:); rct=rc(t,:);
 
 % Outlier detection (all data)
 if o.olThrAll
@@ -283,6 +298,7 @@ end
 for c = unique(act.cnd)'
     id = act.cnd==c;
     xct(id,:) = filloutliers(xct(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
+    %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
 end
 
 % PCA
@@ -291,38 +307,27 @@ if o.pca
 
 
 %% Run classifier algorithm
-[rct,act] = runClassifier_lfn(xct,act,rct,classif,o);
+[act,rct] = runClassifier_lfn(xct,act,rct,classif,o);
 
 
 
 
 
 
-% Run classifier (unified) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rct,act] = runClassifier_lfn(xct,act,rct,classif,o)
+% Run classifier (unified) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [act,rct] = runClassifier_lfn(xct,act,rct,classif,o)
 % Get training indices
 idt = ismember(act.cnd,o.cond);
 idx = ismember(act.cnd,o.condx);
-nCond = numel(o.cond);
-
-% Create cost matrix for unbalanced classes
-costMat = zeros(nCond,nCond);
-for i = 1:nCond
-    for j = 1:nCond
-        if i ~= j
-            costMat(i,j) = rct.wt(j);  % Penalty for predicting i when true is j
-        end
-    end
-end
 
 % Create stratified partition to ensure balanced folds
-cvp = cvpartition(act.y(idt),KFold=o.crossval.KFold,Stratify=true); % GroupingVariable=at.tr(idt)
-o.bayes.HyperparameterOptimizationOptions.CVPartition = cvp;
+oo = namedargs2cell(o.crossval);
+cvp = cvpartition(act.y(idt),oo{:},Stratify=true); % GroupingVariable=at.tr(idt)
 
 
 %% Train & optimize
 oo = namedargs2cell(o.hyper);
-mdl = classif(xct(idt,:),act.y(idt),oo{:},'Cost',costMat,...
+mdl = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},...
     'OptimizeHyperparameters',o.bayes.OptimizeHyperparameters,...
     'HyperparameterOptimizationOptions',o.bayes.HyperparameterOptimizationOptions);
 
@@ -333,17 +338,13 @@ if any(idx)
 end
 
 
-%% Cross-validate (with stratified CV to handle unbalanced classes)
+%% Cross-validate (stratified CV to handle unbalanced classes)
 if o.fun=="fitclinear"
-    % For fitclinear: extract optimized hyperparameters and use for CV
-    o = extractHyperparams_lfn(mdl,o);
-    oo = horzcat(namedargs2cell(o.hyper));
-    % Add cost matrix if available
-    if ~isempty(costMat)
-        oo = [oo {'Cost', costMat}];
-    end
-    oo = [oo {'CVPartition', cvp}];
-    mdlCV = classif(xct(idt,:),act.y(idt),oo{:});
+    % fitclinear must be run again for CV 
+    oo = extractHyperparams_lfn(mdl,o); % extract optimized hyperparameters from main model
+    oo = namedargs2cell(oo);
+    % Run fitclinear with CV
+    mdlCV = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},'CVPartition',cvp);
 else
     mdlCV = mdl.crossval(CVPartition=cvp);
 end
@@ -353,6 +354,7 @@ end
 
 % Get CV performance
 [rct.auc,aucL,aucU] = auc(rocmetrics(mdlCV,alpha=o.alpha));
+rct.loss = mdlCV.kfoldLoss; % (Mode="individual")'
 
 
 %% Calculate classifier metrics
@@ -365,21 +367,21 @@ rct.acc_p = 1 - binocdf(nnz(act.acc(idt))-1, nnz(idt), 0.5);
 
 % CV balanced accuracy (ROC AUC)
 rct.auc1 = mean(rct.auc,"omitmissing");
-rct.auc1_ci = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
+rct.auc1_CI = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
 % figure out AUC p-value???
 % **OR** USE f1-score & its p-value?? (fit to binomial dist?)
 
 % CV posterior probability
-rct.pp = mean(act.pp(idt),1,"omitmissing");
+rct.pp = mean(act.pp(idt,:),1,"omitmissing");
 rct.pp1 = mean(act.pp1(idt),1,"omitmissing");
 rct.pp1_SD = std(act.pp1(idt),1,1,"omitmissing");
 [~,rct.pp1_p] = ttest(act.pp1(idt));
 
 % CC posterior probability
 if any(idx)
-    rct.ppx = mean(act.pp(idx),1,"omitmissing");
+    rct.ppx = mean(act.pp(idx,:),1,"omitmissing");
     rct.ppx1 = mean(act.pp1(idx),1,"omitmissing");
-    rct.ppx1_SD = std(act.ppa(idx),1,1,"omitmissing");
+    rct.ppx1_SD = std(act.pp1(idx),1,1,"omitmissing");
     [~,rct.ppx1_p] = ttest(act.pp1(idx));
 end
 
@@ -389,14 +391,13 @@ end
 
 
 % Extract optimized hyperparameters from model %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function o = extractHyperparams_lfn(mdl,o)
+function oh = extractHyperparams_lfn(mdl,o)
+oh = o.hyper;
+
 % Loop across hyperparameters
 for p = 1:numel(o.bayes.OptimizeHyperparameters)
-    paramName = o.bayes.OptimizeHyperparameters(p);
-    % Handle special case for Regularization in fitclinear
-    if paramName == "Regularization" && o.fun == "fitclinear"
-        o.hyper.Regularization = extractBefore(mdl.(paramName)," ");
-    else
-        o.hyper.(paramName) = mdl.(paramName);
-    end
+    param = o.bayes.OptimizeHyperparameters(p); % parameter name
+    oh.(param) = mdl.(param); % extract parameter   
+    if param=="Regularization" % handle special case for Regularization
+        oh.(param) = extractBefore(oh.(param)," "); end
 end
