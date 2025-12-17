@@ -4,11 +4,11 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
     "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
     "S15_83_RR";"S16_95_JOB";"S16_96_LF"];
-sbjs = "S12_38_LK"; %["S12_38_LK";"S12_42_NC"];
+%sbjs = "S12_38_LK"; %["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
-analFolder = "classifySpec";
-analName = "MzAb_clinearSVM";
+analFolder = "classifyChSpec";
+analName = "MzAb_regLDA";
 
 dirs = ec_getDirs(proj,task);
 
@@ -40,7 +40,7 @@ o.condx = ["Self" "Other"];       % Coditions to cross-classify (test only)
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
+o.fdrDep = "unknown"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
 
 % Classifier basic options
 o.fun = "fitcdiscr"; % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
@@ -89,20 +89,23 @@ end
 % Cross-validation parameters (mathworks.com/help/stats/crossval.html)
 o.crossval.KFold = 10;
 % o.crossval.Leaveout = "on";
+o.hyperOptKFold = 5;
 
 % Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
 if o.fun == "fitcsvm"
-    o.bayes.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
+    o.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
 elseif o.fun == "fitclinear"
-    o.bayes.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
+    o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif o.fun == "fitcdiscr"
-    o.bayes.OptimizeHyperparameters = ["Gamma" "Delta"]; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = ["Gamma" "Delta"]; % "Gamma" "Delta"
 elseif o.fun == "fitcknn"
-    o.bayes.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
+    o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
-o.bayes.HyperparameterOptimizationOptions =...
-    struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
+o.HyperparameterOptimizationOptions =...
+    struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Repartition=false,...
     AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
+%struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
+%AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
 
 % Task Epoching (see 'ec_epochPsy')
 o.epoch.float = "single"; % task metadata output floating-point precision
@@ -176,9 +179,8 @@ if ~exist('logs','var')
     logs.i{1} = table;
     logs.i{1}.sbj = string(sbjs);
     logs.i{1}.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
-    logs.i{1}.prep(:) = nan;
-    logs.i{1}.class(:) = nan;
-    logs.i{1}.plot(:) = nan;
+    logs.i{1}.class(:) = false;
+    logs.i{1}.plot(:) = false;
     logs.i{1}.o = cell(numel(sbjs),1);
     logs.i{1}.time(:) = startTime;
     logs.i{1}.error = cell(numel(sbjs),1);
@@ -201,7 +203,7 @@ try parpool("threads"); catch;end
 % Loop across subjects
 for s = 1:height(logs.i{1})
     for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
-        if ~logs.i{p}.prep(s) && ~logs.i{p}.class(s)
+        if ~logs.i{p}.class(s)
             % Set options struct per subject
             sbj = logs.i{p}.sbj(s);
             o.name = logs.name(p);
@@ -216,7 +218,7 @@ for s = 1:height(logs.i{1})
             if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
             try
                 disp("STARTING: "+sbj);
-                logs.i{p}.o{s} = ec_condConChs_lm(o);
+                logs.i{p}.o{s} = ec_classifyChSpec(o);
                 logs.i{p}.prep(s) = 1;
                 logs.i{p}.class(s) = 1;
             catch ME; getReport(ME)

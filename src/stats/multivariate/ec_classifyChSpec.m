@@ -1,4 +1,4 @@
-function [stats,obs] = ec_classifyChSpec(o)
+function [o,stats,obs] = ec_classifyChSpec(o)
 % Performs classification & cross-classification within channels/sources
 % across time using spectral activity as features.
 %
@@ -26,9 +26,16 @@ tt = tic; % start timer
 
 
 %% Classification
-[stats,obs] = classify_lfn(x,a,r,n,o,tt);
-% stats = classification statistics per channel & timebin
+[obs,stats] = classify_lfn(x,a,r,n,o,tt);
 % obs = classification of observations
+% stats = classification statistics per channel & timebin
+
+%% Save
+fn = o.dirOut+"s"+n.sbjID+"_stats.mat";
+save(fn,"stats","-v7");
+fn = o.dirOut+"s"+n.sbjID+"_obs.mat";
+save(fn,"obs","-v7");
+disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
 
 
 
@@ -225,6 +232,7 @@ end
 stats = cell(chsN,1);
 obs = stats;
 
+
 %% Compute across timebins
 if o.gpu
     for c = 1:chsN
@@ -237,14 +245,24 @@ else
 end
 
 
-%% Finalize
+%% Concactenate channel results
+obs = sortrows(vertcat(obs{:}),["ch" "tr" "t"],"ascend");
 stats = sortrows(vertcat(stats{:}),["ch" "t"],"ascend");
-obs = sortrows(vertcat(obs{:}),["cnd" "ch" "t" "latency" "tr"],"ascend");
 
-% Save
-fn = o.dirOut+"s"+n.sbjID+"_classifySpec_"+o.name+".mat";
-save(fn,"stats","obs","o","-v7");
-disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
+
+%% FDR
+stats.acc_q = ec_fdr(stats.acc_p,o.alpha,o.fdrDep);
+stats.pp1_q = ec_fdr(stats.pp1_p,o.alpha,o.fdrDep);
+stats.ppx1_q = ec_fdr(stats.ppx1_p,o.alpha,o.fdrDep);
+
+
+%% Finalize
+% TO DO: convert float vars to output type
+% Remove vars
+stats.cost = [];
+% Rename vars
+obs = renamevars(obs,["t" "cnd"],[o.timeVar o.condVar]);
+stats = renamevars(stats,"t",o.timeVar);
 
 
 
@@ -252,9 +270,9 @@ disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
 
 
 % Compute within channel/IC/source %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [rc,ac] = classifyCh_lfn(xc,ac,rc,o,classif,cNfo,tt)
+function [ac,rc] = classifyCh_lfn(xc,ac,rc,o,classif,cNfo,tt)
 % c=92; xc=x(:,c,:); ac=a; rc=r; cNfo=chNfo(c,:);
-xc = squeeze(xc);
+xc = squeeze(xc); % xc = xc(:,5:6);
 ac.ch(:)=cNfo.ch; rc.ch(:)=cNfo.ch;
 ac.sbjCh(:)=cNfo.sbjCh; rc.sbjCh(:)=cNfo.sbjCh;
 
@@ -263,7 +281,6 @@ if o.gpu
     xc = gpuArray(xc); end
 
 %% Loop across channels/ICs
-tic;
 for t = 1:height(rc)
     % Indices for timepoint
     id = ac.t==rc.t(t);
@@ -271,14 +288,13 @@ for t = 1:height(rc)
     % Compute within timepoint
     [ac(id,:),rc(t,:)] = classifyTime_lfn(xc(id,:),ac(id,:),rc(t,:),classif,o);
 end
-toc;
 
 %% Finalize
 if o.gpu
     rc = convertvars(rc,@isgpuarray,@gather);
     ac = convertvars(ac,@isgpuarray,@gather);
 end
-disp("[ec_classifyChSpec] Finished "+o.fun+": "+sbjCh+" toc="+toc(tt));
+disp("[ec_classifyChSpec] Finished "+o.fun+": "+cNfo.sbjCh+" toc="+toc(tt));
 
 
 
@@ -320,16 +336,20 @@ function [act,rct] = runClassifier_lfn(xct,act,rct,classif,o)
 idt = ismember(act.cnd,o.cond);
 idx = ismember(act.cnd,o.condx);
 
-% Create stratified partition to ensure balanced folds
+% Main cross-validation (stratified for balanced folds)
 oo = namedargs2cell(o.crossval);
-cvp = cvpartition(act.y(idt),oo{:},Stratify=true); % GroupingVariable=at.tr(idt)
+cv = cvpartition(act.y(idt),oo{:},Stratify=true); % GroupingVariable=at.tr(idt)
+
+% Hyperparameter tuning CV
+oho = o.HyperparameterOptimizationOptions; % extract options
+oho.CVPartition = cvpartition(act.y(idt),KFold=o.hyperOptKFold,Stratify=true);
 
 
 %% Train & optimize
 oo = namedargs2cell(o.hyper);
 mdl = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},...
-    'OptimizeHyperparameters',o.bayes.OptimizeHyperparameters,...
-    'HyperparameterOptimizationOptions',o.bayes.HyperparameterOptimizationOptions);
+    'OptimizeHyperparameters',o.OptimizeHyperparameters,...
+    'HyperparameterOptimizationOptions',oho);
 
 
 %% Cross-classify 
@@ -344,9 +364,9 @@ if o.fun=="fitclinear"
     oo = extractHyperparams_lfn(mdl,o); % extract optimized hyperparameters from main model
     oo = namedargs2cell(oo);
     % Run fitclinear with CV
-    mdlCV = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},'CVPartition',cvp);
+    mdlCV = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},'CVPartition',cv);
 else
-    mdlCV = mdl.crossval(CVPartition=cvp);
+    mdlCV = mdl.crossval(CVPartition=cv);
 end
 
 % Predict CV data
@@ -395,8 +415,8 @@ function oh = extractHyperparams_lfn(mdl,o)
 oh = o.hyper;
 
 % Loop across hyperparameters
-for p = 1:numel(o.bayes.OptimizeHyperparameters)
-    param = o.bayes.OptimizeHyperparameters(p); % parameter name
+for p = 1:numel(o.OptimizeHyperparameters)
+    param = o.OptimizeHyperparameters(p); % parameter name
     oh.(param) = mdl.(param); % extract parameter   
     if param=="Regularization" % handle special case for Regularization
         oh.(param) = extractBefore(oh.(param)," "); end
