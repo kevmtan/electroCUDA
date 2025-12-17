@@ -1,4 +1,4 @@
-function x = ec_filtfilt(x,b,o)
+function [x,ME] = ec_filtfilt(x,b,a,o)
 %% [ec_filtfilt] Filter timeseries with no phase distortiion (zero-phase)
 % Modification of Matlab's filtfilt() for threadpools, gpuArrays & CUDA MEX
 
@@ -6,6 +6,7 @@ function x = ec_filtfilt(x,b,o)
 arguments
     x {mustBeFloat}
     b {isfloat,isa(b,"digitalFilter")}
+    a {mustBeFloat} = 1
     o.single (1,1) logical = false
     o.gpu (1,1) string {mustBeMember(o.gpu,["no" "matlab" "cuda"])} = "no"
     o.mem double = []
@@ -13,21 +14,20 @@ end
 
 %% Prep
 if isgpuarray(x); o.gpu="matlab"; end
-if o.single; x=single(x); end
-if isa(x,"single"); o.single=true; else; x=double(x); end
-fin = 0;
+if o.single; x=single(x); elseif isa(x,"single"); o.single=true; end
+fin = false;
 
 
 %% Run compiled CUDA binary
 if o.gpu=="cuda"
-    if isa(b,"digitalFilter"); b1=b.Coefficients; else; b1=b; end
+    if isa(b,"digitalFilter"); b1=b.Numerator; a=b.Denominator; else; b1=b; end
     try
-        if isa(x,"single")
-            x = ec_filtfilt_fp32(single(b1),single(1),x);
+        if o.single
+            x = ec_filtfilt_fp32(single(b1),single(a),x);
         else
-            x = ec_filtfilt_fp64(double(b1),1,double(x));
+            x = ec_filtfilt_fp64(double(b1),double(a),double(x));
         end
-        fin = 1;
+        fin = true;
     catch ME; getReport(ME)
     end
 end
@@ -39,9 +39,9 @@ if ~fin && o.gpu~="no"
         if isa(b,"digitalFilter")
             x = filtfilt(b,x);
         else
-            x = filtfilt(cast(b,like=x),cast(1,like=x),x);
+            x = filtfilt(cast(b,like=x),cast(a,like=x),x);
         end
-        fin = 1;
+        fin = true;
     catch ME; getReport(ME)
     end
 end
@@ -51,7 +51,7 @@ if ~fin
     if isa(b,"digitalFilter")
         x = filtfilt(b,x);
     else
-        x = filtfilt(cast(b,like=x),cast(1,like=x),x);
+        x = filtfilt(cast(b,like=x),cast(a,like=x),x);
     end
 end
 

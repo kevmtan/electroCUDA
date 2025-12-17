@@ -1,4 +1,4 @@
-function [x,n,trs] = ec_epochBaseline(x,n,psy,ep,tt,op)
+function [x,n,trs] = ec_epochBaseline(x,n,psy,ep,tt,o)
 % Analysis-specific preprocessing, epoching & baseline correction
 %   Kevin Tan (2025) | github.com/kevmtan/electroCUDA
 %
@@ -15,51 +15,53 @@ arguments
     psy timetable                               % Task metadata per timepoint
     ep table                                    % Epoch metadata per timepoint
     tt uint64 = tic                             % Timer
-    op.test (1,1) logical = false               % Running a test? (keeps removed fields)
-    op.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
-    op.typeProc (1,1) string = "double"         % processing FP precision ("double"|"single"|""=same as input)
-    op.typeOut (1,1) string = class(x)          % output FP precision ("double"|"single"|""=same as input)
-    op.hzTarget (1,1) double = nan              % Target sampling rate
+    o.test (1,1) logical = false               % Running a test? (keeps removed fields)
+    o.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
+    % processing FP precision ("double"|"single"|"half"|default=same as input)
+    o.typeProc (1,1){mustBeMember(o.typeProc,["double" "single" "half"])} = class(x)
+    % output FP precision ("double"|"single"|"half"|default=same as input)
+    o.typeOut (1,1){mustBeMember(o.typeOut,["double" "single" "half"])} = class(x)          
+    o.hzTarget (1,1) double = nan              % Target sampling rate
     % Within-run preprocessing
-    op.runNorm string = "zscore";               % Normalize run
-    op.log (1,1) logical = false;               % Log transform
-    op.mag2db (1,1) logical = false;            % Spectral magnitude to decibel
+    o.runNorm string {mustBeMember(o.runNorm,["robust" "zscore" ""])} = "robust"; % Normalize run
+    o.log (1,1) logical = false;               % Log transform
+    o.mag2db (1,1) logical = false;            % Spectral magnitude to decibel
     % Within-trial preprocessing (baseline correction)
     %   Epoch baseline period (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-    op.baselinePre {mustBeFloat} = []            % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
-    op.baselinePost {mustBeFloat} = []           % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
-    op.trialNorm string {mustBeMember(op.trialNorm,["robust" "zscore" ""])} = "robust"; % Normalize trial (skip="")
-    op.trialNormDev string {mustBeMember(op.trialNormDev,["baseline" "pre" "post" "on" "off" "all"])}...
+    o.baselinePre {mustBeFloat} = []            % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
+    o.baselinePost {mustBeFloat} = []           % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
+    o.trialNorm string {mustBeMember(o.trialNorm,["robust" "zscore" ""])} = "robust"; % Normalize trial (skip="")
+    o.trialNormDev string {mustBeMember(o.trialNormDev,["baseline" "pre" "post" "on" "off" "all"])}...
         = "baseline"; % Timepoints for StdDev relative to stim ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-    op.trialBaseline string {mustBeMember(op.trialBaseline,["median" "mean" ""])} = "median"; % Subtract trial by mean or median of baseline period (skip="")
+    o.trialBaseline string {mustBeMember(o.trialBaseline,["median" "mean" ""])} = "median"; % Subtract trial by mean or median of baseline period (skip="")
     % Bad frames/outliers
-    op.interp string {mustBeMember(op.interp,["nearest" "linear" "spline" "pchip" "makima"])}...
+    o.interp string {mustBeMember(o.interp,["nearest" "linear" "spline" "pchip" "makima"])}...
         = "linear";
-    op.badFields string {mustBeMember(op.badFields,["" "hfo" "mad" "diff" "sns"])} = "" % skip=""
-    op.olCenter string {mustBeMember(op.olCenter,["median" "mean"])} = "median"
-    op.olThr (1,1) double = 5;                   % Threshold for outlier
-    op.olThr2 (1,1) double = 0;                  % Threshold for outlier
-    op.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
+    o.badFields string {mustBeMember(o.badFields,["" "hfo" "mad" "diff" "sns"])} = "" % skip=""
+    o.olCenter string {mustBeMember(o.olCenter,["median" "mean"])} = "median"
+    o.olThr (1,1) double = 5;                   % Threshold for outlier
+    o.olThr2 (1,1) double = 0;                  % Threshold for outlier
+    o.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
     % Remove spectral frequencies (indices for dim3)
-    op.rmFreqs {islogical,isnumeric} = [];
+    o.rmFreqs {islogical,isnumeric} = [];
     % Spectral dimensionality reduction by PCA (skip=0)
-    op.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
+    o.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
     % Spectral dimensionality reduction into bands (skip=[])
-    op.bands string = "";                        % Band name
-    op.bands2 string = "";                       % Band display name
-    op.bandsF = [];                              % Band freq limits
+    o.bands string = "";                        % Band name
+    o.bands2 string = "";                       % Band display name
+    o.bandsF = [];                              % Band freq limits
     % Filtering (within-run):
-    op.hpf (1,1) double = 0;                     % HPF cutoff in hertz (skip=0)
-    op.hpfSteep (1,1) double = 0.75;              % HPF steepness
-    op.hpfImpulse {mustBeMember(op.hpfImpulse,["auto" "fir" "iir"])} = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
-    op.lpf (1,1) double = 0;                     % LPF cutoff in hz (skip=0)
-    op.lpfSteep = 0.75;                           % LPF steepness
-    op.lpfImpulse {mustBeMember(op.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]
+    o.hpf (1,1) double = 0;                     % HPF cutoff in hertz (skip=0)
+    o.hpfSteep (1,1) double = 0.7;              % HPF steepness
+    o.hpfImpulse {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
+    o.lpf (1,1) double = 0;                     % LPF cutoff in hz (skip=0)
+    o.lpfSteep = 0.7;                           % LPF steepness
+    o.lpfImpulse {mustBeMember(o.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]
 end
 
-% Conditional validation
-if ~isany(op.typeProc); op.typeProc = class(x); end
-if ~isany(op.typeOut); op.typeOut = class(x); end
+% Additional validation
+if ~isany(o.hpf); o.hpf=false; end
+if ~isany(o.lpf); o.lpf=false; end
 
 
 %% Prep
@@ -97,26 +99,57 @@ idx = varfun(@(v) isa(v,"half"),psy,OutputFormat="uniform");
 psy = convertvars(psy,idx,"single");
 
 % Get downsampling factor & anti-aliasing filter
-if isany(op.hzTarget)
-    [ds(1),ds(2)] = rat(op.hzTarget/n.hz);
+if o.hzTarget < n.hz
+    [o.ds(1),o.ds(2)] = rat(o.hzTarget/n.hz);
     % Errors
-    if ds(1) > ds(2)
+    if o.ds(1) > o.ds(2)
         error("[ec_epochBaseline] downsampling target > sampling rate"); end
-    if ds(1) ~= 1
+    if o.ds(1) ~= 1
         error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
-    ds = ds(2);
-    disp("[ec_epochBaseline] downsampling factor = "+ds);
+    o.ds = o.ds(2);
+    disp("[ec_epochBaseline] downsampling factor = "+o.ds);
+
+    % Ensure anti-aliasing LPF
+    hzNyquist = o.hzTarget/2;
+    if ~o.lpf || o.lpf<hzNyquist
+        o.lpf = hzNyquist;
+        disp("[ec_epochBaseline] adding downsampling anti-aliasing LPF: "+...
+            o.lpf+"hz");
+    end
 else
-    ds = 1;
+    o.ds = false;
+end
+
+% Filter prep
+if o.hpf || o.lpf
+    % Get single-channel/freq timeseries from longest run
+    [~,idx] = min(n.runIdxOg);
+    xTmp = x(psy.run==n.runs(idx),1,1);
+    xTmp = cast(xTmp,o.typeProc);
+    if o.gpu; xTmp = gpuArray(xTmp); end
+
+    % Make filter(s)
+    if o.hpf
+        o.HPF = {};
+        [o.HPF{1},o.HPF{2}] = ec_designFilt(xTmp,n.hz,o.hpf,"highpass",...
+            steepness=o.hpfSteep,impulse=o.hpfImpulse,coefOut=true);
+        disp("[ec_epochBaseline] Created high-pass filter: "+n.sbj+" time="+toc(tt));
+    end
+    if o.lpf
+        o.LPF = {};
+        [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz,o.lpf,"lowpass",...
+            steepness=o.lpfSteep,impulse=o.lpfImpulse,coefOut=true);
+        disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
+    end
 end
 
 % Remove spectral indices (frequencies)
-if isany(op.rmFreqs)
+if isany(o.rmFreqs)
     n.freqsOg = n.freqs;
-    if islogical(op.rmFreqs)
-        n.keptFreqIdx = ~op.rmFreqs;
+    if islogical(o.rmFreqs)
+        n.keptFreqIdx = ~o.rmFreqs;
     else
-        n.keptFreqIdx = ~ismember((1:n.nFreqs)',op.rmFreqs);
+        n.keptFreqIdx = ~ismember((1:n.nFreqs)',o.rmFreqs);
     end
     n.freqs = n.freqs(n.keptFreqIdx);
 
@@ -125,13 +158,13 @@ if isany(op.rmFreqs)
 end
 
 % Spectral Band indices
-if isany(op.bands)
+if isany(o.bands)
     n.bands = table;
-    n.bands.name = op.bands';
-    n.bands.disp = op.bands2';
+    n.bands.name = o.bands';
+    n.bands.disp = o.bands2';
     n.bands.freqs(:) = {[]};
-    for b = 1:numel(op.bands)
-        n.bands.id(b,:) = (n.freqs>op.bandsF(b,1) & n.freqs<=op.bandsF(b,2))';
+    for b = 1:numel(o.bands)
+        n.bands.id(b,:) = (n.freqs>o.bandsF(b,1) & n.freqs<=o.bandsF(b,2))';
         n.bands.freqs{b} = n.freqs(n.bands.id(b,:));
     end
     n.bands.Properties.RowNames = n.bands.name;
@@ -139,39 +172,18 @@ if isany(op.bands)
 end
 
 % Preallocate PCA weights
-if op.pcaSpec
+if o.pcaSpec
     pcaWts = cell(1,n.xChs); end
 
-% Filter prep
-hpf=[]; lpf=[];
-if isany(op.hpf) || isany(op.lpf)
-    % Get single-channel/freq timeseries from longest run
-    [~,idx] = min(n.runIdxOg);
-    xTmp = x(psy.run==n.runs(idx),1,1);
-    xTmp = cast(xTmp,op.typeProc);
-    if op.gpu; xTmp = gpuArray(xTmp); end
-
-    % Make filter(s)
-    if isany(op.hpf)
-        hpf = ec_designFilt(xTmp,n.hz,op.hpf,"highpass",...
-            steepness=op.hpfSteep,impulse=op.hpfImpulse,coefOut=true);
-        disp("[ec_epochBaseline] Created high-pass filter: "+n.sbj+" time="+toc(tt));
-    end
-    if isany(op.lpf)
-        lpf = ec_designFilt(xTmp,n.hz,op.lpf,"lowpass",...
-            steepness=op.lpfSteep,impulse=op.lpfImpulse,coefOut=true);
-        disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
-    end
-end
 
 %% All-chan processing
 
 % Remove bad frames
-if isany(op.badFields)
-    for f = 1:numel(op.badFields)
+if isany(o.badFields)
+    for f = 1:numel(o.badFields)
         % Get bad timepoints for specific metric
         try
-            xBad = n.xBad.(op.badFields(f));
+            xBad = n.xBad.(o.badFields(f));
         catch
             continue
         end
@@ -191,11 +203,11 @@ if isany(op.badFields)
 end
 
 % Log-transform
-if op.log || op.mag2db
-    idNeg = x<0;
+if o.log || o.mag2db
+    idNeg = x < eps(cast(0,like=x));
     if any(idNeg,"all")
-        warning("[ec_preprocBaseline] Negative values found in 'x' ("+...
-            (nnz(idNeg)/numel(x))*100+"%). Converting to nans for log-transform & interpolating");
+        warning("[ec_preprocBaseline] Log-transform: negative values found in 'x' ("+...
+            (nnz(idNeg)/numel(x))*100+"%), converting to eps(0)");
     end
 end
 
@@ -204,15 +216,15 @@ x = ec_dim2cell(x,2);
 
 
 %% Main processing (loop across channels)
-if op.gpu
+if o.gpu
     % Run on GPU (devs: gpuArray table fields?)
     for c = 1:numel(x)
-        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,ds,op);
+        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,o);
     end
 else
     % Run on CPU parallel loop (ideally threadpool, initialize before running)
     parfor c = 1:numel(x)
-        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,hpf,lpf,ds,op);
+        [x{c},pcaWts{c}] = withinCh_lfn(x{c},n,stim,epIdx,trs,o);
     end
 end
 
@@ -224,16 +236,16 @@ x = cellfun(@(y) permute(y,[1 3 2]),x,'UniformOutput',false);
 x = horzcat(x{:});
 
 % Save PCA weights
-if op.pcaSpec
+if o.pcaSpec
     n.pcaWts = pcaWts; end
 
 % Save spectral info
 n.nSpect = size(x,3);
 n.spect = table;
-if op.pcaSpec
+if o.pcaSpec
     n.spect.name = "pc"+(1:n.nSpect)';
     n.spect.disp = "Spectral PC "+(1:n.nSpect)';
-elseif isany(op.bands)
+elseif isany(o.bands)
     n = renameStructField(n,"bands","spect");
 elseif n.nSpect > 1
     n.spect.name = "f"+(1:n.nSpect)';
@@ -245,9 +257,11 @@ else
 end
 
 % remove bad frames indices to save memory
-if ~op.test
+if ~o.test
     n.xBad = []; end 
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
+
+
 
 
 
@@ -257,26 +271,28 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
-function [xc,chWts] = withinCh_lfn(xc,n,stim,epIdx,trs,hpf,lpf,ds,op)
+
+
+function [xc,chWts] = withinCh_lfn(xc,n,stim,epIdx,trs,o)
 %% Compute within-chan %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % xc=x{104};
 
 % Process at specified float precision
-xc = cast(xc,op.typeProc);
+xc = cast(xc,o.typeProc);
 
 % Move to GPU
-if op.gpu
+if o.gpu
     xc = gpuArray(xc); end
 
 % Log-transform
-if op.log || op.mag2db
+if o.log || o.mag2db
     % Find negative numbers & convert to nan
-    idNeg = xc<0;
-    xc(idNeg) = nan;
+    idNeg = xc < eps(cast(0,like=xc));
+    xc(idNeg) = eps(cast(0,like=xc));
 
-    if op.mag2db
+    if o.mag2db
         xc = mag2db(xc); % Magnitude to decible 
-    elseif op.log
+    elseif o.log
         xc = log(xc); % Natural log
     end
 end
@@ -286,13 +302,13 @@ xc = mat2cell(xc,n.runIdxOg);
 
 % Processing within-run (z-score, outliers, spectral processing, etc)
 for r = 1:n.nRuns
-    xc{r} = withinRun_lfn(xc{r},stim{r},hpf,lpf,ds,n,op);
+    xc{r} = withinRun_lfn(xc{r},stim{r},n,o);
 end
 xc = vertcat(xc{:});
 
 % Spectral PCA (use ec_robustPCA??)
-if op.pcaSpec
-    [chWts,xc] = pca(xc,NumComponents=op.pcaSpec,Economy=false);
+if o.pcaSpec
+    [chWts,xc] = pca(xc,NumComponents=o.pcaSpec,Economy=false);
 else
     chWts = [];
 end
@@ -303,44 +319,55 @@ xc = cellfun(@(tr) xc(tr,:), trs.i,UniformOutput=false); % Reshape by epoch
 
 % Baseline correct & zscore within-trial
 for t = 1:numel(xc)
-    xc{t} = withinTrial_lfn(xc{t},trs(t,:),op);
+    xc{t} = withinTrial_lfn(xc{t},trs(t,:),o);
 end
 xc = vertcat(xc{:});
 
 % Get from GPU
-if op.gpu
+if o.gpu
     xc = gather(xc);
-    if op.pcaSpec; chWts = gather(chWts); end
+    if o.pcaSpec; chWts = gather(chWts); end
 end
 
 % Output at specified float precision
-xc = cast(xc,op.typeOut);
+xc = cast(xc,o.typeOut);
 
 
 
-function xr = withinRun_lfn(xr,stimR,hpf,lpf,ds,n,op)
+
+
+
+function xr = withinRun_lfn(xr,stimR,n,o)
 %% Compute within-run %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Z-score
-if op.runNorm=="robust"
-    xr = normalize(xr,1,"zscore","robust");
-elseif isany(op.runNorm)
-    xr = normalize(xr,1,op.runNorm);
-end
-
 % All outliers
-if any(op.olThr)
-    xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr); end
+if any(o.olThr)
+    xr = filloutliers(xr,nan,o.olCenter,1,ThresholdFactor=o.olThr); end
 
 % Interpolate outliers/missing (slower on GPU)
-xr = fillmissing(xr,op.interp,1,EndValues="nearest");
+xr = fillmissing(xr,o.interp,1,EndValues="nearest");
 
 % High-pass filter
-if ~isempty(hpf)
-    xr = ec_filtfilt(xr,hpf); end
+if o.hpf
+    xr = ec_filtfilt(xr,o.HPF{1},o.HPF{2}); end
+
+% All outliers (2nd round)
+if any(o.olThr2)
+    xr = filloutliers(xr,nan,o.olCenter,1,ThresholdFactor=o.olThr2); end
+
+% Baseline outliers
+if any(o.olThrBL)
+    xr(~stimR,:) = filloutliers(xr(~stimR,:),nan,o.olCenter,1,ThresholdFactor=o.olThrBL); end
+
+% Interpolate outliers/missing (slower on GPU)
+xr = fillmissing(xr,o.interp,1,EndValues="nearest");
+
+% Low-pass filter
+if o.lpf
+    xr = ec_filtfilt(xr,o.LPF{1},o.LPF{2}); end
 
 % Spectral bands
-if isany(op.bands)
+if isany(o.bands)
     xrb = nan([size(xr,1) height(n.bands)],class(xr)); % Preallocate
 
     % Get band timecourse from mean of freq range
@@ -350,31 +377,18 @@ if isany(op.bands)
     xr = xrb; % Save
 end
 
-% All outliers (2nd round)
-if any(op.olThr2)
-    xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr2); end
+% Downsample
+if o.ds
+    xr = xr(1:o.ds:end,:); end
 
-% Baseline outliers
-if any(op.olThrBL)
-    xr(~stimR,:) = filloutliers(xr(~stimR,:),nan,op.olCenter,1,ThresholdFactor=op.olThrBL); end
-
-% Interpolate outliers/missing (slower on GPU)
-xr = fillmissing(xr,op.interp,1,EndValues="nearest");
-
-% Low-pass filter
-if ~isempty(lpf)
-    xr = ec_filtfilt(xr,lpf); end
-
-% Z-score round 2
-if op.runNorm=="robust"
+% Z-score
+if o.runNorm=="robust"
     xr = normalize(xr,1,"zscore","robust");
-elseif isany(op.runNorm)
-    xr = normalize(xr,1,op.runNorm);
+elseif isany(o.runNorm)
+    xr = normalize(xr,1,o.runNorm);
 end
 
-% Downsample
-if ds > 1
-    xr = xr(1:ds:end,:); end
+
 
 
 
@@ -429,93 +443,3 @@ end
 
 % Do baseline correction
 xt = c*(xt-bl)./sd;
-
-
-% % Get downsampling factor & anti-aliasing filter
-% if isany(op.hzTarget)
-%     [ds(1),ds(2)] = rat(op.hzTarget/n.hz);
-%     % Errors
-%     if ds(1) > ds(2)
-%         error("[ec_epochBaseline] downsampling target > sampling rate"); end
-%     if ds(1) ~= 1
-%         error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
-%     ds = ds(2);
-%     disp("[ec_epochBaseline] downsampling factor = "+ds);
-% else
-%     ds = 1;
-% end
-%
-% function xc = acrossTrials_lfn(xc,trs,op)
-% %% acrossTrials_lfn %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
-% % Reshape by trial
-% xc = arrayfun(@(tr) xc(tr.i,:), trs,UniformOutput=false);
-% 
-% % Baseline correct within-trial (robust z-score)
-% for t = 1:numel(xc)
-%     if any(trs(t).baseline)
-%         xc{t} = withinTrial_lfn(xc{t},trs(t).baseline,op); end
-% end
-% xc = vertcat(xc{:});
-% 
-% 
-% 
-% function xc = withinCh_lfn(xc,rr,idr,stim,fs2,hpf,lpf,op)
-% %% Compute within chan/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% xc = squeeze(xc);
-%
-% % Log transform
-% if op.log
-%     xc = arrayfun(@log,xc); end
-%
-% % Outliers, HPF, z-score (within-run)
-% for r = rr
-%     id = idr(:,r);
-%     xc(id,:) = withinChRun_lfn(xc(id,:),~stim(id),fs2,hpf,op);
-% end
-%
-% % PCA (use ec_robustPCA??)
-% if op.pcaSpec
-%     [~,xc] = pca(xc,NumComponents=op.pcaSpec,Economy=false); end
-%
-% % LPF (within-run) [after PCA]
-% if ~isempty(lpf)
-%     for r = rr
-%         xc(idr(:,r),:) = ec_filtfilt(xc(idr(:,r),:),lpf); end
-% end
-%
-% % Finalize
-% xc = permute(xc,[1 3 2]);
-%
-%
-%
-% function xr = withinChRun_lfn(xr,idb,fs2,hpf,op)
-% %% Compute within run per chan/IC  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% % Baseline outliers
-% if any(op.olThrBL)
-%     xr(idb,:) = filloutliers(xr(idb,:),nan(1,like=xr),op.olCenter,1,ThresholdFactor=op.olThrBL); end
-%
-% % Peri-stimulus outliers
-% if any(op.olThr)
-%     xr = filloutliers(xr,nan(1,like=xr),op.olCenter,1,ThresholdFactor=op.olThr); end
-%
-% % Interpolate outliers/missing (slower on GPU)
-% xr = fillmissing_lfn(xr,fs2);
-%
-% % High-pass filter
-% if ~isempty(hpf)
-%     xr = ec_filtfilt(xr,hpf); end
-%
-% % Redo outliers
-% if any(op.olThr2)
-%     xr = filloutliers(xr,nan,op.olCenter,1,ThresholdFactor=op.olThr2);
-%     xr = fillmissing_lfn(xr,fs2);
-% end
-%
-% % Normalize (z-score)
-% if op.runNorm=="robust"
-%     xr = normalize(xr,1,"zscore","robust");
-% elseif isany(op.runNorm)
-%     xr = normalize(xr,1,op.runNorm);
-% end

@@ -1,29 +1,33 @@
-function [d,a] = ec_designFilt(x,fs,hz,dType,arg)
+function [d,a] = ec_designFilt(x,fs,hz,dType,o)
 % Input validation
 arguments
     x {mustBeFloat} % Data to filter (faster if data sample: full-length vector)
     fs (1,1) double
     hz (1,:) double
     dType {mustBeMember(dType,["lowpass" "highpass" "bandpass"])} = "highpass"
-    arg.steepness {mustBeLessThanOrEqual(arg.steepness,1)} = 0.85 % Passband to stopband multiplier
-    arg.impulse {mustBeMember(arg.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
-    arg.coefOut (1,1) logical = true
+    o.steepness {mustBeLessThanOrEqual(o.steepness,1)} = 0.7 % Passband to stopband multiplier
+    o.impulse {mustBeMember(o.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
+    o.coefOut (1,1) logical = true
 end
 if numel(hz)>1; dType = "bandpass"; end
 % if arg.impulse=="auto"; x = double(x(:,1,1)); end % Get sample vector
 
 %% Make filter object
 d = signal.internal.filteringfcns.parseAndValidateInputs(x,char(dType),...
-    {hz,fs,'Steepness',arg.steepness,'ImpulseResponse',arg.impulse});
+    {hz,fs,'Steepness',o.steepness,'ImpulseResponse',o.impulse});
 d = designFilter_lfn(d);
 
 % Finalize
-if arg.coefOut
+if o.coefOut
     if d.ImpulseResponse=="iir" && nargout<2
         error("[ec_designFilt] Second output needed: IIR coef denominator"); end
-    a = d.Denominator;
     d = d.Numerator;
+    a = d.Denominator;
 end
+
+
+
+
 
 
 
@@ -31,7 +35,10 @@ end
 
 
 
-%% designFilter_lpf %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+% designFilter_lpf %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [d,opts] = designFilter_lfn(opts)
 opts.IsFIR = true;
 Fs = opts.Fs;
@@ -63,8 +70,8 @@ Wstop = WstopNormalized * (Fs/2);
 opts.Wstop = Wstop;
 opts.WstopNormalized = WstopNormalized;
 
-% Try to design an FIR filter, if order too large for input signal length,
-% then try an IIR filter.
+%% Try to design an FIR filter
+% if order too large for input signal length try an IIR filter
 
 % Calculate the required min FIR order from the parameters
 if opts.Response=="lowpass"
@@ -112,7 +119,11 @@ d = designfilt(params{:});
 
 
 
-%% getIIRMinOrder
+
+
+
+
+% getIIRMinOrder %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function N = getIIRMinOrder(WpassNormalized,WstopNormalized,Apass, Astop)
 % Compute analog frequencies
 %   WpassNormalized, WstopNormalized are passband and stopband normalized
