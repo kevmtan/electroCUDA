@@ -122,6 +122,9 @@ for t = 1:trs
     trialNfo(t,:) = tNfo;
 end
 
+% Concactenate epochs
+ep = vertcat(ep{:});
+
 
 %% Remove bad trials
 trialNfo.removed(:) = false;
@@ -160,8 +163,6 @@ end
 
 
 %% Finalize
-ep = vertcat(ep{:});
-ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]) = [];
 
 % Label pre-stimulus baseline frames
 if abs(o.baselinePre)==inf
@@ -210,6 +211,9 @@ ep.binPct = round(ep.binPct+eps(ep.binPct)) * o.binPct;
 ep = convertvars(ep,["frame" "bin" "binRT"],"int16");
 ep = convertvars(ep,"binPct","int8");
 ep = convertvars(ep,["latency" "pct" "RT" "latRT"],o.float);
+
+% Remove vars
+ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]) = [];
 
 % Reorder vars
 ep = movevars(ep,["frame" "latency" "bin" "pct" "binPct" "latRT" "binRT"],...
