@@ -7,7 +7,7 @@ arguments
     dType {mustBeMember(dType,["lowpass" "highpass" "bandpass"])} = "highpass"
     o.steepness {mustBeLessThanOrEqual(o.steepness,1)} = 0.7 % Passband to stopband multiplier
     o.impulse {mustBeMember(o.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
-    o.coefOut (1,1) logical = true
+    o.coefOut (1,1) logical = false
 end
 if numel(hz)>1; dType = "bandpass"; end
 % if arg.impulse=="auto"; x = double(x(:,1,1)); end % Get sample vector

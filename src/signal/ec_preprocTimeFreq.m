@@ -57,6 +57,10 @@ end
 % o=oSpec; o=oHFB;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
+if o.avg && o.out=="magnitude"
+    o.fOut = "power";
+    warning("[ec_preprocTimeFreq] Scale-averaged output can't be magnitude, outputing power (or specify decibel)");
+end
 % if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
 % if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
 % if ~isfield(o,'fMean');       o.fMean=true; end        % Collapse across frequency bands (for 1d vector output)
@@ -98,7 +102,7 @@ if isany(o.hzTarget)
 end
 
 % Anti-aliasing LPF filter for downsampling (Nyquist freq)
-if ds && o.gpu~="cuda"
+if ds && o.gpu=="no"
     % Get single-channel/freq timeseries from longest run
     [~,idx] = min(n.runIdxOg);
     xTmp = x(psy.run==n.runs(idx),1,1);
@@ -107,6 +111,8 @@ if ds && o.gpu~="cuda"
     lpfFilt = ec_designFilt(xTmp,n.hz,floor(o.hzTarget/2),"lowpass",...
         steepness=o.lpfSteep,impulse="fir",coefOut=true);
     disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
+else
+    lpfFilt = [];
 end
 
 % Reset GPU & get free VRAM
