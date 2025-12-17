@@ -64,7 +64,7 @@ o.pre.log = false; % Log transform
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
+o.pre.trialBaseline = ""; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear";
 o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]

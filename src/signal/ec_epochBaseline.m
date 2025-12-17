@@ -313,15 +313,22 @@ else
     chWts = [];
 end
 
-% Epoch EEG
+% Epoch EEG data
 xc = xc(epIdx,:); % Match epoched indices
-xc = cellfun(@(tr) xc(tr,:), trs.i,UniformOutput=false); % Reshape by epoch
 
 % Baseline correct & zscore within-trial
-for t = 1:numel(xc)
-    xc{t} = withinTrial_lfn(xc{t},trs(t,:),o);
+if isany(o.trialNorm) || isany(o.trialBaseline)
+    % Split data by epoch
+    xc = cellfun(@(tr) xc(tr,:), trs.i,UniformOutput=false);
+
+    % Loop across trials
+    for t = 1:numel(xc)
+        xc{t} = withinTrial_lfn(xc{t},trs(t,:),o); % within-trial processing
+    end
+
+    % Concactenate epochs
+    xc = vertcat(xc{:});
 end
-xc = vertcat(xc{:});
 
 % Get from GPU
 if o.gpu
@@ -426,7 +433,7 @@ if op.trialBaseline=="median"
 elseif op.trialBaseline=="mean"
     bl = mean(xt(iBL,:),1,"omitnan"); % BL median
 else
-    bl = 0;
+    bl = cast(0,like=xt);
 end
 
 % Get trial std deviation
@@ -437,9 +444,10 @@ elseif op.trialNorm=="zscore"
     sd = std(xt(iSD,:),1,1,"omitnan");
     c = 1;
 else
-    sd = 1;
+    sd = cast(1,like=xt);
     c = 1;
 end
+c = cast(c,like=xt);
 
 % Do baseline correction
 xt = c*(xt-bl)./sd;
