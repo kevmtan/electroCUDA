@@ -306,13 +306,6 @@ for r = 1:n.nRuns
 end
 xc = vertcat(xc{:});
 
-% Spectral PCA (use ec_robustPCA??)
-if o.pcaSpec
-    [chWts,xc] = pca(xc,NumComponents=o.pcaSpec,Economy=false);
-else
-    chWts = [];
-end
-
 % Epoch EEG data
 xc = xc(epIdx,:); % Match epoched indices
 
@@ -328,6 +321,13 @@ if isany(o.trialNorm) || isany(o.trialBaseline)
 
     % Concactenate epochs
     xc = vertcat(xc{:});
+end
+
+% Spectral PCA (use ec_robustPCA??)
+if o.pcaSpec
+    [chWts,xc] = pca(xc,NumComponents=o.pcaSpec,Economy=false);
+else
+    chWts = [];
 end
 
 % Get from GPU
