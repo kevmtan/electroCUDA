@@ -65,10 +65,8 @@ end
 sz = size(p);
 n = numel(p); % number of tests
 
-% Reshape
-if numel(sz)>2 || sz(2)>1
-    p = reshape(p,n,1);
-end
+% Reshape to vector
+p = reshape(p,n,1);
 
 % Parameters
 switch dep
@@ -82,11 +80,14 @@ end
 k = (1:1:n)';
 [pSort, idx] = sort(p,'ascend');
 pAdj(idx,1) = cummin(pSort.*(c.*n./k), 'reverse');
-pAdj = reshape(pAdj,sz);
+pAdj = reshape(pAdj,sz); % reshape to original shape
 
 % Compute the corrected significance levels
 aAdj(idx,1) = a.*k./(n.*c);
-aAdj = reshape(aAdj,sz);
 
 % Rejected H0
-h = p(:) < aAdj(:);
+h = p < aAdj;
+
+% Reshape to original shape
+aAdj = reshape(aAdj,sz);
+h = reshape(h,sz);
