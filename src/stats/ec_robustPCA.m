@@ -38,7 +38,6 @@ if gpu
     mu = gpuArray(mu);
     tol = gpuArray(tol);
     unobserved = gpuArray(unobserved);
-
 end
 
 %% Main

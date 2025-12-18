@@ -21,8 +21,8 @@ d = designFilter_lfn(d);
 if o.coefOut
     if d.ImpulseResponse=="iir" && nargout<2
         error("[ec_designFilt] Second output needed: IIR coef denominator"); end
-    d = d.Numerator;
     a = d.Denominator;
+    d = d.Numerator;
 end
 
 
