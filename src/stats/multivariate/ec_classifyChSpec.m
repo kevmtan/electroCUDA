@@ -27,7 +27,7 @@ tt = tic; % start timer
 
 %% Classification
 [obs,stats] = classify_lfn(x,a,r,n,o,tt);
-% obs = classification of observations
+% obs = classification of observationsall(nPerClass==nMin)
 % stats = classification statistics per channel & timebin
 
 %% Save
@@ -122,11 +122,13 @@ a.pred(:) = categorical("",o.cond,Ordinal=true); % predicted class
 a.pp(:,1:numel(o.cond)) = s0; % posterior probability per class
 a.pp1(:) = s0; % posterior probability difference
 a.acc(:) = false; % accurate prediction?
+a.use(:) = false; % use for training/testing/CV (for class balancing)
 a.ch(:) = u0;
 a.sbjCh(:) = "";
 % Organize analysis template
+a.use(ismember(a.cnd,o.cond)) = true; % use if one of the main conds (train/test)
 a = movevars(a,"sbjCh","Before",1);
-a = movevars(a,["ch" "sbjID" "ide"],"After","acc");
+a = movevars(a,["ch" "sbjID" "ide"],"After","use");
 a.Properties.RowNames = {};
 
 
@@ -134,22 +136,22 @@ a.Properties.RowNames = {};
 r = table;
 r.t = unique(a.t,"stable");
 r.acc(:) = s0; % Cross-validation (CV) mean accuracy
+r.acc_SE(:) = s0;
 r.acc_p(:) = s0; % p-value above chance
 r.acc_q(:) = s0; % FDR-corrected sig
-r.accBal(:) = s0; % Balanced accuracy (handles class imbalance)
 r.auc(:,1:nCond) = s0; % CV ROC AUC per cond
 r.auc1(:) = s0; % AUC mean
 r.auc1_CI(:,1:2) = s0; % AUC confidence interval
 r.pp(:,1:nCond) = s0; % mean posterior probability (PP)
 r.pp1(:) = s0; % PP difference
-r.pp1_SD(:) = s0; % PP diff std dev
+r.pp1_SE(:) = s0; % PP diff std dev
 r.pp1_p(:) = s0; % PP not equal p-value
 r.pp1_q(:) = s0; % FDR-corrected sig
 if any(nCondx)
     % Cross-classification (CC) stats
     r.ppx(:,1:nCondx) = s0; % CC PP
     r.ppx1(:) = s0; % CC PP diff
-    r.ppx1_SD(:) = s0; % CC PP diff SD
+    r.ppx1_SE(:) = s0; % CC PP diff SD
     r.ppx1_p(:) = s0;
     r.ppx1_q(:) = s0;
 end
@@ -158,6 +160,8 @@ r.wt(:,1:nCond) = s0; % class weight
 if isany(nCondx)
     r.nx(:,1:nCondx) = uint32(0); end % samples per cross-classification cond
 r.cost = cell(height(r),1);
+r.cv = r.cost;
+r.cvh = r.cost;
 r.loss(:) = s0; % average loss per fold CV
 r.sbjCh(:) = "";
 r.sbjID(:) = n.sbjID;
@@ -165,19 +169,79 @@ r.ch(:) = u0;
 r = movevars(r,"sbjCh",Before=1);
 
 
-%% Deal with unbalanced classes
 
-% Find sample counts per training & CC cond
+%% Check for insufficient sample sizes & unbalanced classes per timepoint
+for t = 1:height(r)
+    % Indices of main conditions (classes to train/test)
+    idt = a.t==r.t(t) & ismember(a.cnd,o.cond);
+
+    % Find smallest observation count across classes
+    nPerClass = zeros(1,nCond);
+    for c = 1:nCond
+        nPerClass(c) = nnz(idt & a.cnd==o.cond(c));
+    end
+    nMin = min(nPerClass); % smallest # obs
+
+    % Check if timepoint is good, needs balancing, or should be discarded
+    if nMin < o.nMin
+        % Not enough obs per class, discard timepoint in analyses
+        a.use(idt) = false;
+        continue;
+    elseif all(nPerClass==nMin) || ~o.balanceConds
+        % Timepoint already balanced or balancing disabled
+        continue; 
+    end
+
+    %% Balance classes by maximizing number of unique trials in kept obs
+    for c = 1:nCond
+        % Skip balancing if class already has smallest # obs
+        if nPerClass(c)==nMin; continue; end 
+
+        % Initialize
+        idtc = idt & a.cnd==o.cond(c); % class obs within timepoint
+        trs = unique(a.tr(idtc)); % get unique trials
+        trOrder = randperm(numel(trs));
+        trObsKept = cell(numel(trs),1); % kept obs per trial
+        nKept = 0; % counter for kept obs
+
+        % Mark all class obs as unused 
+        a.use(idtc) = false;
+
+        % Select 1 observation per trial until 'nMin' are kept
+        while nKept < nMin
+            % Randomized loop across trials
+            for trId = trOrder
+                % Find unused observations
+                trObs = find(idtc & a.tr==trs(trId)); % get trial obs
+                obsUnused = setdiff(trObs,trObsKept{trId}); % obs not yet selected
+
+                % Randomly select 1 unused obs from trial
+                if nKept<nMin && ~isempty(obsUnused)
+                    obsAdd = obsUnused(randperm(numel(obsUnused),1)); % keep 1
+                    trObsKept{trId} = [trObsKept{trId}; obsAdd];
+                    nKept = nKept + 1;
+                end
+            end
+        end
+
+        % Mark selected observations to be used
+        a.use(vertcat(trObsKept{:})) = true;
+    end
+end
+
+
+%% Find sample counts per training & CC cond (after balancing)
 for t = 1:height(r)
     for c = 1:nCond
-        r.n(t,c) = nnz(a.t==r.t(t) & a.cnd==o.cond(c)); end
+        r.n(t,c) = nnz(a.t==r.t(t) & a.cnd==o.cond(c) & a.use); end
     if any(nCondx)
         for c = 1:nCondx
             r.nx(t,c) = nnz(a.t==r.t(t) & a.cnd==o.condx(c)); end
     end
 end
 
-% Cost matrix weights: minority class gets higher weight
+
+%% Cost matrix weights: minority class gets higher weight
 r.wt = max(r.n,[],2) ./ r.n;  % inverse frequency weighting: max_count / class_count
 r.wt = cast(r.wt,o.typeProc);
 r.n = uint32(r.n);
@@ -193,6 +257,28 @@ for t = 1:height(r)
         end
     end
     r.cost{t} = costMat;
+end
+
+
+%% Make cross-validation objects
+oo = namedargs2cell(o.crossval);
+
+% Loop across timepoint
+for t = 1:height(r)
+    idt = a.t==r.t(t) & a.use;
+    % Ungrouped, stratified
+    r.cv{t} = cvpartition(a.y(idt),oo{:});
+    r.cvh{t} = cvpartition(a.y(idt),KFold=o.hyperOptKFold);
+    % if o.balanceConds
+    %     % Grouped by trial, unstratified
+    %     r.cv{t} = cvpartition(a.y(idt),oo{:},GroupingVariable=a.tr(idt),Stratify=false);
+    %     r.cvh{t} = cvpartition(a.y(idt),KFold=o.hyperOptKFold,Stratify=false,...
+    %         GroupingVariable=a.tr(idt));
+    % else
+    %     % Ungrouped, stratified
+    %     r.cv{t} = cvpartition(a.y(idt),oo{:});
+    %     r.cvh{t} = cvpartition(a.y(idt),KFold=o.hyperOptKFold);
+    % end
 end
 
 %a = arrayfun(@(b) a(a.t==b,:), r.t, UniformOutput=false);
@@ -211,7 +297,7 @@ disp("[ec_classifyChSpec] Made classifier templates: "+o.dirs.sbj+" | toc="+toc(
 
 
 % Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [stats,obs] = classify_lfn(x,a,r,n,o,tt)
+function [obs,stats] = classify_lfn(x,a,r,n,o,tt)
 chNfo = n.chNfo(:,["ch" "sbjCh"]);
 chsN = height(chNfo);
 
@@ -229,8 +315,8 @@ else
 end
 
 % Preallocate
+obs = cell(chsN,1);
 stats = cell(chsN,1);
-obs = stats;
 
 
 %% Compute across timebins
@@ -258,8 +344,10 @@ stats.ppx1_q = ec_fdr(stats.ppx1_p,o.alpha,o.fdrDep);
 
 %% Finalize
 % TO DO: convert float vars to output type
+
 % Remove vars
-stats.cost = [];
+stats = removevars(stats,["cost" "cv" "cvh"]);
+
 % Rename vars
 obs = renamevars(obs,["t" "cnd"],[o.timeVar o.condVar]);
 stats = renamevars(stats,"t",o.timeVar);
@@ -284,6 +372,7 @@ if o.gpu
 for t = 1:height(rc)
     % Indices for timepoint
     id = ac.t==rc.t(t);
+    if ~any(ac.use(id)); continue; end % skip if insufficient obs
 
     % Compute within timepoint
     [ac(id,:),rc(t,:)] = classifyTime_lfn(xc(id,:),ac(id,:),rc(t,:),classif,o);
@@ -291,8 +380,8 @@ end
 
 %% Finalize
 if o.gpu
-    rc = convertvars(rc,@isgpuarray,@gather);
     ac = convertvars(ac,@isgpuarray,@gather);
+    rc = convertvars(rc,@isgpuarray,@gather);
 end
 disp("[ec_classifyChSpec] Finished "+o.fun+": "+cNfo.sbjCh+" toc="+toc(tt));
 
@@ -303,7 +392,7 @@ disp("[ec_classifyChSpec] Finished "+o.fun+": "+cNfo.sbjCh+" toc="+toc(tt));
 
 % Compute within channel/IC %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [act,rct] = classifyTime_lfn(xct,act,rct,classif,o)
-% t=35; id=ac.t==rc.t(t); xct=xc(id,:); act=ac(id,:); rct=rc(t,:);
+% t=43; id=ac.t==rc.t(t); xct=xc(id,:); act=ac(id,:); rct=rc(t,:);
 
 % Outlier detection (all data)
 if o.olThrAll
@@ -332,17 +421,13 @@ if o.pca
 
 % Run classifier (unified) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [act,rct] = runClassifier_lfn(xct,act,rct,classif,o)
-% Get training indices
-idt = ismember(act.cnd,o.cond);
-idx = ismember(act.cnd,o.condx);
+% Get observation indices
+idt = act.use; % Training/testing/CV
+idx = ismember(act.cnd,o.condx); % Cross-classification 
 
-% Main cross-validation (stratified for balanced folds)
-oo = namedargs2cell(o.crossval);
-cv = cvpartition(act.y(idt),oo{:},Stratify=true); % GroupingVariable=at.tr(idt)
-
-% Hyperparameter tuning CV
+% Add CV for hyperparameter tuning opts
 oho = o.HyperparameterOptimizationOptions; % extract options
-oho.CVPartition = cvpartition(act.y(idt),KFold=o.hyperOptKFold,Stratify=true);
+oho.CVPartition = rct.cvh{1};
 
 
 %% Train & optimize
@@ -364,26 +449,34 @@ if o.fun=="fitclinear"
     oo = extractHyperparams_lfn(mdl,o); % extract optimized hyperparameters from main model
     oo = namedargs2cell(oo);
     % Run fitclinear with CV
-    mdlCV = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},'CVPartition',cv);
+    mdlCV = classif(xct(idt,:),act.y(idt),oo{:},'Cost',rct.cost{1},'CVPartition',rct.cv{1});
 else
-    mdlCV = mdl.crossval(CVPartition=cv);
+    mdlCV = mdl.crossval(CVPartition=rct.cv{1});
 end
 
 % Predict CV data
 [act.pred(idt),act.pp(idt,:)] = mdlCV.kfoldPredict;
 
+
+
 % Get CV performance
-[rct.auc,aucL,aucU] = auc(rocmetrics(mdlCV,alpha=o.alpha));
+rocm = rocmetrics(mdlCV,alpha=o.alpha);
+[rct.auc,aucL,aucU] = rocm.auc;
 rct.loss = mdlCV.kfoldLoss; % (Mode="individual")'
 
 
 %% Calculate classifier metrics
-act.acc = act.pred==act.y;
-act.pp1 = diff(act.pp,1,2);
+N = nnz(idt);
+Nx = nnz(idx);
+
+% Observations
+act.acc = act.pred==act.y; % accuracy
+act.pp1 = diff(act.pp,1,2); % posterior probability difference
 
 % CV accuracy
-rct.acc = mean(act.acc(idt),1,"omitmissing");
-rct.acc_p = 1 - binocdf(nnz(act.acc(idt))-1, nnz(idt), 0.5);
+rct.acc = mean(act.acc(idt),"omitmissing");
+rct.acc_SE = std(act.acc(idt),"omitmissing")/sqrt(N);
+rct.acc_p = 1 - binocdf(nnz(act.acc(idt))-1, N, 0.5);
 
 % CV balanced accuracy (ROC AUC)
 rct.auc1 = mean(rct.auc,"omitmissing");
@@ -392,16 +485,16 @@ rct.auc1_CI = [mean(aucL,"omitmissing") mean(aucU,"omitmissing")];
 % **OR** USE f1-score & its p-value?? (fit to binomial dist?)
 
 % CV posterior probability
-rct.pp = mean(act.pp(idt,:),1,"omitmissing");
-rct.pp1 = mean(act.pp1(idt),1,"omitmissing");
-rct.pp1_SD = std(act.pp1(idt),1,1,"omitmissing");
+rct.pp = mean(act.pp(idt,:),"omitmissing");
+rct.pp1 = mean(act.pp1(idt),"omitmissing");
+rct.pp1_SE = std(act.pp1(idt),"omitmissing")/sqrt(N);
 [~,rct.pp1_p] = ttest(act.pp1(idt));
 
 % CC posterior probability
 if any(idx)
-    rct.ppx = mean(act.pp(idx,:),1,"omitmissing");
-    rct.ppx1 = mean(act.pp1(idx),1,"omitmissing");
-    rct.ppx1_SD = std(act.pp1(idx),1,1,"omitmissing");
+    rct.ppx = mean(act.pp(idx,:),"omitmissing");
+    rct.ppx1 = mean(act.pp1(idx),"omitmissing");
+    rct.ppx1_SE = std(act.pp1(idx),"omitmissing")/sqrt(Nx);
     [~,rct.ppx1_p] = ttest(act.pp1(idx));
 end
 

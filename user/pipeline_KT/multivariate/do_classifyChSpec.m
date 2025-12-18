@@ -20,22 +20,28 @@ o.sfx = ""; % Suffix of input data (filled in subject loop)
 %% Options
 o.test = false;
 o.save = true;
-o.chBadFields = "bad"; % fields from n.chBad that exclude chans from stats
-o.psyVars = ["frame" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
+o.chBadFields = "bad"; % fields from n.chBad/icBad that exclude chans from analysis
 
-% Classifier processing options
+% Processing options
 o.gpu = false; % do GPU
 o.typeProc = "single"; % processing floating-point precision ("double"|"single")
 o.typeOut = "single"; % output floating-point precision ("double"|"single")
 
 % Timing for classification
-o.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+o.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
 o.timeRng = [-200 2000]; % Range of times to run (indlude baseline)
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
 
 % Conditions for classification
 o.condVar = "cond";
 o.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
-o.condx = ["Self" "Other"];       % Coditions to cross-classify (test only)
+o.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
+
+% Outliers within timepoint
+o.ol = "median"; % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
+o.olFill = "clip"; % Outlier fill method
+o.olThrAll = 7.5; % Outlier threshold (all observations)
+o.olThrCond = 3; % Outlier threshold (within-condition)
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -44,21 +50,24 @@ o.fdrDep = "unknown"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|
 
 % Classifier basic options
 o.fun = "fitcdiscr"; % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
-o.minN = 15; % minimum observations per sample per contrast per chan
-o.ol = "median"; % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
-o.olFill = "clip"; % Outlier fill method
-o.olThrAll = 7.5; % Outlier threshold (all observations)
-o.olThrCond = 3; % Outlier threshold (within-condition)
-o.pca = 0; % Number of spectral PCA components (0 = no PCA)
-%o.std = ""; % Standardize predictors (z-score)
+o.nMin = 30; % minimum observations per class within timepoint
+o.balanceConds = true; % balance sample size per class within timepoint 
+o.pca = 0; % Spectral PCA within timepoint (0 = no PCA)
+o.std = ""; % Standardize predictors (z-score)
+
+% Cross-validation parameters (mathworks.com/help/stats/crossval.html)
+o.crossval.KFold = 10; % o.crossval.Leaveout = "on";
+% Cross-validation for hyperparameter optimization
+o.hyperOptKFold = 5;
 
 % Classifier hyperparameters
+o.hyper = struct;
+o.hyper.Prior = "uniform";
 if o.fun == "fitcsvm"
     % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
     o.hyper.KernelFunction = "linear";
     o.hyper.BoxConstraint = 1;
     o.hyper.KernelScale = "auto";
-    %o.hyper.Prior = "empirical";
     o.hyper.Standardize = false;
     o.hyper.Solver = "SMO";
     o.hyper.CacheSize = "maximal";
@@ -69,7 +78,6 @@ elseif o.fun == "fitclinear"
     o.hyper.Lambda = "auto";
     o.hyper.Regularization = "ridge";
     o.hyper.Solver = "lbfgs";
-    o.hyper.Prior = "empirical";
     o.hyper.FitBias = true;
     o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = true;
@@ -81,15 +89,9 @@ elseif o.fun == "fitcknn"
     o.hyper.Distance = "euclidean";
     o.hyper.NumNeighbors = 25;
     o.hyper.DistanceWeight = "inverse";
-   % o.hyper.Prior = "empirical";
     o.hyper.std = true;
     % o.hyper.ScoreTransform = "invlogit";
 end
-
-% Cross-validation parameters (mathworks.com/help/stats/crossval.html)
-o.crossval.KFold = 10;
-% o.crossval.Leaveout = "on";
-o.hyperOptKFold = 5;
 
 % Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
 if o.fun == "fitcsvm"
@@ -152,16 +154,21 @@ o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.7; % LPF steepness
+o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
+o.pre.lpfSteep = 0.5; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral dimensionality reduction by PCA (skip=0)
 o.pre.pca = 0; % Spectral components to keep per channel
 % Spectral dimensionality reduction into bands (skip=[])
-o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+o.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+
+% o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+% o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+% o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 
 
@@ -219,12 +226,10 @@ for s = 1:height(logs.i{1})
             try
                 disp("STARTING: "+sbj);
                 logs.i{p}.o{s} = ec_classifyChSpec(o);
-                logs.i{p}.prep(s) = 1;
-                logs.i{p}.class(s) = 1;
+                logs.i{p}.class(s) = true;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;
-                logs.i{p}.prep(s) = 1;
-                logs.i{p}.class(s) = 0;
+                logs.i{p}.class(s) = false;
             end
 
             %% Save logs
