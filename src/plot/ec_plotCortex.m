@@ -52,6 +52,7 @@ arguments
     a.rmHidden logical = true % don't plot electrodes hidden from view
     a.lightColor = "w"
     a.lightStyle = "infinite"
+    a.align (1,1) logical = false % align vertex centers
     a.title string = "" % figure title
     a.titleSz (1,1) double = 8 % title text size
     a.visible logical = false % visible/interactive plot
