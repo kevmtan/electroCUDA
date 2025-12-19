@@ -31,10 +31,10 @@ tt = tic; % start timer
 % stats = classification statistics per channel & timebin
 
 %% Save
-fn = o.dirOut+"s"+n.sbjID+"_stats.mat";
-save(fn,"stats","-v7");
-fn = o.dirOut+"s"+n.sbjID+"_obs.mat";
-save(fn,"obs","-v7");
+o.saved.stats = o.dirOut+"s"+n.sbjID+"_stats.mat";
+save(o.saved.stats,"stats","-v7");
+o.saved.obs = o.dirOut+"s"+n.sbjID+"_obs.mat";
+save(o.saved.obs,"obs","-v7");
 disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
 
 
@@ -112,7 +112,7 @@ nCondx = numel(o.condx);
 
 % Get vars from 'ep' to include in analysis template (to save for further analysis)
 psyVars = ismember(ep.Properties.VariableNames,...
-    ["run" "tr" "cnd" "t" "sbjID" "ide" o.psyVars]);
+    ["run" "tr" "cnd" "t" "sbjID" o.psyVars]);
 
 
 %% Make analysis template
@@ -128,7 +128,7 @@ a.sbjCh(:) = "";
 % Organize analysis template
 a.use(ismember(a.cnd,o.cond)) = true; % use if one of the main conds (train/test)
 a = movevars(a,"sbjCh","Before",1);
-a = movevars(a,["ch" "sbjID" "ide"],"After","use");
+a = movevars(a,["ch" "sbjID"],"After","use");
 a.Properties.RowNames = {};
 
 
@@ -337,9 +337,21 @@ stats = sortrows(vertcat(stats{:}),["ch" "t"],"ascend");
 
 
 %% FDR
-stats.acc_q = ec_fdr(stats.acc_p,o.alpha,o.fdrDep);
-stats.pp1_q = ec_fdr(stats.pp1_p,o.alpha,o.fdrDep);
-stats.ppx1_q = ec_fdr(stats.ppx1_p,o.alpha,o.fdrDep);
+vs = string(stats.Properties.VariableNames);
+vsP = vs(contains(vs,"_p")); % pval vars
+vsQ = vs(contains(vs,"_q")); % fdr vars
+id = stats.t>=o.fdrTimeRng(1) & stats.t<=o.fdrTimeRng(2); % fdr time range
+
+
+% Loop across q vars
+for v = 1:numel(vsQ)
+    % Loop across var columns -- KEEP THIS??
+    for w = 1:width(stats.(vsQ(v)))
+        % do FDR
+        stats.(vsQ(v))(id,w) = ec_fdr(stats.(vsP(v))(id,w),...
+            o.alpha,o.fdrDep);
+    end
+end
 
 
 %% Finalize
@@ -456,8 +468,6 @@ end
 
 % Predict CV data
 [act.pred(idt),act.pp(idt,:)] = mdlCV.kfoldPredict;
-
-
 
 % Get CV performance
 rocm = rocmetrics(mdlCV,alpha=o.alpha);

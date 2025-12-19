@@ -208,8 +208,8 @@ try delete(gcp("nocreate")); catch;end
 try parpool("threads"); catch;end
 
 % Loop across subjects
-for s = 1:height(logs.i{1})
-    for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
+for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
+    for s = 1:height(logs.i{p})
         if ~logs.i{p}.class(s)
             % Set options struct per subject
             sbj = logs.i{p}.sbj(s);
@@ -220,11 +220,11 @@ for s = 1:height(logs.i{1})
             o.dirOut = logs.out(p);
             sbjID = logs.i{p}.sbjID(s);
             %o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
+            disp("STARTING: "+sbj);
 
             %% Run subject
             if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
-            try
-                disp("STARTING: "+sbj);
+            try               
                 logs.i{p}.o{s} = ec_classifyChSpec(o);
                 logs.i{p}.class(s) = true;
             catch ME; getReport(ME)
