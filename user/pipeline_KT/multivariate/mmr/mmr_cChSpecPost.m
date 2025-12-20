@@ -107,7 +107,7 @@ function st = furtherAnalysis_lfn(st,ob,o)
 
 
 %% Mean posterior probability per cond
-if ~isany(st.ppc)
+if any(isnan(st.ppc),"all")
     % Main conds
     for c = 1:numel(o.cond)
         id = ob.cnd == o.cond(c);
@@ -131,7 +131,7 @@ end
 
 
 %% Regression on cross-classification posterior probability
-if isany(o.condx) && ~isany(st.ppr_cx)
+if isany(o.condx) && any(isnan(st.ppr_cx),"all")
     id = ismember(ob.cnd,o.condx);
 
     % Cond/class differences

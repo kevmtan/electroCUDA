@@ -1,7 +1,7 @@
 % Run analyses on resuls of classifyChSpec
 
 % Log filename
-fnLog = "/01/lbcn/anal/classifyChSpec/MzAb_regLDA_ch_251218/log_251218_0914.mat";
+fnLog = "/01/lbcn/anal/classifyChSpec/MzAb_regLDA_ch_251217/log_251217_0732.mat";
 
 % Load logs
 load(fnLog,"logs")
