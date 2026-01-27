@@ -45,7 +45,7 @@ arguments
     % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
     o.freqs {islogical,isnumeric} = [];
     % Spectral dimensionality reduction by PCA (skip=0)
-    o.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
+    o.pca (1,1) double = 0;                 % Spectral components to keep per channel
     % Spectral dimensionality reduction into bands (skip=[])
     o.bands string = "";                        % Band name
     o.bands2 string = "";                       % Band display name
@@ -153,14 +153,14 @@ if isany(o.freqs) && size(x,3)>1
         n.freqKeepIdx = o.freqs(:);
     else 
         % Frequency ranges
-        for b = 1:size(n.freqs,1)
+        for b = 1:size(o.freqs,1)
             n.freqKeepIdx = [n.freqKeepIdx;...
                 n.freqs>o.freqs(b,1) & n.freqs<=o.freqs(b,2)];
         end
     end
-    n.freqs = n.freqs(n.freqKeepIdx);
 
-    % Remove from EEG data
+    % Keep specified freqs in EEG data
+    n.freqs = n.freqs(n.freqKeepIdx);
     x = x(:,:,n.freqKeepIdx);
 end
 
@@ -179,7 +179,7 @@ if isany(o.bands)
 end
 
 % Preallocate PCA weights
-if o.pcaSpec
+if o.pca
     pcaWts = cell(1,n.xChs); end
 
 
@@ -211,10 +211,21 @@ end
 
 % Log-transform
 if o.log || o.mag2db
+    % Find negative values
     idNeg = x < eps(cast(0,like=x));
+    x(idNeg) = eps(cast(0,like=x));
     if any(idNeg,"all")
         warning("[ec_preprocBaseline] Log-transform: negative values found in 'x' ("+...
             (nnz(idNeg)/numel(x))*100+"%), converting to eps(0)");
+    end
+
+    % Transform
+    if o.mag2db
+        % Magnitude to decible 
+        % TO DO: add error if not magnitude (make n.spectOpts??) !!!
+        x = mag2db(x); 
+    elseif o.log
+        x = log(x); % Natural log
     end
 end
 
@@ -243,13 +254,13 @@ x = cellfun(@(y) permute(y,[1 3 2]),x,'UniformOutput',false);
 x = horzcat(x{:});
 
 % Save PCA weights
-if o.pcaSpec
-    n.pcaWts = pcaWts; end
+if o.pca
+    n.spectPCA = pcaWts; end
 
 % Save spectral info
 n.nSpect = size(x,3);
 n.spect = table;
-if o.pcaSpec
+if o.pca
     n.spect.name = "pc"+(1:n.nSpect)';
     n.spect.disp = "Spectral PC "+(1:n.nSpect)';
 elseif isany(o.bands)
@@ -291,19 +302,6 @@ xc = cast(xc,o.typeProc);
 if o.gpu
     xc = gpuArray(xc); end
 
-% Log-transform
-if o.log || o.mag2db
-    % Find negative numbers & convert to nan
-    idNeg = xc < eps(cast(0,like=xc));
-    xc(idNeg) = eps(cast(0,like=xc));
-
-    if o.mag2db
-        xc = mag2db(xc); % Magnitude to decible 
-    elseif o.log
-        xc = log(xc); % Natural log
-    end
-end
-
 % Reshape per run
 xc = mat2cell(xc,n.runIdxOg);
 
@@ -331,8 +329,8 @@ if isany(o.trialNorm) || isany(o.trialBaseline)
 end
 
 % Spectral PCA (use ec_robustPCA??)
-if o.pcaSpec
-    [chWts,xc] = pca(xc,NumComponents=o.pcaSpec,Economy=false);
+if o.pca
+    [chWts,xc] = pca(xc,NumComponents=o.pca);
 else
     chWts = [];
 end
@@ -340,7 +338,7 @@ end
 % Get from GPU
 if o.gpu
     xc = gather(xc);
-    if o.pcaSpec; chWts = gather(chWts); end
+    if o.pca; chWts = gather(chWts); end
 end
 
 % Output at specified float precision
