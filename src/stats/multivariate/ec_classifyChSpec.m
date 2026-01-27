@@ -27,7 +27,7 @@ tt = tic; % start timer
 
 %% Classification
 [obs,stats] = classify_lfn(x,a,r,n,o,tt);
-% obs = classification of observationsall(nPerClass==nMin)
+% obs = classification of observations
 % stats = classification statistics per channel & timebin
 
 %% Save
@@ -35,7 +35,7 @@ o.saved.stats = o.dirOut+"s"+n.sbjID+"_stats.mat";
 save(o.saved.stats,"stats","-v7");
 o.saved.obs = o.dirOut+"s"+n.sbjID+"_obs.mat";
 save(o.saved.obs,"obs","-v7");
-disp("[ec_classifyChSpec] Saved classificiation results: "+fn+" toc="+toc(tt));
+disp("[ec_classifyChSpec] Saved classificiation results: "+o.saved.stats+" toc="+toc(tt));
 
 
 
@@ -319,7 +319,7 @@ obs = cell(chsN,1);
 stats = cell(chsN,1);
 
 
-%% Compute across timebins
+%% Compute across channels/ICs
 if o.gpu
     for c = 1:chsN
         [obs{c},stats{c}] = classifyCh_lfn(x(:,c,:),a,r,o,classif,chNfo(c,:),tt);
@@ -380,7 +380,7 @@ ac.sbjCh(:)=cNfo.sbjCh; rc.sbjCh(:)=cNfo.sbjCh;
 if o.gpu
     xc = gpuArray(xc); end
 
-%% Loop across channels/ICs
+%% Loop across time
 for t = 1:height(rc)
     % Indices for timepoint
     id = ac.t==rc.t(t);
