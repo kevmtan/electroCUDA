@@ -42,8 +42,8 @@ arguments
     o.olThr (1,1) double = 5;                   % Threshold for outlier
     o.olThr2 (1,1) double = 0;                  % Threshold for outlier
     o.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
-    % Remove spectral frequencies (indices for dim3)
-    o.rmFreqs {islogical,isnumeric} = [];
+    % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
+    o.freqs {islogical,isnumeric} = [];
     % Spectral dimensionality reduction by PCA (skip=0)
     o.pcaSpec (1,1) double = 0;                 % Spectral components to keep per channel
     % Spectral dimensionality reduction into bands (skip=[])
@@ -143,18 +143,25 @@ if o.hpf || o.lpf
     end
 end
 
-% Remove spectral indices (frequencies)
-if isany(o.rmFreqs)
-    n.freqsOg = n.freqs;
-    if islogical(o.rmFreqs)
-        n.keptFreqIdx = ~o.rmFreqs;
-    else
-        n.keptFreqIdx = ~ismember((1:n.nFreqs)',o.rmFreqs);
+% Spectral frequencies to keep
+if isany(o.freqs) && size(x,3)>1 
+    n.freqsOg = n.freqs; % save old frequencies
+    n.freqKeepIdx = logical([]);
+
+    % Find frequency indices to keep
+    if islogical(o.freqs)
+        n.freqKeepIdx = o.freqs(:);
+    else 
+        % Frequency ranges
+        for b = 1:size(n.freqs,1)
+            n.freqKeepIdx = [n.freqKeepIdx;...
+                n.freqs>o.freqs(b,1) & n.freqs<=o.freqs(b,2)];
+        end
     end
-    n.freqs = n.freqs(n.keptFreqIdx);
+    n.freqs = n.freqs(n.freqKeepIdx);
 
     % Remove from EEG data
-    x = x(:,:,n.keptFreqIdx);
+    x = x(:,:,n.freqKeepIdx);
 end
 
 % Spectral Band indices
@@ -246,7 +253,7 @@ if o.pcaSpec
     n.spect.name = "pc"+(1:n.nSpect)';
     n.spect.disp = "Spectral PC "+(1:n.nSpect)';
 elseif isany(o.bands)
-    n = renameStructField(n,"bands","spect");
+    n.spect = n.bands; % renameStructField(n,"bands","spect");
 elseif n.nSpect > 1
     n.spect.name = "f"+(1:n.nSpect)';
     n.spect.disp = round(n.freqs,2) + " hz";
