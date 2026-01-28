@@ -41,8 +41,8 @@ else
 end
 
 % Remove bad chans/ICs
-x(:,chBad,:) = [];
-sbjChs(chBad,:) = [];
+x(:,o.chBad,:) = [];
+sbjChs(o.chBad,:) = [];
 
 
 %% Analysis template
@@ -216,7 +216,7 @@ for t = 1:nTimes
 end
 
 
-%% Within-contrast FDR
+%% Within-channel FDR
 
 % Find rows within FDR timerange
 if numel(o.fdrTimeRng)==2

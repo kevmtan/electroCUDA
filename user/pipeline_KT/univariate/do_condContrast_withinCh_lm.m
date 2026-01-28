@@ -50,7 +50,7 @@ o.timeVar = "bin"; % Time variable ["frame"|"latency"|"bin"|"binPct"|"binRT"]
 o.timeRng = [-200 2000]; % Range of times to run (include baseline)
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
+o.fdrDep = "unknown"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
 o.minN = 15; % minimum observations per sample per contrast per chan
 o.robust = true; % use robust regression
 
@@ -69,7 +69,7 @@ o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.epoch.max = nan; % Max duration after stim onset, supercedes 'post' [nan = no limit]
 % Epoch time bins
-o.epoch.bin = 0.05; % latency bin width (secs)
+o.epoch.bin = 0.01; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -87,6 +87,7 @@ o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same 
 o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
+o.pre.mag2db = true; % Log-transform magnitude to decibel
 o.pre.runNorm = "robust"; % Normalize run
 o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
