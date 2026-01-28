@@ -190,6 +190,7 @@ if ~exist('logs','var')
     logs.i{1}.sbj = string(sbjs);
     logs.i{1}.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
     logs.i{1}.class(:) = false;
+    logs.i{1}.post(:) = false;
     logs.i{1}.plot(:) = false;
     logs.i{1}.o = cell(numel(sbjs),1);
     logs.i{1}.time(:) = startTime;

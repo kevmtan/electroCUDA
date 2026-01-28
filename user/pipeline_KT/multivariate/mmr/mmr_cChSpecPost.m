@@ -107,26 +107,25 @@ function st = furtherAnalysis_lfn(st,ob,o)
 
 
 %% Mean posterior probability per cond
-if any(isnan(st.ppc),"all")
-    % Main conds
-    for c = 1:numel(o.cond)
-        id = ob.cnd == o.cond(c);
-        N = nnz(id);
-        
-        st.ppc(1,c) = mean(ob.pp1(id),"omitmissing");
-        st.ppc_SE(1,c) = std(ob.pp1(id),"omitmissing") / sqrt(N);
-        [~,st.ppc_p(1,c)] = ttest(ob.pp1(id));
-    end
 
-    % Cross-classification conds
-    for c = 1:numel(o.condx)
-        id = ob.cnd == o.condx(c);
-        N = nnz(id);
+% Main conds
+for c = 1:numel(o.cond)
+    id = ob.cnd == o.cond(c);
+    N = nnz(id);
 
-        st.ppcx(1,c) = mean(ob.pp1(id),"omitmissing");
-        st.ppcx_SE(1,c) = std(ob.pp1(id),"omitmissing") / sqrt(N);
-        [~,st.ppcx_p(1,c)] = ttest(ob.pp1(id));
-    end
+    st.ppc(1,c) = mean(ob.pp1(id),"omitmissing");
+    st.ppc_SE(1,c) = std(ob.pp1(id),"omitmissing") / sqrt(N);
+    [~,st.ppc_p(1,c)] = ttest(ob.pp1(id));
+end
+
+% Cross-classification conds
+for c = 1:numel(o.condx)
+    id = ob.cnd == o.condx(c);
+    N = nnz(id);
+
+    st.ppcx(1,c) = mean(ob.pp1(id),"omitmissing");
+    st.ppcx_SE(1,c) = std(ob.pp1(id),"omitmissing") / sqrt(N);
+    [~,st.ppcx_p(1,c)] = ttest(ob.pp1(id));
 end
 
 

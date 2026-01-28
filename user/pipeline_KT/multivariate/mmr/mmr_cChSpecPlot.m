@@ -46,8 +46,11 @@ end
 
 function plotCh_lfn(st,d,o,op)
 %% Plot channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ch=92; st=stats{ch}; d=d0;
-od = op.o1D;
+% ch=71; st=stats{ch}; d=d0;
+od = op.od;
+odc = op.odc;
+odc1 = op.odc1;
+odr = op.odr;
 
 % Channel 
 sbjCh = st.sbjCh(1);
@@ -71,7 +74,7 @@ ht = tiledlayout(h,3,2,TileSpacing="compact",padding="tight"); % tiledlayout
 
 % Title
 if any(op.txtSz)
-    title(ht,replace(sbjCh,"_"," "),FontSize=op.txtSz*1.5,FontWeight="bold"); end
+    title(ht,replace(sbjCh,"_"," "),FontSize=op.txtSz,FontWeight="bold"); end
 
 
 %% Plot cortex
@@ -86,7 +89,7 @@ ha.Visible="off";
 %% Accuracy
 y = st.acc;
 ySig = y;
-ySig(~(st.acc_q<o.alpha)) = nan;
+ySig(~(st.acc_q<o.alpha) | st.t<0) = nan;
 
 ha = nexttile(ht);
 title(ha,"Accuracy",FontSize=op.txtSz);
@@ -102,55 +105,55 @@ plot([0 0],ylim,"k-","LineWidth",od.wSig);
 y = [st.ppc,st.ppcx];
 ySE = [st.ppc_SE,st.ppcx_SE];
 ySig = y;
-ySig(~(st.ppc_q(:,1)<o.alpha),1) = nan;
-ySig(~(st.ppc_q(:,2)<o.alpha),2) = nan;
-ySig(~(st.ppcx_q(:,1)<o.alpha),3) = nan;
-ySig(~(st.ppcx_q(:,2)<o.alpha),4) = nan;
+ySig(~(st.ppc_q(:,1)<o.alpha) | st.t<0,1) = nan; % semantic
+ySig(~(st.ppc_q(:,2)<o.alpha) | st.t<0,2) = nan; % episodic
+ySig(~(st.ppcx_q(:,1)<o.alpha) | st.t<0,3) = nan; % self
+ySig(~(st.ppcx_q(:,2)<o.alpha) | st.t<0,4) = nan; % other
 
 ha = nexttile(ht);
-title(ha,"Posterior Probability per Cond",FontSize=op.txtSz);
+title(ha,"Posterior Probability",FontSize=op.txtSz);
 ha.XLim = o.timeRng;
-mseb(st.t',y',ySE',od,1);
+mseb(st.t',y',ySE',odc,1);
 hold on; axis tight;
-plot(st.t,ySig(:,1),"-","Color",od.col{1},"LineWidth",od.wSig);
-plot(st.t,ySig(:,2),"-","Color",od.col{2},"LineWidth",od.wSig);
-plot(st.t,ySig(:,3),"-","Color",od.col{3},"LineWidth",od.wSig);
-plot(st.t,ySig(:,4),"-","Color",od.col{4},"LineWidth",od.wSig);
-plot(xlim,[0 0],"k-","LineWidth",od.wSig);
-plot([0 0],ylim,"k-","LineWidth",od.wSig);
+plot(st.t,ySig(:,1),"-","Color",odc.col{1},"LineWidth",odc.wSig);
+plot(st.t,ySig(:,2),"-","Color",odc.col{2},"LineWidth",odc.wSig);
+plot(st.t,ySig(:,3),"-","Color",odc.col{3},"LineWidth",odc.wSig);
+plot(st.t,ySig(:,4),"-","Color",odc.col{4},"LineWidth",odc.wSig);
+plot(xlim,[0 0],"k-","LineWidth",odc.wSig);
+plot([0 0],ylim,"k-","LineWidth",odc.wSig);
 
 
 %% RT/valence
 y = [st.ppr_RT,st.ppr_val];
 ySE = [st.ppr_RT_SE,st.ppr_val_SE];
 ySig = y;
-ySig(~(st.ppr_RT_q<o.alpha),1) = nan;
-ySig(~(st.ppr_val_q<o.alpha),2) = nan;
+ySig(~(st.ppr_RT_q<o.alpha) | st.t<0,1) = nan;
+ySig(~(st.ppr_val_q<o.alpha) | st.t<0,2) = nan;
 
 ha = nexttile(ht);
 title(ha,"Posterior Probability Regression",FontSize=op.txtSz);
 ha.XLim = o.timeRng;
-mseb(st.t',y',ySE',od,1);
+mseb(st.t',y',ySE',odr,1);
 hold on; axis tight;
-plot(st.t,ySig(:,1),"-","Color",od.col{1},"LineWidth",od.wSig);
-plot(st.t,ySig(:,2),"-","Color",od.col{2},"LineWidth",od.wSig);
-plot(xlim,[0 0],"k-","LineWidth",od.wSig);
-plot([0 0],ylim,"k-","LineWidth",od.wSig);
+plot(st.t,ySig(:,1),"-","Color",odr.col{1},"LineWidth",odr.wSig);
+plot(st.t,ySig(:,2),"-","Color",odr.col{2},"LineWidth",odr.wSig);
+plot(xlim,[0 0],"k-","LineWidth",odr.wSig);
+plot([0 0],ylim,"k-","LineWidth",odr.wSig);
 
 
 %% PP cond difference
 y = st.ppr_cx;
 ySig = y;
-ySig(~(st.ppr_cx_q<o.alpha)) = nan;
+ySig(~(st.ppr_cx_q<o.alpha) | st.t<0) = nan;
 
 ha = nexttile(ht);
 title(ha,"Posterior Probability (Other-Self)",FontSize=op.txtSz);
 ha.XLim = o.timeRng;
-mseb(st.t',y',st.ppr_cx_SE',od,1);
+mseb(st.t',y',st.ppr_cx_SE',odc1,1);
 hold on; axis tight;
-plot(st.t,ySig,"-","Color",od.col{1},"LineWidth",od.wSig);
-plot(xlim,[0 0],"k-","LineWidth",od.wSig);
-plot([0 0],ylim,"k-","LineWidth",od.wSig);
+plot(st.t,ySig,"-","Color",odc1.col{1},"LineWidth",odc1.wSig);
+plot(xlim,[0 0],"k-","LineWidth",odc1.wSig);
+plot([0 0],ylim,"k-","LineWidth",odc1.wSig);
 
 
 %% Save
