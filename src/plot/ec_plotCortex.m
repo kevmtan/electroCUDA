@@ -192,7 +192,9 @@ for l = 1:hemN
                 if ismember(view,["lateral","medial"])
                     iCh(iCh) = ismember(d.lat(iCh),[view "both" ""]); end
                 % Skip elec plots if no elecs left
-                if ~any(iCh); warning("no electrodes for: "+hem+" "+view); continue; end
+                if ~any(iCh); warning("no electrodes for: "+hem+" "+view);
+                    continue;
+                end
             end
 
             % Plot electrode channels

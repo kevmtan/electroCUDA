@@ -1,9 +1,11 @@
 %% Load stats processing log
 if ~exist("logs","var")
-    load("/01/lbcn/anal/stimBL/bandLM_ch_251124/log_251124_0940.mat")
+    load("/01/lbcn/anal/condContrast/mzAutoMath_ch_251124/log_251124_0838.mat")
 end
 
 %% Plot cortex options
+plotName = "b_q0001_onlyECoG";
+
 proj = "lbcn";
 task = "MMR"; % task name
 dirs = ec_getDirs(proj,task);
@@ -28,7 +30,8 @@ if ~exist("op","var")
     op.fsSbj = "fsaverage";
 
     % Channels to exclude
-    op.chBadFields = "bad";
+    op.chBadFields = "bad"; % chNfo.bad
+    op.chRmFun = @(c) ~c.ECoG; 
 
     % Condition/contrast
     op.condVar = "con"; % variable for condition, contrast, or test (in stats table)
@@ -43,13 +46,13 @@ if ~exist("op","var")
     op.frqs = []; % frequency names to plot (empty=all)
 
     % Activation metric
-    op.actVar = "t"; % activity variable for electrode plot color (in stats table)
+    op.actVar = "b"; % activity variable for electrode plot color (in stats table)
     op.actUnit = "z"; % activity unit to display in fig
-    op.clim = [-10 10]; %[-1 1] [-7 7] % limits for activity colorscale
+    op.clim = [-1 1]; %[-2 2]; %[-1 1] [-7 7] % limits for activity colorscale
 
     % Statistical significance
     op.sigVar = "q"; % statistical significance variable (in stats table)
-    op.sigThr = 0.01; % significance threshold (default=0.05, none=0)
+    op.sigThr = 0.0001; % significance threshold (default=0.05, none=0)
 
     % Plotting
     op.posVar = "MNI"; % position variable in chNfo table (should match surfType)
@@ -58,28 +61,33 @@ if ~exist("op","var")
     op.alpha = 0.95; % cortex opacity
     op.marker = "o"; % marker type (see Matlab marker symbols)
     op.nsMark = "o"; % marker type for nonsignificant chans (see Matlab marker symbols)
-    op.markSz = 9; % marker size for significant chans;
+    op.markSz = 5; % marker size for significant chans;
     op.nsSz = 3; % marker size for nonsignificant chans;
     op.bSz = 0; % marker border size
     op.cmap = "RdBu"; % colormap (see ec_colorsFromValues)
     op.nsCol = [0 0 0]; % marker color for nonsignificant chans: [R G B]
     op.bCol = [0 0 0]; % marker border color: [R G B]
     op.txtCol = [.8 .8 .8]; % Text color: [R G B]
-    op.txtSz = 10; % text size
+    op.txtSz = 10; % text size (0 = no titles)
     op.labelVars = ["sbjCh" op.actVar op.sigVar]; % channel label variable (for visible/interactive plots)
 
     % Individual plots per cond/time/freq
     op.indiv.do = false;
-    op.indiv.saveDir = "indiv";
+    op.indiv.saveDir = "indiv_"+plotName;
     op.indiv.res = [1980 1080];
-    op.indiv.title = true; % add titles?
 
     % Condition plots showing subplots per time & freq
     op.cond.do = true;
-    op.cond.saveDir = "con_t_q01";
+    op.cond.saveDir = "con_"+plotName;
     op.cond.res = [1980 1080];
-    op.cond.title = true; % add titles? 
 end
+
+
+
+%% Start parfor
+try delete(gcp("nocreate")); catch;end
+try parpool("local6"); catch;end
+
 
 
 %% Loop across channel vs IC data
@@ -93,7 +101,7 @@ for p = 1 %1:2
 end
 
 
-%%
-if 0
-    ec_plotTimesCortex(op,[],stats,chs) %#ok<UNRCH>
-end
+
+
+
+%   ec_plotTimesCortex(op,[],stats,chs);

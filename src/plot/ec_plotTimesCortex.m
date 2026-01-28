@@ -61,14 +61,22 @@ chs(~ismember(chs.sbjCh,stats.sbjCh),:) = [];
 
 % Remove chans with no position coords
 id = isnan(chs.pos(:,1));
-chs(id,:) = [];
 stats(ismember(stats.sbjCh,chs.sbjCh(id)),:) = [];
+chs(id,:) = [];
+
+% Remove chans with specified function on 'chs' fields
+if ~isempty(op.chRmFun)
+    id = op.chRmFun(chs);
+    stats(ismember(stats.sbjCh,chs.sbjCh(id)),:) = [];
+    chs(id,:) = [];
+end
 
 % Remove bad chans
-id = any(chs.bad{:,op.chBadFields},2);
-chs(id,:) = [];
-stats(ismember(stats.sbjCh,chs.sbjCh(id)),:) = [];
-
+if isany(op.chBadFields)
+    id = any(chs.bad{:,op.chBadFields},2);
+    stats(ismember(stats.sbjCh,chs.sbjCh(id)),:) = [];
+    chs(id,:) = [];
+end
 
 
 %% Make plot data
@@ -282,7 +290,7 @@ dp.frq = categorical(dp.frq,frqs.name,Ordinal=true);
 
 
 
-%%% Make individual images per plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Run individual images per plot %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function indiv_lfn(dp,op)
 % Make directory
 dirOut = op.dirOut+op.indiv.saveDir+filesep;
@@ -291,29 +299,38 @@ if ~exist(dirOut,"dir")
 conds = categories(dp.cnd);
 
 %% Loop across plots
-for p = 1:height(dp)
-    % Title text
-    if isany(dp.frq); txt = dp.frqD(p)+" | "; else; txt = ""; end
-    txt = txt + string(dp.cnd(p))+" | "+dp.time(p)+op.timeUnit;
+parfor p = 1:height(dp)
+    plotIndiv_lfn(dp(p,:),op,conds,dirOut);
+end
 
-    % Initialize figure
-    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
-            Theme="light",Color="w");
-    
-    % Plot cortex
-    ec_plotCortex("L",["lateral","medial"],dp.d{p},h,sbj=op.fsSbj,sbjDir=op.fsDir,...
-        surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
-        title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
 
-    %% Save
-    if op.save && ~op.test
-        c = find(conds==dp.cnd(p));
-        fn = dirOut+c+"_"+string(dp.cnd(p))+"_"+string(dp.frq(p))+"_"+dp.time(p)+".png";
-        exportgraphics(h,fn,Resolution=150);
-        disp("[ec_PlotTimesCortex] saved: "+fn);
-        delete(h);
-    end
 
+
+
+
+%%% Plot individual image %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function plotIndiv_lfn(dpp,op,conds,dirOut)
+% Title text
+if isany(dpp.frq); txt = dpp.frqD+" | "; else; txt = ""; end
+txt = txt + string(dpp.cnd)+" | "+dpp.time+op.timeUnit;
+
+% Initialize figure
+h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+    Theme="light",Color="w");
+
+% Plot cortex
+ec_plotCortex("L",["lateral","medial"],dpp.d,h,sbj=op.fsSbj,sbjDir=op.fsDir,...
+    surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
+    title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
+
+%% Save
+if op.save && ~op.test
+    c = find(conds==dpp.cnd);
+    fn = dirOut+c+"_"+string(dpp.cnd)+"_"+string(dpp.frq)+"_"+dpp.time+".jpg";
+    print(h,fn,"-djpeg","-r150");
+    % exportgraphics(h,fn,Resolution=150);
+    disp("[ec_PlotTimesCortex] saved: "+fn);
+    delete(h);
 end
 
 
@@ -328,12 +345,13 @@ dirOut = op.dirOut+op.cond.saveDir+filesep;
 if ~exist(dirOut,"dir")
     mkdir(dirOut); end
 
-conds = categories(dp.cnd);
+% Split plot data by cond for parfor
+dp = splitapply(@(ci){dp(ci,:)},(1:height(dp))',findgroups(dp.cnd));
 
 %% Loop across plots
-for c = 1:numel(conds)
+parfor c = 1:numel(dp)
     %%
-    plotCond_lfn(dp(dp.cnd==conds(c),:),c,dirOut,op);
+    plotCond_lfn(dp{c},c,dirOut,op);
 end
 
 
@@ -384,8 +402,9 @@ end
 
 %% Save
 if op.save && ~op.test
-    fn = dirOut+c+"_"+dc.cnd(1)+".png";
-    exportgraphics(h,fn,Resolution=150);
+    fn = dirOut+c+"_"+dc.cnd(1)+".jpg";
+    print(h,fn,"-djpeg","-r150");
+    % exportgraphics(h,fn,Resolution=150);
     disp("[ec_PlotTimesCortex] saved: "+fn);
     delete(ht); delete(h);
 end
