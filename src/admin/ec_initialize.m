@@ -122,7 +122,6 @@ end
 %% Get behavioral data & align with neural data (trialNfo & psy)
 fn = o.dirOut+"trialNfo"+hz_s+"_"+o.fnStr+".mat";
 fn2 = o.dirOut+"psy"+hz_s+"_"+o.fnStr+".mat";
-psy=[]; trialNfo=[];
 
 % Do trialNfo & psy
 if ~isfile(fn) || ~isfile(fn2) || a.redoBeh || a.redo
@@ -131,12 +130,33 @@ if ~isfile(fn) || ~isfile(fn2) || a.redoBeh || a.redo
     end
 
     % Make trialNfo & psy
-    [psy,trialNfo,n] = ec_concatRunsBehav_MMR(sbj,task,proj,hzTarget=hz);
+    [psy,trialNfo,n] = ec_concatRunsBehav_MMR(n,hzTarget=hz);
     disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": made trialNfo & psy");
 else
     % Load trialNfo & psy
-    if nargout>4; load(fn,"trialNfo"); load(fn2,"psy");
-        disp("LOADED: "+fn); disp("LOADED: "+fn2); end
+    load(fn,"trialNfo"); load(fn2,"psy");
+    disp("LOADED: "+fn); disp("LOADED: "+fn2);
+
+    % Save info to n
+    n.nFrames = height(psy);
+    n.nRuns = numel(unique(trialNfo.run));
+    n.nTrials = height(trialNfo);
+    n.runs = unique(trialNfo.run);
+    n.runIdx = nan(n.nRuns,2);
+    n.runIdxOg = nan(n.nRuns,1);
+    n.runTimes = seconds(nan(n.nRuns,2));
+    n.runTimesOg = seconds(nan(n.nRuns,1));
+    for r = 1:n.nRuns
+        run = n.runs(r);
+        idx = psy.idx(psy.run==run);
+        n.runIdx(r,:) = [min(idx) max(idx)];
+        n.runIdxOg(r) = psy.idr(max(idx));
+        n.runTimes(r,:) = [psy.Time(min(idx)) psy.Time(max(idx))];
+        n.runTimesOg(r) = psy.timeR(max(idx));
+    end
+    n.conds = unique(trialNfo.cond);
+    n.nConds = numel(n.conds);
+    disp(sbj+": updated 'n"+o.suffix+"' with info from 'trialNfo' & 'psy'");
 end
 
 
