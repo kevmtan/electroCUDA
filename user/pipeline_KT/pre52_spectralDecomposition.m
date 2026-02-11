@@ -6,7 +6,6 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 % s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
-sbjs="S12_38_LK";
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -18,16 +17,17 @@ o = struct;
 o.suffix = "s";
 o.sfx_src = "";
 
-o.gpu = "no"; % Run on... ["no"|"matlab"|"cuda"]
-o.hzTarget = 100; % Downsample target in Hz (default=[]: no downsample)
+o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
+o.hzTarget = 200; % Downsample target in Hz (default=[]: no downsample)
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 o.lpfSteep = 0.85;
 
 % Wavelet coherence
 o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
+o.avg = false; % Full-spectrum (false) of scale-spectrum (true)
 o.fName = "spec"; % Name of frequency analysis
-o.fLims = [1 300]; % frequency limits in hz; HFB=[70 200]
+o.fLims = [2 300]; % frequency limits in hz; HFB=[70 200]
 o.fMean = false; % Collapse across frequency bands (for 1d vector output)
 o.fVoices = 10; % Voices per octave (default=10, HFB=18)
 o.fOut = "decibel";
@@ -38,12 +38,10 @@ o.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRu
 o.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
 o.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
 o.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
-o.hiPass = []; %"asr"; %"ASR"; % Hi-pass cutoff in hertz (skip=0)
-o.hiPassGPU = false; % GPU slower than CPU??
 
 
 %% Log
-sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc/spec_'...
+sbjFinFn = ['/01/lbcn/logs/preproc/spec_'...
     char(datetime('now','TimeZone','local','Format','yyMMdd_HHmm')) '_errors.mat'];
 if ~exist('status','var')
     status = table;

@@ -44,8 +44,7 @@ end
 %% Prep
 
 % Floating-point precision
-if isa(x,"single"); o.single = true; % Input data type is single
-elseif o.single; x = single(x); % Convert to single if specified
+if o.single; x = single(x); % Convert to single if specified
 elseif ~isa(x,"double"); x = double(x); % Convert to double if not
 end 
 
@@ -197,9 +196,12 @@ else
         % Convert to magnitude (amplitude)
         xc = abs(xc); 
 
-        % Convert to power
         if o.pwr
+            % Convert to power
             xc = xc.^2;
+        elseif o.db
+            % Convert to decibel
+            xc = mag2db(xc);
         end
     end
 end
@@ -208,7 +210,7 @@ end
 %% Downsample
 if o.ds
     if isempty(o.lpfFilt)
-        xc = resample(xc,1,ds);
+        xc = resample(xc,1,o.ds);
     else
         xc = ec_filtfilt(xc,o.lpfFilt); % apply anti-aliasing filter
         xc = xc(1:o.ds:end,:); % decimate

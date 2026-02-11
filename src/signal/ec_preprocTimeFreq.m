@@ -84,7 +84,7 @@ nRuns = n.nRuns;
 blocks = string(n.blocks);
 n.hz= floor(n.hz);
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
-if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task+".mat"; end % Filename ending string
+if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task; end % Filename ending string
 
 % Get downsampling factor & anti-aliasing filter
 ds = 0;
@@ -138,12 +138,14 @@ for r = 1:nRuns
     disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+blocks(r)+" time="+toc(tt));
 end
 
+
 %% Organize
 x = vertcat(x{:});
 if ~o.fMean
     x = flip(x,3); end % Sort freqs from low to high
 
-%%
+
+%% Save spectral info to n struct
 n.suffix = o.suffix;
 n.xFrames = size(x,1);
 n.xChs = size(x,2);
@@ -152,6 +154,18 @@ n.freqs = flip(cwtHz{1});
 n.freqsRun = vertcat(cwtHz{:});
 n.("o"+o.suffix) = o;
 n.spectOpts = o;
+
+% Frequency info 
+n.spect = table;
+if n.nFreqs > 1
+    n.spect.name = "f"+(1:n.nFreqs)';
+    n.spect.disp = round(n.freqs,2) + " hz";
+    n.spect.freq = n.freqs;
+else
+    n.spect.name = o.fName;
+    n.spect.disp = o.fName;
+    n.spect.freq = n.freqs;
+end
 
 
 %% Identify bad frames per chan
@@ -205,16 +219,16 @@ end
 if arg.save
     % Save chNfo
     if o.doBadFrames && ~arg.ica
-        fn = o.dirOut+"chNfo_"+o.fnStr;
+        fn = o.dirOut+"chNfo_"+o.fnStr+".mat";
         save(fn,'chNfo','-v7'); disp("SAVED: "+fn);
     end
 
     % Save n struct
-    fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr;
+    fn = o.dirOut+"n"+o.suffix+"_"+o.fnStr+".mat";
     save(fn,"n","-v7"); disp("SAVED: "+fn);
 
     % Save processed iEEG data
-    fn = o.dirOut+"x"+o.suffix+"_"+o.fnStr;
+    fn = o.dirOut+"x"+o.suffix+"_"+o.fnStr+".mat";
     savefast(fn,'x'); disp("SAVED: "+fn+" time="+toc(tt));
 end
 
