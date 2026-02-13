@@ -142,7 +142,7 @@ if a.redo; createIndivHCPMapping(sbj); end
 [elecParc,HCP] = ec_elec2Parc(sbj,'HCP',fsDir);
 if all(elecParc(:,1)==fsNfo.fs)
     fsNfo.HCP = elecParc(:,2);
-    fsNfo.hcpRGB(:,3) = uint8(0);
+    fsNfo.hcpRGB(:,1:3) = uint8(0);
     HCP.name = string(HCP.name);
     HCP.RGB = uint8(HCP.RGB);
     for i = 1:height(HCP)
