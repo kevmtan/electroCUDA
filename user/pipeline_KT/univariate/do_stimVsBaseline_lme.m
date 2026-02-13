@@ -58,13 +58,14 @@ o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
-o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
+o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
 o.pre.log = false; % Log transform
-o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.pre.mag2db = false; % Log-transform magnitude to decibel
+o.pre.runNorm = ""; % Normalize run
+o.pre.trialNorm = "zscore"; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = ""; % Subtract trial by mean or median of baseline period (skip=[])
+o.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear";
 o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
@@ -74,10 +75,10 @@ o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
 o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 % Filtering (within-run):
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
-o.pre.hpfSteep = 0.5; % HPF steepness
+o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.85; % LPF steepness
+o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
+o.pre.lpfSteep = 0.7; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral dimensionality reduction by PCA (skip=0)
 o.pre.pca = 0; % Spectral components to keep per channel

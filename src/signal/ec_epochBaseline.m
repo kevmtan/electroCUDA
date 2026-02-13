@@ -17,16 +17,16 @@ arguments
     tt uint64 = tic                             % Timer
     o.test (1,1) logical = false               % Running a test? (keeps removed fields)
     o.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
+    o.hzTarget (1,1) double = nan              % Target sampling rate
     % processing FP precision ("double"|"single"|"half"|default=same as input)
     o.typeProc (1,1){mustBeMember(o.typeProc,["double" "single" "half"])} = class(x)
     % output FP precision ("double"|"single"|"half"|default=same as input)
     o.typeOut (1,1){mustBeMember(o.typeOut,["double" "single" "half"])} = class(x)          
-    o.hzTarget (1,1) double = nan              % Target sampling rate
-    % Within-run preprocessing
-    o.runNorm string {mustBeMember(o.runNorm,["robust" "zscore" ""])} = "robust"; % Normalize run
+    % Trasnform/normalization
     o.log (1,1) logical = false;               % Log transform
     o.mag2db (1,1) logical = false;            % Spectral magnitude to decibel
-    % Within-trial preprocessing (baseline correction)
+    o.runNorm string {mustBeMember(o.runNorm,["robust" "zscore" ""])} = "robust"; % Normalize run
+    % Within-trial normalization (baseline correction)
     %   Epoch baseline period (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
     o.baselinePre {mustBeFloat} = []            % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
     o.baselinePost {mustBeFloat} = []           % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
@@ -44,8 +44,8 @@ arguments
     o.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
     % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
     o.freqs {islogical,isnumeric} = [];
-    % Spectral dimensionality reduction by PCA (skip=0)
-    o.pca (1,1) double = 0;                 % Spectral components to keep per channel
+    % PCA within-chan or within-concactenated chans (e.g., make spectral components)
+    o.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
     % Spectral dimensionality reduction into bands (skip=[])
     o.bands string = "";                        % Band name
     o.bands2 string = "";                       % Band display name

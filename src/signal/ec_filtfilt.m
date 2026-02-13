@@ -46,7 +46,7 @@ if ~fin && o.gpu~="no"
     end
 end
 
-%% Run as CPU threadpool
+%% Run on CPU
 if ~fin
     if isa(b,"digitalFilter")
         x = filtfilt(b,x);

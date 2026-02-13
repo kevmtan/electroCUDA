@@ -1,32 +1,39 @@
-function [x,ep,n,o] = ec_prepAnalysis(o,tt)
+function [x,ep,n,o,trialNfo] = ec_prepAnalysis(o,tt)
 % ec_prepAnalysis: prep subject data for further analyses in electroCUDA
 
-% Load data 
+%% Load data 
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
 if numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU> % Copy origs for testing
 disp("[ec_classifyChSpec] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
 
+%% Channels
+
 % Channel/IC info
 if o.ICA
     n.chNfo = n.icNfo;
     n.chNfo = renamevars(n.chNfo,["ic" "sbjIC"],["ch" "sbjCh"]);
-    chBad = find(any(n.icBad{:,o.chBadFields},2)); % ICs to include in stats
+    chBad = any(n.icBad{:,o.chBadFields},2); % ICs to include in stats
 else
     n.chNfo = chNfo;
-    chBad = find(any(n.chBad{:,o.chBadFields},2)); % chans to include in stats
+    chBad = any(n.chBad{:,o.chBadFields},2); % chans to include in stats
 end
 
 % Remove bad chans/ICs
 x(:,chBad,:) = [];
 n.chNfo(chBad,:) = [];
 
+% Remove specified chans
+chRm = ismember(o.chRm,n.chNfo.ch);
+x(:,chRm,:) = [];
+n.chNfo(chRm,:) = [];
+
 
 %% Behavioral / recording metadata
 
 % Epoch psych/behav task data
 oo = namedargs2cell(o.epoch);
-[ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,oo{:}); %#ok<ASGLU>
+[ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
 
 % Rename target time & condition variables
 ep = renamevars(ep,[o.timeVar o.condVar],["t" "cnd"]);
