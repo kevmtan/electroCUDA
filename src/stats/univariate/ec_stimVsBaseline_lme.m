@@ -21,46 +21,17 @@ end
 tt = tic;
 if o.test; disp("[ec_stimVsBaseline_lme] TESTING: "+o.dirs.sbj); end
 
-% Load
-[n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
-    vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
-if o.test && isempty(dbstack); nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU>
-toc(tt);
+% Prep subject data
+[x,ep,n,o] = ec_prepAnalysis(o,tt);
 
-% Channel/IC names
-sbjChs = chNfo.sbjCh;
-if o.ICA
-    sbjChs = n.icNfo.sbjIC; end
+% Organize
+ep.t = string(ep.(o.timeVar)); % keep this???
+ep.Properties.RowNames = {};
+sbjChs = n.chNfo.sbjCh;
 
 % Preallocate results
 sAvg = cell(size(sbjChs)); % Trial-averaged results 
 sTr = cell(size(sbjChs)); % Single-trial results
-
-
-%% Analysis template
-
-% Epoch psych/behav task data
-oo = namedargs2cell(o.epoch);
-[ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,oo{:}); toc(tt); %#ok<ASGLU>
-ep.Properties.RowNames = {};
-
-% Prep regressor for time variable
-ep.t = string(ep.(o.timeVar));
-if numel(o.timeRng) == 2
-    ep.t(ep.(o.timeVar)<o.timeRng(1) | ep.(o.timeVar)>o.timeRng(2))...
-        = ""; % Clear excluded times
-end
-
-% Remove excluded times that aren't in baseline
-ep(ep.t=="" & ~(ep.BLpre|ep.BLpost),:) = [];
-ep.ide = uint32(1:height(ep))'; % new epoch indices
-
-
-%% Analysis-specific EEG preprocessing
-oo = namedargs2cell(o.pre);
-[x,n] = ec_epochBaseline(x,n,psy,ep,oo{:},test=o.test); toc(tt);
-o.n = n;
-o.spect = n.spect;
 
 
 %% Run stats per channel

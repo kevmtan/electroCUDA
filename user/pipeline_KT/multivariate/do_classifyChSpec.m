@@ -1,10 +1,10 @@
-% sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";...
-%     "S12_40_MJ";"S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";...
-%     "S13_50_LGM";"S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";...
-%     "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
-%     "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
-%     "S15_83_RR";"S16_95_JOB";"S16_96_LF"];
-sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
+sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";...
+    "S12_40_MJ";"S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";...
+    "S13_50_LGM";"S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";...
+    "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
+    "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
+    "S15_83_RR";"S16_95_JOB";"S16_96_LF"];
+%sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "classifyChSpec";
@@ -46,10 +46,10 @@ o.olThrCond = 3; % Outlier threshold (within-condition)
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.fdrDep = "unknown"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
+o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
 
 % Classifier basic options
-o.fun = "fitcdiscr"; % Classifier function ("fitcknn", "fitclinear", or "fitcsvm")
+o.fun = @fitcdiscr; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.nMin = 15; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint 
 o.pca = 0; % Spectral PCA within timepoint (0 = no PCA)
@@ -63,7 +63,7 @@ o.hyperOptKFold = 5;
 % Classifier hyperparameters
 o.hyper = struct;
 o.hyper.Prior = "uniform";
-if o.fun == "fitcsvm"
+if isequal(o.fun,@fitcsvm)
     % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
     o.hyper.KernelFunction = "linear";
     o.hyper.BoxConstraint = 1;
@@ -72,7 +72,7 @@ if o.fun == "fitcsvm"
     o.hyper.Solver = "SMO";
     o.hyper.CacheSize = "maximal";
     o.hyper.Verbose = 0;
-elseif o.fun == "fitclinear"
+elseif isequal(o.fun,@fitclinear)
     % Linear SVM hyperparameters (mathworks.com/help/stats/fitclinear.html)
     o.hyper.Learner = "svm";
     o.hyper.Lambda = "auto";
@@ -82,10 +82,10 @@ elseif o.fun == "fitclinear"
     o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
-elseif o.fun == "fitcdiscr"
+elseif isequal(o.fun,@fitcdiscr)
     o.hyper.DiscrimType = "linear";
     % o.hyper.FillCoeffs = "off"; % "off" makes CV unreliable
-elseif o.fun == "fitcknn"
+elseif isequal(o.fun,@fitcknn)
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
     o.hyper.Distance = "euclidean";
     o.hyper.NumNeighbors = 25;
@@ -95,13 +95,13 @@ elseif o.fun == "fitcknn"
 end
 
 % Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
-if o.fun == "fitcsvm"
+if isequal(o.fun,@fitcsvm)
     o.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
-elseif o.fun == "fitclinear"
+elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
-elseif o.fun == "fitcdiscr"
+elseif isequal(o.fun,@fitcdiscr)
     o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
-elseif o.fun == "fitcknn"
+elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
 o.HyperparameterOptimizationOptions =...

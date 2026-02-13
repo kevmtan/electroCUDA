@@ -26,45 +26,9 @@ elseif isscalar(o.cond0)
     o.cond0 = repmat(o.cond0,1,o.nCons);
 end
 
-% Load
-[n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
-    vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
-if o.test && numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU>
-
-% Channels/ICs
-if ~o.ICA
-    sbjChs = chNfo.sbjCh; % chan names
-    o.chBad = find(any(n.chBad{:,o.chBadFields},2)); % chans to include in stats
-else
-    sbjChs = n.icNfo.sbjIC; % IC names
-    o.chBad = find(any(n.icBad{:,o.chBadFields},2)); % ICs to include in stats
-end
-
-% Remove bad chans/ICs
-x(:,o.chBad,:) = [];
-sbjChs(o.chBad,:) = [];
-
-
-%% Analysis template
-
-% Epoch psych/behav task data
-oo = namedargs2cell(o.epoch);
-[ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,oo{:}); %#ok<ASGLU>
-ep.Properties.RowNames = {};
-
-% Rename time variable
-ep = renamevars(ep,o.timeVar,"t");
-
-% Remove excluded times
-ep(ep.t<o.timeRng(1) | ep.t>o.timeRng(2),:) = [];
-ep.ide = cast(1:height(ep),like=ep.ide)'; % new epoch indices
-
-
-%% Analysis-specific EEG preprocessing
-oo = namedargs2cell(o.pre);
-[x,n] = ec_epochBaseline(x,n,psy,ep,tt,oo{:},test=o.test);
-o.n = n;
-o.spect = n.spect;
+% Prep subject data
+[x,ep,n,o] = ec_prepAnalysis(o,tt);
+sbjChs = n.chNfo.sbjCh;
 
 
 %% Run stats
