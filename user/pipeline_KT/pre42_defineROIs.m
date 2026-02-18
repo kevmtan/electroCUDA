@@ -39,6 +39,15 @@ end
 %%
 chNfo.roi(:) = "";
 
+% Visual
+id = (contains(chNfo.HCP,"_V") & ~contains(chNfo.HCP,"_VIP")) |...
+    contains(chNfo.HCP,"_ProS") | contains(chNfo.HCP,"_LO") |...
+    contains(chNfo.HCP,"_FFC") | chNfo.HCP=="R_PH" | chNfo.HCP=="L_PH" |...
+    contains(chNfo.HCP,"_FST") | contains(chNfo.HCP,"_MST") | contains(chNfo.HCP,"_MT") |...
+    contains(chNfo.HCP,"_LO3") | contains(chNfo.HCP,"_IP0") | contains(chNfo.HCP,"_IPS1") |...
+    contains(chNfo.HCP,"_PIT") | contains(chNfo.HCP,"_LO1") | contains(chNfo.HCP,"_LO2");
+chNfo.roi(id) = "Visual";
+
 % TPJ
 id = contains(chNfo.HCP,"_PGs") | contains(chNfo.HCP,"_PGi") | contains(chNfo.HCP,"_PFm") |...
     contains(chNfo.HCP,"_STV") | contains(chNfo.HCP,"_TPOJ1") | contains(chNfo.HCP,"_TPOJ2") |...
@@ -78,6 +87,7 @@ chNfo.roi(id) = "vmPFC";
 % Corrections
 chNfo.roi(ismember(chNfo.sbjCh,["s33_ch97" "s47_ch17"])) = "amPFC";
 chNfo.roi(ismember(chNfo.sbjCh,["s53_ch68" "s33_ch1"])) = "dmPFC"; % ex-dmPFC
+chNfo.roi(ismember(chNfo.sbjCh,["s59_ch50" "s59_ch51" "s59_ch52"])) = ""; % ex-TPJ, not in brain sEEG?
 chNfo.roi(ismember(chNfo.sbjCh,["s82_ch2" "s82_ch3" "s82_ch53" "s82_ch54"])) = "";
 
 
@@ -97,7 +107,7 @@ chNfo.roiGrp(ismember(chNfo.roi,["dmPFC" "amPFC" "vmPFC"])) = "mPFC";
 %% Finalize
 
 % Organize
-chNfo = movevars(chNfo,["roi" "roiGrp"],"After","gyrus");
+chNfo = movevars(chNfo,["ECoG" "roi" "roiGrp"],"After","gyrus");
 
 % Save
 fn = dirs.procSbj+"chNfo_s"+dirs.sbjID+"_"+task;

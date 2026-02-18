@@ -1,4 +1,4 @@
-load("/01/lbcn/anal/chNfoA_260212.mat","chNfoA");
+load("/01/lbcn/anal/chNfoA_260218.mat","chNfoA");
 
 dirs = ec_loadSbj(proj="lbcn",task="MMR");
 load("cdcol_2018.mat","cdcol");
