@@ -9,17 +9,7 @@ arguments
 end
 
 %% Main
-sz = size(x);
-
-if dim==2 && length(sz)<=3
-    y = cell(1,sz(2));
-    for c = 1:sz(2)
-        y{c} = squeeze(x(:,c,:));
-    end
-else
-    sz = 1:length(size(x));
-    sz(dim) = [];
-
-    y = num2cell(x,sz);
-    y = cellfun(@squeeze,y,UniformOutput=false);
-end
+dims = 1:ndims(x);
+dims(dim) = [];
+y = num2cell(x, dims);
+y = cellfun(@squeeze, y, 'UniformOutput', false);
