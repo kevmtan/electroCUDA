@@ -10,7 +10,7 @@ end
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
 if numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU> % Copy origs for testing
-disp("[ec_classifyChSpec] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
+disp("[ec_prepAnalysis] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
 %% Channels
@@ -80,6 +80,9 @@ if isany(o.concatChs)
     [x,n] = concatChs_lfn(x,n,o);
 end
 
+%% Final
+disp("[ec_prepAnalysis] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
+
 
 
 
@@ -95,7 +98,7 @@ if o.concatChs=="roi"
     if ~isany(o.ROIs)
         o.ROIs = unique(n.chNfo.(rv),"stable"); end
     n.ROIs = table;
-    n.ROIs.(rv) = intersect(o.ROIs,unique(n.chNfo.(rv)),"stable");
+    n.ROIs.roi = intersect(o.ROIs,unique(n.chNfo.(rv)),"stable");
     n.nROIs = height(n.ROIs);
 
     % Preallocate
@@ -104,12 +107,12 @@ if o.concatChs=="roi"
     n.ROIs.columns = cell(n.nROIs,1);
     n.ROIs.chs = cell(n.nROIs,1);
     n.ROIs.sbjChs = cell(n.nROIs,1);
-    n.ROIs.sbjROI = "s"+n.sbjID+"_"+n.ROIs.(rv);
+    n.ROIs.sbjROI = "s"+n.sbjID+"_"+n.ROIs.roi;
     
     % Concactenate ROI channels
     for r = 1:n.nROIs
         % Find ROI chans
-        id = ismember(n.chNfo.(rv),n.ROIs.(rv)(r));
+        id = ismember(n.chNfo.(rv),n.ROIs.roi(r));
         n.ROIs.nChs(r) = nnz(id);
         n.ROIs.chs{r} = n.chNfo.ch(id);
         n.ROIs.sbjChs{r} = n.chNfo.sbjCh(id);

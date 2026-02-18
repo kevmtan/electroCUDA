@@ -1,7 +1,8 @@
 function [a,r] = ec_classifyTemplates(n,ep,o,tt)
 % Prep
 u0 = cast(0,like=n.chNfo.ch); % integer type
-s0 = cast(nan,o.typeProc); % float type
+f0 = cast(nan,o.typeProc); % float type
+s0 = string(missing);
 nCond = numel(o.cond);
 nCondx = numel(o.condx);
 
@@ -14,68 +15,69 @@ psyVars = ismember(ep.Properties.VariableNames,...
 a = ep(:,psyVars);
 a.y = categorical(a.cnd,o.cond,Ordinal=true); % class (e.g. condition)
 a.pred(:) = categorical("",o.cond,Ordinal=true); % predicted class
-a.pp(:,1:numel(o.cond)) = s0; % posterior probability per class
-a.pp1(:) = s0; % posterior probability difference
+a.pp(:,1:numel(o.cond)) = f0; % posterior probability per class
+a.pp1(:) = f0; % posterior probability difference
 a.acc(:) = false; % accurate prediction?
 a.use(ismember(a.cnd,o.cond)) = true; % use if one of the main conds (train/test)
-if isfield(o,"ROIs") && isany(o.ROIs)
+if isany(o.concatChs)
     % ROI info
-    a.ROI(:) = string(missing);
-    a.sbjROI(:) = string(missing);
+    a.roi(:) = s0;
+    a.sbjROI(:) = s0;
     a = movevars(a,"sbjROI","Before",1);
 else
     % Channel/IC info
     a.ch(:) = u0;
-    a.sbjCh(:) = string(missing);
+    a.sbjCh(:) = s0;
     a = movevars(a,"sbjCh","Before",1);
 end
 a.sbjID(:) = n.sbjID;
 a.Properties.RowNames = {};
 
 
+
 %% Make stats template
 r = table;
 r.t = unique(a.t,"stable");
-r.acc(:) = s0; % Cross-validation (CV) mean accuracy
-r.acc_SE(:) = s0;
-r.acc_p(:) = s0; % p-value above chance
-r.acc_q(:) = s0; % FDR-corrected sig
-r.auc(:,1:nCond) = s0; % CV ROC AUC per cond
-r.auc1(:) = s0; % AUC mean
-r.auc1_CI(:,1:2) = s0; % AUC confidence interval
-r.pp(:,1:nCond) = s0; % mean posterior probability (PP)
-r.pp1(:) = s0; % PP difference
-r.pp1_SE(:) = s0; % PP diff std dev
-r.pp1_p(:) = s0; % PP not equal p-value
-r.pp1_q(:) = s0; % FDR-corrected sig
+r.acc(:) = f0; % Cross-validation (CV) mean accuracy
+r.acc_SE(:) = f0;
+r.acc_p(:) = f0; % p-value above chance
+r.acc_q(:) = f0; % FDR-corrected sig
+r.auc(:,1:nCond) = f0; % CV ROC AUC per cond
+r.auc1(:) = f0; % AUC mean
+r.auc1_CI(:,1:2) = f0; % AUC confidence interval
+r.pp(:,1:nCond) = f0; % mean posterior probability (PP)
+r.pp1(:) = f0; % PP difference
+r.pp1_SE(:) = f0; % PP diff std dev
+r.pp1_p(:) = f0; % PP not equal p-value
+r.pp1_q(:) = f0; % FDR-corrected sig
 if any(nCondx)
     % Cross-classification (CC) stats
-    r.ppx(:,1:nCondx) = s0; % CC PP
-    r.ppx1(:) = s0; % CC PP diff
-    r.ppx1_SE(:) = s0; % CC PP diff SD
-    r.ppx1_p(:) = s0;
-    r.ppx1_q(:) = s0;
+    r.ppx(:,1:nCondx) = f0; % CC PP
+    r.ppx1(:) = f0; % CC PP diff
+    r.ppx1_SE(:) = f0; % CC PP diff SD
+    r.ppx1_p(:) = f0;
+    r.ppx1_q(:) = f0;
 end
 r.n(:,1:nCond) = double(nan); % samples per training cond
-r.wt(:,1:nCond) = s0; % class weight
+r.wt(:,1:nCond) = f0; % class weight
 if isany(nCondx)
     r.nx(:,1:nCondx) = uint32(0); end % samples per cross-classification cond
 r.cost = cell(height(r),1);
 r.cv = r.cost;
 r.cvh = r.cost;
-r.loss(:) = s0; % average loss per fold CV
-if isfield(o,"ROIs") && isany(o.ROIs)
+r.loss(:) = f0; % average loss per fold CV
+if isany(o.concatChs)
     % ROI info
-    r.ROI(:) = string(missing);
-    r.sbjROI(:) = string(missing);
+    r.roi(:) = s0;
+    r.sbjROI(:) = s0;
     r = movevars(r,"sbjROI","Before",1);
 else
     % Channel/IC info
     r.ch(:) = u0;
-    r.sbjCh(:) = string(missing);
+    r.sbjCh(:) = s0;
     r = movevars(r,"sbjCh","Before",1);
 end
-a.sbjID(:) = n.sbjID;
+r.sbjID(:) = n.sbjID;
 
 
 %% Check for insufficient sample sizes & unbalanced classes per timepoint
