@@ -12,23 +12,23 @@ function [L,S] = ec_robustPCA(x,lambda,mu,tol,maxIter)
 
 %% Input validation
 arguments
-    x {mustBeFloat}                   % data matrix (size NxM) to be decomposed, nan values = unobsurved
-    lambda (1,1){mustBeFloat} = nan   % regularization parameter, default = 1/sqrt(max(N,M))
-    mu (1,1){mustBeFloat} = nan       % augmented lagrangian parameter, default = 10*lambda
-    tol (1,1){mustBeFloat} = 1e-6     % reconstruction error tolerance, default = 1e-6
-    maxIter (1,1){mustBeFloat} = 1000 % max iterations to do
+    x {mustBeFloat}                     % data matrix (size NxM) to be decomposed, nan values = unobserved
+    lambda (1,1){mustBeFloat} = 0       % regularization parameter, default = 1/sqrt(max(N,M))
+    mu (1,1){mustBeFloat} = 0           % augmented lagrangian parameter, default = 10*lambda
+    tol (1,1){mustBeFloat} = 1e-6       % reconstruction error tolerance, default = 1e-6
+    maxIter (1,1){mustBeFloat} = 1000   % max iterations to do
 end
 
 %% Prep
+gpu = isgpuarray(x);
 [M,N] = size(x);
 unobserved = isnan(x);
-gpu = isgpuarray(x);
 
 % Fill defaults if empty
-if isnan(lambda)
+if ~lambda
     lambda = 1 / sqrt(max(M,N));
 end
-if isnan(mu)
+if ~mu
     mu = 10*lambda;
 end
 
@@ -37,7 +37,7 @@ if gpu
     lambda = gpuArray(lambda);
     mu = gpuArray(mu);
     tol = gpuArray(tol);
-    unobserved = gpuArray(unobserved);
+    maxIter = gpuArray(maxIter);
 end
 
 %% Main
@@ -62,11 +62,14 @@ for iter = 1:maxIter
     Y = Y + mu*Z;
 
     err = norm(Z,'fro') / normX;
-    if ~gpu && (iter==1 || mod(iter,10)==0 || err<tol)
-        disp("iter="+iter+" err="+err+" rank(L)="+ec_rank(L)+" card(S)="+nnz(S(~unobserved)));
-    end
     if err<tol; break; end
 end
+% disp("[ec_robustPCA] finished: iter="+iter+" err="+err+" rank(L)="+ec_rank(L)+" card(S)="+nnz(S(~unobserved)));
+
+
+
+
+
 
 
 %% Subfunctions
