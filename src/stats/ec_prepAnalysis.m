@@ -1,4 +1,4 @@
-function [x,ep,n,o,trialNfo] = ec_prepAnalysis(o,tt)
+function [x,ep,n,o] = ec_prepAnalysis(o,tt)
 % ec_prepAnalysis: prep subject data for further analyses in electroCUDA
 arguments
     o struct
@@ -9,46 +9,62 @@ end
 %% Load data 
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
-if numel(dbstack)<2; nOg=n; xOg=x; trialNfoOg=trialNfo; end %#ok<NASGU> % Copy origs for testing
+if numel(dbstack)<2; n0=n; x0=x; trialNfo0=trialNfo; end %#ok<NASGU> % Copy origs for testing
 disp("[ec_prepAnalysis] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
+% n=n0; x=x0; trialNfo=trialNfo0; tt=tic; disp("Restored original sbj vars");
 
 
-%% Channels
-
-% Channel/IC info
+%% Channel info & removal
 if o.ICA
+    % IC info
     n.chNfo = n.icNfo;
     n.chNfo = renamevars(n.chNfo,["ic" "sbjIC"],["ch" "sbjCh"]);
-    chBad = any(n.icBad{:,o.chBadFields},2); % ICs to include in stats
+    n = renameStructField(n,'chBad','chBad0'); % must be char
+    n = renameStructField(n,'icBad','chBad');
 else
+    % Channel info
     n.chNfo = chNfo;
-    chBad = any(n.chBad{:,o.chBadFields},2); % chans to include in stats
 end
 
-% Remove bad chans/ICs
-x(:,chBad,:) = [];
-n.chNfo(chBad,:) = [];
+% Find bad chans
+if isany(o.chBadFields)
+    chBad = full(any(n.chBad{:,o.chBadFields},2));
+else
+    chBad = false(n.nChs,1);
+end
 
-% Remove specified chans
+% Find specified chans to remove
 if isany(o.chRm)
-    chRm = ismember(n.chNfo.ch,o.chRm);
-    x(:,chRm,:) = [];
-    n.chNfo(chRm,:) = [];
+    chRm = o.chRm;
+    if isnumeric(chRm)
+        chRm = ismember(n.chNfo.ch,chRm);
+    end
+else
+    chRm = false(n.nChs,1);
 end
 
-% Remove non-ROI channels
+% Find ROI chans
 if isany(o.ROIs)
     chROIs = ismember(n.chNfo.(o.roiVar),o.ROIs);
-    x = x(:,chROIs,:);
-    n.chNfo = n.chNfo(chROIs,:);
+else
+    chROIs = true(n.nChs,1);
 end
 
+% Remove chans
+chKeep = all([~chBad,~chRm,chROIs],2);
+x = x(:,chKeep,:);
+n.chNfo = n.chNfo(chKeep,:);
+n.chKeep = chKeep;
+n.xChs = width(x);
+disp("[ec_prepAnalysis] Kept "+n.xChs+"/"+n.nChs+" chans: "+n.sbj+" | toc="+toc(tt));
 
-%% Behavioral / recording metadata
 
-% Epoch psych/behav task data
+%% Psychobehavioral metadata
+
+% Epoch metadata
 oo = namedargs2cell(o.epoch);
 [ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
+n.trialNfo = trialNfo;
 
 % Rename target time & condition variables
 ep = renamevars(ep,[o.timeVar o.condVar],["t" "cnd"]);
