@@ -71,7 +71,7 @@ o.epoch.badTrials = ""; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.epoch.max = nan; % Max duration after stim onset, supercedes 'post' [nan = no limit]
+o.epoch.dur = nan; % Duration after stim onset, supercedes 'post' [nan = no limit]
 % Epoch time bins
 o.epoch.bin = 0.01; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)

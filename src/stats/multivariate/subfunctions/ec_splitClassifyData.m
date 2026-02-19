@@ -5,7 +5,7 @@ arguments
     r table
     n struct
     o struct
-    tt = tic
+    tt uint64 = tic
 end
 
 

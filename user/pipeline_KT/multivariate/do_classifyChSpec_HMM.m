@@ -32,7 +32,7 @@ o.epoch.float = "single";
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = 0.5; % Duration after stim offset [nan = post-stim ITI]
-o.epoch.max = nan; % Max duration after stim onset, supercedes 'post' [nan = no limit]
+o.epoch.dur = nan; % Duration after stim onset, supercedes 'post' [nan = no limit]
 % Epoch time bins (secs)
 o.epoch.bin = 0.01; % Fine latency bin width (secs)
 o.epoch.bin2 = 0.05; % Coarse latency bin width (secs)
