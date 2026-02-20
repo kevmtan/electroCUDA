@@ -68,16 +68,19 @@ id = contains(chNfo.HCP,"_STGa") | contains(chNfo.HCP,"_TGd") | contains(chNfo.H
 chNfo.roi(id) = "ATL";
 
 % amPFC
-id = chNfo.HCP=="L_a24" | chNfo.HCP=="R_a24" | chNfo.HCP=="L_p32" | chNfo.HCP=="R_p32" |...
-    contains(chNfo.HCP,"_10r") | (contains(chNfo.HCP,"_10d") & abs(chNfo.MNI(:,1))<=10);
+id = chNfo.HCP=="L_a24" | chNfo.HCP=="R_a24" |...
+    chNfo.HCP=="L_p32" | chNfo.HCP=="R_p32" | contains(chNfo.HCP,"_10r") |...
+    (contains(chNfo.HCP,"_10d") & chNfo.MNI(:,3)<=9 & abs(chNfo.MNI(:,1))<12);
 chNfo.roi(id) = "amPFC";
 
 % dmPFC
 id = contains(chNfo.HCP,"_9m") | contains(chNfo.HCP,"_d32") | contains(chNfo.HCP,"_a32pr") |...
-    contains(chNfo.HCP,"_8BM") | (contains(chNfo.HCP,"_8BL") & abs(chNfo.MNI(:,1))<=10);
-id(id) = chNfo.MNI(id,2)>28;
+    ((contains(chNfo.HCP,"_9p") | contains(chNfo.HCP,"_9a")) & abs(chNfo.MNI(:,1))<12) |...
+    (contains(chNfo.HCP,"_10d") & chNfo.MNI(:,3)>9 & abs(chNfo.MNI(:,1))<12) |...
+    contains(chNfo.HCP,"_8BM") | (contains(chNfo.HCP,"_8BL"));
+%chNfo.HCP=="L_p24" | chNfo.HCP=="R_p24" | 
+id(id) = chNfo.MNI(id,2) > 28;
 chNfo.roi(id) = "dmPFC";
-%d.HCP=="L_p24" | d.HCP=="R_p24" | 
 
 % vmPFC
 id = contains(chNfo.HCP,"_OFC") | contains(chNfo.HCP,"_25") | contains(chNfo.HCP,"_s32") |...
