@@ -1,10 +1,10 @@
-sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";...
-    "S12_40_MJ";"S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";...
-    "S13_50_LGM";"S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";...
-    "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
-    "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
-    "S15_83_RR";"S16_95_JOB";"S16_96_LF"];
-sbjs = "S12_38_LK"; %["S12_38_LK";"S12_42_NC"];
+sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
+    "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
+    "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
+    "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
+    "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
+    "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
+%sbjs = "S12_38_LK"; %["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "classifyROIspec";
@@ -131,7 +131,7 @@ o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.epoch.dur = nan; % Duration after stim onset, supercedes 'post' [nan = no limit]
 % Epoch time bins
-o.epoch.bin = 0.01; % latency bin width (secs)
+o.epoch.bin = 0.025; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -156,7 +156,7 @@ o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
-o.pre.interp = "linear";
+o.pre.interp = "linear"; % interpolation method
 o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
 o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
@@ -166,7 +166,7 @@ o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
+o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
 o.pre.lpfSteep = 0.5; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
@@ -221,6 +221,8 @@ end
 %% Do classification per sbj %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 try delete(gcp("nocreate")); catch;end
 try parpool("threads"); catch;end
+% s=5; p=1;
+% s=9; p=1;
 
 % Loop across subjects
 for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
