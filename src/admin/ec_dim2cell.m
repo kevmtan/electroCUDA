@@ -11,5 +11,5 @@ end
 %% Main
 dims = 1:ndims(x);
 dims(dim) = [];
-y = num2cell(x, dims);
-y = cellfun(@squeeze, y, 'UniformOutput', false);
+y = num2cell(x,dims);
+y = cellfun(@squeeze,y,UniformOutput=false);

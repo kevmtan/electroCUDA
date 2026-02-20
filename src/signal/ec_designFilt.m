@@ -1,5 +1,11 @@
 function [d,a] = ec_designFilt(x,fs,hz,dType,o)
-% Input validation
+% Design zero-impulse filter for filtfilt
+%
+% Outputs:
+%   d = digitalFilter object or numerator coefficients
+%   a = denominator coeffiicents
+
+%% Input validation
 arguments
     x {mustBeFloat} % Data to filter (faster if data sample: full-length vector)
     fs (1,1) double
@@ -7,7 +13,7 @@ arguments
     dType {mustBeMember(dType,["lowpass" "highpass" "bandpass"])} = "highpass"
     o.steepness {mustBeLessThanOrEqual(o.steepness,1)} = 0.7 % Passband to stopband multiplier
     o.impulse {mustBeMember(o.impulse,["fir" "iir" "auto"])} = "auto" % Impulse response
-    o.coefOut (1,1) logical = false
+    o.coefOut (1,1) logical = false % Return filter coefficients instead of digitalFilter object
 end
 if numel(hz)>1; dType = "bandpass"; end
 % if arg.impulse=="auto"; x = double(x(:,1,1)); end % Get sample vector
@@ -69,6 +75,7 @@ end
 Wstop = WstopNormalized * (Fs/2);
 opts.Wstop = Wstop;
 opts.WstopNormalized = WstopNormalized;
+
 
 %% Try to design an FIR filter
 % if order too large for input signal length try an IIR filter

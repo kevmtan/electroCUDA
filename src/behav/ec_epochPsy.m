@@ -8,9 +8,9 @@ arguments
     % Bad trial removal
     o.rmTrials {isNumOrLogical} = []; % Trials to remove (numeric array or logical index)
     o.rmTrialsFun = {} % Function handle for removing trials (using trialNfo vars)
-    o.badTrials {mustBeMember(o.badTrials,["noPdio" "noRT" ""])} = ""; % Bad trial criteria to remove
+    o.badTrials {mustBeMember(o.badTrials,["noPdio" "noRT" "" []])} = ""; % Bad trial criteria to remove
     % Floating-point precision for variables [half|single|double]
-    o.float (1,1){mustBeMember(o.float,["double" "single" "half"])} = "double"
+    o.float (1,1){mustBeMember(o.float,["double" "single" "half" []])} = "double"
     % Epoch time limits (secs) [nan=variable, 0=none]
     o.pre (1,1) double = nan  % Duration before stim onset [nan = pre-stim ITI]
     o.post (1,1) double = nan % Duration after stim offset [nan = post-stim ITI]
@@ -86,8 +86,8 @@ if any(trialNfo.removed)
     rmTrials = trialNfo.tr(trialNfo.removed);
     ep = ep(~ismember(ep.tr,rmTrials),:);
 end
-n.xTrials = height(trialNfo);
-disp("[ec_epochPsy] kept "+n.xTrials+"/"+n.nTrials+" trials: "+n.sbj);
+n.nTrs = height(trialNfo);
+disp("[ec_epochPsy] kept "+n.nTrs+"/"+n.nTrials+" trials: "+n.sbj);
 
 
 %% Finalize

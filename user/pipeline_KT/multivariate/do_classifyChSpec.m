@@ -114,7 +114,7 @@ o.HyperparameterOptimizationOptions =...
 o.epoch.float = "single"; % task metadata output floating-point precision
 % Bad trial removal
 o.epoch.rmTrials = []; % Trials to remove (numeric array or logical index)
-o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function for removing trials
+o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function handle for removing trials (using trialNfo vars)
 o.epoch.badTrials = ""; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]

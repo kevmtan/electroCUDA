@@ -4,6 +4,7 @@ arguments
     o struct
     tt uint64 = tic
 end
+% tt=tic;
 
 
 %% Load data 
@@ -68,6 +69,7 @@ n.trialNfo = trialNfo;
 
 % Rename target time & condition variables
 ep = renamevars(ep,[o.timeVar o.condVar],["t" "cnd"]);
+n.trialNfo = renamevars(n.trialNfo,o.condVar,"cnd");
 
 % Remove excluded times
 if numel(o.timeRng)==2
@@ -75,26 +77,32 @@ if numel(o.timeRng)==2
 
 % Remove excluded conditions
 if isfield(o,"cond1")
-    ep(~ismember(ep.cnd,[o.cond1 o.cond0]),:) = [];
+    ep = ep(ismember(ep.cnd,[o.cond1 o.cond0]),:);
 elseif isfield(o,"cond")
-    ep(~ismember(ep.cnd,[o.cond o.condx]),:) = [];
+    ep = ep(ismember(ep.cnd,[o.cond o.condx]),:);
 elseif isfield(o,"conds")
-    ep(~ismember(ep.cnd,o.conds),:) = [];
+    ep = ep(ismember(ep.cnd,o.conds),:);
 end
 ep.ide = cast(1:height(ep),like=ep.ide)'; % update epoch indices
 
+% Update nfo struct
+trs = unique(ep.tr);
+n.trialNfo = n.trialNfo(ismember(n.trialNfo.tr,trs),:);
+n.nTrs = numel(trs);
+n.cnds = unique(n.trialNfo.cnd);
+n.nCnds = numel(n.cnds);
 
-%% Analysis-specific EEG preprocessing
+
+%% Analysis-specific preprocessing
 oo = namedargs2cell(o.pre);
 [x,n] = ec_epochBaseline(x,n,psy,ep,tt,oo{:},test=o.test);
-o.n = n;
-o.spect = n.spect;
 
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
 if isany(o.concatChs)
     [x,n] = concatChs_lfn(x,n,o);
 end
+
 
 %% Final
 disp("[ec_prepAnalysis] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
