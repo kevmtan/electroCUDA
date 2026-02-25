@@ -178,7 +178,7 @@ for t = 1:height(r)
     idt = a.t==r.t(t) & a.use;
     % Ungrouped, stratified
     r.cv{t} = cvpartition(a.y(idt),oo{:});
-    r.cvh{t} = cvpartition(a.y(idt),KFold=o.hyperOptKFold);
+    r.cvh{t} = cvpartition(a.y(idt),KFold=o.hyperKFold);
     % if o.balanceConds
     %     % Grouped by trial, unstratified
     %     r.cv{t} = cvpartition(a.y(idt),oo{:},GroupingVariable=a.tr(idt),Stratify=false);
