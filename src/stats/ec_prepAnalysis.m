@@ -101,6 +101,7 @@ oo = namedargs2cell(o.pre);
 %% Concactenate channels (e.g., concactenate within-ROI chs)
 if isany(o.concatChs)
     [x,n] = concatChs_lfn(x,n,o);
+    disp("[ec_prepAnalysis] Concactenated channels: "+o.dirs.sbj+" | toc="+toc(tt));
 end
 
 
@@ -142,11 +143,10 @@ if o.concatChs=="roi"
         n.ROIs.sbjChs{r} = n.chNfo.sbjCh(id);
 
         % Extract ROI EEG data
-        y{r} = x(:,id,:);
+        y{r} = permute(x(:,id,:),[1 3 2]); % permute dims for concatenation
 
-        % Concactenate EEG from (times,chans,freqs) to (times,freqs*chans)
-        y{r} = reshape(permute(y{r},[1 3 2]), height(y{r}),...
-            width(y{r}) * size(y{r},3));  % a-by-(b*c)
+        % Concatenate EEG from (times,chans,freqs) to (times,freqs*chans)
+        y{r} = reshape(y{r}, height(y{r}), width(y{r})*size(y{r},3));  % a-by-(b*c)
 
         % Column info
         for ch = 1:n.ROIs.nChs(r)

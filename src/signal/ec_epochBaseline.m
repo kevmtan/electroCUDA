@@ -139,14 +139,14 @@ if o.ds
         x{r} = downsample_lfn(x{r},o);
     end
     x = vertcat(x{:});
+    disp("[ec_epochBaseline] Downsampled: "+n.sbj+" time="+toc(tt));
 end
-disp("[ec_epochBaseline] Downsampled: "+n.sbj+" time="+toc(tt));
 
 
 %% Within-epoch processing
 
 % Epoch EEG data
-x = x(ep.idx,:); % match epoched indices
+x = x(ep.idx,:,:); % match epoched indices
 
 if isany(o.trialNorm) || isany(o.trialBaseline)
     % Split data by epoch
@@ -161,20 +161,20 @@ if isany(o.trialNorm) || isany(o.trialBaseline)
 
     % Concactenate epochs
     x = vertcat(x{:});
+    disp("[ec_epochBaseline] Baseline corrected: "+n.sbj+" time="+toc(tt));
 end
-disp("[ec_epochBaseline] Baseline corrected: "+n.sbj+" time="+toc(tt));
 
 
 %% Spectral processing
 
 % Spectral bands
 if isany(o.bands)
-    x = constructBands_lfn(x,n);
+    x = constructBands_lfn(x,n,tt);
 end
 
 % Spectral PCA
 if o.pca
-    [x,n] = pca_lfn(x,n,o);
+    [x,n] = pca_lfn(x,n,o,tt);
 end
 
 
@@ -287,19 +287,19 @@ end
 
 % Get trial baseline
 if o.trialBaseline=="median"
-    bl = median(xe(iBL,:),1,"omitnan"); % BL median
+    bl = median(xe(iBL,:,:),1,"omitnan"); % BL median
 elseif o.trialBaseline=="mean"
-    bl = mean(xe(iBL,:),1,"omitnan"); % BL median
+    bl = mean(xe(iBL,:,:),1,"omitnan"); % BL median
 else
     bl = cast(0,like=xe);
 end
 
 % Get trial std deviation
 if o.trialNorm=="robust"
-    sd = mad(xe(iSD,:),1,1); % BL MAD median absolute deviation
+    sd = mad(xe(iSD,:,:),1,1); % BL MAD median absolute deviation
     c = 0.6745;
 elseif o.trialNorm=="zscore"
-    sd = std(xe(iSD,:),1,1,"omitnan");
+    sd = std(xe(iSD,:,:),1,1,"omitnan");
     c = 1;
 else
     sd = cast(1,like=xe);
@@ -517,7 +517,7 @@ end
 
 
 %%% Construct spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xb = constructBands_lfn(x,n)
+function xb = constructBands_lfn(x,n,tt)
 
 % Preallocate
 xb = nan([size(x,1) height(n.spect)],class(x));
@@ -535,7 +535,7 @@ disp("[ec_epochBaseline] Constructed spectral bands: "+n.sbj+" time="+toc(tt));
 
 
 %%% Spectral PCA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [y,n] = pca_lfn(x,n,o)
+function [y,n] = pca_lfn(x,n,o,tt)
 
 % Preallocate PCA weights
 y = cell(n.xChs,1);
@@ -574,6 +574,7 @@ n.nSpect = o.pca;
 n.spect = table;
 n.spect.name = "pc"+(1:n.nSpect)';
 n.spect.disp = "Spectral Component "+(1:n.nSpect)';
+disp("[ec_epochBaseline] Performed spectral PCA: "+n.sbj+" time="+toc(tt));
 
 
 

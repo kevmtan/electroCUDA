@@ -22,8 +22,8 @@ aa = cell(nCh,1);
 rr = aa;
 
 
-%% Split data by channel
-parfor c = 1:numel(x)
+%% Split data for each independent analysis (channel/IC/ROI x timepoint)
+parfor c = 1:nCh
     [x{c},aa{c},rr{c}] = withinCh_lfn(x{c},a,r,n,o,c);
 end
 
@@ -31,22 +31,31 @@ end
 x = vertcat(x{:});
 aa = vertcat(aa{:});
 rr = vertcat(rr{:});
+nS = numel(x); % number of splits
+disp("[ec_splitClassifyData] Split data by "+nS+" independent analysis: "+...
+    o.dirs.sbj+" | toc="+toc(tt));
 
 
 %% PCA on EEG data for each independent analysis (e.g., spectral PCA)
 if o.pca
-    % Preallocate weights
-    wts = cell(numel(x),1);
+    wts = cell(nS,1); % Preallocate weights
 
     % Probablistic PCA
     if o.pcaGPU
-        % Run on GPU
-        for c = 1:numel(x)
+        % Move to GPU
+        x = cellfun(@gpuArray,x,UniformOutput=false); 
+        
+        % Run on GPU per chan
+        for c = 1:nS
             [x{c},wts{c}] = pca_lfn(x{c},o);
         end
+
+        % Move from GPU
+        if ~o.gpu
+            x = cellfun(@gather,x,UniformOutput=false); end
     else
         % Run on CPU
-        parfor c = 1:numel(x)
+        parfor c = 1:nS
             [x{c},wts{c}] = pca_lfn(x{c},o);
         end
     end
@@ -74,7 +83,7 @@ if isany(o.concatChs)
     sbjCh = n.ROIs.sbjROI(c);
 
     % Fill
-    ac.roi(:)=ch; rc.ch(:)=ch;
+    ac.roi(:)=ch; rc.roi(:)=ch;
     ac.sbjROI(:)=sbjCh; rc.sbjROI(:)=sbjCh;
 else
     % Get channel
@@ -106,13 +115,12 @@ end
 
 %%% Within-timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [xct,act] = withinTime_lfn(xct,act,o)
-
 % Outlier detection (all data)
 if o.olThrAll
     xct = filloutliers(xct,o.olFill,o.ol,1,ThresholdFactor=o.olThrAll);
 end
 
-% Outlier detection (within-condition)
+%% Outlier detection (within-condition)
 for c = unique(act.cnd)'
     id = act.cnd==c;
     xct(id,:) = filloutliers(xct(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
@@ -126,16 +134,9 @@ end
 
 %%% PCA on EEG data for each independent analysis (e.g., spectral PCA) %%%%
 function [xct,wct] = pca_lfn(xct,o)
+% Robust PCA
+if o.pcaRobust
+    xct = inexact_alm_rpca(xct); end
 
-% Move EEG to GPU
-if o.pcaGPU
-    xct = gpuArray(xct); end
-
-% Probablistic PCA
-[wct,xct] = ppca(xct,o.pca);
-% % Run robust PCA
-% xct = ec_robustPCA(xct,o.pca);
-
-% Move from GPU to CPU
-if o.pcaGPU
-    xct = gather(xct); end
+%% PCA
+[wct,xct] = pca(xct,NumComponents=o.pca);
