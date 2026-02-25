@@ -4,11 +4,11 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-%sbjs = "S12_38_LK"; %["S12_38_LK";"S12_42_NC"];
+%sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
-analFolder = "classifyROIspec";
-analName = "MzAb_SVM";
+analFolder = "classifyChSpec";
+analName = "MzAb_regLDA";
 
 dirs = ec_getDirs(proj,task);
 
@@ -17,24 +17,15 @@ o = struct;
 o.name = ""; % Analysis name (filled in subject loop)
 o.sfx = ""; % Suffix of input data (filled in subject loop)
 
-
 %% Options
 o.test = false;
 o.save = true;
+o.chBadFields = "bad"; % fields from n.chBad/icBad that exclude chans from analysis
 
 % Processing options
 o.gpu = false; % do GPU
 o.typeProc = "single"; % processing floating-point precision ("double"|"single")
 o.typeOut = "single"; % output floating-point precision ("double"|"single")
-
-% Channel removal
-o.chRm = []; % channels to remove (array of chan numbers)
-o.chBadFields = "bad"; % remove bad chs from specified fields in n.chBad/icBad
-o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
-o.roiVar = "roi"; % ROI variable in chNfo
-
-% Channel concactenation (e.g. concactenate within-ROI chs into 'wide channels')
-o.concatChs = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
 
 % Timing for classification
 o.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
@@ -58,11 +49,10 @@ o.fdrTimeRng = [0 inf]; % Range of times for FDR
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
 
 % Classifier basic options
-o.fun = @fitcsvm; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
+o.fun = @fitcdiscr; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.nMin = 15; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint 
-o.pca = 0; % Spectral robust PCA within timepoint (0 = no PCA)
-o.pcaGPU = true; % Use GPU for robust PCA
+o.pca = 0; % Spectral PCA within timepoint (0 = no PCA)
 o.std = ""; % Standardize predictors (z-score)
 
 % Cross-validation parameters (mathworks.com/help/stats/crossval.html)
@@ -123,15 +113,15 @@ o.HyperparameterOptimizationOptions =...
 % Task Epoching (see 'ec_epochPsy')
 o.epoch.float = "single"; % task metadata output floating-point precision
 % Bad trial removal
-o.epoch.rmTrials = []; % Trials to remove (numeric array)
-o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function for removing trials
+o.epoch.rmTrials = []; % Trials to remove (numeric array or logical index)
+o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function handle for removing trials (using trialNfo vars)
 o.epoch.badTrials = ""; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.epoch.dur = nan; % Duration after stim onset, supercedes 'post' [nan = no limit]
 % Epoch time bins
-o.epoch.bin = 0.025; % latency bin width (secs)
+o.epoch.bin = 0.01; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -148,15 +138,14 @@ o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
 o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
-% Normalization/transform
 o.pre.log = false; % Log transform
-o.pre.mag2db = false; % Log-transform magnitude to decibel
+o.pre.mag2db = true; % Log-transform magnitude to decibel
 o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
-o.pre.interp = "linear"; % interpolation method
+o.pre.interp = "linear";
 o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
 o.pre.olCenter = "median";
 o.pre.olThr = 5; % Threshold for outlier (skip=0)
@@ -166,13 +155,13 @@ o.pre.olThrBL = 2; % Threshold for baseline outlier (skip=0)
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
+o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.pre.lpfSteep = 0.5; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
+% Spectral dimensionality reduction by PCA (skip=0)
+o.pre.pca = 10; % Spectral components to keep per channel
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.pre.freqs = [4 300];
-% PCA within-chan or within-concactenated chans (e.g., make spectral components)
-o.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 % % Spectral dimensionality reduction into bands (skip=[])
 % o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
@@ -221,8 +210,6 @@ end
 %% Do classification per sbj %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 try delete(gcp("nocreate")); catch;end
 try parpool("threads"); catch;end
-% s=5; p=1;
-% s=9; p=1;
 
 % Loop across subjects
 for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
@@ -230,19 +217,19 @@ for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
         if ~logs.i{p}.class(s)
             % Set options struct per subject
             sbj = logs.i{p}.sbj(s);
-            sbjID = logs.i{p}.sbjID(s);
             o.name = logs.name(p);
             o.sfx = logs.sfx(p);
             o.ICA = logs.ICA(p);
             o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
             o.dirOut = logs.out(p);
-            o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
+            sbjID = logs.i{p}.sbjID(s);
+            %o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
             disp("STARTING: "+sbj);
 
             %% Run subject
             if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
             try               
-                logs.i{p}.o{s} = ec_classifyChSpec(o);
+                logs.i{p}.o{s} = ec_classifySpec(o);
                 logs.i{p}.class(s) = true;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;
