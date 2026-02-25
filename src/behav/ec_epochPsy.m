@@ -38,7 +38,7 @@ trialNfo = convertvars(trialNfo,...
     varfun(@class,trialNfo,OutputFormat="cell")=="half","single");
 
 % Convert timing arguments to seconds
-o.pre=seconds(abs(o.pre)); o.post=seconds(abs(o.post)); o.max=seconds(abs(o.post));
+o.pre=seconds(abs(o.pre)); o.post=seconds(abs(o.post)); o.dur=seconds(abs(o.dur));
 
 
 %% Generate epochs

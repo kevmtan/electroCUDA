@@ -14,7 +14,6 @@ arguments
     o.exact (1,1) logical = false   % Determine exact rank tol (slower)
     o.gpu (1,1) logical = false
 end
-if width(x)>height(x); x = x'; end
 if o.gpu; x=gpuArray(x); elseif isgpuarray(x); o.gpu=true; end
 if o.gpu; o=structfun(@gpuArray,o,UniformOutput=false); tol=gpuArray(tol); end
 
