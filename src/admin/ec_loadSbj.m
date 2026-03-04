@@ -37,11 +37,14 @@ if any(ismember(a.vars,["n" "psy" "trialNfo"]))
 
     % Check sampling rate
     if ~a.hz
-        a.hzTarget = n.hz; disp("[ec_loadSbj] Verified sampling rate: "+a.hz+"hz"); end
+        a.hz = n.hz;
+        disp("[ec_loadSbj] Verified sampling rate: "+a.hz+"hz");
+    end
 
     % Original sampling rate not appended on filenames
     if a.hz==n.hz_og
-        a.hz=""; end
+        a.hz="";
+    end
 
     % Check if psy/trialNfo needs to be resampled
     if any(ismember(a.vars,["psy" "trialNfo"]))
@@ -66,7 +69,9 @@ for v = 1:numel(a.vars)
         disp("[ec_loadSbj] Loaded: "+fn); % Display preloaded n
 
         if ismember("n",a.compact)
-            n.asr=[]; n.zapline=[];
+            n = rmfield(n,["asr" "zapline" "chDist" "fsNfo" "chCov" "chVar"...
+                "chCorr" "freqsRun"]);
+            n.o.asr = rmfield(n.o.asr,"chIgnore");
             disp("[ec_loadSbj] Compacted: "+fn); % Load
         end
         varargout{v} = n;
