@@ -10,21 +10,31 @@ end
 
 
 %% Prep
-
-% Convert EEG into channelwise cell array
 if isfloat(x)
-    x = ec_dim2cell(x,2);
+    x = ec_dim2cell(x,2); % convert EEG into channelwise cell array
 end
 nCh = numel(x);
 
 % Preallocate
 ob1 = cell(nCh,1);
 st1 = ob1;
+wts = ob1;
 
 
-%% Split data for each independent analysis (channel/IC/ROI x timepoint)
-parfor c = 1:nCh
-    [x{c},ob1{c},st1{c}] = withinCh_lfn(x{c},ob,st,n,o,c);
+%% Main
+if o.pcaGPU && o.pca~="split"
+    % Move EEG to GPU
+    x = cellfun(@gpuArray,x,UniformOutput=false);
+
+    % Run on GPU
+    for c = 1:nCh
+        [x{c},ob1{c},st1{c},wts{c}] = withinCh_lfn(x{c},ob,st,n,o,c);
+    end
+else
+    % Run on CPU threadpool
+    parfor c = 1:nCh
+        [x{c},ob1{c},st1{c},wts{c}] = withinCh_lfn(x{c},ob,st,n,o,c);
+    end
 end
 
 % Vertically concatenate: each element corresponds to each independent analysis
@@ -36,43 +46,31 @@ disp("[ec_splitClassifyData] Split data by "+splits+" independent analysis: "+..
     o.dirs.sbj+" | toc="+toc(tt));
 
 
-%% PCA & data rank for each analysis split
-if o.pca
-    %% PCA on chan/IC/ROI width (e.g., spectral PCA)
-    wts = cell(splits,1); % Preallocate weights
+%% PCA & data rank by analysis split
+if o.pca=="split"
+    wts = cell(splits,1); % preallocate PCA weights
     if o.pcaGPU
-        % Move to GPU
+        % Move EEG to GPU
         x = cellfun(@gpuArray,x,UniformOutput=false); 
         
-        % Run on GPU per chan
+        % Run on GPU
         for s = 1:splits
-            [x{s},wts{s}] = pca_lfn(x{s},st(s,:),o);
+            [x{s},st(s,:),wts{s}] = rankPCA_lfn(x{s},st(s,:),o);
         end
-
-        % Move from GPU
-        if ~o.gpu
-            x = cellfun(@gather,x,UniformOutput=false); end
     else
-        % Run on CPU
+        % Run on CPU threadpool
         parfor s = 1:splits
-            [x{s},wts{s},st(s,:)] = pca_lfn(x{s},st(s,:),o);
+            [x{s},st(s,:),wts{s}] = rankPCA_lfn(x{s},st(s,:),o);
         end
     end
-
-    % Save weights to n
-    n.pcaWts = wts;
-    disp("[ec_splitClassifyData] Ran PCA on data splits: "+o.dirs.sbj+" | toc="+toc(tt));
-else
-    %% EEG data rank
-    parfor s = 1:splits
-        sts = st(s,:);
-        sts.rank = ec_rank(x{s});
-        st(s,:) = sts;
-    end
+    disp("[ec_splitClassifyData] Ran rank calculation/PCA on data splits: "+o.dirs.sbj+" | toc="+toc(tt));
 end
 
 
 %% Finish
+if o.pcaComps 
+    n.pcaWts = wts; % Save weights to n
+end
 disp("[ec_splitClassifyData] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
@@ -81,8 +79,8 @@ disp("[ec_splitClassifyData] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
 %%% Within-channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [xc1,ac1,stc] = withinCh_lfn(xc,obc,stc,n,o,c)
-% Prep
+function [xc,obc,stc,wc] = withinCh_lfn(xc,obc,stc,n,o,c)
+% Fill chan info
 if isany(o.concatChs)
     % Get ROI
     ch = n.ROIs.roi(c);
@@ -97,70 +95,63 @@ end
 obc.ch(:)=ch; stc.ch(:)=ch;
 obc.sbjCh(:)=sbjCh; stc.sbjCh(:)=sbjCh;
 
-% Channel/IC/ROI width & features
+% Channel/IC/ROI width
 stc.width(:) = width(xc);
-stc.features(:) = width(xc);
-
-% Preallocate
-xc1 = cell(height(stc),1);
-ac1 = xc1;
 
 
-%% Split EEG & analysis by timepoint
-for t = 1:height(stc)
-    % Indices for timepoint
-    id = obc.t==stc.t(t);
-    if ~any(obc.use(id)); continue; end % skip if insufficient obs
-
-    % Within-timepoint
-    [xc1{t},ac1{t}] = withinTime_lfn(xc(id,:),obc(id,:),o);
+%% PCA & data rank
+if o.pca~="split"
+    [xc,stc,wc] = rankPCA_lfn(xc,stc,o);
 end
 
 
-%% Remove empty cells
-xc1 = xc1(~cellfun("isempty",xc1));
-ac1 = ac1(~cellfun("isempty",ac1));
+%% Split data by timepoint
+xc = cellfun(@(t) xc(t,:),n.times.id,"UniformOutput",false);
+obc = cellfun(@(t) obc(t,:),n.times.id,"UniformOutput",false);
 
-
-
-
-
-%%% Within-timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [xct,obct] = withinTime_lfn(xct,obct,o)
-
-% Outliers: all-data
-if o.olThrAll
-    xct = filloutliers(xct,o.olFill,o.ol,1,ThresholdFactor=o.olThrAll);
-end
-
-% Outliers: within-condition
-for c = unique(obct.cnd)'
-    id = obct.cnd==c;
-    xct(id,:) = filloutliers(xct(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
-    %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
-end
+% Remove empty cells
+xc = xc(~cellfun("isempty",xc));
+obc = obc(~cellfun("isempty",obc));
 
 
 
 
 
 
-
-%%% PCA on EEG data for each independent analysis (e.g., spectral PCA) %%%%
-function [xs,ws,sts] = pca_lfn(xs,sts,o)
-%% EEG data rank
-sts.rank = ec_rank(xs);
-
-% Get number of components (features)
-nComps = o.pca;
-if nComps > sts.rank
-    nComps = sts.rank; end
-sts.features = nComps;
-
+%%% PCA on EEG data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,st,w] = rankPCA_lfn(x,st,o)
+w = [];
 
 %% Robust PCA
 if o.pcaRobust
-    xs = inexact_alm_rpca(xs); end
+    x = ec_robustPCA(x); % run robust PCA for denoising
+end
 
-%% PCA (on robustPCA output if previously done)
-[ws,xs] = pca(xs,NumComponents=nComps);
+
+%% Data rank
+xRank = ec_rank(x);
+
+
+%% Standard PCA
+if o.pcaComps
+    % Get number of components (features)
+    nComps = o.pcaComps;
+    if nComps > xRank
+        nComps = xRank; end
+
+    % Run standard PCA for dimensionality reduction
+    if nComps>0 && nComps<st.width(1)
+        [w,x] = pca(x,NumComponents=nComps);
+    end
+end
+
+
+%% Finalize
+st.features(:) = width(x);
+st.rank(:) = xRank;
+
+% Move from GPU
+if ~o.gpu
+    x = gather(x); % keep 'x' as gpuArray if processing as GPU
+end
+w = gather(w); % PCA weights always saved on CPU

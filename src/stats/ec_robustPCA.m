@@ -1,6 +1,7 @@
 function [L,S] = ec_robustPCA(x,lambda,mu,tol,maxIter)
 %% Robust principal components analysis (PCA)
-% PCA algorithm: alternating direction method of multipliers (ADMM)
+% Optimization problem: Principal Component Pursuit (PCP)
+% Optimization method: Alternating direction method of multipliers (ADMM)
 %
 % Inputs: see "input validation" below
 % Outputs:

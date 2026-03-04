@@ -15,17 +15,21 @@ dirs = ec_getDirs(proj,task);
 % Initialize options struct
 o = struct;
 o.name = ""; % Analysis name (filled in subject loop)
-o.sfx = ""; % Suffix of input data (filled in subject loop)
 
 
 %% Options
 o.test = false;
 o.save = true;
 
+% Input data
+o.sfx = "s";
+o.ICA = false; % Run on ICs?
+
 % Processing options
 o.gpu = false; % do GPU
 o.typeProc = "single"; % processing floating-point precision ("double"|"single")
 o.typeOut = "single"; % output floating-point precision ("double"|"single")
+o.nRmFields = ["fsNfo" "chCov" "chVar" "chCorr" "chDist" "freqsRun" "os"]; % Fields to remove from 'n' to save memory
 
 % Channel removal
 o.chRm = []; % channels to remove (array of chan numbers)
@@ -46,16 +50,17 @@ o.condVar = "cond";
 o.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
 o.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
-% Outliers within timepoint
+% Outliers within timepoint / data split
 o.ol = "median"; % Outlier detection method (mathworks.com/help/stats/filloutlier.html)
 o.olFill = "clip"; % Outlier fill method
-o.olThrAll = 7.5; % Outlier threshold (all observations)
-o.olThrCond = 3; % Outlier threshold (within-condition)
+o.olThrAll = 0; % All-observation outlier threshold (0=skip)
+o.olThrCond = 3; % Within-condition outlier threshold (0=skip)
 
-% PCA on each data split (chans/ROIs x timepoint)
-o.pca = 60; % Spectral robust PCA within timepoint (0=no PCA, inf=data rank)
-o.pcaGPU = false; % Use GPU for robust PCA
-o.pcaRobust = false; % Use robust PCA
+% Rank calculation & PCA
+o.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"](channel,ROI,analysis data split)
+o.pcaComps = Inf; % Number of components (0=skip, inf=data rank)
+o.pcaGPU = true; % GPU for rank calculation & PCA
+o.pcaRobust = true; % Run robust PCA for denoising
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -72,7 +77,7 @@ o.std = ""; % Standardize predictors (z-score)
 o.cv.KFold = 10; % o.cv.Leaveout = "on";
 % Cross-validation for hyperparameter optimization
 o.cvh.KFold = 5;
-o.cvMinTrialsPerFold = 5; % minimum trials per class in each fold
+o.cvMinTrialsPerFold = 3; % minimum trials per class in each fold
 
 % Classifier hyperparameters
 o.hyper = struct;
@@ -126,6 +131,7 @@ o.HyperparameterOptimizationOptions =...
 
 % Task Epoching (see 'ec_epochPsy')
 o.epoch.float = "single"; % task metadata output floating-point precision
+o.epoch.hzTarget = 0; % Target sampling rate (0=default rate)
 % Bad trial removal
 o.epoch.rmTrials = []; % Trials to remove (numeric array)
 o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function for removing trials
@@ -150,8 +156,8 @@ o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 % Preprocessing (see 'ec_epochBaseline')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
-o.pre.typeOut = "single"; % output FP precision ("double"|"single"|""=same as input)
-o.pre.hzTarget = nan; % Target sampling rate (nan=default rate)
+o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
+o.pre.hzTarget = 0; % Target sampling rate (0=default rate)
 % Normalization/transform
 o.pre.log = false; % Log transform
 o.pre.mag2db = false; % Log-transform magnitude to decibel
@@ -177,6 +183,8 @@ o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 o.pre.freqs = [4 300];
 % PCA within-chan or within-concactenated chans (e.g., make spectral components)
 o.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+o.pre.pcaRobust = false;
+o.pre.pcaGPU = false;
 % % Spectral dimensionality reduction into bands (skip=[])
 % o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
@@ -192,73 +200,61 @@ o.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0
 
 %% Logs
 if ~exist('logs','var')
+    %%
     date = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
+    o.name = analName+"_"+date;
 
     logs = table;
-    logs.name(1) = analName+"_ch_"+date;
-    logs.name(2) = analName+"_ic_"+date;
-    logs.ICA = [false;true];
-    logs.sfx = ["s";"is"];
-
-    logs.i{1} = table;
-    logs.i{1}.sbj = string(sbjs);
-    logs.i{1}.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
-    logs.i{1}.class(:) = false;
-    logs.i{1}.post(:) = false;
-    logs.i{1}.plot(:) = false;
-    logs.i{1}.o = cell(numel(sbjs),1);
-    logs.i{1}.n = cell(numel(sbjs),1);
-    logs.i{1}.time(:) = date;
-    logs.i{1}.error = cell(numel(sbjs),1);
-
-    logs.i{2} = logs.i{1};
-
-    for p = 1:2
-        logs.out(p) = dirs.anal+analFolder+filesep+logs.name(p)+filesep;
-        logs.out(p) = dirs.anal+analFolder+filesep+logs.name(p)+filesep;
-        logs.fn(p) = logs.out(p)+"log_"+date+".mat";
-    end
+    logs.sbj = string(sbjs);
+    logs.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
+    logs.name(:) = analName+"_"+date;
+    logs.class(:) = false;
+    logs.post(:) = false;
+    logs.plot(:) = false;
+    logs.o = cell(numel(sbjs),1);
+    logs.n = cell(numel(sbjs),1);
+    logs.time(:) = date;
+    logs.error = cell(numel(sbjs),1);
+    logs.out(:) = dirs.anal+analFolder+filesep+logs.name(1)+filesep;
+    logs.fn(:) = logs.out(1)+"log_"+date+".mat";
 end
 
 
 
-%% Do classification per sbj %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Initialize threadpool
 try delete(gcp("nocreate")); catch;end
 try ppool = parpool("threads"); catch;end
-% s=5; p=1;
-% s=9; p=1;
+% s=5; %sbj38
+% s=9; %sbj42
+% s=21; %sbj60
 
-% Loop across subjects
-for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
-    for s = 1:height(logs.i{p})
-        if ~logs.i{p}.class(s)
-            % Set options struct per subject
-            sbj = logs.i{p}.sbj(s);
-            sbjID = logs.i{p}.sbjID(s);
-            o.name = logs.name(p);
-            o.sfx = logs.sfx(p);
-            o.ICA = logs.ICA(p);
-            o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
-            o.dirOut = logs.out(p);
-            o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
-            disp("STARTING: "+sbj);
 
-            %% Run subject
-            if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
-            try               
-                [logs.i{p}.o{s},logs.i{p}.n{s}] = ec_classifySpec(o);
-                logs.i{p}.class(s) = true;
-            catch ME; getReport(ME)
-                logs.i{p}.error{s} = ME;
-                logs.i{p}.class(s) = false;
-            end
+%% Loop across subjects
+for s = 1:height(logs)
+    if ~logs.class(s)
+        % Set options struct per subject
+        sbj = logs.sbj(s);
+        sbjID = logs.sbjID(s);
+        o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
+        o.dirOut = logs.out(s);
+        o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
+        disp("STARTING: "+sbj);
 
-            %% Save logs
-            logs.i{p}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(logs.fn(p),'logs','-v7');
-
-        else
-            disp("SKIPPING: "+o.name);
+        %% Run subject
+        if ~exist(logs.out(s),"dir"); mkdir(logs.out(s)); end
+        try
+            [logs.o{s},logs.n{s}] = ec_classifySpec(o);
+            logs.class(s) = true;
+        catch ME; getReport(ME)
+            logs.error{s} = ME;
+            logs.class(s) = false;
         end
+
+        %% Save logs
+        logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+        save(logs.fn(s),'logs','-v7');
+
+    else
+        disp("SKIPPING: "+o.name);
     end
 end

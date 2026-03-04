@@ -12,10 +12,13 @@ arguments
     o.eig (1,1) logical = false     % Eigenvector as 1st output
     o.compare (1,1) logical = false % Compare with Matlab's rank() function
     o.exact (1,1) logical = false   % Determine exact rank tol (slower)
-    o.gpu (1,1) logical = false
+    o.gpu (1,1) logical = false     % Use GPU
+    o.double (1,1) logical = true   % Double precision
 end
-if o.gpu; x=gpuArray(x); elseif isgpuarray(x); o.gpu=true; end
-if o.gpu; o=structfun(@gpuArray,o,UniformOutput=false); tol=gpuArray(tol); end
+
+%% Prep
+if o.double; x = double(x); end % convert to double-precision (FP64)
+if o.gpu; x = gpuArray(x); end % copy to GPU
 
 % Calculate rank tolerance if not specified
 if ~tol
@@ -26,9 +29,11 @@ if ~tol
     end
 end
 
+
 %% Calculate data rank from covariance eigenvectors (Sven Hoffman)
 xEig = eig(cov(x,1,"partialrows"));
 xRank = nnz(xEig>tol);
+
 
 %% Compare with built-in Matlab function: rank() 
 if o.compare
@@ -40,6 +45,7 @@ if o.compare
         end
     end
 end
+
 
 %% Output eigenvectors first (useful for arrayfun/cellfun/pagefun/etc)
 if o.eig

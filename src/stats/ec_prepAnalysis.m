@@ -7,11 +7,11 @@ end
 % tt=tic;
 
 %% Additional arguments validation
-if o.pca=="ch"
-    o.prep.pca = o.pcaComps;
-    o.prep.pcaRobust = o.pcaRobust;
-    o.prep.pcaGPU = o.pcaGPU;
-end
+% if o.pca=="ch"
+%     o.prep.pca = o.pcaComps;
+%     o.prep.pcaRobust = o.pcaRobust;
+%     o.prep.pcaGPU = o.pcaGPU;
+% end
 
 
 %% Load data 
@@ -99,10 +99,31 @@ n.nTrs = numel(trs);
 n.cnds = unique(n.trialNfo.cnd);
 n.nCnds = numel(n.cnds);
 
+% Analysis times 
+n.times = table;
+n.times.t = unique(ep.t,"stable"); 
+n.nTimes = height(n.times);
+
+% Indices of times
+n.times.id = cell(n.nTimes,1); % preallocate
+for t = 1:n.nTimes
+    n.times.id{t} = sparse(ep.t==n.times.t(t));
+end
+
 
 %% Analysis-specific preprocessing
 oo = namedargs2cell(o.pre);
 [x,n] = ec_epochBaseline(x,n,psy,ep,tt,oo{:},test=o.test);
+
+
+%% Outliers per channel, timepoint & condition
+if o.olThrAll || o.olThrCond
+    % Parallel loop across time
+    parfor ch = 1:n.xChs
+        x(:,ch,:) = outliers_lfn(x(:,ch,:),ep,n,o);
+    end
+    disp("[ec_prepAnalysis] Filled outliers per timepoint & cond: "+o.dirs.sbj+" | toc="+toc(tt));
+end
 
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
@@ -113,6 +134,7 @@ end
 
 
 %% Final
+n = rmfield(n,o.nRmFields); % Fields to remove from 'n' to save memory
 disp("[ec_prepAnalysis] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
@@ -196,3 +218,40 @@ elseif o.concatChs=="all"
         end
     end
 end
+
+
+
+
+%%% Outliers within channel  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function xc = outliers_lfn(xc,ep,n,o)
+% Squeeze
+xc = squeeze(xc);
+
+% Loop across timepoints
+for t = 1:n.nTimes
+    id = n.times.id{t};
+    xc(id,:) = outliersTime_lfn(xc(id,:),ep(id,:),n,o);
+end
+
+
+
+
+
+
+%%% Outliers within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function xt = outliersTime_lfn(xt,ept,n,o)
+
+% Outliers: all-data
+if o.olThrAll
+    xt = filloutliers(xt,o.olFill,o.ol,1,ThresholdFactor=o.olThrAll);
+end
+
+% Outliers: within-condition
+if o.olThrCond
+    for c = n.cnds'
+        id = ept.cnd==c;
+        xt(id,:) = filloutliers(xt(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
+        %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
+    end
+end
+

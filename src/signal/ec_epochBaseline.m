@@ -297,7 +297,7 @@ if o.trialBaseline=="median"
 elseif o.trialBaseline=="mean"
     bl = mean(xe(iBL,:,:),1,"omitnan"); % BL median
 else
-    bl = cast(0,like=xe);
+    bl = 0;
 end
 
 % Get trial std deviation
@@ -308,10 +308,9 @@ elseif o.trialNorm=="zscore"
     sd = std(xe(iSD,:,:),1,1,"omitnan");
     c = 1;
 else
-    sd = cast(1,like=xe);
+    sd = 1;
     c = 1;
 end
-c = cast(c,like=xe);
 
 % Do baseline correction
 xe = c*(xe-bl)./sd;
