@@ -43,7 +43,6 @@ end
 %% Main
 x(unobserved) = 0;
 
-
 % Norm of input data
 normX = norm(x, 'fro');
 
