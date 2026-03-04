@@ -117,6 +117,10 @@ for t = 1:height(stc)
 end
 
 
+%% Remove empty cells
+xc1 = xc1(~cellfun("isempty",xc1));
+ac1 = ac1(~cellfun("isempty",ac1));
+
 
 
 

@@ -1,4 +1,4 @@
-function stats = mmr_cChSpecPost(o)
+function st = mmr_cChSpecPost(o)
 % Further analysis on results from classifyChSpec
 arguments
     o struct
@@ -9,69 +9,69 @@ tic;
 s0 = cast(nan,o.typeProc);
 
 % Load
-fnStats = o.dirOut+"s"+o.n.sbjID+"_stats.mat";
-load(fnStats,"stats");
-fnObs = o.dirOut+"s"+o.n.sbjID+"_obs.mat";
-load(fnObs,"obs");
+fnSt = o.dirOut+"s"+o.n.sbjID+"_st.mat";
+load(fnSt,"st");
+fnOb = o.dirOut+"s"+o.n.sbjID+"_ob.mat";
+load(fnOb,"ob");
 
 % Rename table vars to standard names
-stats = renamevars(stats,o.timeVar,"t");
-obs = renamevars(obs,[o.timeVar o.condVar],["t" "cnd"]);
-svars = string(stats.Properties.VariableNames);
+st = renamevars(st,o.timeVar,"t");
+ob = renamevars(ob,[o.timeVar o.condVar],["t" "cnd"]);
+svars = string(st.Properties.VariableNames);
 
 
 %% Preallocate additional stats vars
 
 % Posterior probability (PP) per cond
 if ~ismember("ppc",svars)
-    stats.ppc(:,1:numel(o.cond)) = s0;
-    stats.ppc_SE = stats.ppc;
-    stats.ppc_p = stats.ppc;
-    stats.ppc_q = stats.ppc;
+    st.ppc(:,1:numel(o.cond)) = s0;
+    st.ppc_SE = st.ppc;
+    st.ppc_p = st.ppc;
+    st.ppc_q = st.ppc;
 end
 
 % PP per cross-classification (CC) cond
 if isany(o.condx) && ~ismember("ppcx",svars)
-    stats.ppcx(:,1:numel(o.condx)) = s0;
-    stats.ppcx_SE = stats.ppcx;
-    stats.ppcx_p = stats.ppcx;
-    stats.ppcx_q = stats.ppcx;
+    st.ppcx(:,1:numel(o.condx)) = s0;
+    st.ppcx_SE = st.ppcx;
+    st.ppcx_p = st.ppcx;
+    st.ppcx_q = st.ppcx;
 end
 
 % Regression on CC PP
 if isany(o.condx) && ~ismember("ppr_cx",svars)
     % Difference between conds/classes
-    stats.ppr_cx(:,1:numel(o.condx)-1) = s0;
-    stats.ppr_cx_SE(:) = stats.ppr_cx;
-    stats.ppr_cx_p(:) = stats.ppr_cx;
-    stats.ppr_cx_q(:) = stats.ppr_cx;
+    st.ppr_cx(:,1:numel(o.condx)-1) = s0;
+    st.ppr_cx_SE(:) = st.ppr_cx;
+    st.ppr_cx_p(:) = st.ppr_cx;
+    st.ppr_cx_q(:) = st.ppr_cx;
     % Behav response time
-    stats.ppr_RT(:) = s0;
-    stats.ppr_RT_SE(:) = s0;
-    stats.ppr_RT_p(:) = s0;
-    stats.ppr_RT_q(:) = s0;
+    st.ppr_RT(:) = s0;
+    st.ppr_RT_SE(:) = s0;
+    st.ppr_RT_p(:) = s0;
+    st.ppr_RT_q(:) = s0;
     % Affective valence
-    stats.ppr_val(:) = s0;
-    stats.ppr_val_SE(:) = s0;
-    stats.ppr_val_p(:) = s0;
-    stats.ppr_val_q(:) = s0;
+    st.ppr_val(:) = s0;
+    st.ppr_val_SE(:) = s0;
+    st.ppr_val_p(:) = s0;
+    st.ppr_val_q(:) = s0;
 
     % Add CC cond var to obs
-    obs.cx = categorical(string(obs.cnd),o.condx,Ordinal=true);
+    ob.cx = categorical(string(ob.cnd),o.condx,Ordinal=true);
 end
 
 % Move added vars
-stAddVars = setdiff(stats.Properties.VariableNames,svars,"stable");
-stats = movevars(stats,stAddVars,"Before","n");
+stAddVars = setdiff(st.Properties.VariableNames,svars,"stable");
+st = movevars(st,stAddVars,"Before","n");
 
 % Split obs by chan & timept (output from unique models) for parfor
-obs = splitapply(@(ct){obs(ct,:)},(1:height(obs))',findgroups(obs.ch,obs.t));
+ob = splitapply(@(ct){ob(ct,:)},(1:height(ob))',findgroups(ob.ch,ob.t));
 disp("[mmr_cChSpecPost] Finished prep: "+o.n.sbj+" toc="+toc);
 
 
 %% Run analyses per model (parfor across chan & timept)
-parfor ct = 1:height(stats)
-    stats(ct,:) = furtherAnalysis_lfn(stats(ct,:),obs{ct},o);
+parfor s = 1:height(st)
+    st(s,:) = furtherAnalysis_lfn(st(s,:),ob{s},o);
 end
 disp("[mmr_cChSpecPost] Finished analyses: "+o.n.sbj+" toc="+toc);
 
@@ -79,23 +79,23 @@ disp("[mmr_cChSpecPost] Finished analyses: "+o.n.sbj+" toc="+toc);
 %% FDR
 varsP = stAddVars(contains(stAddVars,"_p")); % new pval vars
 varsQ = stAddVars(contains(stAddVars,"_q")); % new fdr vars
-idFDR = stats.t>=o.fdrTimeRng(1) & stats.t<=o.fdrTimeRng(2);
+idFDR = st.t>=o.fdrTimeRng(1) & st.t<=o.fdrTimeRng(2);
 
 % Loop across q vars
 for v = 1:numel(varsQ)
     % Loop across var columns -- KEEP THIS??
-    for w = 1:width(stats.(varsQ(v)))
+    for w = 1:width(st.(varsQ(v)))
         % do FDR
-        stats.(varsQ(v))(idFDR,w) = ec_fdr(stats.(varsP(v))(idFDR,w),...
+        st.(varsQ(v))(idFDR,w) = ec_fdr(st.(varsP(v))(idFDR,w),...
             o.alpha,o.fdrDep);
     end
 end
 
 
 %% Finalize & Save
-stats = renamevars(stats,"t",o.timeVar); % rename to original names
-save(fnStats,"stats");
-disp("[mmr_cChSpecPost] Saved (toc="+toc+"): "+fnStats);
+st = renamevars(st,"t",o.timeVar); % rename to original names
+save(fnSt,"st");
+disp("[mmr_cChSpecPost] Saved (toc="+toc+"): "+fnSt);
 
 
 

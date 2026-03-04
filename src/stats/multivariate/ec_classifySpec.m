@@ -1,4 +1,4 @@
-function [o,stat,ob] = ec_classifySpec(o)
+function [o,n,st,ob] = ec_classifySpec(o)
 % Performs classification & cross-classification within channels/ICs/ROIs
 % across time using spectral activity as features. ROI classificaiton
 % concatenates timecourses from within-ROI channels. 
@@ -26,24 +26,26 @@ tt = tic; % start timer
 
 
 %% Make classifier templates
-[ob,stat] = ec_classifyTemplates(n,ep,o,tt);
+[ob,st] = ec_classifyTemplates(n,ep,o,tt);
 
 
 %% Split variables so splits directly go into ec_runClassifier
-[x,ob,stat,n] = ec_splitClassifyData(x,ob,stat,n,o,tt);
+[x,ob,st,n] = ec_splitClassifyData(x,ob,st,n,o,tt);
 
 
 %% Classification
-[ob,stat] = classify_lfn(x,ob,stat,n,o,tt);
+[ob,st] = classify_lfn(x,ob,st,n,o,tt);
 
 
 %% Save
-o.saved.stat = o.dirOut+"s"+n.sbjID+"_stat.mat";
-save(o.saved.stat,"stat","-v7");
-disp("[ec_classifyChSpec] Saved classificiation statistics: "+o.saved.stat+" toc="+toc(tt));
+o.saved.st = o.dirOut+"s"+n.sbjID+"_st.mat";
+save(o.saved.st,"st","-v7");
+disp("[ec_classifyChSpec] Saved classificiation statistics: "+o.saved.st+" toc="+toc(tt));
 o.saved.ob = o.dirOut+"s"+n.sbjID+"_ob.mat";
 save(o.saved.ob,"ob","-v7");
 disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc="+toc(tt));
+o.saved.nfo = o.dirOut+"s"+n.sbjID+".mat";
+save(o.saved.nfo,"o","n","-v7");
 
 
 
@@ -58,17 +60,17 @@ disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc
 
 
 %%% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [ob,stat] = classify_lfn(x,ob,stat,n,o,tt)
+function [ob,st] = classify_lfn(x,ob,st,n,o,tt)
 splits = numel(x);
 
 %% Compute across data splits (chans/ICs/ROIs x timepoints)
 if o.gpu
     for s = 1:splits
-        [ob{s},stat(s,:)] = ec_runClassifier(x{s},ob{s},stat(s,:),o);
+        [ob{s},st(s,:)] = ec_runClassifier(x{s},ob{s},st(s,:),o);
     end
 else
     parfor s = 1:splits
-        [ob{s},stat(s,:)] = ec_runClassifier(x{s},ob{s},stat(s,:),o);
+        [ob{s},st(s,:)] = ec_runClassifier(x{s},ob{s},st(s,:),o);
     end
 end
 disp("[ec_classifyChSpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
@@ -79,17 +81,17 @@ ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "t"],"ascend");
 
 
 %% FDR
-vs = string(stat.Properties.VariableNames);
+vs = string(st.Properties.VariableNames);
 vsP = vs(contains(vs,"_p")); % pval vars
 vsQ = vs(contains(vs,"_q")); % fdr vars
-id = stat.t>=o.fdrTimeRng(1) & stat.t<=o.fdrTimeRng(2); % fdr time range
+id = st.t>=o.fdrTimeRng(1) & st.t<=o.fdrTimeRng(2); % fdr time range
 
 % Loop across q vars
 for v = 1:numel(vsQ)
     % Loop across var columns -- KEEP THIS??
-    for w = 1:width(stat.(vsQ(v)))
+    for w = 1:width(st.(vsQ(v)))
         % do FDR
-        stat.(vsQ(v))(id,w) = ec_fdr(stat.(vsP(v))(id,w),...
+        st.(vsQ(v))(id,w) = ec_fdr(st.(vsP(v))(id,w),...
             o.alpha,o.fdrDep);
     end
 end
@@ -100,8 +102,8 @@ disp("[ec_classifyChSpec] Ran FDR: "+n.sbj+" toc="+toc(tt));
 % TO DO: convert float vars to output type
 
 % Remove vars
-stat = removevars(stat,["cost" "cv" "cvh"]);
+st = removevars(st,["cost" "cv" "cvh"]);
 
 % Rename vars
 ob = renamevars(ob,["t" "cnd"],[o.timeVar o.condVar]);
-stat = renamevars(stat,"t",o.timeVar);
+st = renamevars(st,"t",o.timeVar);

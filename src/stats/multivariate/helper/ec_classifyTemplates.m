@@ -133,6 +133,7 @@ for t = 1:height(st)
     st.cv{t} = cvpartition_lfn(ob(idt,:),nCond,o.cv,o.cvMinTrialsPerFold);
     if isempty(st.cv{t})
         ob.use(idt) = false; % mark timepoint as unusable
+        st.cv{t} = [];
         continue;
     end
 
@@ -140,7 +141,7 @@ for t = 1:height(st)
     st.cvh{t} = cvpartition_lfn(ob(idt,:),nCond,o.cvh,o.cvMinTrialsPerFold);
     if isempty(st.cvh{t})
         ob.use(idt) = false;
-        st.cv{t} = [];
+        st.cvh{t} = [];
     end
 end
 disp("[ec_classifyTemplates] Made classifier templates: "+o.dirs.sbj+" | toc="+toc(tt));
