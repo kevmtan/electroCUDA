@@ -19,7 +19,7 @@ arguments
     tt uint64 = tic                             % Timer
     o.test (1,1) logical = false               % Running a test? (keeps removed fields)
     o.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
-    o.hzTarget (1,1) double = nan              % Target sampling rate
+    o.hzTarget (1,1) double = 0                % Target sampling rate (0=skip)
     % processing FP precision ("double"|"single"|default=same as input)
     o.typeProc (1,1){mustBeMember(o.typeProc,["double" "single"])} = class(x)
     % output FP precision ("double"|"single"|"half"|default=same as input)
@@ -48,6 +48,8 @@ arguments
     o.freqs {islogical,isnumeric} = [];
     % PCA within-chan or within-concactenated chans (e.g., make spectral components)
     o.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+    o.pcaRobust = false; % Use robust PCA
+    o.pcaGPU = false; % Use GPU for PCA (recommended for robustPCA)
     % Spectral dimensionality reduction into bands (skip=[])
     o.bands string = "";                        % Band name
     o.bands2 string = "";                       % Band display name
@@ -62,39 +64,15 @@ arguments
 end
 
 % Additional validation
+if ~isfield(n,"hz0"); error("Must run 'ec_epochPsy' first with same downsampling (if any)"); end
 if ~isany(o.hpf); o.hpf=false; end
 if ~isany(o.lpf); o.lpf=false; end
 
 
 %% Prep
 
-% Convert EEG to specified float type for processing
-x = cast(x,o.typeProc);
-
-% Move EEG to GPU
-if o.gpu
-    x = gpuArray(x); end
-
-% Make temporal filters
-if o.hpf || o.lpf
-    o = makeFilters_lfn(x,n,o,tt);
-end
-
-% Downsampling
-if o.hzTarget < n.hz
-    o = downsamplingPrep_ln(n,o); % downsampling factors & anti-aliasing
-else
-    o.ds = false;
-end
-
-% Spectral
-if isany(o.bands)
-    % Find spectral band frequencies in EEG
-    n = bandFreqs_lfn(n,o,tt);
-elseif isany(o.freqs)
-    % Keep only specified spectral frequencies
-    [x,n] = keepFreqs_lfn(x,n,o,tt);
-end
+% Peristimulus indices
+stim = psy.stim;
 
 % Run indices
 ri = false(height(psy),n.nRuns);
@@ -102,8 +80,36 @@ for r = 1:n.nRuns
     ri(:,r) = psy.run==n.runs(r);
 end
 
-% Peristimulus indices
-stim = psy.stim;
+% Spectral
+if isany(o.bands)
+    % Find spectral band frequencies in EEG
+    n = findBandFreqs_lfn(n,o,tt);
+elseif isany(o.freqs)
+    % Keep only specified spectral frequencies
+    [x,n] = keepFreqs_lfn(x,n,o,tt);
+end
+
+% Convert EEG to specified float type for processing
+x = cast(x,o.typeProc);
+if o.gpu
+    % Move EEG to GPU
+    x = gpuArray(x);
+end
+
+% Downsampling
+if any(o.hzTarget) && o.hzTarget~=n.hz0
+    o = downsamplingPrep_ln(n,o); % downsampling factors & anti-aliasing
+else
+    o.ds = false;
+end
+
+% Make temporal filters
+if o.hpf || o.lpf
+    o = makeFilters_lfn(x,n,ri,o,tt);
+end
+
+
+
 
 
 %% All-data processing
@@ -128,13 +134,13 @@ end
 disp("[ec_epochBaseline] Completed within-run routines: "+n.sbj+" time="+toc(tt));
 
 
-%% Downsampling
+%% Downsampling ('ep' should be already downsampled)
 if o.ds
-    % Split data by epoch
-    trs = findgroups(ep.tr);
-    x = splitapply(@(e){x(e,:,:)},ep.ide,trs);
+    % Split EEG data by epoch
+    runs = findgroups(psy.tr);
+    x = splitapply(@(r){x(r,:,:)},psy.idx,runs);
 
-    % Downsample within-run
+    % Downsample EEG within-run
     for r = 1:n.nRuns
         x{r} = downsample_lfn(x{r},o);
     end
@@ -328,33 +334,8 @@ if ~any(iSD) && isany(o.trialNorm)
 
 
 
-%%% Downsampling preparation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function o = downsamplingPrep_ln(n,o)
-
-% Downsampling factors
-[o.ds(1),o.ds(2)] = rat(o.hzTarget/n.hz); % get factors
-if o.ds(1) > o.ds(2)
-    error("[ec_epochBaseline] downsampling target > sampling rate"); end
-if o.ds(1) ~= 1
-    error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
-o.ds = o.ds(2);
-disp("[ec_epochBaseline] downsampling factor = "+o.ds);
-
-% Ensure anti-aliasing LPF
-hzNyquist = o.hzTarget/2;
-if ~o.lpf || o.lpf<hzNyquist
-    o.lpf = hzNyquist;
-    disp("[ec_epochBaseline] adding downsampling anti-aliasing LPF: "+...
-        o.lpf+"hz");
-end
-
-
-
-
-
-
 %%% Split EEG frequencies into spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function n = bandFreqs_lfn(n,o,tt)
+function n = findBandFreqs_lfn(n,o,tt)
 
 % Copy original frequency info
 n.spect0 = n.spect; 
@@ -413,17 +394,42 @@ disp("[ec_epochBaseline] Kept "+n.nSpect+"/"+n.nFreqs+" freqs: "+n.sbj+" time="+
 
 
 
+%%% Downsampling preparation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function o = downsamplingPrep_ln(n,o)
+
+% Downsampling factors
+[o.ds(1),o.ds(2)] = rat(o.hzTarget/n.hz0); % get factors
+if o.ds(1) > o.ds(2)
+    error("[ec_epochBaseline] downsampling target > sampling rate"); end
+if o.ds(1) ~= 1
+    error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
+o.ds = o.ds(2);
+disp("[ec_epochBaseline] downsampling factor = "+o.ds);
+
+% Ensure anti-aliasing LPF
+hzNyquist = o.hzTarget/2;
+if ~o.lpf || o.lpf>hzNyquist
+    o.lpf = hzNyquist;
+    disp("[ec_epochBaseline] adding downsampling anti-aliasing LPF: "+...
+        o.lpf+"hz");
+end
+
+
+
+
+
+
 %%% Make temporal filters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function o = makeFilters_lfn(x,n,o,tt)
+function o = makeFilters_lfn(x,n,ri,o,tt)
 
 % Extract EEG timeseries vector from shortest run
-[~,idx] = min(n.runIdxOg);
-xTmp = x(n.runIdx(idx,1):n.runIdx(idx,2),1,1);
+[~,id] = min(n.runIdxOg);
+xTmp = x(ri(:,id),1,1);
 
 % High-pass filter
 if o.hpf
     o.HPF = {};
-    [o.HPF{1},o.HPF{2}] = ec_designFilt(xTmp,n.hz,o.hpf,"highpass",...
+    [o.HPF{1},o.HPF{2}] = ec_designFilt(xTmp,n.hz0,o.hpf,"highpass",...
         steepness=o.hpfSteep,impulse=o.hpfImpulse,coefOut=true);
     disp("[ec_epochBaseline] Created high-pass filter: "+n.sbj+" time="+toc(tt));
 end
@@ -431,7 +437,7 @@ end
 % Low-pass filter
 if o.lpf
     o.LPF = {};
-    [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz,o.lpf,"lowpass",...
+    [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz0,o.lpf,"lowpass",...
         steepness=o.lpfSteep,impulse=o.lpfImpulse,coefOut=true);
     disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
 end

@@ -5,6 +5,7 @@ arguments
     trialNfo table
     n struct
     tt (1,1) uint64 = tic
+    o.hzTarget (1,1) double = 0 % Target sampling rate (0=skip)
     % Bad trial removal
     o.rmTrials {isNumOrLogical} = []; % Trials to remove (numeric array or logical index)
     o.rmTrialsFun = {} % Function handle for removing trials (using trialNfo vars)
@@ -32,13 +33,20 @@ end
 trs = height(trialNfo);
 idxOns = trialNfo.idxOns;
 
+% Convert timing arguments to seconds
+o.pre=seconds(abs(o.pre)); o.post=seconds(abs(o.post)); o.dur=seconds(abs(o.dur));
+
+% Resample to target sampling rate
+n.hz0 = n.hz;
+if any(o.hzTarget) && o.hzTarget~=n.hz0
+    [psy,trialNfo,n] = ec_loadSbj(n.dirs,hz=o.hzTarget,vars=["psy" "trialNfo" "n"]);
+    disp("[ec_epochPsy] Resampled psychobehavioral data: "+o.hzTarget+"hz");
+end
+
 % Convert float vars from half to single for threadpool
 psy = convertvars(psy,varfun(@class,psy,OutputFormat="cell")=="half","single");
 trialNfo = convertvars(trialNfo,...
     varfun(@class,trialNfo,OutputFormat="cell")=="half","single");
-
-% Convert timing arguments to seconds
-o.pre=seconds(abs(o.pre)); o.post=seconds(abs(o.post)); o.dur=seconds(abs(o.dur));
 
 
 %% Generate epochs

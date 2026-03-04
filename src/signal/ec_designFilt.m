@@ -18,6 +18,7 @@ end
 if numel(hz)>1; dType = "bandpass"; end
 % if arg.impulse=="auto"; x = double(x(:,1,1)); end % Get sample vector
 
+
 %% Make filter object
 d = signal.internal.filteringfcns.parseAndValidateInputs(x,char(dType),...
     {hz,fs,'Steepness',o.steepness,'ImpulseResponse',o.impulse});
@@ -36,15 +37,7 @@ end
 
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%% Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-
-
-
-% designFilter_lpf %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% designFilter_lpf %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [d,opts] = designFilter_lfn(opts)
 opts.IsFIR = true;
 Fs = opts.Fs;
@@ -130,7 +123,7 @@ d = designfilt(params{:});
 
 
 
-% getIIRMinOrder %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% getIIRMinOrder %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function N = getIIRMinOrder(WpassNormalized,WstopNormalized,Apass, Astop)
 % Compute analog frequencies
 %   WpassNormalized, WstopNormalized are passband and stopband normalized

@@ -6,6 +6,13 @@ arguments
 end
 % tt=tic;
 
+%% Additional arguments validation
+if o.pca=="ch"
+    o.prep.pca = o.pcaComps;
+    o.prep.pcaRobust = o.pcaRobust;
+    o.prep.pcaGPU = o.pcaGPU;
+end
+
 
 %% Load data 
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...

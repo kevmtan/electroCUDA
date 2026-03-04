@@ -17,14 +17,21 @@ arguments
     a.dirs struct = []
     a.blocks string = BlockBySubj(sbj,task)
 end
-dirs=a.dirs; blocks=a.blocks; hzTarget=a.hzTarget;
-if ~isstruct(dirs)||isempty(dirs); dirs = ec_getDirs(proj,task,sbj); end
-if isempty(blocks); blocks=BlockBySubj(sbj,task); end
-if ~isfield(o,'suffix'); o.suffix=""; end
-if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
-if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending string
+if ~isstruct(a.dirs)||isempty(a.dirs); a.dirs = ec_getDirs(proj,task,sbj); end
+if isempty(a.blocks); a.blocks=BlockBySubj(sbj,task); end
+if ~isfield(o,"suffix")
+    if isfield(o,"sfx")
+        o.suffix = o.sfx;
+    elseif ~isempty("n") && isfield(n,"suffix")
+        o.suffix;
+    else
+        o.suffix = "";
+    end
+end
+if ~isfield(o,'dirOut'); o.dirOut=a.dirs.procSbj; end % Output directory
+if ~isfield(o,'fnStr');  o.fnStr="s"+a.dirs.sbjID+"_"+task; end % Filename ending string
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
-blocks = string(blocks);
+a.blocks = string(a.blocks);
 errors={};
 % arg.save=0; arg.redoCh=0; arg.redoTr=0; arg.redoPsy=1;
 
@@ -42,20 +49,20 @@ if isempty(n) || a.redo || a.redoN
         load(fn_base,"n"); disp("LOADED: "+fn);
     elseif ~isfile(fn_base) || a.redo
         % Load sbjNfo
-        fn = dirs.origSbj+"sbjNfo_s"+dirs.sbjID+"_"+task+".mat";
+        fn = a.dirs.origSbj+"sbjNfo_s"+a.dirs.sbjID+"_"+task+".mat";
         load(fn,"sbjNfo"); disp("LOADED: "+fn);
 
         n = struct; 
         n.sbj = sbj;
-        n.sbjID = dirs.sbjID;
+        n.sbjID = a.dirs.sbjID;
         n.proj = proj;
         n.task = task;
         n.suffix = o.suffix;
         n.fnStr = o.fnStr;
         n.ICA = a.ica;
         n.nChs = sbjNfo.nCh;
-        n.nBlocks = numel(blocks);
-        n.blocks = blocks;
+        n.nBlocks = numel(a.blocks);
+        n.blocks = a.blocks;
         n.hz = sbjNfo.hz;
         n.hz_og = sbjNfo.hz;
         n.hz_Pdio = sbjNfo.hz_Pdio;
@@ -63,7 +70,7 @@ if isempty(n) || a.redo || a.redoN
         n.nChFS = sbjNfo.nChFS;
         n.fsNfo = sbjNfo.fsNfo;
         n.sbjNfo = sbjNfo.demographics;
-        n.dirs = dirs;
+        n.dirs = a.dirs;
     end
 end
 
@@ -80,22 +87,22 @@ n.suffix = o.suffix;
 hz = n.hz;
 
 % Target sampling rate
-if ~isany(hzTarget)
-    hzTarget = n.hz; end
+if ~isany(a.hzTarget)
+    a.hzTarget = n.hz; end
 
 % Figure out downsampling factor
-if rem(n.hz_og,hzTarget)~=0
+if rem(n.hz_og,a.hzTarget)~=0
     error("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": Target sampling rate must be wholey divisible from original");
 end
-if hzTarget>0; ds=floor(n.hz_og/hzTarget); else; ds=1; end
-if ds~=1; hz=hzTarget; end
+if a.hzTarget>0; ds=floor(n.hz_og/a.hzTarget); else; ds=1; end
+if ds~=1; hz=a.hzTarget; end
 if hz==n.hz_og; hz_s=""; else; hz_s=num2str(hz); end
 
 %% EEG channel info
 fn = o.dirOut+"chNfo_"+o.fnStr+".mat";
 if ~isfile(fn) || a.redoCh || a.redo
     % Load chNfo
-    fn = dirs.origSbj+"chNfo_s"+dirs.sbjID+"_"+task+".mat";
+    fn = a.dirs.origSbj+"chNfo_s"+a.dirs.sbjID+"_"+task+".mat";
     load(fn,"chNfo"); disp("LOADED: "+fn)
 
     % Load marked chans
@@ -119,7 +126,7 @@ elseif nargout > 3
 end
 
 
-%% Get behavioral data & align with neural data (trialNfo & psy)
+%% Get psychobehavioral data & align with neural data (trialNfo & psy)
 fn = o.dirOut+"trialNfo"+hz_s+"_"+o.fnStr+".mat";
 fn2 = o.dirOut+"psy"+hz_s+"_"+o.fnStr+".mat";
 
@@ -170,7 +177,7 @@ end
 %% Finalize
 n.hz = hz; % changed if downsampled
 n.errorPsy = errors;
-n.dirs = dirs;
+n.dirs = a.dirs;
 
 % Save to disk
 if a.save || a.saveN
