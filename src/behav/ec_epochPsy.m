@@ -101,26 +101,26 @@ disp("[ec_epochPsy] kept "+n.nTrs+"/"+n.nTrials+" trials: "+n.sbj);
 %% Finalize
 
 % Label pre-stimulus baseline frames
-if abs(o.baselinePre)==inf
-    ep.BLpre = ep.pre>0; % ITI any trial
+if abs(o.baselinePre) == inf
+    ep.BLpre = ep.pre > 0; % ITI any trial
 elseif isany(o.baselinePre)
     if isscalar(o.baselinePre)
-        ep.BLpre = -abs(o.baselinePre)<=ep.latency & ep.pre;
-    elseif numel(o.baselinePre)==2
-        ep.BLpre = o.baselinePre(1)<=ep.latency & ep.latency<o.baselinePre(2);
+        ep.BLpre = ep.latency >= -abs(o.baselinePre) & ep.pre;
+    elseif numel(o.baselinePre) == 2
+        ep.BLpre = ep.latency >= o.baselinePre(1) & ep.latency <= o.baselinePre(2);
     end
 else
     ep.BLpre(:) = false;
 end
 
 % Label post-stimulus baseline frames
-if abs(o.baselinePost)==inf
-    ep.BLpost = ep.post>0; % ITI any trial
+if o.baselinePost == inf
+    ep.BLpost = ep.post > 0; % ITI any trial
 elseif isany(o.baselinePost)
     if isscalar(o.baselinePost)
-        ep.BLpost = o.baselinePost<=ep.latency & ep.post;
-    elseif numel(o.baselinePost)==2
-        ep.BLpost = o.baselinePost(1)<=ep.latency & ep.latency<o.baselinePost(2);
+        ep.BLpost = ep.latRT <= o.baselinePost & ep.post;
+    elseif numel(o.baselinePost) == 2
+        ep.BLpost = ep.latRT >= o.baselinePost(1) & ep.latRT <= o.baselinePost(2);
     end
 else
     ep.BLpost(:) = false;
