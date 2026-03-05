@@ -12,11 +12,11 @@ function [x,n,o] = ec_epochBaseline(x,n,psy,ep,tt,o)
 
 %% Input validation
 arguments
-    x {mustBeFloat}                             % Ephysio data, 2D/3D matrix = [time,channel,freq]
-    n struct                                    % Info struct
-    psy timetable                               % Task metadata per timepoint
-    ep table                                    % Epoch metadata per timepoint
-    tt uint64 = tic                             % Timer
+    x (:,:,:){mustBeFloat}                     % Ephysio data, 2D/3D matrix = [time,channel,freq]
+    n struct                                   % Info struct
+    psy timetable                              % Task metadata per timepoint
+    ep table                                   % Epoch metadata per timepoint
+    tt uint64 = tic                            % Timer
     o.test (1,1) logical = false               % Running a test? (keeps removed fields)
     o.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
     o.hzTarget (1,1) double = 0                % Target sampling rate (0=skip)
@@ -41,9 +41,12 @@ arguments
         = "linear";
     o.badFields string {mustBeMember(o.badFields,["hfo" "mad" "diff" "sns" "" []])} = "" % skip=""
     o.olCenter string {mustBeMember(o.olCenter,["median" "mean"])} = "median"
-    o.olThr (1,1) double = 5;                   % Threshold for outlier
-    o.olThr2 (1,1) double = 0;                  % Threshold for outlier
-    o.olThrBL (1,1) double = 3;                 % Threshold for in baseline period
+    o.olThr (1,1) double = 5                   % Outlier threshold (pre-HPF)
+    o.olThr2 (1,1) double = 0                  % Outlier threshold (post-HPF,pre-BL)
+    o.olThrBL (1,1) double = 3                 % Outlier threshold for baseline period (for baseline correction)
+    o.olThrTime (1,1) double = 5               % Outlier threshold within timepoints across epochs
+    o.olThrCond (1,1) double = 3               % Outlier threshold for conditions within timepts
+    o.olFillTime (1,1) string = "clip"         % Outlier fill method for timepts/conds
     % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
     o.freqs {islogical,isnumeric} = [];
     % PCA within-chan or within-concactenated chans (e.g., make spectral components)
@@ -71,14 +74,12 @@ if ~isany(o.lpf); o.lpf=false; end
 
 %% Prep
 
-% Peristimulus indices
-stim = psy.stim;
+% Convert EEG to specified float type for processing
+x = cast(x,o.typeProc);
 
-% Run indices
-ri = false(height(psy),n.nRuns);
-for r = 1:n.nRuns
-    ri(:,r) = psy.run==n.runs(r);
-end
+% Groups for splitapply
+psy.runG = cast(findgroups(psy.run),like=psy.run); % runs
+ep.trG = cast(findgroups(ep.tr),like=ep.tr); % epochs/trials
 
 % Spectral
 if isany(o.bands)
@@ -87,13 +88,6 @@ if isany(o.bands)
 elseif isany(o.freqs)
     % Keep only specified spectral frequencies
     [x,n] = keepFreqs_lfn(x,n,o,tt);
-end
-
-% Convert EEG to specified float type for processing
-x = cast(x,o.typeProc);
-if o.gpu
-    % Move EEG to GPU
-    x = gpuArray(x);
 end
 
 % Downsampling
@@ -105,14 +99,11 @@ end
 
 % Make temporal filters
 if o.hpf || o.lpf
-    o = makeFilters_lfn(x,n,ri,o,tt);
+    o = makeFilters_lfn(x,n,o,tt);
 end
 
 
-
-
-
-%% All-data processing
+%% All-data preproc
 
 % Remove bad frames
 if isany(o.badFields)
@@ -121,81 +112,60 @@ end
 
 % Log-transform
 if o.log || o.mag2db
-    x = logTransform_lfn(x,o,n,tt);
+    x = logTransform_lfn(x,o,n,tt); % TODO: move to within-chan (parfor/GPU speedup)
 end
 
+% Convert for main preproc
+x = ec_dim2cell(x,2); % EEG data to channelwise cells for main preproc
+wts = cell(n.xChs,1); % preallocate channel PCA weights
 
-%% Within-run processing
 
-% Parfor within-channel for speed
-parfor ch = 1:n.xChs
-    x(:,ch,:) = withinCh_lfn(x(:,ch,:),stim,ri,n,o);
+%% Main preproc
+% The main within-channel routine calls within-run & within-epoch routines
+
+% Loop across channels
+if o.gpu
+    % GPU loop
+    for ch = 1:n.xChs
+        [x{ch},wts{ch}] = withinCh_lfn(x{ch},psy,ep,n,o);
+    end
+else
+    % CPU parallel loop (ideally threadpool)
+    parfor ch = 1:n.xChs
+        [x{ch},wts{ch}] = withinCh_lfn(x{ch},psy,ep,n,o);
+    end
 end
 disp("[ec_epochBaseline] Completed within-run routines: "+n.sbj+" time="+toc(tt));
 
-
-%% Downsampling ('ep' should be already downsampled)
-if o.ds
-    % Split EEG data by epoch
-    runs = findgroups(psy.tr);
-    x = splitapply(@(r){x(r,:,:)},psy.idx,runs);
-
-    % Downsample EEG within-run
-    for r = 1:n.nRuns
-        x{r} = downsample_lfn(x{r},o);
-    end
-    x = vertcat(x{:});
-    disp("[ec_epochBaseline] Downsampled: "+n.sbj+" time="+toc(tt));
-end
+% Reformat EEG data as matrix
+x = cellfun(@(xc) permute(xc,[1 3 2]), x, UniformOutput=false);
+x = horzcat(x{:});
 
 
-%% Within-epoch processing
 
-% Epoch EEG data
-x = x(ep.idx,:,:); % match epoched indices
-
-if isany(o.trialNorm) || isany(o.trialBaseline)
-    % Split data by epoch
-    trs = findgroups(ep.tr);
-    x = splitapply(@(e){x(e,:,:)},ep.ide,trs);
-    ep = splitapply(@(e){ep(e,:)},ep.ide,trs);
-
-    % Loop across epochs
-    for e = 1:n.nTrs
-        x{e} = withinEpoch_lfn(x{e},ep{e},o); % within-trial processing
-    end
-
-    % Concactenate epochs
-    x = vertcat(x{:});
-    disp("[ec_epochBaseline] Baseline corrected: "+n.sbj+" time="+toc(tt));
-end
-
-
-%% Spectral processing
-
-% Spectral bands
-if isany(o.bands)
-    x = constructBands_lfn(x,n,tt);
-end
-
-% Spectral PCA
-if o.pca
-    [x,n] = pca_lfn(x,n,o,tt);
-end
 
 
 %% Finalize
 
-% Move EEG from GPU to CPU
-if o.gpu
-    x = gather(x); end
+% if o.pca
+%     % Save PCA weights to nfo struct
+%     n.spectPCA = n.chNfo(:,["sbjID" "ch" "sbjCh"]);
+%     n.spectPCA.wts = gather(vertcat(wts{:}));
+% 
+%     % Copy previous spectral info struct
+%     if isfield(n,"spect0")
+%         n.spect1 = n.spect;
+%     else
+%         n.spect0 = n.spect;
+%     end
+% 
+%     % New spectral info struct
+%     n.nSpect = o.pca;
+%     n.spect = table;
+%     n.spect.name = "pc"+(1:n.nSpect)';
+%     n.spect.disp = "Spectral Component "+(1:n.nSpect)';
+% end
 
-% Output EEG as specified float type
-x = cast(x,o.typeOut);
-
-% Delete bad frame indices to save memory
-if ~o.test
-    n.xBad = []; end 
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
@@ -210,17 +180,73 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
-%%% Process runs within-chan %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xc = withinCh_lfn(xc,stim,ri,n,o)
-
-% Ensure 2D EEG
-xc = squeeze(xc);
-
-% Within-run preprocessing (outliers, filter, z-score)
-for r = 1:n.nRuns
-    id = ri(:,r);
-    xc(id,:) = withinRun_lfn(xc(id,:),stim(id),o);
+%%% Within-channel preprocessing routine (top-level) %%%%%%%%%%%%%%%%%%%%%%
+function [xc,wc] = withinCh_lfn(xc,psy,ep,n,o)
+% Move EEG to GPU
+if o.gpu
+    xc = gpuArray(xc);
 end
+
+
+%% Within-run preproc
+
+% Call within-run routine (outliers, missing vals, filters, downsample, z-score)
+xc = splitapply(@(xcr,stimr) {withinRun_lfn(xcr,stimr,o)},...
+    xc,psy.stim,psy.runG);
+
+% Concatenate runs
+xc = vertcat(xc{:});
+
+
+%% Within-epoch preproc
+
+% Epoch EEG data
+xc = xc(ep.idx,:); % match 'ep' indices
+
+% Baseline correction & normalization
+if isany(o.trialNorm) || isany(o.trialBaseline)
+    % Split data by epoch
+    xc = splitapply(@(e){xc(e,:)},ep.ide,ep.trG);
+    ep = splitapply(@(e){ep(e,:)},ep.ide,ep.trG);
+
+    % Loop across epochs
+    for e = 1:n.nTrs
+        xc{e} = withinEpoch_lfn(xc{e},ep{e},o); % call within-trial routine
+    end
+
+    % Concatenate epochs
+    xc = vertcat(xc{:});
+end
+
+
+%% Epoch / condition outliers
+
+% Loop across timepoints
+for t = 1:n.nTimes
+    id = n.times.id{t};
+    xc(id,:) = outliersTime_lfn(xc(id,:),ep(id,:),n,o);
+end
+
+
+%% Spectral processing
+
+% Spectral bands
+if isany(o.bands)
+    xc = constructBands_lfn(xc,n,tt);
+end
+
+% % Spectral PCA
+% if o.pca
+%     % IMPLEMENT WITH NEW FUNCTION
+% end
+
+
+%% Finalize
+if o.gpu
+    xc = gather(xc);
+end
+xc = cast(xc,o.typeOut);
+
 
 
 
@@ -228,57 +254,65 @@ end
 
 
 %%% Within-run preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xcr = withinRun_lfn(xcr,stimR,o)
+function xcr = withinRun_lfn(xcr,stimr,o)
 
 % All outliers
 if any(o.olThr)
-    xcr = filloutliers(xcr,nan,o.olCenter,1,ThresholdFactor=o.olThr); end
+    xcr = filloutliers(xcr,nan,o.olCenter,1,ThresholdFactor=o.olThr);
+end
 
 % Interpolate outliers/missing (slower on GPU)
 xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % High-pass filter
 if o.hpf
-    xcr = ec_filtfilt(xcr,o.HPF{1},o.HPF{2}); end
+    xcr = ec_filtfilt(xcr,o.HPF{1},o.HPF{2});
+end
 
 % All outliers (2nd round)
 if any(o.olThr2)
-    xcr = filloutliers(xcr,nan,o.olCenter,1,ThresholdFactor=o.olThr2); end
+    xcr = filloutliers(xcr,nan,o.olCenter,1,ThresholdFactor=o.olThr2);
+end
 
 % Baseline outliers
 if any(o.olThrBL)
-    xcr(~stimR,:) = filloutliers(xcr(~stimR,:),nan,o.olCenter,1,ThresholdFactor=o.olThrBL); end
+    xcr(~stimr,:) = filloutliers(xcr(~stimr,:),nan,o.olCenter,1,ThresholdFactor=o.olThrBL);
+end
 
 % Interpolate outliers/missing (slower on GPU)
 xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % Low-pass filter / anti-aliasing
 if o.lpf
-    xcr = ec_filtfilt(xcr,o.LPF{1},o.LPF{2}); end
+    xcr = ec_filtfilt(xcr,o.LPF{1},o.LPF{2});
+end
+
+% Downsample
+if o.ds
+    xcr = xcr(1:o.ds:end,:);
+end
 
 % Z-score
-if ~o.ds
-    if o.runNorm=="robust"
-        xcr = normalize(xcr,1,"zscore","robust"); % robust z-score
-    elseif isany(o.runNorm)
-        xcr = normalize(xcr,1,o.runNorm); % standard z-score
-    end
-    % Skip if downsampling (z-score after downsampling)
+if o.runNorm=="robust"
+    xcr = normalize(xcr,1,"zscore","robust"); % robust z-score
+elseif isany(o.runNorm)
+    xcr = normalize(xcr,1,o.runNorm); % standard z-score
 end
 
 
 
 
 
+
 %%% Within-epoch preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xe = withinEpoch_lfn(xe,epe,o)
+function xce = withinEpoch_lfn(xce,epe,o)
 
 % Frames for baseline subtraction
 iBL = epe.BLpre | epe.BLpost;
 
 % Frames for std deviation calculation
 if o.trialNormDev=="baseline" && any(iBL)
-    iSD = epe.BLpre | epe.BLpost;
+    iSD = iBL;
 elseif o.trialNormDev == "pre"
     iSD = logical(epe.pre);
 elseif o.trialNormDev == "post"
@@ -293,19 +327,19 @@ end
 
 % Get trial baseline
 if o.trialBaseline=="median"
-    bl = median(xe(iBL,:,:),1,"omitnan"); % BL median
+    bl = median(xce(iBL,:,:),1,"omitnan"); % BL median
 elseif o.trialBaseline=="mean"
-    bl = mean(xe(iBL,:,:),1,"omitnan"); % BL median
+    bl = mean(xce(iBL,:,:),1,"omitnan"); % BL median
 else
     bl = 0;
 end
 
 % Get trial std deviation
 if o.trialNorm=="robust"
-    sd = mad(xe(iSD,:,:),1,1); % BL MAD median absolute deviation
+    sd = mad(xce(iSD,:,:),1,1); % BL MAD median absolute deviation
     c = 0.6745;
 elseif o.trialNorm=="zscore"
-    sd = std(xe(iSD,:,:),1,1,"omitnan");
+    sd = std(xce(iSD,:,:),1,1,"omitnan");
     c = 1;
 else
     sd = 1;
@@ -313,7 +347,7 @@ else
 end
 
 % Do baseline correction
-xe = c*(xe-bl)./sd;
+xce = c*(xce-bl)./sd;
 
 % Errors
 if ~any(iBL) && isany(o.trialBaseline)
@@ -419,11 +453,15 @@ end
 
 
 %%% Make temporal filters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function o = makeFilters_lfn(x,n,ri,o,tt)
+function o = makeFilters_lfn(x,n,o,tt)
 
 % Extract EEG timeseries vector from shortest run
 [~,id] = min(n.runIdxOg);
-xTmp = x(ri(:,id),1,1);
+xTmp = x(n.runIdx(1,id):n.runIdx(2,id),1,1);
+xTmp = cast(xTmp,o.typeProc);
+if o.gpu
+    xTmp = gpuArray(xTmp); % move to GPU if specified
+end
 
 % High-pass filter
 if o.hpf
@@ -454,16 +492,12 @@ vars = o.badFields;
 id = ismember(vars,n.xBad.Properties.VariableNames);
 vars = vars(id);
 
-
 % Loop across bad frame vars
 for v = 1:numel(vars)
-    % Get bad timepoints for specific metric
-    try
-        xBad = n.xBad.(vars(v));
-    catch
-        continue
-    end
+    % Extract bad frame var
+    xBad = n.xBad.(vars(v));
 
+    % Replace bad frames with NaNs
     s1=numel(size(x)); s2=numel(size(xBad));
     if s1==s2
         x(xBad) = nan;
@@ -477,6 +511,11 @@ for v = 1:numel(vars)
         Error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
     end
 end
+
+% Delete bad frame indices to save memory
+if ~o.test
+    n.xBad = [];
+end 
 disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
 
 
@@ -521,80 +560,35 @@ end
 
 
 
+%%% Outliers within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function xct = outliersTime_lfn(xct,ept,n,o)
+
+% Outliers: all-data
+if o.olThrTime
+    xct = filloutliers(xct,o.olFillTime,o.ol,1,ThresholdFactor=o.olThrTime);
+end
+
+% Outliers: within-condition
+if o.olThrCond
+    for c = n.cnds'
+        id = ept.cnd==c;
+        xct(id,:) = filloutliers(xct(id,:),o.olFillTime,o.ol,1,ThresholdFactor=o.olThrCond);
+        %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
+    end
+end
+
+
+
+
+
+
 %%% Construct spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xb = constructBands_lfn(x,n,tt)
+function y = constructBands_lfn(xc,n)
 
 % Preallocate
-xb = nan([size(x,1) height(n.spect)],class(x));
+y = nan([height(xc) height(n.spect)],like=xc);
 
 % Get band timecourse from mean of freq range
 for b = 1:height(n.spect)
-    xb(:,b) = mean(x(:,n.spect.id(b,:)),2,"omitmissing");
-end
-disp("[ec_epochBaseline] Constructed spectral bands: "+n.sbj+" time="+toc(tt));
-% TODO: use splitapply to improve performance?
-
-
-
-
-
-
-%%% Spectral PCA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [y,n] = pca_lfn(x,n,o,tt)
-
-% Preallocate PCA weights
-y = cell(n.xChs,1);
-wts = y;
-
-% Run PCA per chan
-if o.gpu
-    % GPU loop across chans
-    for ch = gpuArray(1:n.xChs)
-        [wts{ch},y{ch}] = pca(squeeze(x(:,ch,:)),NumComponents=o.pca);
-    end
-else
-    % Parfor loop across chans
-    parfor ch = 1:n.xChs
-        [wts{ch},y{ch}] = pca(squeeze(x(:,ch,:)),NumComponents=o.pca); %#ok<PFBNS>
-    end
-end
-
-% Reformat EEG data as array
-y = cellfun(@(yc) permute(yc,[1 3 2]), y, UniformOutput=false);
-y = horzcat(y{:});
-
-% Save PCA weights to nfo struct
-n.spectPCA = n.chNfo(:,["sbjID" "ch" "sbjCh"]);
-n.spectPCA.wts = gather(vertcat(wts{:}));
-
-% Copy previous spectral info struct
-if isfield(n,"spect0")
-    n.spect1 = n.spect;
-else
-    n.spect0 = n.spect;
-end
-
-% New spectral info struct
-n.nSpect = o.pca;
-n.spect = table;
-n.spect.name = "pc"+(1:n.nSpect)';
-n.spect.disp = "Spectral Component "+(1:n.nSpect)';
-disp("[ec_epochBaseline] Performed spectral PCA: "+n.sbj+" time="+toc(tt));
-
-
-
-
-
-
-%%% Downsample (within-run) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xr = downsample_lfn(xr,o)
-
-% Downsample
-xr = xr(1:o.ds:end,:);
-
-% Z-score
-if o.runNorm=="robust"
-    xr = normalize(xr,1,"zscore","robust"); % robust z-score
-elseif isany(o.runNorm)
-    xr = normalize(xr,1,o.runNorm); % standard z-score
+    y(:,b) = mean(xc(:,n.spect.id(b,:)),2,"omitmissing");
 end

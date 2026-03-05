@@ -145,7 +145,7 @@ o.epoch.bin = 0.025; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.epoch.baselinePre = inf; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.epoch.baselinePre = -0.3; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering - all conds in data (leave blank for to leave unordered)
 o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -169,9 +169,12 @@ o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline p
 o.pre.interp = "linear"; % interpolation method
 o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
 o.pre.olCenter = "median";
-o.pre.olThr = 0; % Threshold for outlier (skip=0)
-o.pre.olThr2 = 0; % Threshold for 2nd outlier after HPF (skip=0)
-o.pre.olThrBL = 2.5; % Threshold for baseline outlier (skip=0)
+o.pre.olThr = 0; % Outlier threshold (pre-HPF)
+o.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
+o.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
+o.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
+o.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
+o.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
@@ -222,6 +225,7 @@ end
 
 
 %% Initialize threadpool
+try reset(gpuDevices); catch;end
 try delete(gcp("nocreate")); catch;end
 try ppool = parpool("threads"); catch;end
 % s=5; %sbj38

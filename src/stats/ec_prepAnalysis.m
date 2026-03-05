@@ -117,13 +117,13 @@ oo = namedargs2cell(o.pre);
 
 
 %% Outliers per channel, timepoint & condition
-if o.olThrAll || o.olThrCond
-    % Parallel loop across time
-    parfor ch = 1:n.xChs
-        x(:,ch,:) = outliers_lfn(x(:,ch,:),ep,n,o);
-    end
-    disp("[ec_prepAnalysis] Filled outliers per timepoint & cond: "+o.dirs.sbj+" | toc="+toc(tt));
-end
+% if o.olThrAll || o.olThrCond
+%     % Parallel loop across time
+%     parfor ch = 1:n.xChs
+%         x(:,ch,:) = outliers_lfn(x(:,ch,:),ep,n,o);
+%     end
+%     disp("[ec_prepAnalysis] Filled outliers per timepoint & cond: "+o.dirs.sbj+" | toc="+toc(tt));
+% end
 
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
