@@ -10,7 +10,7 @@ function y = isany(x,dim)
 %% Input validation
 arguments
     x % Variable to check if empty
-    dim (1,1) {isnumeric,isstring} = "all" % Dimension to check, "all" for entire file
+    dim (1,1) {isnumeric,istext} = "all" % Dimension to check, "all" for entire file
 end
 
 % Return if empty
