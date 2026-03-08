@@ -7,13 +7,13 @@ function [xRank,tol,xEig,xRank1] = ec_rank(x,tol,o)
 
 %% Input validation
 arguments
-    x (:,:){mustBeFloat}                        % Input data: x(observations,variables)
-    tol (1,1){mustBeNumericOrLogical} = false   % Rank tolerance (min eigenvalue)
-    o.eig (1,1) logical = false                 % Eigenvector as 1st output
-    o.compare (1,1) logical = false             % Compare with Matlab's rank() function
-    o.exact (1,1) logical = false               % Determine exact rank tol (slower)
-    o.gpu (1,1) logical = false                 % Use GPU
-    o.double (1,1) logical = false              % Double-precision compute (FP64)
+    x (:,:){mustBeFloat}            % Input data: x(observations,variables)
+    tol (1,1) double = 0            % Rank tolerance (min eigenvalue)[0=auto]
+    o.eig (1,1) logical = false     % Eigenvector as 1st output
+    o.compare (1,1) logical = false % Compare with Matlab's rank() function
+    o.exact (1,1) logical = false   % Determine exact rank tol (slower)
+    o.gpu (1,1) logical = false     % Use GPU
+    o.double (1,1) logical = false  % Double-precision compute (FP64)
 end
 
 %% Prep

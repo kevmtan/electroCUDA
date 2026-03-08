@@ -1,4 +1,4 @@
-function [L,S] = ec_robustPCA(x,lambda,mu,tol,maxIter)
+function [L,S] = ec_pcaRobust(x,lambda,mu,tol,maxIter)
 %% Robust principal components analysis (PCA)
 % Optimization problem: Principal Component Pursuit (PCP)
 % Optimization method: Alternating direction method of multipliers (ADMM)
