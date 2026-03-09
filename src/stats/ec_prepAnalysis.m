@@ -7,11 +7,13 @@ end
 % tt=tic;
 
 %% Additional arguments validation
-% if o.pca=="ch"
-%     o.prep.pca = o.pcaComps;
-%     o.prep.pcaRobust = o.pcaRobust;
-%     o.prep.pcaGPU = o.pcaGPU;
-% end
+if o.gpu; o.pcaGPU = true; end
+
+if o.pca=="ch"
+    o.prep.pca = o.pcaComps;
+    o.prep.pcaRobust = o.pcaRobust;
+    o.prep.pcaGPU = o.pcaGPU;
+end
 
 
 %% Load data 
@@ -59,15 +61,17 @@ else
 end
 
 % Remove chans
-chKeep = all([~chBad,~chRm,chROIs],2);
-x = x(:,chKeep,:);
-n.chNfo = n.chNfo(chKeep,:);
-n.chKeep = chKeep;
+n.chKeep = all([~chBad,~chRm,chROIs],2);
+x = x(:,n.chKeep,:);
+n.chNfo = n.chNfo(n.chKeep,:);
 n.xChs = width(x);
 disp("[ec_prepAnalysis] Kept "+n.xChs+"/"+n.nChs+" chans: "+n.sbj+" | toc="+toc(tt));
 
 
 %% Psychobehavioral metadata
+
+% Convert half to single for threadpool
+psy = convertvars(psy,varfun(@class,psy,OutputFormat="cell")=="half","single");
 
 % Epoch metadata
 oo = namedargs2cell(o.epoch);
@@ -113,17 +117,7 @@ end
 
 %% Analysis-specific preprocessing
 oo = namedargs2cell(o.pre);
-[x,n] = ec_epochBaseline(x,n,psy,ep,tt,oo{:},test=o.test);
-
-
-%% Outliers per channel, timepoint & condition
-% if o.olThrAll || o.olThrCond
-%     % Parallel loop across time
-%     parfor ch = 1:n.xChs
-%         x(:,ch,:) = outliers_lfn(x(:,ch,:),ep,n,o);
-%     end
-%     disp("[ec_prepAnalysis] Filled outliers per timepoint & cond: "+o.dirs.sbj+" | toc="+toc(tt));
-% end
+[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
 
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
@@ -218,40 +212,3 @@ elseif o.concatChs=="all"
         end
     end
 end
-
-
-
-
-%%% Outliers within channel  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xc = outliers_lfn(xc,ep,n,o)
-% Squeeze
-xc = squeeze(xc);
-
-% Loop across timepoints
-for t = 1:n.nTimes
-    id = n.times.id{t};
-    xc(id,:) = outliersTime_lfn(xc(id,:),ep(id,:),n,o);
-end
-
-
-
-
-
-
-%%% Outliers within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xt = outliersTime_lfn(xt,ept,n,o)
-
-% Outliers: all-data
-if o.olThrAll
-    xt = filloutliers(xt,o.olFill,o.ol,1,ThresholdFactor=o.olThrAll);
-end
-
-% Outliers: within-condition
-if o.olThrCond
-    for c = n.cnds'
-        id = ept.cnd==c;
-        xt(id,:) = filloutliers(xt(id,:),o.olFill,o.ol,1,ThresholdFactor=o.olThrCond);
-        %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
-    end
-end
-

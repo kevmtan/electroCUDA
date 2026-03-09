@@ -22,7 +22,7 @@ wts = ob1;
 
 
 %% Main
-if o.pcaGPU && o.pca~="split"
+if isany(o.pca) && o.pca~="split" && (o.pcaGPU||o.gpu)
     % Move EEG to GPU
     x = cellfun(@gpuArray,x,UniformOutput=false);
 
@@ -50,9 +50,6 @@ disp("[ec_splitClassifyData] Split data by "+splits+" independent analysis: "+..
 if o.pca=="split"
     wts = cell(splits,1); % preallocate PCA weights
     if o.pcaGPU
-        % Move EEG to GPU
-        x = cellfun(@gpuArray,x,UniformOutput=false); 
-        
         % Run on GPU
         for s = 1:splits
             [x{s},st(s,:),wts{s}] = rankPCA_lfn(x{s},st(s,:),o);
@@ -92,16 +89,30 @@ else
 end
 
 % Fill chan/IC/ROI info
-obc.ch(:)=ch; stc.ch(:)=ch;
-obc.sbjCh(:)=sbjCh; stc.sbjCh(:)=sbjCh;
+stc.ch(:)=ch; stc.sbjCh(:)=sbjCh;
+obc.ch(:)=ch; obc.sbjCh(:)=sbjCh; 
 
 % Channel/IC/ROI width
 stc.width(:) = width(xc);
 
 
 %% PCA & data rank
+if isany(o.pca) && o.pca~="split"
+    % Run PCA & rank
+    [xc,wc,stc.rank(:)] = ec_pca(xc,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
+        robust=o.pcaRobust,gpu=o.pcaGPU,double=true);
+
+    % Gather from GPU
+    xc = gather(xc);
+end
+
+
+%% Final pre-split
+stc.features(:) = width(x); % final number of features
+
+% Convert to processing precision
 if o.pca~="split"
-    [xc,stc,wc] = rankPCA_lfn(xc,stc,o);
+    xc = cast(xc,o.typeProc); 
 end
 
 
@@ -120,38 +131,15 @@ obc = obc(~cellfun("isempty",obc));
 
 %%% PCA on EEG data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [x,st,w] = rankPCA_lfn(x,st,o)
-w = [];
+% Run PCA & rank
+[x,w,st.rank] = ec_pca(x,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
+    robust=o.pcaRobust,gpu=o.pcaGPU,double=true);
 
-%% Robust PCA
-if o.pcaRobust
-    x = ec_robustPCA(x); % run robust PCA for denoising
-end
+% Gather from GPU
+x = gather(x);
 
+% Convert to processing precision
+x = cast(x,o.typeProc);
 
-%% Data rank
-xRank = ec_rank(x);
-
-
-%% Standard PCA
-if o.pcaComps
-    % Get number of components (features)
-    nComps = o.pcaComps;
-    if nComps > xRank
-        nComps = xRank; end
-
-    % Run standard PCA for dimensionality reduction
-    if nComps>0 && nComps<st.width(1)
-        [w,x] = pca(x,NumComponents=nComps);
-    end
-end
-
-
-%% Finalize
-st.features(:) = width(x);
-st.rank(:) = xRank;
-
-% Move from GPU
-if ~o.gpu
-    x = gather(x); % keep 'x' as gpuArray if processing as GPU
-end
-w = gather(w); % PCA weights always saved on CPU
+% Final number of features
+st.features = width(x);

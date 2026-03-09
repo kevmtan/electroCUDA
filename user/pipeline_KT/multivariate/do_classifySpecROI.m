@@ -59,8 +59,9 @@ o.olThrCond = 3; % Within-condition outlier threshold (0=skip)
 % Rank calculation & PCA
 o.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"](channel,ROI,analysis data split)
 o.pcaComps = Inf; % Number of components (0=skip, inf=data rank)
+o.pcaRankLim = true; % Limit PCA components to data rank
+o.pcaRobust = true; % Run robust PCA for denoising (can do without dim reduction)
 o.pcaGPU = true; % GPU for rank calculation & PCA
-o.pcaRobust = true; % Run robust PCA for denoising
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -153,7 +154,7 @@ o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 %   o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
 %   o.epoch.conds2 = ["Mz" "Mz" "Ab" "Ab" "Math" "Rest"]; % custom condition names (per above order, can repeat)
 
-% Preprocessing (see 'ec_epochBaseline')
+% Preprocessing (see 'ec_epochPreproc')
 o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
@@ -225,7 +226,7 @@ end
 
 
 %% Initialize threadpool
-try reset(gpuDevices); catch;end
+try reset(gpuDevice); catch;end
 try delete(gcp("nocreate")); catch;end
 try ppool = parpool("threads"); catch;end
 % s=5; %sbj38
