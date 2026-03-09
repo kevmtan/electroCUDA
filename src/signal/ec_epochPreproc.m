@@ -1,18 +1,19 @@
-function [x,n,o] = ec_epochBaseline(x,n,psy,ep,tt,o)
-% Analysis-specific preprocessing: epoching & baseline correction
+function [x,n,o] = ec_epochPreproc(x,n,psy,ep,tt,o)
+% Epoch-based preprocessing routines for analysis-specific preprocessing
 %   Kevin Tan (2025) | github.com/kevmtan/electroCUDA
 %
 % Inputs: see next section
 %
 % Outputs:
-%   x = pre-preprocessed EEG data, 2D/3D matrix = [time,channel,spectral]
+%   x = preprocessed epoched EEG data, 2D/3D matrix:
+%       x(timeframe,channel/IC,freq/band/component)
 %   n = recording information
 %   trs = trial/epoch metadata per timepoint
 
 
 %% Input validation
 arguments
-    x (:,:,:){mustBeFloat}                     % Ephysio data, 2D/3D matrix = [time,channel,freq]
+    x (:,:,:){mustBeFloat}                     % EEG data, 2D/3D matrix: x(timeframe,channel/IC,frequency)
     n struct                                   % Info struct
     psy timetable                              % Task metadata per timepoint
     ep table                                   % Epoch metadata per timepoint
@@ -50,9 +51,9 @@ arguments
     % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
     o.freqs {islogical,isnumeric} = [];
     % PCA within-chan or within-concactenated chans (e.g., make spectral components)
-    o.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
-    o.pcaRobust = false; % Use robust PCA
-    o.pcaGPU = false; % Use GPU for PCA (recommended for robustPCA)
+    o.pca (1,1) double = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+    o.pcaRobust (1,1) logical = false; % Use robust PCA
+    o.pcaGPU (1,1) logical = false; % Use GPU for PCA (recommended for robustPCA)
     % Spectral dimensionality reduction into bands (skip=[])
     o.bands string = "";                        % Band name
     o.bands2 string = "";                       % Band display name
@@ -118,6 +119,7 @@ end
 % Convert for main preproc
 x = ec_dim2cell(x,2); % EEG data to channelwise cells for main preproc
 wts = cell(n.xChs,1); % preallocate channel PCA weights
+ranks = nan(n.xChs,1);
 
 
 %% Main preproc
@@ -127,12 +129,12 @@ wts = cell(n.xChs,1); % preallocate channel PCA weights
 if o.gpu
     % GPU loop
     for ch = 1:n.xChs
-        [x{ch},wts{ch}] = withinCh_lfn(x{ch},psy,ep,n,o);
+        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o);
     end
 else
     % CPU parallel loop (ideally threadpool)
     parfor ch = 1:n.xChs
-        [x{ch},wts{ch}] = withinCh_lfn(x{ch},psy,ep,n,o);
+        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o);
     end
 end
 disp("[ec_epochBaseline] Completed within-run routines: "+n.sbj+" time="+toc(tt));
@@ -142,29 +144,28 @@ x = cellfun(@(xc) permute(xc,[1 3 2]), x, UniformOutput=false);
 x = horzcat(x{:});
 
 
-
-
-
 %% Finalize
 
-% if o.pca
-%     % Save PCA weights to nfo struct
-%     n.spectPCA = n.chNfo(:,["sbjID" "ch" "sbjCh"]);
-%     n.spectPCA.wts = gather(vertcat(wts{:}));
-% 
-%     % Copy previous spectral info struct
-%     if isfield(n,"spect0")
-%         n.spect1 = n.spect;
-%     else
-%         n.spect0 = n.spect;
-%     end
-% 
-%     % New spectral info struct
-%     n.nSpect = o.pca;
-%     n.spect = table;
-%     n.spect.name = "pc"+(1:n.nSpect)';
-%     n.spect.disp = "Spectral Component "+(1:n.nSpect)';
-% end
+% PCA info table
+if o.pca
+    % Save PCA weights to nfo struct
+    n.pca = n.chNfo(:,["sbjID" "ch" "sbjCh"]);
+    n.pca.wts = wts;
+    n.pca.rank = ranks;
+
+    % Copy previous spectral info struct
+    if isfield(n,"spect0")
+        n.spect1 = n.spect;
+    else
+        n.spect0 = n.spect;
+    end
+
+    % New spectral info struct
+    n.nSpect = o.pca;
+    n.spect = table;
+    n.spect.name = "pc"+(1:n.nSpect)';
+    n.spect.disp = "Spectral Component "+(1:n.nSpect)';
+end
 
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
@@ -181,7 +182,7 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 %%% Within-channel preprocessing routine (top-level) %%%%%%%%%%%%%%%%%%%%%%
-function [xc,wc] = withinCh_lfn(xc,psy,ep,n,o)
+function [xc,wc,xcRank] = withinCh_lfn(xc,psy,ep,n,o)
 % Move EEG to GPU
 if o.gpu
     xc = gpuArray(xc);
@@ -235,14 +236,16 @@ if isany(o.bands)
     xc = constructBands_lfn(xc,n,tt);
 end
 
-% % Spectral PCA
-% if o.pca
-%     % IMPLEMENT WITH NEW FUNCTION
-% end
+% Spectral PCA
+if o.pca || o.pcaRobust
+    [xc,wc,xcRank] = ec_pca(xc,rankLim=false,gpu=o.pcaGPU||o.gpu);
+else
+    wc=[]; xcRank=nan;
+end
 
 
 %% Finalize
-if o.gpu
+if o.gpu || o.pcaGPU
     xc = gather(xc);
 end
 xc = cast(xc,o.typeOut);
@@ -495,20 +498,30 @@ vars = vars(id);
 % Loop across bad frame vars
 for v = 1:numel(vars)
     % Extract bad frame var
-    xBad = n.xBad.(vars(v));
+    xBad = full(n.xBad.(vars(v)));
+    if width(xBad) > 1
+        xBad = xBad(:,n.chKeep,:); % only kept chans
+    end
 
-    % Replace bad frames with NaNs
-    s1=numel(size(x)); s2=numel(size(xBad));
-    if s1==s2
+    % Size & non-singleton dim counts
+    szX = size(x);
+    szB = size(xBad);
+    ndX = nnz(szX > 1);
+    ndB = nnz(szB > 1);
+
+    % Replace bad frames with NaNs (xBad indexes frames; fewer dims broadcast)
+    if isequal(szX, szB)
         x(xBad) = nan;
-    elseif s2==2
-        xBad = repmat(full(xBad),[1 1 size(x,3)]);
-        x(xBad) = nan;
-    elseif s2==1
-        xBad = repmat(full(xBad),[1 size(x,2) size(x,3)]);
-        x(xBad) = nan;
+    elseif ndB < ndX && all(szB(1:ndB) == szX(1:ndB))
+        % xBad has fewer non-singleton dims; broadcast over trailing dims
+        idx = find(xBad);
+        if ~isempty(idx)
+            step = prod(szX(1:ndB));
+            nRep = prod(szX(ndB+1:end));  % prod([])=1 when x is 2D and ndB=2
+            x(idx(:) + (0:nRep-1) * step) = nan;
+        end
     else
-        Error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
+        error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
     end
 end
 
