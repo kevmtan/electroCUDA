@@ -1,4 +1,4 @@
-function [ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,o)
+function [ep,trialNfo,n,psy] = ec_epochPsy(psy,trialNfo,n,tt,o)
 % ec_epochPsy - Generate epochs of a recording from psychobehavioral metadata
 arguments
     psy timetable
@@ -144,9 +144,8 @@ ep.binPct = ep.pct/o.binPct;
 ep.binPct = round(ep.binPct+eps(ep.binPct)) * o.binPct;
 
 % Convert vars
-ep = convertvars(ep,["frame" "bin" "binRT"],"int16");
-ep = convertvars(ep,"binPct","int8");
-ep = convertvars(ep,["latency" "pct" "RT" "latRT"],o.float);
+ep = convertvars(ep,["latency" "bin" "pct" "binPct" "latRT" "binRT"],o.float);
+ep = convertvars(ep,"frame","int32");
 
 % Remove vars
 ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]) = [];
@@ -165,7 +164,6 @@ ep.Properties.RowNames = string(ep.frame)+"_tr"+ep.tr+"_"+string(ep.cond);
 % Save conditions
 n.conds = string(categories(trialNfo.cond));
 n.nConds = numel(n.conds);
-
 disp("[ec_epochPsy] Epoched psychobehavioral metadata: "+n.sbj+" time="+toc(tt));
 
 
@@ -175,8 +173,8 @@ disp("[ec_epochPsy] Epoched psychobehavioral metadata: "+n.sbj+" time="+toc(tt))
 
 
 
-%%% Generate epoch %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [e,tNfo] = makeEpoch_lfn(tNfo,idxOns,psy,trs,t,n,o)
+%%% Generate epoch %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % t=5; tNfo=trialNfo(t,:);
 
 %% Prep

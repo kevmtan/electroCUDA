@@ -75,10 +75,11 @@ disp("[ec_splitClassifyData] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
 
-%%% Within-channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [xc,obc,stc,wc] = withinCh_lfn(xc,obc,stc,n,o,c)
+%%% Within-channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % Fill chan info
-if isany(o.concatChs)
+if isany(o.chConcat)
     % Get ROI
     ch = n.ROIs.roi(c);
     sbjCh = n.ROIs.sbjROI(c);
@@ -110,7 +111,7 @@ end
 
 
 %% Final pre-split
-stc.features(:) = width(x); % final number of features
+stc.features(:) = width(xc); % final number of features
 
 % Convert to processing precision
 if o.pca~="split"
@@ -119,20 +120,21 @@ end
 
 
 %% Split data by timepoint
-xc = cellfun(@(t) xc(t,:),n.times.id,"UniformOutput",false);
-obc = cellfun(@(t) obc(t,:),n.times.id,"UniformOutput",false);
+xc = splitapply(@(e){xc(e,:)},n.ide,n.timesG);
+obc = splitapply(@(e){obc(e,:)},n.ide,n.timesG);
 
 % Remove empty cells
-xc = xc(~cellfun("isempty",xc));
-obc = obc(~cellfun("isempty",obc));
+xc = xc(~cellfun(@isempty,xc));
+obc = obc(~cellfun(@isempty,obc));
 
 
 
 
 
 
-%%% PCA on EEG data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [x,st,w] = splitPCA_lfn(x,st,o)
+%%% PCA on split EEG data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % Run PCA & rank
 [x,w,st.rank] = ec_pca(x,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
     robust=o.pcaRobust,gpu=o.pcaGPU,double=true);

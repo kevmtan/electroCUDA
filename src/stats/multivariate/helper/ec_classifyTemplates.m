@@ -5,7 +5,7 @@ nCondx = numel(o.condx);
 f0 = cast(nan,o.typeProc); % float type
 u0 = uint16(0); % unsigned integer
 s0 = string(missing);
-if isany(o.concatChs)
+if isany(o.chConcat)
     c0 = s0; % missing string for ROI
 else
     c0 = cast(0,like=n.chNfo.ch); % Chan/IC integer type
@@ -152,8 +152,8 @@ disp("[ec_classifyTemplates] Made classifier templates: "+o.dirs.sbj+" | toc="+t
 
 
 
-%%% Balance classes within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function use = balanceClasses_lfn(obt,nCond,o)
+%%% Balance classes within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Checks sample sizes and balances classes for a single timepoint.
 % Returns 'use' logical vector indicating which observations to use.
 % Balances by selecting equal observations per class while maximizing trial diversity.
@@ -219,8 +219,8 @@ end
 
 
 
-%%% Make CV partition %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function cv = cvpartition_lfn(obt,nCond,cvArgs,minTrialsPerFold)
+%%% Make CV partition %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Creates a grouped CV partition where each fold has approximately equal
 % class counts. Trials are grouped (all obs from a trial go to same fold),
 % and trials are distributed to balance classes across folds.

@@ -29,7 +29,7 @@ o.ICA = false; % Run on ICs?
 o.gpu = false; % do GPU
 o.typeProc = "single"; % processing floating-point precision ("double"|"single")
 o.typeOut = "single"; % output floating-point precision ("double"|"single")
-o.nRmFields = ["fsNfo" "chCov" "chVar" "chCorr" "chDist" "freqsRun" "os"]; % Fields to remove from 'n' to save memory
+o.nRmFields = "os"; % Fields to remove from 'n' to save memory
 
 % Channel removal
 o.chRm = []; % channels to remove (array of chan numbers)
@@ -38,7 +38,7 @@ o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outs
 o.roiVar = "roi"; % ROI variable in chNfo
 
 % Channel concactenation (e.g. concactenate within-ROI chs into 'wide channels')
-o.concatChs = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
+o.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
 
 % Timing for classification
 o.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
@@ -60,7 +60,7 @@ o.olThrCond = 3; % Within-condition outlier threshold (0=skip)
 o.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"](channel,ROI,analysis data split)
 o.pcaComps = Inf; % Number of components (0=skip, inf=data rank)
 o.pcaRankLim = true; % Limit PCA components to data rank
-o.pcaRobust = true; % Run robust PCA for denoising (can do without dim reduction)
+o.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
 o.pcaGPU = true; % GPU for rank calculation & PCA
 
 % Stats options
@@ -168,7 +168,7 @@ o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear"; % interpolation method
-o.pre.badFields = "hfo"; % ["hfo" "mad" "diff" "sns"]
+o.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
 o.pre.olCenter = "median";
 o.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)

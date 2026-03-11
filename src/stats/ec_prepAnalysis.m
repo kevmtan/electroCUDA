@@ -25,6 +25,38 @@ disp("[ec_prepAnalysis] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
 %% Channel info & removal
+[x,n] = chRemoval_lfn(x,chNfo,n,o,tt);
+
+
+%% Make epochs from psychobehavioral metadata
+[psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,o,tt);
+
+
+%% Analysis-specific preprocessing
+oo = namedargs2cell(o.pre);
+[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
+
+
+%% Concactenate channels (e.g., concactenate within-ROI chs)
+if isany(o.chConcat)
+    [x,n] = chConcat_lfn(x,n,o);
+    disp("[ec_prepAnalysis] Concactenated channels: "+o.dirs.sbj+" | toc="+toc(tt));
+end
+
+
+%% Final
+n = rmfield(n,o.nRmFields); % Fields to remove from 'n' to save memory
+disp("[ec_prepAnalysis] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
+
+
+
+
+
+
+function [x,n] = chRemoval_lfn(x,chNfo,n,o,tt)
+%%% Channel info & removal %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Channel/IC info
 if o.ICA
     % IC info
     n.chNfo = n.icNfo;
@@ -60,22 +92,40 @@ else
     chROIs = true(n.nChs,1);
 end
 
-% Remove chans
+% Collate chans to keep/remove
 n.chKeep = all([~chBad,~chRm,chROIs],2);
-x = x(:,n.chKeep,:);
-n.chNfo = n.chNfo(n.chKeep,:);
-n.xChs = width(x);
+
+% Remove chans
+x = x(:,n.chKeep,:);            % from EEG data
+n.chNfo = n.chNfo(n.chKeep,:);  % from chNfo
+n.xChs = width(x);              % number of remaining chans
+
+% Remove chans from bad frames (n.xBad)
+vars = string(n.xBad.Properties.VariableNames);
+for v = vars
+    if width(n.xBad.(v))==n.nChs
+        if ndims(n.xBad.(v))==3
+            xBad = full(n.xBad.(v));
+            xBad = xBad(:,n.chKeep,:);
+            n.xBad.(v) = sparse(xBad);
+        else
+            n.xBad.(v) = n.xBad.(v)(:,n.chKeep);
+        end
+    end
+end
 disp("[ec_prepAnalysis] Kept "+n.xChs+"/"+n.nChs+" chans: "+n.sbj+" | toc="+toc(tt));
 
 
-%% Psychobehavioral metadata
 
-% Convert half to single for threadpool
-psy = convertvars(psy,varfun(@class,psy,OutputFormat="cell")=="half","single");
+
+
+
+function [psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,o,tt)
+%%% Make epochs from psychobehavioral metadata %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Epoch metadata
 oo = namedargs2cell(o.epoch);
-[ep,trialNfo,n] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
+[ep,trialNfo,n,psy] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
 n.trialNfo = trialNfo;
 
 % Rename target time & condition variables
@@ -94,7 +144,10 @@ elseif isfield(o,"cond")
 elseif isfield(o,"conds")
     ep = ep(ismember(ep.cnd,o.conds),:);
 end
-ep.ide = cast(1:height(ep),like=ep.ide)'; % update epoch indices
+
+% Update epoch indices
+ep.ide = cast(1:height(ep),like=ep.ide)';
+n.ide = ep.ide;
 
 % Update nfo struct
 trs = unique(ep.tr);
@@ -103,42 +156,19 @@ n.nTrs = numel(trs);
 n.cnds = unique(n.trialNfo.cnd);
 n.nCnds = numel(n.cnds);
 
-% Analysis times 
-n.times = table;
-n.times.t = unique(ep.t,"stable"); 
-n.nTimes = height(n.times);
-
-% Indices of times
-n.times.id = cell(n.nTimes,1); % preallocate
-for t = 1:n.nTimes
-    n.times.id{t} = sparse(ep.t==n.times.t(t));
-end
-
-
-%% Analysis-specific preprocessing
-oo = namedargs2cell(o.pre);
-[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
-
-
-%% Concactenate channels (e.g., concactenate within-ROI chs)
-if isany(o.concatChs)
-    [x,n] = concatChs_lfn(x,n,o);
-    disp("[ec_prepAnalysis] Concactenated channels: "+o.dirs.sbj+" | toc="+toc(tt));
-end
-
-
-%% Final
-n = rmfield(n,o.nRmFields); % Fields to remove from 'n' to save memory
-disp("[ec_prepAnalysis] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
+% Analysis times
+[n.timesG,n.times] = findgroups(ep.t);
+n.timesG = int32(n.timesG);
+n.nTimes = height(n.times); % number of times
 
 
 
 
 
 
-%%% Concactenate channels %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [y,n] = concatChs_lfn(x,n,o)
-if o.concatChs=="roi"
+function [y,n] = chConcat_lfn(x,n,o)
+%%% Channel concatenation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if o.chConcat=="roi"
     %% Concatenate chs within ROI: y{roi}(times,freqs*chans)
     rv = o.roiVar;
 
@@ -184,7 +214,7 @@ if o.concatChs=="roi"
             end
         end
     end
-elseif o.concatChs=="all"
+elseif o.chConcat=="all"
     %% Concatenate all chs: y(times,freqs*chans)
 
     % Fill ROI info table

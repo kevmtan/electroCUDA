@@ -40,7 +40,7 @@ arguments
     % Bad frames/outliers
     o.interp string {mustBeMember(o.interp,["nearest" "linear" "spline" "pchip" "makima"])}...
         = "linear";
-    o.badFields string {mustBeMember(o.badFields,["hfo" "mad" "diff" "sns" "" []])} = "" % skip=""
+    o.badFrameVars (1,:) string = "" % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
     o.olCenter string {mustBeMember(o.olCenter,["median" "mean"])} = "median"
     o.olThr (1,1) double = 5                   % Outlier threshold (pre-HPF)
     o.olThr2 (1,1) double = 0                  % Outlier threshold (post-HPF,pre-BL)
@@ -71,6 +71,10 @@ end
 if ~isfield(n,"hz0"); error("Must run 'ec_epochPsy' first with same downsampling (if any)"); end
 if ~isany(o.hpf); o.hpf=false; end
 if ~isany(o.lpf); o.lpf=false; end
+
+% Check bad frame table variables
+o.badFrameVars = o.badFrameVars(ismember(o.badFrameVars,n.xBad.Properties.VariableNames));
+o.badFrameVars2 = string([]);
 
 
 %% Prep
@@ -107,8 +111,8 @@ end
 %% All-data preproc
 
 % Remove bad frames
-if isany(o.badFields)
-    x = rmBadFrames_lfn(x,n,o,tt);
+if isany(o.badFrameVars)
+    [x,o] = badFrames_lfn(x,n,o,tt);
 end
 
 % Log-transform
@@ -129,15 +133,15 @@ ranks = nan(n.xChs,1);
 if o.gpu
     % GPU loop
     for ch = 1:n.xChs
-        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o);
+        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o,ch);
     end
 else
     % CPU parallel loop (ideally threadpool)
     parfor ch = 1:n.xChs
-        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o);
+        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o,ch);
     end
 end
-disp("[ec_epochBaseline] Completed within-run routines: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochBaseline] Completed main preproc: "+n.sbj+" time="+toc(tt));
 
 % Reformat EEG data as matrix
 x = cellfun(@(xc) permute(xc,[1 3 2]), x, UniformOutput=false);
@@ -167,6 +171,10 @@ if o.pca
     n.spect.disp = "Spectral Component "+(1:n.nSpect)';
 end
 
+% Remove bad frame table
+if ~o.test
+    n = rmfield(n,"xBad");
+end
 disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
@@ -181,13 +189,23 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
+function [xc,wc,xcRank] = withinCh_lfn(xc,psy,ep,n,o,ch)
 %%% Within-channel preprocessing routine (top-level) %%%%%%%%%%%%%%%%%%%%%%
-function [xc,wc,xcRank] = withinCh_lfn(xc,psy,ep,n,o)
-% xc = x{1};
+% ch=1; xc=x{ch};
 
 % Move EEG to GPU
 if o.gpu
     xc = gpuArray(xc);
+end
+
+% Remove bad frames (2D xBad, 3D x)
+if isany(o.badFrameVars2)
+    for v = o.badFrameVars2
+        % Extract bad frame var
+        xBad = squeeze(full(n.xBad.(v)(:,ch)));
+        % Replace bad frames with NaNs
+        xc(xBad,:) = nan; 
+    end
 end
 
 
@@ -223,13 +241,14 @@ if isany(o.trialNorm) || isany(o.trialBaseline)
 end
 
 
-%% Timepoint & condition outliers
+%% Outliers: timepoint & condition
 if o.olThrTime || o.olThrCond
-    % Loop across timepoints
-    for t = 1:n.nTimes
-        id = n.times.id{t};
-        xc(id,:) = outliersTime_lfn(xc(id,:),ep(id,:),n,o);
-    end
+    % Call outlier detection per timepoint
+    xc = splitapply(@(xt,ct) {outliersTime_lfn(xt,ct,n,o)},...
+        xc,ep.cnd,n.timesG);
+
+    % Concatenate timepoints
+    xc = vertcat(xc{:});
 end
 
 
@@ -259,9 +278,8 @@ xc = cast(xc,o.typeOut);
 
 
 
-
-%%% Within-run preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function xcr = withinRun_lfn(xcr,stimr,o)
+%%% Within-run preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % All outliers
 if any(o.olThr)
@@ -311,8 +329,8 @@ end
 
 
 
-%%% Within-epoch preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function xce = withinEpoch_lfn(xce,epe,o)
+%%% Within-epoch preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Frames for baseline subtraction
 iBL = epe.BLpre | epe.BLpost;
@@ -374,8 +392,8 @@ if ~any(iSD) && isany(o.trialNorm)
 
 
 
-%%% Split EEG frequencies into spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function n = findBandFreqs_lfn(n,o,tt)
+%%% Split EEG frequencies into spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Copy original frequency info
 n.spect0 = n.spect; 
@@ -402,8 +420,8 @@ disp("[ec_epochBaseline] Found frequencies within spectral bands: "+n.sbj+" time
 
 
 
-%%% Remove spectral frequencies (keep only specified freqs) %%%%%%%%%%%%%%%
 function [x,n] = keepFreqs_lfn(x,n,o,tt)
+%%% Remove spectral frequencies (keep only specified freqs) %%%%%%%%%%%%%%%
 
 % Copy original frequency info
 n.spect0 = n.spect;
@@ -434,8 +452,8 @@ disp("[ec_epochBaseline] Kept "+n.nSpect+"/"+n.nFreqs+" freqs: "+n.sbj+" time="+
 
 
 
-%%% Downsampling preparation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function o = downsamplingPrep_ln(n,o)
+%%% Downsampling preparation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Downsampling factors
 [o.ds(1),o.ds(2)] = rat(o.hzTarget/n.hz0); % get factors
@@ -459,8 +477,8 @@ end
 
 
 
-%%% Make temporal filters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function o = makeFilters_lfn(x,n,o,tt)
+%%% Make temporal filters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Extract EEG timeseries vector from shortest run
 [~,id] = min(n.runIdxOg);
@@ -491,48 +509,35 @@ end
 
 
 
+function [x,o] = badFrames_lfn(x,n,o,tt)
 %%% Remove bad frames %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function x = rmBadFrames_lfn(x,n,o,tt)
 
-% Check bad frame table variables
-vars = o.badFields;
-id = ismember(vars,n.xBad.Properties.VariableNames);
-vars = vars(id);
+% Size of x
+szX = size(x);
+ndX = nnz(szX > 1); % nonsingleton dims
 
-% Loop across bad frame vars
-for v = 1:numel(vars)
-    % Extract bad frame var
-    xBad = full(n.xBad.(vars(v)));
-    if width(xBad) > 1
-        xBad = xBad(:,n.chKeep,:); % only kept chans
-    end
+% Loop across bad frame variables
+for v = o.badFrameVars
+    % Extract xBad var
+    xBad = n.xBad.(v);
 
-    % Size & non-singleton dim counts
-    szX = size(x);
+    % Size of xBad var
     szB = size(xBad);
-    ndX = nnz(szX > 1);
     ndB = nnz(szB > 1);
 
-    % Replace bad frames with NaNs (xBad indexes frames; fewer dims broadcast)
-    if isequal(szX, szB)
-        x(xBad) = nan;
+    % Replace bad frames with nan
+    if isequal(szX,szB)
+        x(full(xBad)) = nan;
     elseif ndB < ndX && all(szB(1:ndB)==szX(1:ndB))
-        % xBad has fewer non-singleton dims; broadcast over trailing dims
-        idx = find(xBad);
-        if ~isempty(idx)
-            step = prod(szX(1:ndB));
-            nRep = prod(szX(ndB+1:end));  % prod([])=1 when x is 2D and ndB=2
-            x(idx(:) + (0:nRep-1) * step) = nan;
+        if ndB==1
+            x(full(xBad),:,:) = nan;
+        else
+            o.badFrameVars2 = v; % 2D xBad & 3D x: do within-Ch
         end
     else
         error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
     end
 end
-
-% Delete bad frame indices to save memory
-if ~o.test
-    n.xBad = [];
-end 
 disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
 
 
@@ -540,8 +545,8 @@ disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
 
 
 
-%%% Log-transform (decibel or natural log) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function x = logTransform_lfn(x,n,o,tt)
+%%% Log-transform (decibel or natural log) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Find negative values & convert to eps(0)
 idNeg = x < eps(cast(0,like=x));
@@ -577,8 +582,8 @@ end
 
 
 
+function xct = outliersTime_lfn(xct,cnd,n,o)
 %%% Outliers within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function xct = outliersTime_lfn(xct,ept,n,o)
 
 % Outliers: all-data
 if o.olThrTime
@@ -588,7 +593,7 @@ end
 % Outliers: within-condition
 if o.olThrCond
     for c = n.cnds'
-        id = ept.cnd==c;
+        id = cnd==c;
         xct(id,:) = filloutliers(xct(id,:),o.olFillTime,o.olCenter,1,ThresholdFactor=o.olThrCond);
         %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
     end
@@ -599,8 +604,8 @@ end
 
 
 
-%%% Construct spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function y = constructBands_lfn(xc,n)
+%%% Construct spectral bands %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Preallocate
 y = nan([height(xc) height(n.spect)],like=xc);
