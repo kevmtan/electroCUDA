@@ -183,6 +183,8 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 
 %%% Within-channel preprocessing routine (top-level) %%%%%%%%%%%%%%%%%%%%%%
 function [xc,wc,xcRank] = withinCh_lfn(xc,psy,ep,n,o)
+% xc = x{1};
+
 % Move EEG to GPU
 if o.gpu
     xc = gpuArray(xc);
@@ -217,15 +219,17 @@ if isany(o.trialNorm) || isany(o.trialBaseline)
 
     % Concatenate epochs
     xc = vertcat(xc{:});
+    ep = vertcat(ep{:});
 end
 
 
-%% Epoch / condition outliers
-
-% Loop across timepoints
-for t = 1:n.nTimes
-    id = n.times.id{t};
-    xc(id,:) = outliersTime_lfn(xc(id,:),ep(id,:),n,o);
+%% Timepoint & condition outliers
+if o.olThrTime || o.olThrCond
+    % Loop across timepoints
+    for t = 1:n.nTimes
+        id = n.times.id{t};
+        xc(id,:) = outliersTime_lfn(xc(id,:),ep(id,:),n,o);
+    end
 end
 
 
@@ -512,7 +516,7 @@ for v = 1:numel(vars)
     % Replace bad frames with NaNs (xBad indexes frames; fewer dims broadcast)
     if isequal(szX, szB)
         x(xBad) = nan;
-    elseif ndB < ndX && all(szB(1:ndB) == szX(1:ndB))
+    elseif ndB < ndX && all(szB(1:ndB)==szX(1:ndB))
         % xBad has fewer non-singleton dims; broadcast over trailing dims
         idx = find(xBad);
         if ~isempty(idx)
@@ -578,14 +582,14 @@ function xct = outliersTime_lfn(xct,ept,n,o)
 
 % Outliers: all-data
 if o.olThrTime
-    xct = filloutliers(xct,o.olFillTime,o.ol,1,ThresholdFactor=o.olThrTime);
+    xct = filloutliers(xct,o.olFillTime,o.olCenter,1,ThresholdFactor=o.olThrTime);
 end
 
 % Outliers: within-condition
 if o.olThrCond
     for c = n.cnds'
         id = ept.cnd==c;
-        xct(id,:) = filloutliers(xct(id,:),o.olFillTime,o.ol,1,ThresholdFactor=o.olThrCond);
+        xct(id,:) = filloutliers(xct(id,:),o.olFillTime,o.olCenter,1,ThresholdFactor=o.olThrCond);
         %disp("Outliers "+string(c)+": "+nnz(TF)/numel(TF));
     end
 end

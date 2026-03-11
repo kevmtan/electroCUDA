@@ -52,12 +52,12 @@ if o.pca=="split"
     if o.pcaGPU
         % Run on GPU
         for s = 1:splits
-            [x{s},st(s,:),wts{s}] = rankPCA_lfn(x{s},st(s,:),o);
+            [x{s},st(s,:),wts{s}] = splitPCA_lfn(x{s},st(s,:),o);
         end
     else
         % Run on CPU threadpool
         parfor s = 1:splits
-            [x{s},st(s,:),wts{s}] = rankPCA_lfn(x{s},st(s,:),o);
+            [x{s},st(s,:),wts{s}] = splitPCA_lfn(x{s},st(s,:),o);
         end
     end
     disp("[ec_splitClassifyData] Ran rank calculation/PCA on data splits: "+o.dirs.sbj+" | toc="+toc(tt));
@@ -103,7 +103,9 @@ if isany(o.pca) && o.pca~="split"
         robust=o.pcaRobust,gpu=o.pcaGPU,double=true);
 
     % Gather from GPU
-    xc = gather(xc);
+    if o.pcaGPU && ~o.gpu
+        xc = gather(xc);
+    end
 end
 
 
@@ -130,13 +132,15 @@ obc = obc(~cellfun("isempty",obc));
 
 
 %%% PCA on EEG data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [x,st,w] = rankPCA_lfn(x,st,o)
+function [x,st,w] = splitPCA_lfn(x,st,o)
 % Run PCA & rank
 [x,w,st.rank] = ec_pca(x,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
     robust=o.pcaRobust,gpu=o.pcaGPU,double=true);
 
 % Gather from GPU
-x = gather(x);
+if o.pcaGPU && ~o.gpu
+    x = gather(x);
+end
 
 % Convert to processing precision
 x = cast(x,o.typeProc);
