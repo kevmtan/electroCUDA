@@ -44,8 +44,8 @@ disp("[ec_classifyChSpec] Saved classificiation statistics: "+o.saved.st+" toc="
 o.saved.ob = o.dirOut+"s"+n.sbjID+"_ob.mat";
 save(o.saved.ob,"ob","-v7");
 disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc="+toc(tt));
-o.saved.nfo = o.dirOut+"s"+n.sbjID+".mat";
-save(o.saved.nfo,"o","n","-v7");
+%o.saved.nfo = o.dirOut+"s"+n.sbjID+".mat";
+%save(o.saved.nfo,"o","n","-v7");
 
 
 
@@ -59,17 +59,15 @@ save(o.saved.nfo,"o","n","-v7");
 
 
 
-%%% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [ob,st] = classify_lfn(x,ob,st,n,o,tt)
-splits = numel(x);
-
+%%% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Compute across data splits (chans/ICs/ROIs x timepoints)
 if o.gpu
-    for s = 1:splits
+    for s = 1:n.splits
         [ob{s},st(s,:)] = ec_runClassifier(x{s},ob{s},st(s,:),o);
     end
 else
-    parfor s = 1:splits
+    parfor s = 1:n.splits
         [ob{s},st(s,:)] = ec_runClassifier(x{s},ob{s},st(s,:),o);
     end
 end

@@ -146,7 +146,7 @@ o.epoch.bin = 0.025; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.epoch.baselinePre = -0.3; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.epoch.baselinePre = -0.25; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering - all conds in data (leave blank for to leave unordered)
 o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -162,8 +162,8 @@ o.pre.hzTarget = 0; % Target sampling rate (0=default rate)
 % Normalization/transform
 o.pre.log = false; % Log transform
 o.pre.mag2db = false; % Log-transform magnitude to decibel
-o.pre.runNorm = "robust"; % Normalize run
-o.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.pre.runNorm = ""; % Normalize run ["robust"|"zscore"|""]; skip=""
+o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers

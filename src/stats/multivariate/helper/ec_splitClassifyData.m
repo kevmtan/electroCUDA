@@ -41,22 +41,22 @@ end
 x = vertcat(x{:});
 ob = vertcat(ob1{:});
 st = vertcat(st1{:});
-splits = numel(x); % number of splits
-disp("[ec_splitClassifyData] Split data by "+splits+" independent analysis: "+...
+n.splits = numel(x); % number of splits
+disp("[ec_splitClassifyData] Split data by "+n.splits+" independent analysis: "+...
     o.dirs.sbj+" | toc="+toc(tt));
 
 
 %% PCA & data rank by analysis split
 if o.pca=="split"
-    wts = cell(splits,1); % preallocate PCA weights
+    wts = cell(n.splits,1); % preallocate PCA weights
     if o.pcaGPU
         % Run on GPU
-        for s = 1:splits
+        for s = 1:n.splits
             [x{s},st(s,:),wts{s}] = splitPCA_lfn(x{s},st(s,:),o);
         end
     else
         % Run on CPU threadpool
-        parfor s = 1:splits
+        parfor s = 1:n.splits
             [x{s},st(s,:),wts{s}] = splitPCA_lfn(x{s},st(s,:),o);
         end
     end

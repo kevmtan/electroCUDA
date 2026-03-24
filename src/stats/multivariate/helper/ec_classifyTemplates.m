@@ -24,6 +24,7 @@ ob.pp(:,1:numel(o.cond)) = f0; % posterior probability per class
 ob.pp1(:) = f0; % posterior probability difference
 ob.acc(:) = false; % accurate prediction?
 ob.use(ismember(ob.cnd,o.cond)) = true; % use if one of the main conds (train/test)
+ob.cc(ismember(ob.cnd,o.condx)) = true; % cross-classification conds
 % Channel/IC/ROI info
 ob.ch(:) = c0;
 ob.sbjCh(:) = s0;
