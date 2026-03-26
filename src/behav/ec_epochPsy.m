@@ -195,6 +195,8 @@ if o.pre~=0
     pre = psy(timerange(tNfo.iti,tNfo.ons),:);
     pre.pre(:)=tr; pre.stim(:)=0; pre.post(:)=0;
     tNfo.durITI = range(pre.Time);
+else
+    pre = [];
 end
 
 
@@ -224,6 +226,8 @@ if o.post~=0 || tNfo.durStim<o.dur
         post = psy(psy.post==tr,:);
     end
     post.pre(:)=0; post.stim(:)=0; post.post(:)=tr;
+else
+    post = [];
 end
 
 
@@ -248,7 +252,7 @@ e.pct(iPost) = normalize(e.latency(iPost),"range",[100+eps(100) 110-eps(110)]);
 
 % REMOVE frames over max latency ('max' argument)
 if ~isnan(o.dur)
-    e(e.latency>o.dur,:) = [];
+    e = e(e.latency <= seconds(o.dur),:);
     iStim = e.stim==tr;
     tNfo.off = max(e.Time(iStim));
     tNfo.idxOff = max(e.idx(iStim));

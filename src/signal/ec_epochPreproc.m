@@ -532,7 +532,7 @@ for v = o.badFrameVars
         if ndB==1
             x(full(xBad),:,:) = nan;
         else
-            o.badFrameVars2 = v; % 2D xBad & 3D x: do within-Ch
+            o.badFrameVars2(end+1) = v; % 2D xBad & 3D x: do within-Ch
         end
     else
         error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
