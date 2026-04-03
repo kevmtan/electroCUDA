@@ -32,7 +32,6 @@ for b = 1:nBlocks
     catch ME; getReport(ME)
         load([chFn '01.mat'],'wave')
         blockLength(b) = size(wave,2);
-        clear wave
     end
     
     % Load channel data
