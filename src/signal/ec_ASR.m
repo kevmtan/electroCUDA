@@ -17,17 +17,18 @@ for ii = 1:length(optFields)
     end
 end
 
+
 %% Convert to EEGLAB format
 EEG = ec_exportEEGLAB(n,x,psy,trialNfo,chNfo);
-clear x psy trialNfo chNfo
 EEGog = EEG;
 
-% Remove excluded channels
-chIgnore = o.chIgnore;
-if isany(chIgnore)
-    EEG = eeg_checkset(pop_select(EEG,'nochannel',cellstr(EEG.chNfo.sbjCh(chIgnore))));
-    disp("Removing these chans for ASR: "); disp(EEG.chNfo.sbjCh(chIgnore)');
-end
+% % Remove excluded channels
+% chIgnore = o.chIgnore;
+% if isany(chIgnore)
+%     EEG = eeg_checkset(pop_select(EEG,'nochannel',cellstr(EEG.chNfo.sbjCh(chIgnore))));
+%     disp("Removing these chans for ASR: "); disp(EEG.chNfo.sbjCh(chIgnore)');
+% end
+
 
 %% Run ASR
 if o.unmodified
@@ -46,14 +47,15 @@ if width(EEG.data)~=width(EEGog.data)
         EEG.data = EEG.data(:,1:EEGog.pnts); end
 end
 
-% Copy cleaned channels to data matrix
-if isany(chIgnore)
-    [~,ia,ib] = intersect({EEGog.chanlocs.labels},{EEG.chanlocs.labels},'stable');
-    EEGog.data(ia,:) = EEG.data(ib,:);
-    EEG = EEGog.data;
-else
-    EEG = EEG.data;
-end
+% % Copy cleaned channels to data matrix
+% if isany(chIgnore)
+%     [~,ia,ib] = intersect({EEGog.chanlocs.labels},{EEG.chanlocs.labels},'stable');
+%     EEGog.data(ia,:) = EEG.data(ib,:);
+%     EEG = EEGog.data;
+% else
+%     EEG = EEG.data;
+% end
+EEG = EEG.data;
 EEG = EEG';
 
 % Save ASR parameters as single
@@ -240,7 +242,7 @@ if isempty(maxMem)
 end
 [C,S] = size(EEG.data);
 if ~isany(blockSz)
-    blockSz = ceil((C*C*S*8*3*2)/maxMem);
+    blockSz = ceil((C*C*S*8*3*2)/(maxMem*1.5));
     %blockSz = ceil((C*C*S*8*3*2)/(maxMem*(2^21))); %blockSz = max(blockSz,ceil((C*C*S*8*3*2)/hlp_memfree));
 end
 dimsPCA = round(ec_rank(EEG.data')*dimsPCA);
