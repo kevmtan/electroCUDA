@@ -793,16 +793,16 @@ function [EEG,state] = asrOg_lfn(EEG,cutoff,windowlen,stepsize,maxdims,ref_maxba
 % write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
 % USA
 
-if ~exist('cutoff','var') || isempty(cutoff) cutoff = 5; end
-if ~exist('windowlen','var') || isempty(windowlen) windowlen = max(0.5,1.5*EEG.nbchan/EEG.srate); end
-if ~exist('stepsize','var') || isempty(stepsize) stepsize = []; end
-if ~exist('maxdims','var') || isempty(maxdims) maxdims = 0.66; end
-if ~exist('ref_maxbadchannels','var') || isempty(ref_maxbadchannels) ref_maxbadchannels = 0.075; end
-if ~exist('ref_tolerances','var') || isempty(ref_tolerances) ref_tolerances = [-3.5 5.5]; end
-if ~exist('ref_wndlen','var') || isempty(ref_wndlen) ref_wndlen = 1; end
-if ~exist('usegpu','var') || isempty(usegpu) usegpu = false; end
-if ~exist('maxmem','var') || isempty(maxmem) maxmem = 64; end
-if ~exist('useriemannian','var') || isempty(useriemannian) useriemannian = false; end
+if ~exist('cutoff','var') || isempty(cutoff); cutoff = 5; end
+if ~exist('windowlen','var') || isempty(windowlen); windowlen = max(0.5,1.5*EEG.nbchan/EEG.srate); end
+if ~exist('stepsize','var') || isempty(stepsize); stepsize = []; end
+if ~exist('maxdims','var') || isempty(maxdims); maxdims = 0.66; end
+if ~exist('ref_maxbadchannels','var') || isempty(ref_maxbadchannels); ref_maxbadchannels = 0.075; end
+if ~exist('ref_tolerances','var') || isempty(ref_tolerances); ref_tolerances = [-3.5 5.5]; end
+if ~exist('ref_wndlen','var') || isempty(ref_wndlen); ref_wndlen = 1; end
+if ~exist('usegpu','var') || isempty(usegpu); usegpu = false; end
+if ~exist('maxmem','var') || isempty(maxmem); maxmem = 64; end
+if ~exist('useriemannian','var') || isempty(useriemannian); useriemannian = false; end
 
 EEG.data = double(EEG.data);
 
