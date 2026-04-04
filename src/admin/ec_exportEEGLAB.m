@@ -2,12 +2,21 @@ function [EEG,eegChanges] = ec_exportEEGLAB(n,x,psy,trialNfo,chNfo)
 arguments
     n struct = []
     x {mustBeFloat} = []
-    psy table = []
+    psy timetable = []
     trialNfo table = []
     chNfo table = []
 end
 %if n.suffix==""; sfx1=""; else; sfx1="_"+n.suffix; end
 sfx = n.suffix;
+
+% Convert psy
+psy = timetable2table(psy);
+isDur = varfun(@isduration,psy,'OutputFormat','uniform');
+psy = convertvars(psy,isDur,"seconds");
+
+% Convert trialNfo
+isDur = varfun(@isduration,trialNfo,'OutputFormat','uniform');
+trialNfo = convertvars(trialNfo,isDur,"seconds");
 
 
 %% Basic Info
@@ -21,7 +30,7 @@ EEG.filepath = char(n.dirs.procSbj);
 EEG.pnts = height(x);
 EEG.nbchan = width(x);
 EEG.srate = n.hz;
-EEG.times = round(psy.time*1000)';
+EEG.times = round(psy.Time*1000)';
 EEG.trials = 1; % 1 for continuous
 EEG.history = {};
 EEG.comments = 'Converted from electroCUDA';
@@ -30,6 +39,7 @@ if isfield(n,'refChs') && ~isempty(n.refChs)
 else
     EEG.ref = find(chNfo.bad.ref);
 end
+
 
 %% Channel info
 EEG.chanlocs = table;
@@ -44,31 +54,49 @@ EEG.chNfo = chNfo;
 EEG.splinefile = [];
 EEG.urchanlocs = EEG.chanlocs;
 
+
 %% Event info
-stim = table;
+
+% ITI
+iti = ~isnan(trialNfo.iti);
+ITI = table;
+ITI.type(1:nnz(iti)) = "ITI";
+ITI.latency = trialNfo.iti(iti);
+ITI.duration = trialNfo.durITI(iti);
+ITI.idxPsy = trialNfo.idxITI(iti);
+ITI.cond = trialNfo.cond(iti);
+ITI.run = trialNfo.run(iti);
+ITI.trial = trialNfo.tr(iti);
+ITI.trialRun = trialNfo.trial(iti);
 
 % Stimulus
+stim = table;
 stim.type(1:height(trialNfo)) = "stim";
-stim.latency = psy.time(trialNfo.idxStim);
-stim.duration = trialNfo.durTrial;
-stim.idxPsy = trialNfo.idxStim;
+stim.latency = trialNfo.ons;
+stim.duration = trialNfo.durStim;
+stim.idxPsy = trialNfo.idxOns;
 stim.cond = trialNfo.cond;
 stim.run = trialNfo.run;
-stim.trial = trialNfo.trialA;
+stim.trial = trialNfo.tr;
 stim.trialRun = trialNfo.trial;
 
 % RT
-RT = stim;
-RT.type(:) = "RT";
-RT.latency = psy.time(trialNfo.idxRT);
+resp = trialNfo.resp=="true"; % trial with RTs
+RT = table;
+RT.type(1:nnz(resp)) = "RT";
+RT.latency = trialNfo.off(resp);
 RT.duration(:) = 0;
-RT.idxPsy = trialNfo.idxRT;
+RT.idxPsy = trialNfo.idxOff(resp);
+RT.cond = trialNfo.cond(resp);
+RT.run = trialNfo.run(resp);
+RT.trial = trialNfo.tr(resp);
+RT.trialRun = trialNfo.trial(resp);
 
 % Run boundaries
 runs = table;
 runs.type(1:n.nRuns) = "boundary";
-runs.latency = psy.time(n.runIdx(:,1));
-runs.duration = n.runTimesOg(:,2);
+runs.latency = psy.Time(n.runIdx(:,1));
+runs.duration(:) = 0; % seconds(n.runTimesOg);
 runs.idxPsy = n.runIdx(:,1);
 runs.cond(:) = "";
 runs.run = n.runs;
@@ -76,7 +104,7 @@ runs.trial(:) = 0;
 runs.trialRun(:) = 0;
 
 % Concactenate & sort
-EEG.event = [stim;RT;runs];
+EEG.event = [ITI;stim;RT;runs];
 EEG.event.type = cellstr(EEG.event.type);
 EEG.event = sortrows(EEG.event,"latency","ascend");
 EEG.event{:,["latency" "duration"]} = round(EEG.event{:,["latency" "duration"]}*1000);
@@ -85,8 +113,8 @@ EEG.event = table2struct(EEG.event);
 EEG.urevent = EEG.event;
 
 % Epoch info
-EEG.xmin = 0;
-EEG.xmax = 0;
+EEG.xmin = psy.Time(1);
+EEG.xmax = psy.Time(end);
 %EEG.eventdescription = [];
 %EEG.epoch = [];
 %EEG.epochdescription = [];

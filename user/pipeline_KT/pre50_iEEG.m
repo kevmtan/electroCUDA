@@ -160,7 +160,7 @@ for s = 1:height(status)
         disp("STARTING: "+sbj);
 
         %%
-        status.error{s} = ec_preproc_iEEG(sbj,proj,task,o,redoN=true,save=true);
+        status.error{s} = ec_preproc_iEEG(sbj,proj,task,o,redo=true,redoN=true,save=true);
         status.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
         status.fin(s) = 1;
     catch ME; getReport(ME)
