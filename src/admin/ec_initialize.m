@@ -98,6 +98,7 @@ if a.hzTarget>0; ds=floor(n.hz_og/a.hzTarget); else; ds=1; end
 if ds~=1; hz=a.hzTarget; end
 if hz==n.hz_og; hz_s=""; else; hz_s=num2str(hz); end
 
+
 %% EEG channel info
 fn = o.dirOut+"chNfo_"+o.fnStr+".mat";
 if ~isfile(fn) || a.redoCh || a.redo
@@ -136,6 +137,10 @@ if ~isfile(fn) || ~isfile(fn2) || a.redoBeh || a.redo
     else; disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": keeping task events @ "+n.hz_og+"hz");
     end
 
+    % Update blocks
+    n.blocks = a.blocks;
+    n.nBlocks = numel(n.blocks);
+
     % Make trialNfo & psy
     [psy,trialNfo,n] = ec_concatRunsBehav_MMR(n,hzTarget=hz);
     disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": made trialNfo & psy");
@@ -168,7 +173,7 @@ end
 
 
 %% Resample bad frames table if needed
-if n.xFrames~=height(n.xBad)
+if isfield(n,"xFrames") && n.xFrames~=height(n.xBad)
     n = ec_resampleBadFrames(n,hzTarget=hz);
     disp("[ec_initialize] n"+n.suffix+"_"+n.fnStr+": resampled bad frames table @ "+hz+"hz");
 end

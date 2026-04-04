@@ -19,10 +19,9 @@ status.hz1000(:) = false;
 status.hz100(:) = false;
 status.error = cell(height(status),1);
 
-try parpool('Processes'); catch; end
-
 
 %% Subject loop
+try parpool('Processes'); catch; end
 if doSave; diary(statusFn+".log"); diary on; end %#ok<*UNRCH>
 parfor s = 1:height(status)
     % Slice status table
@@ -30,21 +29,21 @@ parfor s = 1:height(status)
     sbj = stat.sbj;
     o = struct;
 
-    % No resampling (1000 hz)
+    %% No resampling (1000 hz)
     if ~stat.hz1000
         hz = 1000; 
         try
             o.suffix = "";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                save=doSave,saveN=doSave,hzTarget=hz,redoBeh=1);
+                save=doSave,saveN=doSave,redoBeh=1);
 
             o.suffix = "i";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                saveN=doSave,hzTarget=hz);
+                saveN=doSave);
 
             o.suffix = "z";
             [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                saveN=doSave,hzTarget=hz);
+                saveN=doSave);
 
             stat.hz1000 = true;
         catch ME
@@ -53,7 +52,7 @@ parfor s = 1:height(status)
         end
     end
 
-    % Resample (100 hz)
+    %% Resample (100 hz)
     if ~stat.hz100
         hz = 100;
         try
