@@ -49,8 +49,11 @@ function [mu,sig,alpha,beta] = fit_eeg_distribution(X,min_clean_fraction,...
 %   Alpha : estimated scale parameter of the generalized Gaussian clean EEG distribution (optional)
 %
 %   Beta : estimated shape parameter of the generalized Gaussian clean EEG distribution (optional)
+%
+%                                Christian Kothe, Swartz Center for Computational Neuroscience, UCSD
+%                                2013-08-15
 
-% assign defaults
+% Assign defaults
 if ~exist('min_clean_fraction','var') || isempty(min_clean_fraction)
     min_clean_fraction = 0.25; end
 if ~exist('max_dropout_fraction','var') || isempty(max_dropout_fraction)
@@ -62,7 +65,7 @@ if ~exist('step_sizes','var') || isempty(step_sizes)
 if ~exist('beta','var') || isempty(beta)
     beta = 1.7:0.15:3.5; end
 
-% sanity checks
+% Sanity checks
 if ~isvector(quants) || numel(quants) > 2
     error('Fit quantiles needs to be a 2-element vector (support for matrices deprecated).'); end
 if any(quants(:)<0) || any(quants(:)>1)
@@ -72,22 +75,22 @@ if any(step_sizes<0.0001) || any(step_sizes>0.1)
 if any(beta>=7) || any(beta<=1)
     error('Unreasonable shape range.'); end
 
-% sort data so we can access quantiles directly
+% Sort data so we can access quantiles directly
 X = double(sort(X(:)));
 n = length(X);
 
-% calc z bounds for the truncated standard generalized Gaussian pdf and pdf rescaler
-for b=1:length(beta)    
+% Calc z bounds for the truncated standard generalized Gaussian pdf and pdf rescaler
+for b = 1:length(beta)    
     zbounds{b} = sign(quants-1/2).*gammaincinv(sign(quants-1/2).*(2*quants-1),1/beta(b)).^(1/beta(b)); %#ok<*AGROW>
     rescale(b) = beta(b)/(2*gamma(1/beta(b)));
 end
 
-% determine the quantile-dependent limits for the grid search
+% Determine the quantile-dependent limits for the grid search
 lower_min = min(quants);                    % we can generally skip the tail below the lower quantile
 max_width = diff(quants);                   % maximum width is the fit interval if all data is clean
 min_width = min_clean_fraction*max_width;   % minimum width of the fit interval, as fraction of data
 
-% get matrix of shifted data ranges
+% Get matrix of shifted data ranges
 X = X(bsxfun(@plus,(1:round(n*max_width))',round(n*(lower_min:step_sizes(1):lower_min+max_dropout_fraction))));
 X1 = X(1,:); X = bsxfun(@minus,X,X1);
 
@@ -98,7 +101,6 @@ for m = round(n*(max_width:-step_sizes(2):min_width))
     nbins = round(3*log2(1+m/2));
     H = bsxfun(@times,X(1:m,:),nbins./X(m,:));
     logq = log(histc(H,[0:nbins-1,Inf]) + 0.01);
-    if size(logq,1) == 1, logq = logq'; end
     
     % for each shape value...
     for b=1:length(beta)
