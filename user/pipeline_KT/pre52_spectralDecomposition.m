@@ -1,26 +1,37 @@
 %% Task info
-sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
-    "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
-    "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
-    "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
-    "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
-    "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
+% sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
+%     "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
+%     "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
+%     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
+%     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
+%     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 % s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
+sbjs = "S15_87_RL";
 
 proj = "lbcn";
 task = "MMR"; % task name
 
+% Initialize options struct
+o = struct;
+
 
 %% Options struct (more options in the loop below)
 % NOTE: see individual functions for all inputs, descriptions & defaults
-o = struct;
+
+% Data suffix
 o.suffix = "s";
 o.sfx_src = "";
 
+% Compute
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
-o.hzTarget = 200; % Downsample target in Hz (default=[]: no downsample)
+o.vram = 2.4224e+10; % GPU memory (bytes) % = ec_ramAvail(true)
+
+% Floating-point precision
 o.single = false; % Run & save as single (single much faster on GPU)
 o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
+
+% Downsampling & anti-aliasing filter
+o.hzTarget = 200; % Downsample target in Hz (default=[]: no downsample)
 o.lpfSteep = 0.85;
 
 % Wavelet coherence
@@ -33,11 +44,8 @@ o.fVoices = 10; % Voices per octave (default=10, HFB=18)
 o.fOut = "decibel";
 
 % Other
-o.doBadFrames = false;
-o.detrendOrder = []; %[10 30]; % polynomial order [orderChunkedRun orderEntireRun] {default=[10 30]}
-o.detrendThr =   []; %[6 3]; % outlier threshold [threshChunkedRun threshEntireRun] {default=[6 3]}
-o.detrendItr =   []; %[10 2]; % number of iterations [iterChunkedRun iterEntireRun] {default=[10 2]}
-o.detrendWin =   []; % detrend timewindow in seconds {entire run=[],default=[]}
+o.doBadFrames = false; % Find bad frames in resulting spectral data
+o.save = true; % save data
 
 
 %% Log
@@ -60,7 +68,7 @@ for s = 1:height(status)
         sbj = status.sbj(s);
         disp("STARTING: "+sbj);
         %%
-        status.error{s} = ec_preprocTimeFreq(sbj,proj,task,o,save=true);
+        status.error{s} = ec_preprocTimeFreq(sbj,proj,task,o);
         status.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
         status.fin(s) = 1;
     catch ME; getReport(ME)

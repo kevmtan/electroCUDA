@@ -1,4 +1,4 @@
-function [x,n,trs] = ec_epochBaseline1(x,n,psy,ep,tt,o)
+function [x,n,trs] = ecz_epochBaseline(x,n,psy,ep,tt,o)
 % Analysis-specific preprocessing, epoching & baseline correction
 %   Kevin Tan (2025) | github.com/kevmtan/electroCUDA
 %
