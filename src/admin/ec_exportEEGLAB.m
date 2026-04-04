@@ -1,4 +1,5 @@
-function [EEG,eegChanges] = ec_exportEEGLAB(n,x,psy,trialNfo,chNfo)
+function [EEG,changes] = ec_exportEEGLAB(n,x,psy,trialNfo,chNfo)
+%%% Convert electroCUDA to EEGLAB format (continuous data)
 arguments
     n struct = []
     x {mustBeFloat} = []
@@ -30,7 +31,8 @@ EEG.filepath = char(n.dirs.procSbj);
 EEG.pnts = height(x);
 EEG.nbchan = width(x);
 EEG.srate = n.hz;
-EEG.times = round(psy.Time*1000)';
+EEG.times = psy.Time'*1000;
+EEG.idxPsy = psy.idx';
 EEG.trials = 1; % 1 for continuous
 EEG.history = {};
 EEG.comments = 'Converted from electroCUDA';
@@ -95,13 +97,30 @@ RT.trialRun = trialNfo.trial(resp);
 % Run boundaries
 runs = table;
 runs.type(1:n.nRuns) = "boundary";
-runs.latency = psy.Time(n.runIdx(:,1));
+runs.latency = seconds(n.runTimes(:,1));
 runs.duration(:) = 0; % seconds(n.runTimesOg);
 runs.idxPsy = n.runIdx(:,1);
 runs.cond(:) = "";
 runs.run = n.runs;
 runs.trial(:) = 0;
 runs.trialRun(:) = 0;
+
+% Find discontinuities in psy
+dt_expected = 1/n.hz; % expected time interval at sampling rate
+tol = eps(max(psy.Time)); % tolerance
+d = [0;diff(psy.Time)]; % successive time intervals
+dID = d > (dt_expected + tol);
+
+% Mark boundaries for discontinuities 
+bdry = table;
+bdry.type(1:nnz(dID)) = "boundary";
+bdry.latency = psy.Time(dID);
+bdry.duration(:) = d(dID);
+bdry.idxPsy = psy.idx(dID);
+bdry.cond(:) = "";
+bdry.run = psy.run(dID);
+bdry.trial = psy.tr(dID);
+bdry.trialRun = psy.trial(dID);
 
 % Concactenate & sort
 EEG.event = [ITI;stim;RT;runs];
@@ -143,10 +162,10 @@ EEG.saved = 'no';
 
 %% Check dataset
 try
-    [EEG,eegChanges] = eeg_checkset(EEG); 
-    %[EEG,eegChanges(2)] = eeg_checkset(EEG,'eventconsistency');
-    %[EEG,eegChanges(3)] = eeg_checkset(EEG,'chanlocs_homogeneous');
-    disp(eegChanges);
+    [EEG,changes{1}] = eeg_checkset(EEG); 
+    [EEG,changes{2}] = eeg_checkset(EEG,'eventconsistency');
+    [EEG,changes{3}] = eeg_checkset(EEG,'chanlocs_homogeneous');
+    disp(changes);
 catch ME; warning("Error in eeg_checkset, skipping..."); getReport(ME)
 end
 if isa(x,'double') && isa(EEG.data,'single')
