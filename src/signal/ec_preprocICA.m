@@ -79,6 +79,7 @@ if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
 if o.suffix=="i"; sfx1=""; else; sfx1="_"+o.suffix; end
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
 if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending string
+if ~isfield(o,'thrFlat'); o.thrFlat = 0; end
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
 sfxB = "";
 
@@ -149,7 +150,7 @@ end
 %% Identify bad frames per IC
 if o.doBadFrames
     [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,mad=o.thrMAD,diff=o.thrDiff,...
-        sns=o.thrSNS);
+        flat=o.thrFlat,sns=o.thrSNS);
     disp("Identified bad frames per IC: "+sbj); toc(tt);
 end
 

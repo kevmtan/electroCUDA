@@ -75,6 +75,7 @@ o.thrHFO = [];
 o.thrMAD = 20; % z-threshold relative to all data points to exclude timepoints (default=5)
 o.thrDiff = 20; % z-threshold for amplitude difference of consecutive timepoints (default=5)
 o.thrSNS = 3;
+o.thrFlat = 0; % max |Δz| for flat-segment detection (0=off; try 0.1)
 o.doBadCh = false;
 o.doBadIC = true;
 o.thrHurst = 3; % Hurst threshold (median absolute deviation

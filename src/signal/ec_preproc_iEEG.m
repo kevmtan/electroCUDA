@@ -81,6 +81,7 @@ blocks=arg.blocks; dirs=arg.dirs;
 % if ~isfield(o,'thrMAD');        o.thrMAD=10; end       % Z-threshold relative to all data points to exclude timepoints
 % if ~isfield(o,'thrDiff');       o.thrDiff=10; end      % Z-threshold for amplitude differences of consecutive timepoints
 % if ~isfield(o,'thrSNS');        o.thrSNS=3; end        % Threshold for low-freq spikes; Sensor-specific noise thresh (try 5)
+% if ~isfield(o,'thrFlat');      o.thrFlat=0; end       % max |step| in robust-z for flat segments (0=off, try 0.1)
 % % % Interpolate bad channels
 % % if ~isfield(o,'interpolateCh');    o.interpolateCh=false; end % true/false
 % % % Detect outliers: spatiotemporal covariance (slow, often unecessary!)
@@ -102,16 +103,15 @@ if ~isany(blocks) && ~isfield(n,"blocks"); blocks = string(BlockBySubj(sbj,task)
 hz = n.hz;
 ch_bad = chNfo.bad;
 if o.suffix==""; sfx=""; else; sfx="_"+o.suffix; end
-%try parpool('threads'); catch;end
 
-% Reset GPU & get free VRAM
-if ismember(o.gpu,["matlab" "cuda"])
-	try reset(gpuDevice()); catch; end
-    memMax = ec_ramAvail(true);
-else
-    try parpool('threads'); catch;end
-    memMax = ec_ramAvail;
-end
+% % Reset GPU & get free VRAM
+% if ismember(o.gpu,["matlab" "cuda"])
+% 	try reset(gpuDevice()); catch; end
+%     memMax = ec_ramAvail(true);
+% else
+%     try parpool('threads'); catch;end
+%     memMax = ec_ramAvail;
+% end
 
 
 %% Load EEG data
@@ -135,16 +135,16 @@ if isany(o.missingInterp)
     for ir = 1:n.nRuns
         rIdx = n.runIdx(ir,1):n.runIdx(ir,2); % Run indices
         if any(ismissing(x(rIdx,:)),"all")
-            x(rIdx,:) = fillmissing(x(rIdx,:),"knn",25);
+            x(rIdx,:) = fillmissing(x(rIdx,:),"knn",5);
             disp("Interpolated missing: "+runs(ir)+" time="+toc(o.tic));
         end
     end
 end
 
 
-%% Classify bad EEG channels
+%% Classify bad EEG frames & channels
 if o.doBadCh
-    [n,ch_bad] = badFrame_lfn(x,n,o,chNfo,ch_bad,sfx);
+    [n,ch_bad] = badFrameCh_lfn(x,n,o,chNfo,ch_bad,sfx);
     sfx1 = sfx;
     chGood = ~ch_bad.("bad"+sfx);
 elseif any(ch_bad.Properties.VariableNames=="rr")
@@ -200,8 +200,8 @@ end
 if o.doRereference
     % Figure out chans to include for average reference
     if isany(o.hiPass)
-        [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,n.xBad,sfx,n.xBad.detrend,...
-            mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+        [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,...
+            mad=o.thrMAD,diff=o.thrDiff,flat=o.thrFlat,sns=o.thrSNS);
     end
 
     % Save for robust reference chans
@@ -245,7 +245,7 @@ end
 %% Power line noise removal (zapline)
 if o.lineHz > 0
     % Zapline
-    [x,~,n.zapline] = ec_zaplinePlus(x,hz,'noisefreqs',o.lineHz);
+    [x,~,n.zapline] = ec_zaplinePlus(x,n.hz,'noisefreqs',o.lineHz);
     %[x,~,n.zapline] = ec_zaplinePlus(x,hz,'noisefreqs',o.lineHz,'detectionWinsize',4,...
     %    'noiseCompDetectSigma',3.5,'minsigma',3);
     disp("[ec_preproc] Finished zapline power line noise removal: sbj="+...
@@ -285,21 +285,11 @@ end
 
 %% Identify bad frames per chan
 if o.doBadFrames
-    [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,n.xBad,sfx,n.xBad.detrend,...
-        mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+    [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,mad=o.thrMAD,diff=o.thrDiff,...
+        flat=o.thrFlat,sns=o.thrSNS);
     disp("Identified bad frames per chan: "+sbj);
 end
 
-%% Covariance/correlation outliers
-x_cov = cov(x,'partialrows');
-chCorr = corrcov(x_cov);
-% Get channels with ultra-high covariance
-chCovZ = abs(x_cov);
-chCovZ(chCorr==1) = nan;
-chCovZ = mean(chCovZ,2,"omitnan");
-% Copy to permanent tables
-ch_bad.("cov"+sfx) = isoutlier(chCovZ,"median","ThresholdFactor",10);
-ch_bad.("covP"+sfx) = chCovZ;
 
 %% Final bad chans
 
@@ -322,15 +312,18 @@ if ~isempty(sfx1)
         ch_bad.("hurstL"+sfx1),ch_bad.("hurstH"+sfx1),ch_bad.("detrend"+sfx)],2)>=4;
 end
 
-%% Organize & save
-sfx = erase(sfx,"_");
-n.suffix = o.suffix;
+% Save to nfo struct
 n.chBad = ch_bad;
 n.chCov = x_cov;
 n.chVar = diag(n.chCov);
 n.chCorr = chCorr;
-n.("o"+sfx) = o;
 chNfo.bad = ch_bad;
+
+
+%% Organize & save
+sfx = erase(sfx,"_");
+n.suffix = o.suffix;
+n.("o"+sfx) = o;
 
 % Save
 if arg.save
@@ -358,15 +351,19 @@ toc(tt);
 
 
 
+
+
 %%%%%%%%%%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
-function [n,ch_bad] = badFrame_lfn(x,n,o,chNfo,ch_bad,sfx)
-%% Find bad frames %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,...
-    mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+
+
+function [n,ch_bad] = badFrameCh_lfn(x,n,o,chNfo,ch_bad,sfx)
+%%% Find bad frames %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,mad=o.thrMAD,diff=o.thrDiff,...
+    flat=o.thrFlat,sns=o.thrSNS);
 disp("Identified bad frames per chan: "+n.sbj);
 
 % Weird covariance channels
@@ -400,6 +397,8 @@ ch_bad(:,string(chClass.Properties.VariableNames(3:end))+"P"+sfx) = chClass(:,3:
 % Final
 disp("Bad chans CLASSIFIER:"); disp(find(ch_bad.ai)');
 disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
+
+
 
 
 
@@ -445,9 +444,9 @@ for b = 1:length(blocks)
     if hfoFin
         hfoCh{b} = unique(hfoCh_b);
         [~,hfoIdx_b] = ec_hfoDetectIdx(hfoEvent.ts,hfoEvent.channel,globalVar.channame,...
-            0,0,uint32(blockIdxOg(b,2)),hz);
+            0,0,uint32(blockIdxOg(b)),hz);
         hfoIdx_b = vertcat(hfoIdx_b{:});
-        hfoIdx{b} = hfoIdx_b(:,1:blockIdxOg(b,2));
+        hfoIdx{b} = hfoIdx_b(:,1:blockIdxOg(b));
     end
 end
 
@@ -467,12 +466,14 @@ end
 
 
 
+
+
 function [x,n,o,ch_bad] = asr_lfn(x,n,o,psy,trialNfo,chNfo,ch_bad,sfx,sfx1,tt)
 %% ASR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Decide chans to exclude
-[ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,n.xBad,sfx,n.xBad.detrend,...
-    mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+[ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,mad=o.thrMAD,diff=o.thrDiff,...
+    flat=o.thrFlat,sns=o.thrSNS);
 
 chNoASR = ch_bad.empty | ch_bad.nan | sum([ch_bad.("ai"+sfx1),...
     ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),ch_bad.("sns"+sfx)*2,...

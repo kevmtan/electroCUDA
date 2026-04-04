@@ -39,8 +39,6 @@
 % LICENSE: GNU General Public License
 
 %% Task info
-
-% Subject Names
 sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
     "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
     "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
@@ -48,11 +46,10 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 % s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
-%sbjs="S12_38_LK";
+sbjs = "S15_87_RL";
 
 proj = "lbcn";
 task = "MMR"; % task name
-
 
 
 %% Options struct (more options in the loop below)
@@ -60,7 +57,7 @@ task = "MMR"; % task name
 o = struct;
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
 o.single = false; % Run & save as single (single much faster on GPU)
-o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
+%o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 o.hzTarget = []; % Downsample target in Hz (default=[]: no downsample)
 o.suffix = "";
 
@@ -73,9 +70,10 @@ o.interpolateCh = false; % interpolate bad chans
 % Bad frame detection per chan/IC
 o.doBadFrames = true; % outlier/noise detection
 o.thrHFO = 2; % threshold for epileptic HFO detection (default=2)
-o.thrMAD = 20; % z-threshold relative to all data points to exclude timepoints (default=5)
-o.thrDiff = 20; % z-threshold for amplitude difference of consecutive timepoints (default=5)
+o.thrMAD = 10; % z-threshold relative to all data points to exclude timepoints (default=5)
+o.thrDiff = 10; % z-threshold for amplitude difference of consecutive timepoints (default=5)
 o.thrSNS = 3; % Threshold for low-freq spikes; Sensor-specific noise thresh (try 5)
+o.thrFlat = 0.01; % max |Δz| for flat-segment detection in ec_findBadFrames (0=off; try 0.0001)
 
 % Interpolate missing frames (within run & channel)
 o.missingInterp = "linear";
@@ -115,6 +113,8 @@ o.lineHz = 60; % Electricity hertz @ EEG recording site (default=50|60, skip=0)
 
 % ASR
 o.asr.do = true;
+o.asr.unmodified = false; % use unmodified ASR algorithm
+o.asr.riemannian = false;
 o.asr.gpu = true; % use GPU when appropriate
 o.asr.maxPctDiff = 0.15;
 o.asr.refBurst = 25; % BurstCriterion
@@ -123,10 +123,11 @@ o.asr.refMaxBadChs = 0.075; % ReferenceMaxBadChannels
 o.asr.refWinSz = 0.5; % Granularity at which EEG time windows are extracted for calibration purposes, in seconds. Default: 1.
 o.asr.winSz = 0.5; % Length of stats window (secs), timescale of artifacts (default=0.5)
 o.asr.winOverlap = 3/4; % Overlap between windows 
-o.asr.blockSz = []; % Cut robust estimation by this factor (default=10)
+o.asr.blockSz = []; % Cut robust estimation by this factor (auto=[],default=10)
 o.asr.filtHz =  [0  4 12 16 36 50 200 500]; % default=[]
 o.asr.filtMag = [2 .5 .5 1  1  2  1.5 2];   % default=[];
 o.asr.dimsPCA = 3/4; % Maximum dimensionality to reconstruct (default: 2/3)
+o.asr.maxMem = ec_ramAvail(o.asr.gpu); % max memory (ram/vram)
 
 % % Time-freq decomposition
 % o.wavelet = "morse"; % Wavelet type ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
@@ -138,7 +139,7 @@ o.asr.dimsPCA = 3/4; % Maximum dimensionality to reconstruct (default: 2/3)
 
 
 %%
-sbjFinFn = ['/home/kt/Gdrive/UCLA/Studies/MMR/anal/logs/preproc/asr_'...
+sbjFinFn = ['/01/lbcn/logs/preproc/pre50_iEEG/'...
     char(datetime('now','TimeZone','local','Format','yyMMdd_HHmm')) '_errors.mat'];
 if ~exist('status','var')
     status = table;
@@ -148,6 +149,7 @@ if ~exist('status','var')
     status.error = cell(numel(sbjs),1);
     status.time(:,1) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
 end
+try parpool('threads'); catch;end
 
 
 %% Run

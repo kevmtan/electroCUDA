@@ -125,6 +125,7 @@ o.thrHFO = 2; % threshold for epileptic HFO detection (default=2)
 o.thrMAD = 10; % z-threshold relative to all data points to exclude timepoints (default=5)
 o.thrDiff = 10; % z-threshold for amplitude difference of consecutive timepoints (default=5)
 o.thrSNS = 3;
+o.thrFlat = 0; % max |Δz| for flat-segment detection (0=off; try 0.1)
 
 % Time-frequency decomposition
 o.fName = "hfb"; % name of frequency analysis
@@ -328,6 +329,7 @@ for s = 1:height(statusPP) % subject loop
         oICA.thrMAD = 10; % z-threshold relative to all data points to exclude timepoints (default=5)
         oICA.thrDiff = 10; % z-threshold for amplitude difference of consecutive timepoints (default=5)
         oICA.thrSNS = 3;
+        oICA.thrFlat = 0;
         oICA.doBadCh = false;
         oICA.doBadIC = true;
         oICA.doBadFrames = true; % outlier/noise detection
@@ -498,6 +500,7 @@ for s = 1:height(statusPP) % Subject loop
     oICA.thrMAD = 10; % z-threshold relative to all data points to exclude timepoints (default=5)
     oICA.thrDiff = 10; % z-threshold for amplitude difference of consecutive timepoints (default=5)
     oICA.thrSNS = 3;
+    oICA.thrFlat = 0;
     oICA.doBadCh = false;
     oICA.doBadIC = true;
     oICA.doBadFrames = true; % outlier/noise detection

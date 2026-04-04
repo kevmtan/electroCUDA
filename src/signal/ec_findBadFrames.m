@@ -10,6 +10,7 @@ arguments
     w {isnumeric,islogical,istext} = []
     thr.mad {mustBeNumeric} = 0    % Median absolute deviation thresh (try 15)
     thr.diff {mustBeNumeric} = 0   % 1st-order differential thresh (try 5)
+    thr.flat {mustBeNumeric} = 0   % max |step| in robust-z to count as flat (try 0.01); 0 skips
     thr.sns {mustBeNumeric} = 0 % Sensor-specific noise thresh (try 5)
     %thr.cov {mustBeNumeric} = 0 % Sensor-specific noise thresh (try 5)
 end
@@ -23,7 +24,6 @@ if isempty(xBad); xBad=table; end
 if isequal(size(x),size(w))
     w = double(full(~w));
 end
-x = normalize(x,1,"zscore","robust");
 
 %% Median absolute deviation
 if thr.mad > 0
@@ -38,14 +38,35 @@ end
 %% First-order differential
 if thr.diff > 0
     ol = diff(x,1,1);
-    ol = [false(1,width(ol)); isoutlier(ol,"median",ThresholdFactor=thr.diff)];
+    ol = [false(1,width(ol),size(ol,3)); isoutlier(ol,"median",ThresholdFactor=thr.diff)];
     xBad.diff = ol;
-    chBad.flat = false(nChs,1); 
     chBad.diff = false(nChs,1); 
     chBad.diffP = sum(ol)'./nFrames;
-    [~,thrLo,thrHi] = isoutlier(chBad.diffP,"median",ThresholdFactor=thr.diff);
-    chBad.diff = chBad.diffP > thrHi;
-    chBad.flat = chBad.diffP < thrLo;
+    chBad.diff = isoutlier(chBad.diffP,"median",ThresholdFactor=thr.diff);
+end
+
+%% Flat segments (near-constant across consecutive samples, robust-z space)
+if thr.flat > 0
+    d = normalize(x,1,"zscore","robust");
+    d = abs(diff(d,1,1));
+    if size(x,3) > 1
+        ol = cat(1,false(1,size(x,2),size(x,3)),d < thr.flat);
+    else
+        ol = [false(1,size(x,2)); d < thr.flat];
+    end
+    xBad.flat = ol;
+    nf = size(x,3);
+    chBad.flatP = reshape(sum(ol,[1,3]),[],1) ./ (nFrames * nf);
+    tf = thr.mad;
+    if tf <= 0
+        tf = 10;
+    end
+    [~,~,thrHi] = isoutlier(chBad.flatP,"median",ThresholdFactor=tf);
+    chBad.flat = chBad.flatP > thrHi;
+else
+    xBad.flat = false(size(x));
+    chBad.flat = false(nChs,1);
+    chBad.flatP = zeros(nChs,1);
 end
 
 %% Sensor-specific noise
