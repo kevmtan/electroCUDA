@@ -14,9 +14,11 @@ for i = 1:length(block_name)
     fname =  [dirs.origDat filesep sbj_name filesep bn filesep bn '.edf'];
     
     if strcmp(globalVar.center, 'Stanford')
-        [hdr, D] = edfread_lbcn(globalVar.iEEG_data_server_path);
+        [hdr, D] = MemReadEDF(globalVar.iEEG_data_server_path); % much faster than edfread
+        %[hdr, D] = edfread_lbcn(globalVar.iEEG_data_server_path);
     elseif strcmp(globalVar.center, 'China')
-        [hdr, D] = edfread_China(globalVar.iEEG_data_server_path);
+        [hdr, D] = MemReadEDF(globalVar.iEEG_data_server_path);
+        %[hdr, D] = edfread_China(globalVar.iEEG_data_server_path);
     else
     end
     
