@@ -1,4 +1,4 @@
-function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,task,o,arg)
+function [errors,n,x] = ec_preprocTimeFreq(sbj,proj,task,o)
 %% electroCUDA: time-frequency decomposition
 % This function performs time-frequency decomposition on channel or IC timecourses
 % (output of 'ec_preproc' or 'ec_preprocICA'). Decomposition is performed via
@@ -45,15 +45,7 @@ arguments
     proj string
     task string
     o struct = struct % options struct (see "Options struct validation" below)
-    % n struct = [] % preloaded 'n' struct from ec_preproc (OPTIONAL)
-    % x (:,:) {isfloat} = [] % preloaded EEG recordings: rows=frames, columns=channels (OPTIONAL)
-    arg.dirs struct = [] % Directory paths struct
-    arg.ica (1,1) logical = false
-    arg.raw (1,1) logical = false
-    arg.save (1,1) logical = false
-    arg.test (1,1) logical = false
 end
-% n=[]; x=[]; arg.ica=0; arg.raw=0; arg.save=0; arg.test=1;
 % o=oSpec; o=oHFB;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
@@ -76,15 +68,13 @@ tt=tic; errors={};
 % Load EEG data
 [n,x,chNfo,psy,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
     vars=["n" "x" "chNfo" "psy"]);
-if arg.test; xOg = x; end %#ok<NASGU>
+if numel(dbstack)<2; xOg=x; end %#ok<NASGU> % Save original for testing
 
 % Load metadata
-sbjID = n.sbjID;
-nRuns = n.nRuns;
-blocks = string(n.blocks);
 n.hz= floor(n.hz);
 if ~isfield(o,'dirOut'); o.dirOut=dirs.procSbj; end % Output directory
-if ~isfield(o,'fnStr');  o.fnStr="s"+sbjID+"_"+task; end % Filename ending string
+if ~isfield(o,'fnStr');  o.fnStr="s"+n.sbjID+"_"+task; end % Filename ending string
+if ~isfield(o,'thrFlat'); o.thrFlat = 0; end
 
 % Get downsampling factor & anti-aliasing filter
 ds = 0;
@@ -103,7 +93,7 @@ end
 
 % Anti-aliasing LPF filter for downsampling (Nyquist freq)
 if ds && o.gpu=="no"
-    % Get single-channel/freq timeseries from longest run
+    % Get single-channel/freq timeseries from shortest run
     [~,idx] = min(n.runIdxOg);
     xTmp = x(psy.run==n.runs(idx),1,1);
 
@@ -115,33 +105,33 @@ else
     lpfFilt = [];
 end
 
-% Reset GPU & get free VRAM
-if ismember(o.gpu,["matlab" "cuda"])
-	try reset(gpuDevice()); catch; end
-    memMax = ec_ramAvail(true);
-else
-    try parpool('threads'); catch;end
-    memMax = ec_ramAvail;
-end
+% % Reset GPU & get free VRAM
+% if ismember(o.gpu,["matlab" "cuda"])
+% 	try reset(gpuDevice()); catch; end
+%     memMax = ec_ramAvail(true);
+% else
+%     try parpool('threads'); catch;end
+%     memMax = ec_ramAvail;
+% end
 
 % Reshape per run
 x = mat2cell(x,n.runIdxOg);
 
 
 %% Continuous Wavelet Transform (within-run to avoid edge artifacts)
-cwtHz = cell(nRuns,1);
-for r = 1:nRuns
+cwtHz = cell(n.nRuns,1);
+for r = 1:n.nRuns
     %% CWT on run
-    [x{r},cwtHz{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.fVoices,out=o.fOut,...
-        wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
-        mem=memMax,gpu=o.gpu);
-    disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+blocks(r)+" time="+toc(tt));
+    [x{r},cwtHz{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.voices,bandwidth=o.bandwidth,...
+        coef=o.coef,wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
+        mem=o.vram,gpu=o.gpu);
+    disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+n.runs(r)+" time="+toc(tt));
 end
 
 
 %% Organize
 x = vertcat(x{:});
-if ~o.fMean
+if ~o.avg
     x = flip(x,3); end % Sort freqs from low to high
 
 
@@ -169,7 +159,7 @@ end
 
 
 %% Identify bad frames per chan
-if o.doBadFrames && ~arg.ica
+if o.doBadFrames && ~n.ICA
     % Channel bad frames
     xBad = table;
 
@@ -183,19 +173,20 @@ if o.doBadFrames && ~arg.ica
 
     % Identify
     [n.chBad,n.xBad] = ec_findBadFrames(x,chNfo.bad,xBad,...
-        mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+        mad=o.thrMAD,diff=o.thrDiff,flat=o.thrFlat,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per chan: "+sbj+" time="+toc(tt));
 elseif o.doBadFrames
     % ICs/sources bad frames
-    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,mad=o.thrMAD,diff=o.thrDiff,sns=o.thrSNS);
+    [n.icBad,n.xBad] = ec_findBadFrames(x,n.icBad,n.xBad,mad=o.thrMAD,diff=o.thrDiff,...
+        flat=o.thrFlat,sns=o.thrSNS);
     disp("[ec_preprocTimeFreq] Identified bad frames per IC: "+sbj+" time="+toc(tt));
     % FIGURE OUT how to deal HFO to ICs
 end
 
 
 %% Covariance
-if o.fMean
-    if ~arg.ica
+if o.avg
+    if ~n.ICA
         n.chCov = cov(x,'partialrows');
         n.chVar = diag(n.chCov);
         n.chCorr = corrcov(n.chCov);
@@ -208,17 +199,9 @@ end
 
 
 %% Save
-
-% Reset GPU
-if ismember(o.gpu,["matlab" "cuda"])
-	if ~isempty(gcp('nocreate')); parfevalOnAll(@gpuDevice,0,[]); end
-	try reset(gpuDevice()); catch; end
-end
-
-% Save
-if arg.save
+if o.save
     % Save chNfo
-    if o.doBadFrames && ~arg.ica
+    if o.doBadFrames && ~n.ICA
         fn = o.dirOut+"chNfo_"+o.fnStr+".mat";
         save(fn,'chNfo','-v7'); disp("SAVED: "+fn);
     end

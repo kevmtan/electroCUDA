@@ -16,9 +16,10 @@ arguments
     o.hz (1,1) double = nan           % Sampling rate
     o.lims (1,2) double = nan         % Frequency limits [lower,upper]
     o.voices (1,1) double = 10        % Voices per octave
+    o.bandwidth (1,1) double = 60     % Time Bandwidth
     o.avg (1,1) logical = false       % Scale-average transform?
-    o.out (1,1) string...             % Output coefficient type
-        {mustBeMember(o.out,["decibel" "magnitude" "power" "complex"])} = "decibel"
+    o.coef (1,1) string...             % Output coefficient type
+        {mustBeMember(o.coef,["decibel" "magnitude" "power" "complex"])} = "decibel"
     o.wavelet (1,1) string...         % Wavelet type ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
         {mustBeMember(o.wavelet,["morse" "amor" "bump"])} = "morse"
     o.ds (1,1) double = 0             % Downsampling factor (see https://www.mathworks.com/help/signal/ref/downsample.html)
@@ -36,8 +37,8 @@ end
 if ~isany(o.hz); error("[ec_wt] Must specify sampling rate (fs)"); end
 if ~isany(o.lims); error("[ec_wt] Must specify frequency limits (lims)"); end
 if o.ds<=1||~isany(o.ds); o.ds=0; end % Set no downsampling
-if o.avg && o.out=="magnitude"
-    o.out = "power";
+if o.avg && o.coef=="magnitude"
+    o.coef = "power";
     warning("[ec_wt] Scale-averaged output can't be magnitude, outputing power (or specify decibel)");
 end
 
@@ -49,14 +50,14 @@ elseif ~isa(x,"double"); x = double(x); % Convert to double if not
 end 
 
 % Make logical arguments
-if o.out=="complex"; o.real=false; else; o.real=true; end
-if o.out=="power"; o.pwr=true; else; o.pwr=false; end
-if o.out=="decibel"; o.db=true; else; o.db=false; end
+if o.coef=="complex"; o.real=false; else; o.real=true; end
+if o.coef=="power"; o.pwr=true; else; o.pwr=false; end
+if o.coef=="decibel"; o.db=true; else; o.db=false; end
 if o.db && o.avg; o.pwr=true; end
 
 % Generate wavelet
 fb = cwtfilterbank(Wavelet=o.wavelet,SamplingFrequency=o.hz,SignalLength=height(x),...
-    VoicesPerOctave=o.voices,FrequencyLimits=o.lims);
+    VoicesPerOctave=o.voices,FrequencyLimits=o.lims,TimeBandwidth=o.bandwidth);
 frqs = fb.centerFrequencies; % CWT frequencies
 scales = fb.scales; % CWT scales
 if o.ds; scales = scales.*o.ds; end % Downsample scales
@@ -76,7 +77,7 @@ nChs = width(x);
 memIn = whos("x").bytes * .25;
 if ~o.avg; memIn = memIn*nFrqs; end
 if o.ds; memIn = memIn/o.ds; end
-if o.singleOut; memIn = memIn/2; end
+%if o.singleOut; memIn = memIn/2; end
 o.memIn = memIn/nChs;
 
 
@@ -127,16 +128,8 @@ end
 
 
 function x = gpu_lfn(fb,x,o)
-%% Run on GPU arrayfun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Run on GPU arrayfun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nChs = numel(x);
-if ~isany(o.mem); o.mem=ec_ramAvail(true); end % Get memory
-
-% Find number of chans that fit in GPU RAM
-memChs = floor(o.mem/o.memIn);
-memItr = ceil(nChs/memChs);
-memChs = ceil(nChs/memItr);
-chFin = false(nChs,1);
-disp("[ec_wt] Start GPU arrayFun: memChs="+memChs+"/"+nChs+" time="+toc(o.tic));
 
 % Copy to GPU
 vars = ["avg" "real" "pwr" "db" "ds" "lpfFilt" "singleOut"];
@@ -144,20 +137,11 @@ for v = vars
     o.(v) = gpuArray(o.(v)); end
 
 
-%% Loop gpuArrayFun iterations (simultaneous chans that fit in VRAM)
-for v = 1:memItr
-    % Prep
-    idx = find(~chFin,memChs); % Find iteration chans
-    x(idx) = cellfun(@gpuArray,x(idx),UniformOutput=false); % Copy data to GPU
-
-    % Run CWT
-    x(idx) = cellfun(@(xi) cwt_lfn(fb,xi,o),x(idx),UniformOutput=false);
-
-    % Move data to CPU
-    x(idx) = cellfun(@gather,x(idx),UniformOutput=false);
-    chFin(idx) = true;
+%% Loop across chans
+for ch = 1:nChs
+    % Run CWT on GPU
+    x{ch} = gather(cwt_lfn(fb,gpuArray(x{ch}),o));
 end
-x = cellfun(@gather,x,UniformOutput=false);
 disp("[ec_wt] Finished GPU arrayfun: time="+toc(o.tic));
 
 
@@ -166,7 +150,7 @@ disp("[ec_wt] Finished GPU arrayfun: time="+toc(o.tic));
 
 
 function x = cpu_lfn(fb,x,o)
-%% Run on CPU %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Run on CPU %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 parfor ch = 1:numel(x)
     %% Run CWT for chan
     x{ch} = cwt_lfn(fb,x{ch},o);
@@ -179,7 +163,7 @@ disp("[ec_wt] Finished CPU parfor: time="+toc(o.tic));
 
 
 function xc = cwt_lfn(fb,xc,o)
-%% Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Continuous wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if o.avg 
     % Scale-averaged output
     xc = fb.scaleSpectrum(xc)'; % outputs as power vector
@@ -221,3 +205,42 @@ end
 %% Convert to single
 if o.singleOut
     xc = single(xc); end
+
+
+
+
+
+
+% function x = gpu_lfn(fb,x,o)
+% %%% Run on GPU arrayfun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% nChs = numel(x);
+% if ~isany(o.mem); o.mem=ec_ramAvail(true); end % Get memory
+% 
+% % Find number of chans that fit in GPU RAM
+% memChs = floor(o.mem/o.memIn);
+% memItr = ceil(nChs/memChs);
+% memChs = ceil(nChs/memItr);
+% chFin = false(nChs,1);
+% disp("[ec_wt] Start GPU arrayFun: memChs="+memChs+"/"+nChs+" time="+toc(o.tic));
+% 
+% % Copy to GPU
+% vars = ["avg" "real" "pwr" "db" "ds" "lpfFilt" "singleOut"];
+% for v = vars
+%     o.(v) = gpuArray(o.(v)); end
+% 
+% 
+% %% Loop gpuArrayFun iterations (simultaneous chans that fit in VRAM)
+% for v = 1:memItr
+%     % Prep
+%     idx = find(~chFin,memChs); % Find iteration chans
+%     x(idx) = cellfun(@gpuArray,x(idx),UniformOutput=false); % Copy data to GPU
+% 
+%     % Run CWT
+%     x(idx) = cellfun(@(xi) cwt_lfn(fb,xi,o),x(idx),UniformOutput=false);
+% 
+%     % Move data to CPU
+%     x(idx) = cellfun(@gather,x(idx),UniformOutput=false);
+%     chFin(idx) = true;
+% end
+% x = cellfun(@gather,x,UniformOutput=false);
+% disp("[ec_wt] Finished GPU arrayfun: time="+toc(o.tic));

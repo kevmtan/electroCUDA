@@ -24,7 +24,7 @@ o.sfx_src = "";
 
 % Compute
 o.gpu = "matlab"; % Run on... ["no"|"matlab"|"cuda"]
-o.vram = 2.4224e+10; % GPU memory (bytes) % = ec_ramAvail(true)
+o.vram = ec_ramAvail(true); % GPU memory (bytes) % = ec_ramAvail(true)
 
 % Floating-point precision
 o.single = false; % Run & save as single (single much faster on GPU)
@@ -34,14 +34,14 @@ o.singleOut = true; % Run as double (accuracy) & save as single (small filesize)
 o.hzTarget = 200; % Downsample target in Hz (default=[]: no downsample)
 o.lpfSteep = 0.85;
 
-% Wavelet coherence
+% Wavelet
 o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
-o.avg = false; % Full-spectrum (false) of scale-spectrum (true)
 o.fName = "spec"; % Name of frequency analysis
 o.fLims = [2 300]; % frequency limits in hz; HFB=[70 200]
-o.fMean = false; % Collapse across frequency bands (for 1d vector output)
-o.fVoices = 10; % Voices per octave (default=10, HFB=18)
-o.fOut = "decibel";
+o.avg = false; % Full-spectrum (false) of scale-spectrum (true)
+o.voices = 10; % Voices per octave (default=10, HFB=18)
+o.bandwidth = 60; % Time bandwidth for Morse wavelets (default=60)
+o.coef = "decibel"; % Output coefficient type ["decibel"|"magnitude"|"power"|"complex"]
 
 % Other
 o.doBadFrames = false; % Find bad frames in resulting spectral data
