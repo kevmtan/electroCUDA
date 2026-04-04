@@ -1,12 +1,11 @@
 %% Task info
-% sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
-%     "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
-%     "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
-%     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
-%     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
-%     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-% s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"];
-sbjs = "S15_87_RL";
+sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";"S12_40_MJ";...
+    "S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";"S13_50_LGM";...
+    "S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";"S13_57_TVD";...
+    "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
+    "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
+    "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
+% s=1; sbjs="S12_38_LK"; sbjs="S12_42_NC"; sbjs=["S12_38_LK";"S12_42_NC"]; sbjs = "S15_87_RL";
 
 proj = "lbcn";
 task = "MMR"; % task name
@@ -19,7 +18,7 @@ o = struct;
 % NOTE: see individual functions for all inputs, descriptions & defaults
 
 % Data suffix
-o.suffix = "s";
+o.suffix = "f";
 o.sfx_src = "";
 
 % Compute
@@ -39,8 +38,8 @@ o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
 o.fName = "spec"; % Name of frequency analysis
 o.fLims = [2 300]; % frequency limits in hz; HFB=[70 200]
 o.avg = false; % Full-spectrum (false) of scale-spectrum (true)
-o.voices = 10; % Voices per octave (default=10, HFB=18)
-o.bandwidth = 60; % Time bandwidth for Morse wavelets (default=60)
+o.voices = 5; % Voices per octave (default=10, HFB=18)
+o.bandwidth = 20; % Time bandwidth for Morse wavelets (default=60)
 o.coef = "decibel"; % Output coefficient type ["decibel"|"magnitude"|"power"|"complex"]
 
 % Other

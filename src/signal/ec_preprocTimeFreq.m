@@ -66,8 +66,8 @@ end
 tt=tic; errors={};
 
 % Load EEG data
-[n,x,chNfo,psy,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
-    vars=["n" "x" "chNfo" "psy"]);
+[n,x,chNfo,dirs] = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx_src,...
+    vars=["n" "x" "chNfo"]);
 if numel(dbstack)<2; xOg=x; end %#ok<NASGU> % Save original for testing
 
 % Load metadata
@@ -95,7 +95,8 @@ end
 if ds && o.gpu=="no"
     % Get single-channel/freq timeseries from shortest run
     [~,idx] = min(n.runIdxOg);
-    xTmp = x(psy.run==n.runs(idx),1,1);
+    xTmp = x(n.runIdx(idx,1):n.runIdx(idx,2),1,1);
+    if o.single; xTmp=single(xTmp); else; xTmp=double(xTmp); end % convert float
 
     % Make AA LPF
     lpfFilt = ec_designFilt(xTmp,n.hz,floor(o.hzTarget/2),"lowpass",...
@@ -120,9 +121,10 @@ x = mat2cell(x,n.runIdxOg);
 
 %% Continuous Wavelet Transform (within-run to avoid edge artifacts)
 cwtHz = cell(n.nRuns,1);
+cwtSPSI = cwtHz;
 for r = 1:n.nRuns
-    %% CWT on run
-    [x{r},cwtHz{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.voices,bandwidth=o.bandwidth,...
+    % CWT on run
+    [x{r},cwtHz{r},cwtSPSI{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.voices,bandwidth=o.bandwidth,...
         coef=o.coef,wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
         mem=o.vram,gpu=o.gpu);
     disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+n.runs(r)+" time="+toc(tt));
@@ -130,9 +132,12 @@ end
 
 
 %% Organize
-x = vertcat(x{:});
+x = vertcat(x{:}); % concatenate runs
+
+% Sort freqs from low to high
 if ~o.avg
-    x = flip(x,3); end % Sort freqs from low to high
+    x = flip(x,3);
+end
 
 
 %% Save spectral info to n struct
@@ -141,7 +146,9 @@ n.xFrames = size(x,1);
 n.xChs = size(x,2);
 n.nFreqs = size(x,3);
 n.freqs = flip(cwtHz{1});
-n.freqsRun = vertcat(cwtHz{:});
+n.freqsRun = cwtHz;
+n.cwtSupport = sortrows(cwtSPSI{1},"CF","ascend");
+n.cwtSupportRun = cwtSPSI;
 n.("o"+o.suffix) = o;
 n.spectOpts = o;
 

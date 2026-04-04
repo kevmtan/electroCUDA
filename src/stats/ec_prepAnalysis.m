@@ -36,6 +36,23 @@ disp("[ec_prepAnalysis] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
 oo = namedargs2cell(o.pre);
 [x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
 
+% Keep analysis times
+if numel(o.timeRng)==2
+    % Keep only analysis timerange
+    ep = ep(ep.t>=o.timeRng(1) & ep.t<=o.timeRng(2),:);
+    x = x(ep.ide,:,:);
+
+    % Update epoch indices
+    ep.ide = cast(1:height(ep),like=ep.ide)';
+    n.ide = ep.ide;
+
+    % Analysis times
+    [n.timesG,n.times] = findgroups(ep.t);
+    n.timesG = uint32(n.timesG);
+    n.nTimes = height(n.times); % number of times
+end
+
+
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
 if isany(o.chConcat)
@@ -132,10 +149,6 @@ n.trialNfo = trialNfo;
 ep = renamevars(ep,[o.timeVar o.condVar],["t" "cnd"]);
 n.trialNfo = renamevars(n.trialNfo,o.condVar,"cnd");
 
-% Remove excluded times
-if numel(o.timeRng)==2
-    ep(ep.t<o.timeRng(1) | ep.t>o.timeRng(2),:) = []; end
-
 % Remove excluded conditions
 if isfield(o,"cond1")
     ep = ep(ismember(ep.cnd,[o.cond1 o.cond0]),:);
@@ -158,7 +171,7 @@ n.nCnds = numel(n.cnds);
 
 % Analysis times
 [n.timesG,n.times] = findgroups(ep.t);
-n.timesG = int32(n.timesG);
+n.timesG = uint32(n.timesG);
 n.nTimes = height(n.times); % number of times
 
 
