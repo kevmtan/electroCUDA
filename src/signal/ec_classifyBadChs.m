@@ -8,6 +8,7 @@ arguments
 end
 logScale = 1;
 
+
 %% Prep
 nChs = min(size(x));
 nn = min(arg.nn,nChs);
@@ -18,12 +19,14 @@ if isempty(mdl)
     load("ec_trainedClassifier_ImaGIN_"+v.Release+".mat","mdl");
 end
 
+
 %% Classify bad channels
 [chF,chDist] = computeFeatures_lfn(x,pos,nChs,nn,logScale); % compute features
 
 % Classify features using pre-trained ImaGIN model
 chPred = mdl.predictFcn(chF);
 chF.bad = chPred=="Bad";
+
 
 %% Finalize
 chF.Properties.VariableNames = erase(chF.Properties.VariableNames,'ch_');
@@ -36,14 +39,13 @@ if ~isempty(chNames)
     chDist = movevars(chDist,"ch","Before",1);
 end
 
-end
 
 
-%%%%%%%%%%%%%%%% Subfunctions %%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%% Compute features
+
 function [chF,chDist] = computeFeatures_lfn(x,pos,nChs,nn,logScale)
+%%% Compute features %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Correlation of all chans
 if size(x,2)>size(x,1); x = x'; end
@@ -96,59 +98,12 @@ if logScale
 end
 
 chF = table(ch_xcorr,ch_var,ch_dev,ch_ampl,ch_grad,ch_kurt,ch_hurs); % table of features
-end
 
 
 
-%% Filter %%
-function x = filter_lfn(x) %#ok<DEFNU> 
-
-if size(x,2)>size(x,1)
-    x = x';
-end
-
-d1 = designfilt('lowpassiir','FilterOrder',4,'HalfPowerFrequency',0.05,'DesignMethod','butter');
-x = filtfilt(d1,x);
-end
 
 
-%% Hurst exponent %%
-function h = hurst_lfn(x) %#ok<DEFNU> 
-%      Estimate Hurst exponent on a timeseries.
-%
-%      The estimation is based on the second order discrete derivative.
-%
-%      Parameters
-%      ----------
-%      x : 1D array
-%          The timeseries to estimate the Hurst exponent for.
-%
-%      Returns
-%      -------
-%      h : float
-%          The estimation of the Hurst exponent for the given timeseries.
 
-y = cumsum(diff(x,1));
-
-b1 = [1, -2, 1];
-b2 = [1,  0, -2, 0, 1];
-
-% Second order derivative
-y1 = filter(b1, 1, y);
-% First values contain filter artifacts
-y1 = y1(length(b1)+1:end-1);
-% Wider second order derivative
-y2 = filter(b2, 1, y);
-% First values contain filter artifacts
-y2 = y2(length(b2)+1:end-1);
-s1 = mean(y1 .^2);
-s2 = mean(y2 .^2);
-
-h = 0.5*log2(s2/s1); % Hurst exponent index
-end
-
-
-%% Euclidian distance %%
 function y = eucDist_lfn(a,b)
 % EUCLIDEAN_DIST - Euclidean distance between two points
 %
@@ -190,5 +145,57 @@ end
 
 a = repmat(a,size(b,1),1);
 y = sqrt(sum((a-b).^2,2));
-end
+
+
+
+
+
+% function x = filter_lfn(x)
+% %%% filter %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 
+% if size(x,2)>size(x,1)
+%     x = x';
+% end
+% 
+% d1 = designfilt('lowpassiir','FilterOrder',4,'HalfPowerFrequency',0.05,'DesignMethod','butter');
+% x = filtfilt(d1,x);
+% 
+% 
+% 
+% 
+% 
+% 
+% function h = hurst_lfn(x)
+% %      Estimate Hurst exponent on a timeseries.
+% %
+% %      The estimation is based on the second order discrete derivative.
+% %
+% %      Parameters
+% %      ----------
+% %      x : 1D array
+% %          The timeseries to estimate the Hurst exponent for.
+% %
+% %      Returns
+% %      -------
+% %      h : float
+% %          The estimation of the Hurst exponent for the given timeseries.
+% 
+% y = cumsum(diff(x,1));
+% 
+% b1 = [1, -2, 1];
+% b2 = [1,  0, -2, 0, 1];
+% 
+% % Second order derivative
+% y1 = filter(b1, 1, y);
+% % First values contain filter artifacts
+% y1 = y1(length(b1)+1:end-1);
+% % Wider second order derivative
+% y2 = filter(b2, 1, y);
+% % First values contain filter artifacts
+% y2 = y2(length(b2)+1:end-1);
+% s1 = mean(y1 .^2);
+% s2 = mean(y2 .^2);
+% 
+% h = 0.5*log2(s2/s1); % Hurst exponent index
+
 

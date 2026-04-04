@@ -272,7 +272,7 @@ if ~fin && chRank<numel(chICA)
         chICAbad = setdiff(chICAbad,chRm);
         chRank = ec_rank(x(:,chICA),exact=1);
 
-        % Exclude maximum correlsation if still rank-deficient
+        % Exclude maximum correlation if still rank-deficient
         if chRank < numel(chICA)
             chICA = setdiff(chICA,xCorrs(chRm)); % max correlation of minimum eigenvalue
             chICAbad = setdiff(chICAbad,xCorrs(chRm));

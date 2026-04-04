@@ -116,7 +116,7 @@ o.asr.unmodified = false; % use unmodified ASR algorithm
 o.asr.riemannian = false;
 o.asr.gpu = true; % use GPU when appropriate
 o.asr.maxPctDiff = 0.15;
-o.asr.refBurst = 25; % BurstCriterion
+o.asr.refBurst = 25; % BurstCriterion, default=25
 o.asr.refTols = [-5.5 5.5]; %[-3.5 5.5] BurstCriterionRefTolerances
 o.asr.refMaxBadChs = 0.075; % ReferenceMaxBadChannels
 o.asr.refWinSz = 0.5; % Granularity at which EEG time windows are extracted for calibration purposes, in seconds. Default: 1.

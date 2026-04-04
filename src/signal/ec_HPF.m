@@ -52,10 +52,10 @@ end
 
 if isnumeric(n) % HPF all data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % Interpolate missing
-    if isany(o.missing) && nnz(ismissing(x))
-        x = fillmissing(x,o.missing,1);
-        disp("[ec_HPF] Interpolated missing: time="+toc(tt));
-    end
+    %if isany(o.missing) && nnz(ismissing(x))
+    %    x = fillmissing(x,o.missing,1);
+    %    disp("[ec_HPF] Interpolated missing: time="+toc(tt));
+    %end
 
     % HPF
     x = ec_filtfilt(x,hpf,gpu=o.gpu,single=singleOut);
@@ -68,10 +68,10 @@ else % HPF within-run to avoid edge artifacts %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         xr = x{r};
 
         % Interpolate missing
-        if isany(o.missing) && nnz(ismissing(xr))
-            xr = fillmissing(xr,o.missing,1);
-            disp("[ec_HPF] Interpolated missing: "+n.runs(r)+" time="+toc(tt));
-        end
+        %if isany(o.missing) && nnz(ismissing(xr))
+        %    xr = fillmissing(xr,o.missing,1);
+        %    disp("[ec_HPF] Interpolated missing: "+n.runs(r)+" time="+toc(tt));
+        %end
 
         % HPF
         xr = ec_filtfilt(xr,hpf,gpu=o.gpu,single=singleOut);

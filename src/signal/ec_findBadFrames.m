@@ -55,6 +55,7 @@ if thr.flat > 0
         ol = [false(1,size(x,2)); d < thr.flat];
     end
     xBad.flat = ol;
+    xBad.flatA = sum(ol,2,"omitmissing")./width(ol) > 0.5;
     nf = size(x,3);
     chBad.flatP = reshape(sum(ol,[1,3]),[],1) ./ (nFrames * nf);
     tf = thr.mad;

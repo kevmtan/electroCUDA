@@ -242,12 +242,13 @@ end
 % vis_artifacts(ec_exportEEGLAB(n,x_detr2,psy,trialNfo,chNfo), ec_exportEEGLAB(n,x_rr,psy,trialNfo,chNfo));
 
 
-%% Power line noise removal (zapline)
+%% Electrical line noise removal (Zapline Plus)
 if o.lineHz > 0
-    % Zapline
-    [x,~,n.zapline] = ec_zaplinePlus(x,n.hz,'noisefreqs',o.lineHz);
-    %[x,~,n.zapline] = ec_zaplinePlus(x,hz,'noisefreqs',o.lineHz,'detectionWinsize',4,...
-    %    'noiseCompDetectSigma',3.5,'minsigma',3);
+    idt = ~full(n.xBad.flatA); % frames to include
+    idc = ~full(ch_bad.empty|ch_bad.nan); % chans to include
+
+    % Run zapline
+    [x(idt,idc),~,n.zapline] = ec_zaplinePlus(x(idt,idc),n.hz,'noisefreqs',o.lineHz);
     disp("[ec_preproc] Finished zapline power line noise removal: sbj="+...
         sbj+" time="+toc(tt));
     if arg.test; x_zap=x; end
@@ -404,13 +405,14 @@ disp("Bad chans ALL:"); disp(find(ch_bad.bad)');
 
 
 function [n,ch_bad,errors] = hfo_lfn(x,n,o,dirs,task,ch_bad,errors)
-%% Detect HFO %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Detect HFO %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 sbj = n.sbj;
 hz = n.hz;
 nBlocks = n.nRuns;
 blocks = n.blocks;
 blockIdx = n.runIdx;
 blockIdxOg = n.runIdxOg;
+idc = ~full(ch_bad.empty|ch_bad.nan); % chans to include
 
 hfoIdx = cell(nBlocks,1);
 hfoCh = cell(nBlocks,1);
@@ -425,6 +427,9 @@ for b = 1:length(blocks)
     try
         [hfoCh_b,hfoEvent] = ec_hfoDetect(x(idx,:),globalVar.channame,...
             globalVar.iEEG_rate,o.thrHFO);
+        %[hfoCh_b,hfoEvent] = ec_hfoDetect(x(idx,idc),globalVar.channame{idc},...
+        %    globalVar.iEEG_rate,o.thrHFO); % FIGURE OUT WHATS CAUSING ERROR
+
         % Save to globalVar
         globalVar.pathological_event_bipolar_montage = hfoEvent;
         globalVar.badChan_specs.epileptic_hfo_spike = hfoCh_b;
@@ -471,16 +476,23 @@ end
 function [x,n,o,ch_bad] = asr_lfn(x,n,o,psy,trialNfo,chNfo,ch_bad,sfx,sfx1,tt)
 %% ASR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Decide chans to exclude
+% Rerun bad frames / bad chans
 [ch_bad,n.xBad] = ec_findBadFrames(x,ch_bad,mad=o.thrMAD,diff=o.thrDiff,...
     flat=o.thrFlat,sns=o.thrSNS);
 
+% Channels to exclude
 chNoASR = ch_bad.empty | ch_bad.nan | sum([ch_bad.("ai"+sfx1),...
     ch_bad.("mad"+sfx),ch_bad.("diff"+sfx),ch_bad.("flat"+sfx),ch_bad.("sns"+sfx)*2,...
     ch_bad.("cov"+sfx1),ch_bad.("dev"+sfx1)*2,ch_bad.("grad"+sfx1),...
     ch_bad.("hurstL"+sfx1),ch_bad.("hurstH"+sfx1),ch_bad.("detrend"+sfx1)],2)>=6;
 ch_bad.("asr"+sfx)=chNoASR; n.chNoASR=find(chNoASR); o.asr.chIgnore=chNoASR; % save to asr options struct
+idc = ~full(chNoASR); % included chans index
+disp("[ec_preproc] Chans excluded from ASR:");
+disp(chNfo.ch(chNoASR)');
 
+% Frames to include (TODO: customize xBad vars?)
+idt = ~full(n.xBad.flatA);
+disp("[ec_preproc] Proportion of frames included in ASR: "+nnz(idt)/numel(idt));
 
 % Save for comparison in determining if ASR too strong
 x1 = x;
@@ -488,8 +500,8 @@ asr_reps = 0;
 
 % Run ASR
 while 1
-    [x,n] = ec_ASR(o.asr,n,x,psy,trialNfo,chNfo);
-    pctDiff = nnz(abs(x-x1) > eps(1e10)) / numel(x);
+    [x(idt,idc),n] = ec_ASR(o.asr,n,x(idt,idc),psy(idt,:),trialNfo,chNfo(idc,:));
+    pctDiff = nnz(abs(x(idt,:)-x1(idt,:)) > eps(1e10)) / numel(x(idt,:));
 
     % Redo with more conservative params if ASR too strong
     if pctDiff > o.asr.maxPctDiff && o.asr.refBurst < 100
@@ -516,5 +528,5 @@ while 1
     end
 end
 
-disp("Finished ASR: chans="+nnz(~chNoASR)+" | rank="+ec_rank(x(:,~chNoASR))+...
+disp("Finished ASR: chans="+nnz(~chNoASR)+" | rank="+ec_rank(x(idt,~chNoASR))+...
     " | pctDiff="+pctDiff+" | time="+toc(tt));
