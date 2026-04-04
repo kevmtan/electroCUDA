@@ -1,8 +1,8 @@
 function [x,ME] = ec_filtfilt(x,b,a,o)
-%% [ec_filtfilt] Filter timeseries with no phase distortiion (zero-phase)
+% [ec_filtfilt] Filter timeseries with no phase distortiion (zero-phase)
 % Modification of Matlab's filtfilt() for threadpools, gpuArrays & CUDA MEX
 
-% Input validation
+%% Input validation
 arguments
     x {mustBeFloat}
     b {isfloat,isa(b,"digitalFilter")}
@@ -12,13 +12,14 @@ arguments
     o.mem double = []
 end
 
+
 %% Prep
 if isgpuarray(x); o.gpu="matlab"; end
 if o.single; x=single(x); elseif isa(x,"single"); o.single=true; end
 fin = false;
 
 
-%% Run compiled CUDA binary
+%% Run CUDA binary (compiled GPU)
 if o.gpu=="cuda"
     if isa(b,"digitalFilter"); b1=b.Numerator; a=b.Denominator; else; b1=b; end
     try
@@ -32,8 +33,9 @@ if o.gpu=="cuda"
     end
 end
 
-%% Run as gpuArrayFun
-if ~fin && o.gpu~="no"
+
+%% Run as gpuArray (Matlab GPU)
+if ~fin && o.gpu~="no" % fallback if CUDA binary fails
     try
         if ~isgpuarray(x); x=gpuArray(x); end
         if isa(b,"digitalFilter")
@@ -46,8 +48,9 @@ if ~fin && o.gpu~="no"
     end
 end
 
+
 %% Run on CPU
-if ~fin
+if ~fin % fallback if GPU methods fail
     if isa(b,"digitalFilter")
         x = filtfilt(b,x);
     else
