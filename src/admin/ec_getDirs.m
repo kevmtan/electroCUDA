@@ -4,25 +4,30 @@ function dirs = ec_getDirs(proj,task,sbj,sbjID)
 
 %% Input validation
 arguments
-    proj (1,1) string
+    proj (1,1) string = ""
     task (1,1) string = ""
     sbj {mustBeTextOrNumeric} = ""
     sbjID (1,1) double = nan
 end
-if ~isany(proj); error("'proj' input must not be empty"); end
 if istext(sbj); sbj=string(sbj); end
 
-%% Main
+%% Common paths
 dirs = ecu_paths(proj); % Get user-specified directories
+
+% Fill common paths
+dirs.src = dirs.code+"src"+filesep;
+dirs.srcCUDA = dirs.src+"cuda"+filesep;
+if ~isany(proj); return; end
+
+
+%% Project-specific paths
 
 % Preallocate
 dirs.sbj = "";
 dirs.sbjID = nan;
 dirs.task = task;
 
-% Fill common paths
-dirs.src = dirs.code+"src"+filesep;
-dirs.srcCUDA = dirs.src+"cuda"+filesep;
+% Fill project paths
 dirs.orig = dirs.data+"orig"+filesep;
 dirs.psych = dirs.orig;
 dirs.proc = dirs.data+"proc"+filesep;

@@ -1,6 +1,6 @@
 function dirs = ecu_paths(proj)
 arguments
-    proj (1,1) string % Project name
+    proj (1,1) string = "" % Project name
 end
 dirs.proj = proj;
 
@@ -8,11 +8,13 @@ dirs.proj = proj;
 %   directory paths must end with a slash (filesep)
 
 % Paths to executables
+dirs.gcc = "/usr/bin/gcc-12"; % gcc compiler
+dirs.gpp = "/usr/bin/g++-12"; % g++ compiler
 dirs.cudaica = "/home/kt/bin/cudaica-kt/cudaica"; % CUDAICA binary file
 dirs.thundersvm = "/home/kt/bin/thundersvm-gpu/build/bin"; % ThunderSVM binary folder
 
 % electroCUDA code directory
-dirs.code = "/home/kt/Gdrive/Git/electroCUDA/";
+dirs.code = "/home/kt/Documents/Git/electroCUDA/";
 
 % Project directories (add new case per project)
 switch proj
