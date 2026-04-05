@@ -126,7 +126,7 @@ for r = 1:n.nRuns
     % CWT on run
     [x{r},cwtHz{r},cwtSPSI{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.voices,bandwidth=o.bandwidth,...
         coef=o.coef,wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
-        mem=o.vram,gpu=o.gpu);
+        mem=o.vram,gpu=o.gpu,tic=tt);
     disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+n.runs(r)+" time="+toc(tt));
 end
 
@@ -224,7 +224,7 @@ end
 
 
 %% Resample behavioral data
-ec_initialize(sbj,proj,task,o,n,hzTarget=o.hzTarget);
+ec_initialize(sbj,proj,task,o,n,hzTarget=o.hzTarget,save=o.save);
 
 
 

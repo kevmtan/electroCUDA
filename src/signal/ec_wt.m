@@ -1,64 +1,72 @@
 function [x,frqs,spsi,scales,fb] = ec_wt(x,o)
-%% electroCUDA - continuous wavelet transform (CWT)
-% Process function for CWT called by high-level functions
+% Process function for wavelet transforms called by high-level functions
 % Parallel on CPU, Matlab-GPU (fast), or CUDA-GPU (fastest, must compile! see ecu_compile.m)
 %
 % INPUTS: see 'input validation' below
-% OUTPUTS: [coefficients, frequencies, filterbank] 
+% OUTPUTS: [coefficients, frequencies, timeSupport, filterbank] 
 %
+%   Part of the electroCUDA package: github.com/kevmtan/electroCUDA
 %   AUTHOR: Kevin Tan (2024)
 %   LICENSE: GNU GPL v3
-%   INFO: github.com/kevmtan/electroCUDA/wiki
 
 %% Input validation
 arguments
-    x (:,:){mustBeFloat}              % Input data: x(frames,channels)
-    o.hz (1,1) double = nan           % Sampling rate
-    o.lims (1,2) double = nan         % Frequency limits [lower,upper]
-    o.voices (1,1) double = 10        % Voices per octave
-    o.bandwidth (1,1) double = 60     % Time Bandwidth
-    o.avg (1,1) logical = false       % Scale-average transform?
-    o.coef (1,1) string...             % Output coefficient type
+    x (:,:){mustBeFloat}                    % EEG data: x(frames,channels)
+    o.hz (1,1) double = nan                 % Sampling rate
+    o.lims (1,2) double = nan               % Frequency limits [lower,upper]
+    o.voices (1,1) double = 10              % Voices per octave
+    o.bandwidth (1,1) double = 60           % Time Bandwidth
+    o.avg (1,1) logical = false             % Scale-average transform?
+    o.coef (1,1) string...                  % Output coefficient type
         {mustBeMember(o.coef,["decibel" "magnitude" "power" "complex"])} = "decibel"
-    o.wavelet (1,1) string...         % Wavelet type ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
+    o.wavelet (1,1) string...               % Wavelet type ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
         {mustBeMember(o.wavelet,["morse" "amor" "bump"])} = "morse"
-    o.ds (1,1) double = 0             % Downsampling factor (see https://www.mathworks.com/help/signal/ref/downsample.html)
-    o.mem (1,1) double = nan          % Memory to use
+    o.ds (1,1) double {mustBeInteger} = 0   % Downsampling factor (see https://www.mathworks.com/help/signal/ref/downsample.html)
+    o.mem (1,1) double = nan                % Memory to use
     o.lpfFilt {isfloat,isa(o.lpfFilt,"digitalFilter")} = [] % Anti-aliasing filter (LPF for downsampling)
     o.lpfImpulse {mustBeMember(o.lpfImpulse,["fir" "iir" "auto"])} = "auto" % Anti-aliasing impulse response
-    o.lpfSteep (1,1) double = 0.85    % Anti-aliasing filter steepness
-    o.single (1,1) logical = false    % Run as single-precision?
-    o.singleOut (1,1) logical = false % Output single-precision?
-    o.cell (1,1) logical = false      % Output as cell (matrix otherwise)
-    o.gpu (1,1) string...             % Run on GPU ["no"=parfor|"matlab"=arrayfun|"cuda"=mex binary]
+    o.lpfSteep (1,1) double = 0.85          % Anti-aliasing filter steepness
+    o.single (1,1) logical = false          % Run as single-precision?
+    o.singleOut (1,1) logical = false       % Output single-precision?
+    o.cell (1,1) logical = false            % Output as cell instead of matrix
+    o.gpu (1,1) string...                   % Run on GPU ["no"=parfor|"matlab"=arrayfun|"cuda"=mex binary]
         {mustBeMember(o.gpu,["no" "matlab" "cuda"])} = "no"
-    o.tic (1,1) uint64 = tic          % Timer
+    o.tic (1,1) uint64 = tic                % Timer
 end
-if ~isany(o.hz); error("[ec_wt] Must specify sampling rate (fs)"); end
-if ~isany(o.lims); error("[ec_wt] Must specify frequency limits (lims)"); end
-if o.ds<=1||~isany(o.ds); o.ds=0; end % Set no downsampling
+if ~isany(o.hz); error("Must specify sampling rate (hz)"); end
+if ~isany(o.lims); error("Must specify frequency limits (lims)"); end
+if ~(o.ds>1); o.ds=1; end % Set no downsampling
 if o.avg && o.coef=="magnitude"
-    o.coef = "power";
-    warning("[ec_wt] Scale-averaged output can't be magnitude, outputing power (or specify decibel)");
+    o.coef = "decibel";
+    warning("Scale-averaged output can't be magnitude, outputing decibel (or specify power)");
 end
+if o.ds>1 && ismember(o.coef,["magnitude" "power"])
+    warning("Downsampling magnitude or power outputs results in negative numbers, decibel or complex output is recommended");
+end
+
 
 %% Prep
 
-% Floating-point precision
+% Make logical arguments
+if o.singleOut; o.outClass="single"; else; o.outClass="double"; end
+if o.coef=="complex"; o.real=false; else; o.real=true; end
+if o.coef=="power"; o.pwr=true; else; o.pwr=false; end
+if o.coef=="decibel"; o.db=true; else; o.db=false; end
+if o.db && o.avg; o.pwr=true; end
+
+% Convert EEG to specified precision
 if o.single
     x = single(x); % Convert to single if specified
 else
     x = double(x); % Convert to double if not
 end 
 
-% Make logical arguments
-doAvg = o.avg;
-ds = o.ds;
-if o.singleOut && ~o.single; singleOut=true; else; singleOut=false; end
-if o.coef=="complex"; doReal=false; else; doReal=true; end
-if o.coef=="power"; doPwr=true; else; doPwr=false; end
-if o.coef=="decibel"; doDb=true; else; doDb=false; end
-if doDb && doAvg; doPwr=true; end
+% Make anti-aliasing LPF filter for downsampling (Nyquist freq)
+if o.ds>1 && o.gpu=="no" && isempty(o.lpfFilt)
+    o.lpfFilt = ec_designFilt(x(:,1,1),o.hz,floor(o.hz/o.ds)/2,"lowpass",...
+        steepness=op.lpfSteep,impulse="fir",coefOut=true);
+    disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(o.tic));
+end
 
 % Generate wavelet
 fb = cwtfilterbank(Wavelet=o.wavelet,SamplingFrequency=o.hz,SignalLength=height(x),...
@@ -68,72 +76,29 @@ fb = cwtfilterbank(Wavelet=o.wavelet,SamplingFrequency=o.hz,SignalLength=height(
 frqs = fb.centerFrequencies; % CWT frequencies
 spsi = fb.waveletsupport(0.05); % CWT time supports
 scales = fb.scales; % CWT scales
-if ds; scales = scales.*ds; end % Downsample scales
-
-% Make anti-aliasing LPF filter for downsampling (Nyquist freq)
-LPF = o.lpfFilt;
-if ds && o.gpu=="no" && isempty(LPF)
-    LPF = ec_designFilt(x(:,1,1),o.hz,floor((o.hz/ds)/2),"lowpass",...
-        steepness=op.lpfSteep,impulse="fir",coefOut=true);
-    disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
-end
-
-% Sizes
-nChs = width(x);
-% nFrqs = numel(frqs);
-%
-% % Memory per chan
-% memIn = whos("x").bytes * .25;
-% if ~o.avg; memIn = memIn*nFrqs; end
-% if o.ds; memIn = memIn/o.ds; end
-% if o.singleOut; memIn = memIn/2; end
-% o.memIn = memIn/nChs;
+nFrqs = numel(frqs);
 
 
-%% Run CWT
-if o.gpu=="cuda" && ~o.avg && ismember(o.wavelet,["morse" "amor"])
+%% Run wavelet transform
+if o.gpu=="cuda" && ~o.avg && o.wavelet=="morse"
     % Run CUDA binary
     if o.single
-        x = ec_wt_fp32(x,o.hz,o.lims,o.voices,ds,doReal,doDb,doPwr); % Single-precision
+        % Single-precision
+        x = ec_wt_fp32(x,nFrqs,o.hz,o.lims,o.voices,o.bandwidth,o.real,o.db,...
+            o.pwr,o.ds);
     else
-        x = ec_wt_fp64(x,o.hz,o.lims,o.voices,ds,doReal,doDb,doPwr); % Double-precision
+        % Double-precision
+        x = ec_wt_fp64(x,nFrqs,o.hz,o.lims,o.voices,o.bandwidth,o.real,o.db,...
+            o.pwr,o.ds);
+        % Output as single
         if o.singleOut
-            x = cellfun(@single,x,UniformOutput=false); % Output as single
+            x = single(x);
         end
     end
-    freeUnusedMemory(cudaMemoryManager); % Free memory
     disp("[ec_wt] Ran CWT on CUDA binary: time="+toc(o.tic));
 else
-    % Convert to cell by channel
-    x = ec_dim2cell(x,2); 
-
-    % Run on Matlab
-    if o.gpu~="no"
-        % Run on GPU: loop across chans
-        for ch = 1:nChs
-            % Run chan on GPU
-            x{ch} = gather(cwt_lfn(fb,gpuArray(x{ch}),...
-                doAvg,doReal,doDb,doPwr,ds,LPF,singleOut));
-        end
-        disp("[ec_wt] Ran CWT on GPU: time="+toc(o.tic));
-    else
-        % Run on CPU: parallel loop across chans (idealy threadpool)
-        parfor ch = 1:nChs
-            % Run chan on CPU
-            x{ch} = cwt_lfn(fb,x{ch},doAvg,doReal,doDb,doPwr,ds,LPF,singleOut);
-        end
-        disp("[ec_wt] Ran CWT on CPU parfor: time="+toc(o.tic));
-    end
-end
-
-
-%% Finalize output
-if ~o.cell
-    if o.avg
-        x = horzcat(x{:});
-    else
-        x = permute(cat(3,x{:}),[1 3 2]);
-    end
+    % Run 
+    x = runOnMatlab_lfn(fb,x,o);
 end
 
 
@@ -141,19 +106,53 @@ end
 
 
 
+function y = runOnMatlab_lfn(fb,x,o)
+%%% Wavelet transform on Matlab %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function xc = cwt_lfn(fb,xc,doAvg,doReal,doDb,doPwr,ds,LPF,singleOut)
-%% Run CWT
+% Make local variables
+doAvg=o.avg; doReal=o.real; doDb=o.db; doPwr=o.pwr; ds=o.ds; LPF=o.lpfFilt;
+nChs = width(x);
+
+% Preallocate output
+if doAvg
+    y = nan(ceil(height(x)/ds),nChs,o.outClass);
+else
+    y = nan(ceil(height(x)/ds),nChs,numel(fb.centerFrequencies),o.outClass);
+end
+
+
+%% Wavelet transform across chans
+if o.gpu~="no"
+    % Run on GPU
+    for ch = 1:nChs
+        y(:,ch,:) = wt_lfn(fb,gpuArray(x(:,ch)),doAvg,doReal,doDb,doPwr,ds,[]);
+    end
+    disp("[ec_wt] Ran CWT on GPU: time="+toc(o.tic));
+else
+    % Run on CPU prfor (idealy threadpool)
+    parfor ch = 1:nChs
+        y(:,ch,:) = wt_lfn(fb,x(:,ch),doAvg,doReal,doDb,doPwr,ds,LPF);
+    end
+    disp("[ec_wt] Ran CWT on CPU parfor: time="+toc(o.tic));
+end
+
+
+
+
+
+
+function xc = wt_lfn(fb,xc,doAvg,doReal,doDb,doPwr,ds,LPF)
+%% Run wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if doAvg 
-    % Scale-averaged output
-    xc = fb.scaleSpectrum(xc)'; % outputs as power vector
+    % Scale-averaged wavelet spectrum
+    xc = fb.scaleSpectrum(xc)'; % outputs power vector
 
     % Convert to decibel
     if doDb
         xc = pow2db(xc);
     end
 else
-    % Full-spectrum output
+    % Continuous wavelet transform
     xc = fb.wt(xc)'; % outputs full-spectrum complex array
 
     % Convert to real numbers
@@ -174,7 +173,7 @@ end
 
 
 %% Downsample
-if ds
+if ds > 1
     if isempty(LPF)
         xc = resample(xc,1,ds); % resample
     else
@@ -184,16 +183,23 @@ if ds
 end
 
 
-%% Convert to single
-if singleOut
-    xc = single(xc);
-end
 
 
 
 
-
-
+%% Depreciated
+% Sizes
+% nChs = width(x);
+% nFrqs = numel(frqs);
+%
+% % Memory per chan
+% memIn = whos("x").bytes * .25;
+% if ~o.avg; memIn = memIn*nFrqs; end
+% if o.ds; memIn = memIn/o.ds; end
+% if o.singleOut; memIn = memIn/2; end
+% o.memIn = memIn/nChs;
+%
+%
 % function x = gpu_lfn(fb,x,o)
 % %%% Run on GPU arrayfun %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % nChs = numel(x);

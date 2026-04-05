@@ -44,7 +44,7 @@ o.coef = "decibel"; % Output coefficient type ["decibel"|"magnitude"|"power"|"co
 
 % Other
 o.doBadFrames = false; % Find bad frames in resulting spectral data
-o.save = true; % save data
+o.save = true; %o.save=false; % save data
 
 
 %% Log

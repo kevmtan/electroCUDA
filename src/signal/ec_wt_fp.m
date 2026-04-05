@@ -1,19 +1,21 @@
-function y = ec_wt_fp(x,fs,lims,voices,ds,doReal,doPwr,wvlt)
+function y = ec_wt_fp(x,nFrqs,hz,lims,voices,tbw,doReal,doDb,doPwr,ds)
 %% [electroCUDA] CWT - CUDA mex source
 %   Called by function 'ec_wt' (see for details) 
 %   Intended to be compiled into a CUDA mex binary
 %   Kevin Tan, 2024 (github.com/kevmtan/electroCUDA)
 arguments
-    x (:,:){mustBeFloat}        % Input data
-    fs (1,1) double             % Sampling rate
-    lims (1,2) double          % Frequency limits
-    voices (1,1) double = 10   % Voices per octave
-    ds (1,1) double = 0         % Downsampling factor
-    doReal (1,1) logical = true % Real output? (complex otherwise)
-    doPwr (1,1) logical = false % Power output? (magnitude otherwise)
-    wvlt char {mustBeMember(wvlt,{'morse','amor'})} = 'morse'
+    x (:,:){mustBeFloat}            % Input data: x(frames,channels)
+    nFrqs (1,1) double              % Number of frequencies
+    hz (1,1) double                 % Sampling rate
+    lims (1,2) double               % Frequency limits [lower,upper]
+    voices (1,1) double = 10        % Voices per octave
+    tbw (1,1) double = 60           % Time Bandwidth
+    doReal (1,1) logical = true     % Output as real numberes 
+    doDb (1,1) logical = true       % Output as decibel
+    doPwr (1,1) logical = false     % Output as power
+    ds (1,1) double = 1             % Downsampling factor (see https://www.mathworks.com/help/signal/ref/downsample.html)
 end
-if ds<=1; ds=0; end
+if ~(ds>1); ds=1; end
 
 %% Prep
 coder.gpu.kernelfun; % Trigger CUDA kernel creation
@@ -22,45 +24,50 @@ coder.gpu.kernelfun; % Trigger CUDA kernel creation
 nChs = width(x);
 
 % Preallocate output
-y = coder.nullcopy(cell(1,nChs));
+y = coder.nullcopy(nan(ceil(height(x)/ds),nChs,nFrqs,class(x)));
+% if doReal
+%     y = coder.nullcopy(nan(ceil(height(x)/ds),nChs,nFrqs,class(x)));
+% else
+%     y = coder.nullcopy(complex(nan(ceil(height(x)/ds),nChs,nFrqs,class(x))));
+% end
 
 
 %% Processing loop across channels
 for ch = 1:nChs
-    if doReal
-        y{ch} = cwtR_lfn(x(:,ch),fs,lims,voices,wvlt,ds,doPwr);
-    else
-        y{ch} = cwt_lfn(x(:,ch),fs,lims,voices,wvlt,ds);
-    end
+    y(:,ch,:) = cwt_lfn(x(:,ch),hz,lims,voices,tbw,doReal,doDb,doPwr,ds);
 end
 
 
 
 
-%% Run CWT (complex) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function yc = cwt_lfn(xc,fs,lims,voices,wvlt,ds)
-
-% CWT
-yc = cwt(xc,wvlt,fs,FrequencyLimits=lims,VoicesPerOctave=voices)';
-
-% Downsample
-if ds
-    yc = resample(yc,1,ds);
-end
 
 
-%% Run CWT (magnitude/power) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function yc = cwtR_lfn(xc,fs,lims,voices,wvlt,ds,doPwr)
 
-% CWT - magnitude out
-yc = abs(cwt(xc,wvlt,fs,FrequencyLimits=lims,VoicesPerOctave=voices)');
+function yc = cwt_lfn(xc,fs,lims,voices,tbw,doReal,doDb,doPwr,ds)
+%% Run CWT
+yc = abs(cwt(xc,'morse',fs,FrequencyLimits=lims,VoicesPerOctave=voices,...
+    TimeBandwidth=tbw))';
+% yc = cwt(xc,'morse',fs,FrequencyLimits=lims,VoicesPerOctave=voices,...
+%     TimeBandwidth=tbw)'; % outputs full-spectrum complex array
 
-% Convert to power
-if doPwr
+
+%% Convert to real numbers
+%if doReal
+% Convert to magnitude (amplitude)
+%yc = abs(yc);
+
+% Convert to decibel/power
+if doDb
+    % Convert to decibel
+    yc = mag2db(yc);
+elseif doPwr
+    % Convert to power
     yc = yc.^2;
 end
+%end
 
-% Downsample
+
+%% Downsample
 if ds
     yc = resample(yc,1,ds);
 end
