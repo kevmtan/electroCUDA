@@ -1,6 +1,29 @@
+% export PATH=/usr/bin/gcc-12:$PATH
+% export CUDAHOSTCXX=/usr/bin/g++-12
+% export GCC=/usr/bin/gcc-12
+% export CC=/usr/bin/gcc-12
+% export CXX=/usr/bin/g++-12
+% export CMAKE_C_COMPILER=/usr/bin/gcc-12
+% export CMAKE_CXX_COMPILER=/usr/bin/g++-12
+% export CUDAHOSTCXX=/usr/bin/g++-12
+% export CMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-12
+
+% Get directory paths
 d = ec_getDirs;
+
+% Move to CUDA source dir 
 cd(d.srcCUDA);
-system('rm -rf codegen');
+system('rm -rf codegen'); % delete existing codegen dir if any
+
+% % Set environment paths
+% setenv("GCC",d.gcc);
+% setenv("CC",d.gcc);
+% setenv("CXX",d.gpp);
+% setenv("CMAKE_C_COMPILER",d.gcc);
+% setenv("CMAKE_CXX_COMPILER",d.gpp);
+% setenv("CUDAHOSTCXX",d.gpp);
+% setenv("CMAKE_CUDA_HOST_COMPILER",d.gpp);
+
 
 %% Train imaGIN
 
@@ -45,10 +68,10 @@ save(saveDirClassifier+"ec_trainedClassifier_ImaGIN_"+v.Release+".mat",'mdl','-v
 
 
 %% ec_wtc_fp: wavelet coherence (single- & double-precision)
+clear arg*  fn* fun*
 
 % Config
-clear all; close all;
-[cfg,d] = getCoderConfigs_lfn; 
+[cfg,d] = getCoderConfigs_lfn(d); 
 
 % Paths & names
 fn = d.code+"bin"+filesep;
@@ -85,24 +108,28 @@ end
 
 
 %% ec_wt_fp: wavelet transform (single- & double-precision)
+clear arg*  fn* fun*
 
 % Config
-clear all; close all;
-[cfg,d] = getCoderConfigs_lfn; 
+[cfg,d] = getCoderConfigs_lfn(d); 
 
 % Paths & names
 fn = d.code+"bin"+filesep; 
 fnc = d.srcCUDA+"codegen"+filesep+"mex"+filesep;
 funs = "ec_wt_fp";
 funz = ["ec_wt_fp32","ec_wt_fp64"];
+%ec_wt_fp(x,nFrqs,hz,lims,voices,tbw,doReal,doDb,doPwr,ds)
 
 % args
-arg2 = coder.newtype('double',[1 1],[0 0]); % fs
-arg3 = coder.newtype('double',[1 2],[0 0]); % fLim
-arg4 = coder.newtype('double',[1 1],[0 0]); % fVoices
-arg5 = coder.newtype('double',[1 1],[0 0]); % ds
-arg6 = coder.newtype('logical',[1 1],[0 0]); % doReal
-arg7 = coder.newtype('logical',[1 1],[0 0]); % doPwr
+arg2 = coder.newtype('double',[1 1],[0 0]); % nFrqs
+arg3 = coder.newtype('double',[1 1],[0 0]); % hz
+arg4 = coder.newtype('double',[1 2],[0 0]); % lims
+arg5 = coder.newtype('double',[1 1],[0 0]); % voices
+arg6 = coder.newtype('double',[1 1],[0 0]); % tbw
+arg7 = coder.newtype('logical',[1 1],[0 0]); % doReal
+arg8 = coder.newtype('logical',[1 1],[0 0]); % doDb
+arg9 = coder.newtype('logical',[1 1],[0 0]); % doPwr
+arg10 = coder.newtype('double',[1 1],[0 0]); % ds
 
 % Compile loop
 for v = 1:2
@@ -115,7 +142,7 @@ for v = 1:2
     else
         arg1 = coder.newtype('double',[2147483647-1 65535-1],[1 1]);
     end
-    argz = {arg1,arg2,arg3,arg4,arg5,arg6,arg7};
+    argz = {arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10};
 
     codegen(funs,"-o",funz(v),"-config",cfg,"-args",argz,"-gpuprofile");
 
@@ -125,11 +152,12 @@ for v = 1:2
     system('rm -rf codegen');
 end
 
+
 %% ec_filtfilt_fp: zero-phase filtering
+clear arg*  fn* fun*
 
 % Config
-clear all; close all;
-[cfg,d] = getCoderConfigs_lfn; 
+[cfg,d] = getCoderConfigs_lfn(d); 
 
 % Paths & names
 fn = d.code+"bin"+filesep;
@@ -166,8 +194,7 @@ end
 % %% ec_filtfilt_fp: zero-phase filtering
 % 
 % % Config
-% clear all; close all;
-% [cfg,d] = getCoderConfigs_lfn; 
+% [cfg,d] = getCoderConfigs_lfn(d); 
 % 
 % % Paths & names
 % fn = d.code+"bin"+filesep;
@@ -209,10 +236,10 @@ end
 
 
 %% ec_detr_fp: robust detrending (double & single)
+clear arg*  fn* fun*
 
 % Config
-clear all; close all;
-[cfg,d] = getCoderConfigs_lfn; 
+[cfg,d] = getCoderConfigs_lfn(d); 
 
 % Paths & names
 fn = d.code+filesep+"bin"+filesep;
@@ -255,13 +282,21 @@ end
 
 
 %% CONFIGS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [cfg,d] = getCoderConfigs_lfn
+function [cfg,d] = getCoderConfigs_lfn(d)
+arguments
+    d struct = ec_getDirs
+end
 
+% Move to CUDA src dir & remove existing codegen dir if any
+cd(d.srcCUDA); system('rm -rf codegen');
+
+% Fill out cfg
 cfg = coder.gpuConfig("mex");
 cfg.EnableAutoParallelization = true;
 cfg.DeepLearningConfig = coder.DeepLearningConfig("tensorrt");
 cfg.TargetLang = "C++";
-cfg.DynamicMemoryAllocationThreshold = 65535;
+cfg.UsePrecompiledLibraries = "Prefer";
+%cfg.DynamicMemoryAllocationThreshold = 65535;
 %cfg.FilePartitionMethod = "SingleFile";
 cfg.GenerateReport = true;
 %cfg.GlobalDataSyncMethod = "SyncAlways"; %= "SyncAtEntryAndExits";
@@ -273,11 +308,13 @@ cfg.InlineBetweenMathWorksFunctions = "Speed";
 cfg.MATLABSourceComments = true;
 %cfg.NumberOfCpuThreads = maxNumCompThreads;
 cfg.OptimizeReductions = true;
+cfg.PreserveVariableNames = "All";
 cfg.SIMDAcceleration = "Full";
 % cfg.StackUsageMax = floor(gpu.TotalMemory*.95);
 cfg.Verbosity = "Verbose";
-cfg.GpuConfig.CompilerFlags =...
-    "--fmad=true -O3 --extra-device-vectorization -ccbin g++-12"; % --fmad=false --optimize=3
+cfg.GpuConfig.CompilerFlags = "-ccbin "+d.gpp;
+% cfg.GpuConfig.CompilerFlags =...
+%    "--fmad=true -O3 --extra-device-vectorization -ccbin "+d.gpp; % --fmad=false --optimize=3
 cfg.GpuConfig.ComputeCapability = gpuDevice().ComputeCapability;
 cfg.GpuConfig.EnableMemoryManager = true;
 %cfg.GpuConfig.CustomComputeCapability = "sm_86";
@@ -285,10 +322,6 @@ cfg.GpuConfig.EnableMemoryManager = true;
 %cfg.GpuConfig.MaximumBlocksPerKernel = 3584;
 %cfg.GpuConfig.MaxPoolSize = 8192;
 %cfg.GpuConfig.StackLimitPerThread = floor((gpu.TotalMemory*.95)/3584);
-
-% Dirs
-d = ec_getDirs;
-cd(d.srcCUDA); system('rm -rf codegen');
 end
 
 %%
