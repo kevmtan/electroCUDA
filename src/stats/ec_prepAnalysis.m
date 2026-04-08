@@ -9,6 +9,7 @@ end
 %% Additional arguments validation
 if o.gpu; o.pcaGPU = true; end
 
+% Channelwise PCA to be done in ec_epochPreproc
 if o.pca=="ch"
     o.prep.pca = o.pcaComps;
     o.prep.pcaRobust = o.pcaRobust;
@@ -33,31 +34,12 @@ disp("[ec_prepAnalysis] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
 
 
 %% Analysis-specific preprocessing
-oo = namedargs2cell(o.pre);
-[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
-
-% Keep analysis times
-if numel(o.timeRng)==2
-    % Keep only analysis timerange
-    ep = ep(ep.t>=o.timeRng(1) & ep.t<=o.timeRng(2),:);
-    x = x(ep.ide,:,:);
-
-    % Update epoch indices
-    ep.ide = cast(1:height(ep),like=ep.ide)';
-    n.ide = ep.ide;
-
-    % Analysis times
-    [n.timesG,n.times] = findgroups(ep.t);
-    n.timesG = uint32(n.timesG);
-    n.nTimes = height(n.times); % number of times
-end
-
+[x,ep,n] = preproc_lfn(x,n,psy,ep,o,tt);
 
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
 if isany(o.chConcat)
-    [x,n] = chConcat_lfn(x,n,o);
-    disp("[ec_prepAnalysis] Concactenated channels: "+o.dirs.sbj+" | toc="+toc(tt));
+    [x,n] = chConcat_lfn(x,n,o,tt);
 end
 
 
@@ -85,9 +67,12 @@ else
     n.chNfo = chNfo;
 end
 
+% Only use existing chBadVars
+o.chBadVars(ismember(o.chBadVars,n.chBad.Properties.VariableNames));
+
 % Find bad chans
-if isany(o.chBadFields)
-    chBad = full(any(n.chBad{:,o.chBadFields},2));
+if isany(o.chBadVars)
+    chBad = full(any(n.chBad{:,o.chBadVars},2));
 else
     chBad = false(n.nChs,1);
 end
@@ -118,14 +103,17 @@ n.chNfo = n.chNfo(n.chKeep,:);  % from chNfo
 n.xChs = width(x);              % number of remaining chans
 
 % Remove chans from bad frames (n.xBad)
-vars = string(n.xBad.Properties.VariableNames);
-for v = vars
+for v = string(n.xBad.Properties.VariableNames)
+    % Get number of dims for var
+    nd = ndims(n.xBad.(v));
+
+    % Remove chans from var
     if width(n.xBad.(v))==n.nChs
-        if ndims(n.xBad.(v))==3
+        if nd==3 % 3D
             xBad = full(n.xBad.(v));
             xBad = xBad(:,n.chKeep,:);
             n.xBad.(v) = sparse(xBad);
-        else
+        elseif nd==2 % 2D
             n.xBad.(v) = n.xBad.(v)(:,n.chKeep);
         end
     end
@@ -179,7 +167,32 @@ n.nTimes = height(n.times); % number of times
 
 
 
-function [y,n] = chConcat_lfn(x,n,o)
+function [x,ep,n] = preproc_lfn(x,n,psy,ep,o,tt)
+oo = namedargs2cell(o.pre);
+[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
+
+% Keep analysis times
+if isany(o.timeRng) && numel(o.timeRng)==2
+    % Keep only analysis timerange
+    ep = ep(ep.t>=o.timeRng(1) & ep.t<=o.timeRng(2),:);
+    x = x(ep.ide,:,:);
+
+    % Update epoch indices
+    ep.ide = cast(1:height(ep),like=ep.ide)';
+    n.ide = ep.ide;
+
+    % Analysis times
+    [n.timesG,n.times] = findgroups(ep.t);
+    n.timesG = uint32(n.timesG);
+    n.nTimes = height(n.times); % number of times
+end
+
+
+
+
+
+
+function [y,n] = chConcat_lfn(x,n,o,tt)
 %%% Channel concatenation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if o.chConcat=="roi"
     %% Concatenate chs within ROI: y{roi}(times,freqs*chans)
@@ -227,6 +240,7 @@ if o.chConcat=="roi"
             end
         end
     end
+    disp("[ec_prepAnalysis] Concatenated ROI chs: "+o.dirs.sbj+" | toc="+toc(tt));
 elseif o.chConcat=="all"
     %% Concatenate all chs: y(times,freqs*chans)
 
@@ -254,4 +268,5 @@ elseif o.chConcat=="all"
             n.ROIs.columns{1} = vertcat(n.ROIs.columns{1},xi);
         end
     end
+    disp("[ec_prepAnalysis] Concatenated all chs: "+o.dirs.sbj+" | toc="+toc(tt));
 end

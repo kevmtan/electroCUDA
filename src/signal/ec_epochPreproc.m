@@ -120,14 +120,14 @@ if o.log || o.mag2db
     x = logTransform_lfn(x,o,n,tt); % TODO: move to within-chan (parfor/GPU speedup)
 end
 
-% Convert for main preproc
-x = ec_dim2cell(x,2); % EEG data to channelwise cells for main preproc
-wts = cell(n.xChs,1); % preallocate channel PCA weights
-ranks = nan(n.xChs,1);
-
 
 %% Main preproc
 % The main within-channel routine calls within-run & within-epoch routines
+
+% Reformat/preallocate
+x = ec_dim2cell(x,2); % EEG data to channelwise cells for main preproc
+wts = cell(n.xChs,1); % preallocate channel PCA weights
+ranks = nan(n.xChs,1);
 
 % Loop across channels
 if o.gpu
@@ -144,8 +144,7 @@ end
 disp("[ec_epochBaseline] Completed main preproc: "+n.sbj+" time="+toc(tt));
 
 % Reformat EEG data as matrix
-x = cellfun(@(xc) permute(xc,[1 3 2]), x, UniformOutput=false);
-x = horzcat(x{:});
+x = ec_cell2dim(x,2);
 
 
 %% Finalize
@@ -445,6 +444,9 @@ end
 x = x(:,:,n.freqKeep);
 n.spect = n.spect(n.freqKeep,:);
 n.nSpect = height(n.spect);
+if isfield(n,"cwtSupport")
+    n.cwtSupport = n.cwtSupport(n.freqKeep,:);
+end
 disp("[ec_epochBaseline] Kept "+n.nSpect+"/"+n.nFreqs+" freqs: "+n.sbj+" time="+toc(tt));
 
 
