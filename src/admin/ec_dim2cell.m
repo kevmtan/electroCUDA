@@ -24,7 +24,7 @@ ids = repmat({':'},1,ndims(x)); % subscript template
 % Size of array slices in output cell vector
 outSz = sz;
 outSz(dim) = [];
-outScalar = prod(outSize)==1; % "x" is vector; slices are scalar, no reshape needed
+outScalar = prod(outSz)==1; % "x" is vector; slices are scalar, no reshape needed
 
 % Preallocate output cell vector       
 C = cell(K,1);               
