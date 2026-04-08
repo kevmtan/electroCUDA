@@ -52,12 +52,12 @@ if o.pca=="split"
     if o.pcaGPU
         % Run on GPU
         for s = 1:n.splits
-            [x{s},st(s,:),wts{s}] = splitPCA_lfn(x{s},st(s,:),o);
+            [x{s},st(s,:),wts{s}] = withinSplit_lfn(x{s},st(s,:),o);
         end
     else
         % Run on CPU threadpool
         parfor s = 1:n.splits
-            [x{s},st(s,:),wts{s}] = splitPCA_lfn(x{s},st(s,:),o);
+            [x{s},st(s,:),wts{s}] = withinSplit_lfn(x{s},st(s,:),o);
         end
     end
     disp("[ec_splitClassifyData] Ran rank calculation/PCA on data splits: "+o.dirs.sbj+" | toc="+toc(tt));
@@ -99,23 +99,17 @@ stc.width(:) = width(xc);
 
 %% PCA & data rank
 if isany(o.pca) && o.pca~="split"
-    % Run PCA & rank
+    % Standardize predictors, calculate rank, run PCA
     [xc,wc,stc.rank(:)] = ec_pca(xc,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
-        robust=o.pcaRobust,gpu=o.pcaGPU,double=true);
+        robust=o.pcaRobust,std=o.std,gpu=o.pcaGPU);
 
     % Gather from GPU
     if o.pcaGPU && ~o.gpu
         xc = gather(xc);
     end
-end
-
-
-%% Final pre-split
-stc.features(:) = width(xc); % final number of features
-
-% Convert to processing precision
-if o.pca~="split"
-    xc = cast(xc,o.typeProc); 
+elseif ~isany(o.pca)
+    stc.rank(:) = ec_rank(xc);
+    stc.features(:) = width(xc); % final number of features
 end
 
 
@@ -132,20 +126,30 @@ obc = obc(~cellfun(@isempty,obc));
 
 
 
-function [x,st,w] = splitPCA_lfn(x,st,o)
-%%% PCA on split EEG data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [x,st,w] = withinSplit_lfn(x,st,o)
+%%% Within-split %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if o.pca=="split"
+    % Standardize predictors, calculate rank, run PCA
+    [x,w,st.rank] = ec_pca(x,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
+        robust=o.pcaRobust,std=o.std,gpu=o.pcaGPU,double=true);
 
-% Run PCA & rank
-[x,w,st.rank] = ec_pca(x,nComps=o.pcaComps,rankLim=o.pcaRankLim,...
-    robust=o.pcaRobust,gpu=o.pcaGPU,double=true);
+    % Gather from GPU
+    if o.pcaGPU && ~o.gpu
+        x = gather(x);
+    end
 
-% Gather from GPU
-if o.pcaGPU && ~o.gpu
-    x = gather(x);
+    % Final number of features
+    st.features = width(x);
+else
+    % Standardize predictors
+    if o.std=="robust"
+        x = normalize(x,1,"zscore","robust"); % robust z-score
+    elseif isany(o.std)
+        x = normalize(x,1,o.std); % standard z-score
+    end
 end
 
 % Convert to processing precision
 x = cast(x,o.typeProc);
 
-% Final number of features
-st.features = width(x);
+

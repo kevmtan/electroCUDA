@@ -18,6 +18,7 @@ arguments
     a.rankLim (1,1) logical = false     % Limit num components to matrix rank
     a.robust (1,1) logical = false      % Use robust PCA
     a.exact (1,1) logical = false       % Use exact rank
+    a.std string {mustBeMember(a.std,["zscore" "robust" "" []])} = "robust" % Z-score
     a.double (1,1) logical = true       % Convert to double (single/half can be unstable!)
     a.gpu (1,1) logical = isgpuarray(x) % Compute on GPU
 end
@@ -39,6 +40,14 @@ end
 % Use exact rank if GPU array & single/half (bad results otherwise)
 if a.gpu && (isa(x,"single") || isa(x,"half"))
     a.exact = true;
+end
+
+
+%% Standardize predictors
+if o.std=="robust"
+    x = normalize(x,1,"zscore","robust"); % robust z-score
+elseif isany(o.std)
+    x = normalize(x,1,o.std); % standard z-score
 end
 
 
