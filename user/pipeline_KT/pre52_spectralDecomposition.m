@@ -38,7 +38,7 @@ o.wavelet = "morse"; % Wavelet ["morse"|"amor"|"bump"], "amor" is Gabor/Morlet
 o.fName = "spec"; % Name of frequency analysis
 o.fLims = [2 300]; % frequency limits in hz; HFB=[70 200]
 o.avg = false; % Full-spectrum (false) of scale-spectrum (true)
-o.voices = 5; % Voices per octave (default=10, HFB=18)
+o.voices = 10; % Voices per octave (default=10, HFB=18)
 o.bandwidth = 20; % Time bandwidth for Morse wavelets (default=60)
 o.coef = "decibel"; % Output coefficient type ["decibel"|"magnitude"|"power"|"complex"]
 

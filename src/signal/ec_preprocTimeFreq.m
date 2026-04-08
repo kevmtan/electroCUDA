@@ -49,9 +49,9 @@ end
 % o=oSpec; o=oHFB;
 
 %% Options struct validation (non-exhaustive, see individual functions below)
-if o.avg && o.out=="magnitude"
-    o.fOut = "power";
-    warning("[ec_preprocTimeFreq] Scale-averaged output can't be magnitude, outputing power (or specify decibel)");
+if o.avg && o.coef=="magnitude"
+    o.coef = "decibel";
+    warning("Scale-averaged output can't be magnitude, outputing decibel (or specify power)");
 end
 % if ~isfield(o,'fName');       o.fName="hfb"; end       % Name of frequency analysis
 % if ~isfield(o,'fLims');       o.fLims=[60 180]; end    % Frequency limits in hz; HFB=[70 200]
@@ -226,9 +226,6 @@ end
 %% Resample behavioral data
 ec_initialize(sbj,proj,task,o,n,hzTarget=o.hzTarget,save=o.save);
 
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 

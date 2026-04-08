@@ -144,7 +144,7 @@ end
 function xc = wt_lfn(fb,xc,doAvg,doReal,doDb,doPwr,ds,LPF)
 %% Run wavelet transform %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if doAvg 
-    % Scale-averaged wavelet spectrum
+    % Scale-averaged wavelet transform
     xc = fb.scaleSpectrum(xc)'; % outputs power vector
 
     % Convert to decibel
@@ -160,12 +160,12 @@ else
         % Convert to magnitude (amplitude)
         xc = abs(xc); 
 
-        % Convert to decibel/power
+        % Log or exponential transform
         if doDb
-            % Convert to decibel
+            % Convert to decibel (log-transform)
             xc = mag2db(xc);
         elseif doPwr
-            % Convert to power
+            % Convert to power (magnitude squared)
             xc = xc.^2;
         end
     end
