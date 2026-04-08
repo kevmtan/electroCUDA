@@ -4,7 +4,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";"S14_74_OD";...
     "S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";"S15_83_RR";...
     "S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-sbjs = ["S12_38_LK";"S12_42_NC"];
+%sbjs = ["S12_38_LK";"S12_42_NC"];
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "classifySpecROI";
@@ -53,7 +53,7 @@ o.olThrAll = 7.5; % Outlier threshold (all observations)
 o.olThrCond = 3; % Outlier threshold (within-condition)
 
 % PCA on each data split (chans/ROIs x timepoint)
-o.pca = 0; % Spectral robust PCA within timepoint (0=no PCA, inf=data rank)
+o.pca = 20; % Spectral robust PCA within timepoint (0=no PCA, inf=data rank)
 o.pcaGPU = false; % Use GPU for robust PCA
 o.pcaRobust = false; % Use robust PCA
 
@@ -207,6 +207,7 @@ if ~exist('logs','var')
     logs.i{1}.post(:) = false;
     logs.i{1}.plot(:) = false;
     logs.i{1}.o = cell(numel(sbjs),1);
+    logs.i{1}.n = cell(numel(sbjs),1);
     logs.i{1}.time(:) = date;
     logs.i{1}.error = cell(numel(sbjs),1);
 
@@ -245,7 +246,7 @@ for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
             %% Run subject
             if ~exist(logs.out(p),"dir"); mkdir(logs.out(p)); end
             try               
-                logs.i{p}.o{s} = ec_classifySpec(o);
+                [logs.i{p}.o{s},logs.i{p}.n{s}] = ec_classifySpec(o);
                 logs.i{p}.class(s) = true;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;
