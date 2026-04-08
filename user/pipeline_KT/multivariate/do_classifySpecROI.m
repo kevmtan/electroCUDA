@@ -22,18 +22,18 @@ o.test = false;
 o.save = true;
 
 % Input data
-o.sfx = "s";
+o.sfx = "f";
 o.ICA = false; % Run on ICs?
 
 % Processing options
 o.gpu = false; % do GPU
 o.typeProc = "single"; % processing floating-point precision ("double"|"single")
 o.typeOut = "single"; % output floating-point precision ("double"|"single")
-o.nRmFields = "os"; % Fields to remove from 'n' to save memory
+o.nRmFields = "of"; % Fields to remove from 'n' to save memory
 
 % Channel removal
 o.chRm = []; % channels to remove (array of chan numbers)
-o.chBadFields = "bad"; % remove bad chs from specified fields in n.chBad/icBad
+o.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
 o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
 o.roiVar = "roi"; % ROI variable in chNfo
 
@@ -42,7 +42,7 @@ o.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (non
 
 % Timing for classification
 o.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-o.timeRng = [-200 2000]; % Range of times to run (indlude baseline)
+o.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
 o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
 
 % Conditions for classification
@@ -51,11 +51,11 @@ o.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
 o.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Rank calculation & PCA
-o.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"](channel,ROI,analysis data split)
+o.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""](channel,ROI,analysis data split)
 o.pcaComps = Inf; % Number of components (0=skip, inf=data rank)
 o.pcaRankLim = true; % Limit PCA components to data rank
 o.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.pcaGPU = true; % GPU for rank calculation & PCA
+o.pcaGPU = false; % GPU for rank calculation & PCA
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -66,7 +66,7 @@ o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"i
 o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.nMin = 15; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint 
-o.std = ""; % Standardize predictors (z-score)
+o.std = ""; % Standardize predictors ["zscore"|"robust"|""=skip]
 
 % Cross-validation parameters (mathworks.com/help/stats/crossval.html)
 o.cv.KFold = 10; % o.cv.Leaveout = "on";
@@ -98,7 +98,7 @@ elseif isequal(o.fun,@fitclinear)
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
     o.hyper.DiscrimType = "linear";
-    % o.hyper.FillCoeffs = "off"; % "off" makes CV unreliable
+    o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
 elseif isequal(o.fun,@fitcknn)
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
     o.hyper.Distance = "euclidean";
@@ -127,10 +127,11 @@ o.HyperparameterOptimizationOptions =...
 % Task Epoching (see 'ec_epochPsy')
 o.epoch.float = "single"; % task metadata output floating-point precision
 o.epoch.hzTarget = 0; % Target sampling rate (0=default rate)
+o.epoch.rmVars = ["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]; % Vars to remove from epoch table
 % Bad trial removal
 o.epoch.rmTrials = []; % Trials to remove (numeric array)
-o.epoch.rmTrialsFun = @(t) ~(t.RT>0.1) & t.cond~="Rest"; % Function for removing trials
-o.epoch.badTrials = ""; % Bad trial removal criteria
+o.epoch.rmTrialsFun = @(t) (~(t.RT>0.1) & t.cond~="Rest"); % Function for removing trials
+o.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
@@ -140,7 +141,7 @@ o.epoch.bin = 0.025; % latency bin width (secs)
 o.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.epoch.baselinePre = -0.25; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.epoch.baselinePre = [-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering - all conds in data (leave blank for to leave unordered)
 o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -156,9 +157,9 @@ o.pre.hzTarget = 0; % Target sampling rate (0=default rate)
 % Normalization/transform
 o.pre.log = false; % Log transform
 o.pre.mag2db = false; % Log-transform magnitude to decibel
-o.pre.runNorm = ""; % Normalize run ["robust"|"zscore"|""]; skip=""
+o.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
 o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
-o.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+o.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
 o.pre.interp = "linear"; % interpolation method
@@ -174,11 +175,11 @@ o.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 30; % LPF cutoff in hz (skip=0)
+o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
 o.pre.lpfSteep = 0.5; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.pre.freqs = [4 300];
+o.pre.freqs = [5 300];
 % PCA within-chan or within-concactenated chans (e.g., make spectral components)
 o.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.pre.pcaRobust = false;
