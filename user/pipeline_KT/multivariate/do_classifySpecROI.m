@@ -22,40 +22,38 @@ o.test = false;
 o.save = true;
 
 % Input data
-o.sfx = "f";
-o.ICA = false; % Run on ICs?
+o.p.sfx = "f";
+o.p.ICA = false; % Run on ICs?
+o.p.nRmFields = "of"; % Fields to remove from 'n' to save memory
 
-% Processing options
-o.gpu = false; % do GPU
-o.typeProc = "single"; % processing floating-point precision ("double"|"single")
-o.typeOut = "single"; % output floating-point precision ("double"|"single")
-o.nRmFields = "of"; % Fields to remove from 'n' to save memory
-
-% Channel removal
-o.chRm = []; % channels to remove (array of chan numbers)
-o.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
-o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
-o.roiVar = "roi"; % ROI variable in chNfo
-
-% Channel concactenation (e.g. concactenate within-ROI chs into 'wide channels')
-o.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
+% Channel Options
+o.p.chRm = []; % channels to remove (array of chan numbers)
+o.p.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
+o.p.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
+o.p.roiVar = "roi"; % ROI variable in chNfo
+o.p.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
 
 % Timing for classification
-o.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-o.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
+o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
 
 % Conditions for classification
-o.condVar = "cond";
-o.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
-o.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
+o.p.condVar = "cond";
+o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
+o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Rank calculation & PCA
-o.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""](channel,ROI,analysis data split)
-o.pcaComps = Inf; % Number of components (0=skip, inf=data rank)
+o.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
+o.pcaComps = 0; % Number of components (0=skip, inf=data rank)
 o.pcaRankLim = true; % Limit PCA components to data rank
 o.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
 o.pcaGPU = false; % GPU for rank calculation & PCA
+
+% Processing options
+o.gpu = false; % do GPU
+o.typeAnal = "single"; % processing floating-point precision ("double"|"single")
+o.typeOut = "single"; % output floating-point precision ("double"|"single")
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -66,7 +64,7 @@ o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"i
 o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.nMin = 15; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint 
-o.std = ""; % Standardize predictors ["zscore"|"robust"|""=skip]
+o.std = "robust"; % Standardize predictors ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
 
 % Cross-validation parameters (mathworks.com/help/stats/crossval.html)
 o.cv.KFold = 10; % o.cv.Leaveout = "on";
@@ -93,7 +91,7 @@ elseif isequal(o.fun,@fitclinear)
     o.hyper.Regularization = "ridge";
     o.hyper.Solver = "dual";
     o.hyper.FitBias = true;
-    o.hyper.PostFitBias = false;
+    o.hyper.PostFitBias = true;
     o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
@@ -125,65 +123,66 @@ o.HyperparameterOptimizationOptions =...
 %AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
 
 % Task Epoching (see 'ec_epochPsy')
-o.epoch.float = "single"; % task metadata output floating-point precision
-o.epoch.hzTarget = 0; % Target sampling rate (0=default rate)
-o.epoch.rmVars = ["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]; % Vars to remove from epoch table
+o.p.epoch.float = "single"; % task metadata output floating-point precision
+o.p.epoch.hzTarget = 0; % Target sampling rate (0=default rate)
+o.p.epoch.rmVars = ["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]; % Vars to remove from epoch table
 % Bad trial removal
-o.epoch.rmTrials = []; % Trials to remove (numeric array)
-o.epoch.rmTrialsFun = @(t) (~(t.RT>0.1) & t.cond~="Rest"); % Function for removing trials
-o.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
+o.p.epoch.rmTrials = []; % Trials to remove (numeric array)
+o.p.epoch.rmTrialsFun = @(t) (~(t.RT>0.1) & t.cond~="Rest"); % Function for removing trials
+o.p.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
-o.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
-o.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.epoch.dur = 2.025; % Duration after stim onset, supercedes 'post' [nan = no limit]
+o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
+o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
+o.p.epoch.dur = 2.025; % Duration after stim onset, supercedes 'post' [nan = no limit]
 % Epoch time bins
-o.epoch.bin = 0.025; % latency bin width (secs)
-o.epoch.binPct = 5; % latency percentage bin width (<=100)
+o.p.epoch.bin = 0.025; % latency bin width (secs)
+o.p.epoch.binPct = 5; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.epoch.baselinePre = [-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
-o.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
+o.p.epoch.baselinePre = [-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.p.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering - all conds in data (leave blank for to leave unordered)
-o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
-o.epoch.conds2 = []; % custom condition names (per above order, can repeat)
+o.p.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
+o.p.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 %   o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
 %   o.epoch.conds2 = ["Mz" "Mz" "Ab" "Ab" "Math" "Rest"]; % custom condition names (per above order, can repeat)
 
 % Preprocessing (see 'ec_epochPreproc')
-o.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
-o.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
-o.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
-o.pre.hzTarget = 0; % Target sampling rate (0=default rate)
+o.p.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
+o.p.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
+o.p.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
+o.p.pre.hzTarget = 0; % Target sampling rate (0=default rate)
 % Normalization/transform
-o.pre.log = false; % Log transform
-o.pre.mag2db = false; % Log-transform magnitude to decibel
-o.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
-o.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
-o.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-o.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+o.p.pre.log = false; % Log transform
+o.p.pre.mag2db = false; % Log-transform magnitude to decibel
+o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
+o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+o.p.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 % Bad frames/outliers
-o.pre.interp = "linear"; % interpolation method
-o.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
-o.pre.olCenter = "median";
-o.pre.olThr = 0; % Outlier threshold (pre-HPF)
-o.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
-o.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
-o.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
+o.p.pre.interp = "linear"; % interpolation method
+o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
+o.p.pre.olCenter = "median";
+o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
+o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
+o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
+o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
+o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
-o.pre.hpfSteep = 0.7; % HPF steepness
-o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.pre.lpf = 20; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.5; % LPF steepness
-o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
+o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpfSteep = 0.7; % HPF steepness
+o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
+o.p.pre.lpf = 20; % LPF cutoff in hz (skip=0)
+o.p.pre.lpfSteep = 0.5; % LPF steepness
+o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.pre.freqs = [5 300];
+o.p.pre.freqs = [5 300];
 % PCA within-chan or within-concactenated chans (e.g., make spectral components)
-o.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
-o.pre.pcaRobust = false;
-o.pre.pcaGPU = false;
+o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+o.p.pre.pcaRobust = false;
+o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
+o.p.pre.pcaGPU = false;
 % % Spectral dimensionality reduction into bands (skip=[])
 % o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
@@ -235,7 +234,8 @@ for s = 1:height(logs)
         % Set options struct per subject
         sbj = logs.sbj(s);
         sbjID = logs.sbjID(s);
-        o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.sfx);
+        o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.p.sfx);
+        o.p.dirs = o.dirs;
         o.dirOut = logs.out(s);
         o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
         disp("STARTING: "+sbj);

@@ -20,21 +20,25 @@ end
 % o.test = 1;
 
 
-%% Prepare subject data
+%% Prepare analysis data
 tt = tic; % start timer
-[x,ep,n,o] = ec_prepAnalysis(o,tt); % analysis-specific preprocessing
+oo = namedargs2cell(o.p);
+[x,ep,n] = ec_prepAnalysis(tt,oo{:}); % analysis-specific preprocessing
+
 
 
 %% Make classifier templates
-[ob,st] = ec_classifyTemplates(n,ep,o,tt);
+[st,ob] = ec_classifyTemplates(n,ep,tt,o);
+% st = statistics
+% ob = observations
 
 
 %% Split variables so splits directly go into ec_runClassifier
-[x,ob,st,n] = ec_splitClassifyData(x,ob,st,n,o,tt);
+[x,n,st,ob] = ec_splitAnalData(x,n,st,ob,tt,o);
 
 
 %% Classification
-[ob,st] = classify_lfn(x,ob,st,n,o,tt);
+[st,ob] = classify_lfn(x,n,st,ob,tt,o);
 
 
 %% Save
@@ -59,16 +63,16 @@ disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc
 
 
 
-function [ob,st] = classify_lfn(x,ob,st,n,o,tt)
+function [st,ob] = classify_lfn(x,n,st,ob,tt,o)
 %%% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Compute across data splits (chans/ICs/ROIs x timepoints)
 if o.gpu
     for s = 1:n.splits
-        [ob{s},st(s,:)] = ec_runClassifier(x{s},ob{s},st(s,:),o);
+        [st(s,:),ob{s}] = ec_runClassifier(x{s},st(s,:),ob{s},o);
     end
 else
     parfor s = 1:n.splits
-        [ob{s},st(s,:)] = ec_runClassifier(x{s},ob{s},st(s,:),o);
+        [st(s,:),ob{s}] = ec_runClassifier(x{s},st(s,:),ob{s},o);
     end
 end
 disp("[ec_classifyChSpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));

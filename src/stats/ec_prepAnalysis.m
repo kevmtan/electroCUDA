@@ -1,20 +1,29 @@
-function [x,ep,n,o] = ec_prepAnalysis(o,tt)
+function [x,ep,n] = ec_prepAnalysis(tt,o)
 % ec_prepAnalysis: prep subject data for further analyses in electroCUDA
 arguments
-    o struct
     tt uint64 = tic
+    o.dirs struct % Subject directories struct from ec_loadSbj
+    o.sfx (1,1) string = "f" % Input data suffix
+    o.ICA logical = false % Run on ICs?
+    o.chConcat (1,1) string = "" % Concactenate channels by ["roi"|"all"|""], default="" (none)
+    o.chBadVars (1,:) string = [] % Vars in n.chBad/icBad to use for bad chan removal
+    o.chRm = [] % channels to remove (array of chan numbers)
+    o.ROIs (1,:) string = [] % remove chs outside these ROIs
+    o.roiVar (1,1) string = "roi" % ROI variable in chNfo
+    o.epoch struct = struct % Epoch generation options (ec_epochPsy)
+    o.timeVar (1,1) string = "bin" % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+    o.condVar (1,1) string = "cond"
+    o.cond1 (1,:) string = []
+    o.cond0 (1,:) string = []
+    o.cond (1,:) string = [] % Conditions to classify (train & test)
+    o.condx (1,:) string = [] % Conditions to cross-classify (predict)
+    o.conds (1,:) string = []
+    o.pre struct = struct % Analysis preprocessing options (ec_epochPreproc)
+    o.nRmFields (1,:) string = [] % Fields to remove from 'n' to save memory
+    o.timeRng = [] % Range of times to run including baseline ([]=epochPsy output)
+    o.test logical = false
 end
 % tt=tic;
-
-%% Additional arguments validation
-if o.gpu; o.pcaGPU = true; end
-
-% Channelwise PCA to be done in ec_epochPreproc
-if o.pca=="ch"
-    o.prep.pca = o.pcaComps;
-    o.prep.pcaRobust = o.pcaRobust;
-    o.prep.pcaGPU = o.pcaGPU;
-end
 
 
 %% Load data 
@@ -138,11 +147,11 @@ ep = renamevars(ep,[o.timeVar o.condVar],["t" "cnd"]);
 n.trialNfo = renamevars(n.trialNfo,o.condVar,"cnd");
 
 % Remove excluded conditions
-if isfield(o,"cond1")
+if isany(o.cond1) && isany(o.cond0)
     ep = ep(ismember(ep.cnd,[o.cond1 o.cond0]),:);
-elseif isfield(o,"cond")
+elseif isany(o.cond) && isany(o.condx)
     ep = ep(ismember(ep.cnd,[o.cond o.condx]),:);
-elseif isfield(o,"conds")
+elseif isany(o.conds)
     ep = ep(ismember(ep.cnd,o.conds),:);
 end
 
@@ -168,6 +177,7 @@ n.nTimes = height(n.times); % number of times
 
 
 function [x,ep,n] = preproc_lfn(x,n,psy,ep,o,tt)
+%%% Analysis-specific preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 oo = namedargs2cell(o.pre);
 [x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
 
