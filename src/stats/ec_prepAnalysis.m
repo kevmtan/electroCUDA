@@ -1,71 +1,71 @@
-function [x,ep,n] = ec_prepAnalysis(tt,o)
+function [x,ep,n] = ec_prepAnalysis(tt,a)
 % ec_prepAnalysis: prep subject data for further analyses in electroCUDA
 arguments
     tt uint64 = tic
-    o.dirs struct % Subject directories struct from ec_loadSbj
-    o.sfx (1,1) string = "f" % Input data suffix
-    o.ICA logical = false % Run on ICs?
-    o.chConcat (1,1) string = "" % Concactenate channels by ["roi"|"all"|""], default="" (none)
-    o.chBadVars (1,:) string = [] % Vars in n.chBad/icBad to use for bad chan removal
-    o.chRm = [] % channels to remove (array of chan numbers)
-    o.ROIs (1,:) string = [] % remove chs outside these ROIs
-    o.roiVar (1,1) string = "roi" % ROI variable in chNfo
-    o.epoch struct = struct % Epoch generation options (ec_epochPsy)
-    o.timeVar (1,1) string = "bin" % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
-    o.condVar (1,1) string = "cond"
-    o.cond1 (1,:) string = []
-    o.cond0 (1,:) string = []
-    o.cond (1,:) string = [] % Conditions to classify (train & test)
-    o.condx (1,:) string = [] % Conditions to cross-classify (predict)
-    o.conds (1,:) string = []
-    o.pre struct = struct % Analysis preprocessing options (ec_epochPreproc)
-    o.nRmFields (1,:) string = [] % Fields to remove from 'n' to save memory
-    o.timeRng = [] % Range of times to run including baseline ([]=epochPsy output)
-    o.test logical = false
+    a.dirs struct % Subject directories struct from ec_loadSbj
+    a.sfx (1,1) string = "f" % Input data suffix
+    a.ICA logical = false % Run on ICs?
+    a.chConcat (1,1) string = "" % Concactenate channels by ["roi"|"all"|""], default="" (none)
+    a.chBadVars (1,:) string = [] % Vars in n.chBad/icBad to use for bad chan removal
+    a.chRm = [] % channels to remove (array of chan numbers)
+    a.ROIs (1,:) string = [] % remove chs outside these ROIs
+    a.roiVar (1,1) string = "roi" % ROI variable in chNfo
+    a.epoch struct = struct % Epoch generation options (ec_epochPsy)
+    a.timeVar (1,1) string = "bin" % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
+    a.condVar (1,1) string = "cond"
+    a.cond1 (1,:) string = []
+    a.cond0 (1,:) string = []
+    a.cond (1,:) string = [] % Conditions to classify (train & test)
+    a.condx (1,:) string = [] % Conditions to cross-classify (predict)
+    a.conds (1,:) string = []
+    a.pre struct = struct % Analysis preprocessing options (ec_epochPreproc)
+    a.nRmFields (1,:) string = [] % Fields to remove from 'n' to save memory
+    a.timeRng = [] % Range of times to run including baseline ([]=epochPsy output)
+    a.test logical = false
 end
 % tt=tic;
 
 
 %% Load data 
-[n,x,psy,trialNfo,chNfo] = ec_loadSbj(o.dirs,sfx=o.sfx,...
+[n,x,psy,trialNfo,chNfo] = ec_loadSbj(a.dirs,sfx=a.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
 if numel(dbstack)<2; n0=n; x0=x; trialNfo0=trialNfo; end %#ok<NASGU> % Copy origs for testing
-disp("[ec_prepAnalysis] Loaded data: "+o.dirs.sbj+" | toc="+toc(tt));
+disp("[ec_prepAnalysis] Loaded data: "+a.dirs.sbj+" | toc="+toc(tt));
 % n=n0; x=x0; trialNfo=trialNfo0; tt=tic; disp("Restored original sbj vars");
 
 
 %% Channel info & removal
-[x,n] = chRemoval_lfn(x,chNfo,n,o,tt);
+[x,n] = chRemoval_lfn(x,chNfo,n,a,tt);
 
 
 %% Make epochs from psychobehavioral metadata
-[psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,o,tt);
+[psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,a,tt);
 
 
 %% Analysis-specific preprocessing
-[x,ep,n] = preproc_lfn(x,n,psy,ep,o,tt);
+[x,ep,n] = preproc_lfn(x,n,psy,ep,a,tt);
 
 
 %% Concactenate channels (e.g., concactenate within-ROI chs)
-if isany(o.chConcat)
-    [x,n] = chConcat_lfn(x,n,o,tt);
+if isany(a.chConcat)
+    [x,n] = chConcat_lfn(x,n,a,tt);
 end
 
 
 %% Final
-n = rmfield(n,o.nRmFields); % Fields to remove from 'n' to save memory
-disp("[ec_prepAnalysis] Finished: "+o.dirs.sbj+" | toc="+toc(tt));
+n = rmfield(n,a.nRmFields); % Fields to remove from 'n' to save memory
+disp("[ec_prepAnalysis] Finished: "+n.sbj+" | toc="+toc(tt));
 
 
 
 
 
 
-function [x,n] = chRemoval_lfn(x,chNfo,n,o,tt)
+function [x,n] = chRemoval_lfn(x,chNfo,n,a,tt)
 %%% Channel info & removal %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Channel/IC info
-if o.ICA
+if a.ICA
     % IC info
     n.chNfo = n.icNfo;
     n.chNfo = renamevars(n.chNfo,["ic" "sbjIC"],["ch" "sbjCh"]);
@@ -77,18 +77,18 @@ else
 end
 
 % Only use existing chBadVars
-o.chBadVars(ismember(o.chBadVars,n.chBad.Properties.VariableNames));
+a.chBadVars(ismember(a.chBadVars,n.chBad.Properties.VariableNames));
 
 % Find bad chans
-if isany(o.chBadVars)
-    chBad = full(any(n.chBad{:,o.chBadVars},2));
+if isany(a.chBadVars)
+    chBad = full(any(n.chBad{:,a.chBadVars},2));
 else
     chBad = false(n.nChs,1);
 end
 
 % Find specified chans to remove
-if isany(o.chRm)
-    chRm = o.chRm;
+if isany(a.chRm)
+    chRm = a.chRm;
     if isnumeric(chRm)
         chRm = ismember(n.chNfo.ch,chRm);
     end
@@ -97,8 +97,8 @@ else
 end
 
 % Find ROI chans
-if isany(o.ROIs)
-    chROIs = ismember(n.chNfo.(o.roiVar),o.ROIs);
+if isany(a.ROIs)
+    chROIs = ismember(n.chNfo.(a.roiVar),a.ROIs);
 else
     chROIs = true(n.nChs,1);
 end
@@ -134,25 +134,25 @@ disp("[ec_prepAnalysis] Kept "+n.xChs+"/"+n.nChs+" chans: "+n.sbj+" | toc="+toc(
 
 
 
-function [psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,o,tt)
+function [psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,a,tt)
 %%% Make epochs from psychobehavioral metadata %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Epoch metadata
-oo = namedargs2cell(o.epoch);
+oo = namedargs2cell(a.epoch);
 [ep,trialNfo,n,psy] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
 n.trialNfo = trialNfo;
 
 % Rename target time & condition variables
-ep = renamevars(ep,[o.timeVar o.condVar],["t" "cnd"]);
-n.trialNfo = renamevars(n.trialNfo,o.condVar,"cnd");
+ep = renamevars(ep,[a.timeVar a.condVar],["t" "cnd"]);
+n.trialNfo = renamevars(n.trialNfo,a.condVar,"cnd");
 
 % Remove excluded conditions
-if isany(o.cond1) && isany(o.cond0)
-    ep = ep(ismember(ep.cnd,[o.cond1 o.cond0]),:);
-elseif isany(o.cond) && isany(o.condx)
-    ep = ep(ismember(ep.cnd,[o.cond o.condx]),:);
-elseif isany(o.conds)
-    ep = ep(ismember(ep.cnd,o.conds),:);
+if isany(a.cond1) && isany(a.cond0)
+    ep = ep(ismember(ep.cnd,[a.cond1 a.cond0]),:);
+elseif isany(a.cond) && isany(a.condx)
+    ep = ep(ismember(ep.cnd,[a.cond a.condx]),:);
+elseif isany(a.conds)
+    ep = ep(ismember(ep.cnd,a.conds),:);
 end
 
 % Update epoch indices
@@ -176,15 +176,15 @@ n.nTimes = height(n.times); % number of times
 
 
 
-function [x,ep,n] = preproc_lfn(x,n,psy,ep,o,tt)
+function [x,ep,n] = preproc_lfn(x,n,psy,ep,a,tt)
 %%% Analysis-specific preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-oo = namedargs2cell(o.pre);
-[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=o.test);
+oo = namedargs2cell(a.pre);
+[x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=a.test);
 
 % Keep analysis times
-if isany(o.timeRng) && numel(o.timeRng)==2
+if isany(a.timeRng) && numel(a.timeRng)==2
     % Keep only analysis timerange
-    ep = ep(ep.t>=o.timeRng(1) & ep.t<=o.timeRng(2),:);
+    ep = ep(ep.t>=a.timeRng(1) & ep.t<=a.timeRng(2),:);
     x = x(ep.ide,:,:);
 
     % Update epoch indices
@@ -202,17 +202,17 @@ end
 
 
 
-function [y,n] = chConcat_lfn(x,n,o,tt)
+function [y,n] = chConcat_lfn(x,n,a,tt)
 %%% Channel concatenation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if o.chConcat=="roi"
+if a.chConcat=="roi"
     %% Concatenate chs within ROI: y{roi}(times,freqs*chans)
-    rv = o.roiVar;
+    rv = a.roiVar;
 
     % Get ROIs
-    if ~isany(o.ROIs)
-        o.ROIs = unique(n.chNfo.(rv),"stable"); end
+    if ~isany(a.ROIs)
+        a.ROIs = unique(n.chNfo.(rv),"stable"); end
     n.ROIs = table;
-    n.ROIs.roi = intersect(o.ROIs,unique(n.chNfo.(rv)),"stable");
+    n.ROIs.roi = intersect(a.ROIs,unique(n.chNfo.(rv)),"stable");
     n.nROIs = height(n.ROIs);
 
     % Preallocate
@@ -250,8 +250,8 @@ if o.chConcat=="roi"
             end
         end
     end
-    disp("[ec_prepAnalysis] Concatenated ROI chs: "+o.dirs.sbj+" | toc="+toc(tt));
-elseif o.chConcat=="all"
+    disp("[ec_prepAnalysis] Concatenated ROI chs: "+a.dirs.sbj+" | toc="+toc(tt));
+elseif a.chConcat=="all"
     %% Concatenate all chs: y(times,freqs*chans)
 
     % Fill ROI info table
@@ -278,5 +278,5 @@ elseif o.chConcat=="all"
             n.ROIs.columns{1} = vertcat(n.ROIs.columns{1},xi);
         end
     end
-    disp("[ec_prepAnalysis] Concatenated all chs: "+o.dirs.sbj+" | toc="+toc(tt));
+    disp("[ec_prepAnalysis] Concatenated all chs: "+a.dirs.sbj+" | toc="+toc(tt));
 end

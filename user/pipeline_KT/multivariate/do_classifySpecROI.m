@@ -18,8 +18,12 @@ o.name = ""; % Analysis name (filled in subject loop)
 
 
 %% Options
-o.test = false;
-o.save = true;
+o.test = false; % TEST?
+o.save = true; % SAVE?
+o.gpu = false; % analysis on GPU
+
+
+%%% ANALYSIS PREP: ec_prepAnalysis(...,o.p) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Input data
 o.p.sfx = "f";
@@ -41,86 +45,6 @@ o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochP
 o.p.condVar = "cond";
 o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
 o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
-
-% Rank calculation & PCA
-o.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
-o.pcaComps = 0; % Number of components (0=skip, inf=data rank)
-o.pcaRankLim = true; % Limit PCA components to data rank
-o.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.pcaGPU = false; % GPU for rank calculation & PCA
-
-% Processing options
-o.gpu = false; % do GPU
-o.typeAnal = "single"; % processing floating-point precision ("double"|"single")
-o.typeOut = "single"; % output floating-point precision ("double"|"single")
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
-
-% Stats options
-o.alpha = 0.05; % Critical p-value (default=0.05)
-o.fdrTimeRng = [0 inf]; % Range of times for FDR
-o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
-
-% Classifier basic options
-o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
-o.nMin = 15; % minimum observations per class within timepoint
-o.balanceConds = true; % balance sample size per class within timepoint 
-o.std = "robust"; % Standardize predictors ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
-
-% Cross-validation parameters (mathworks.com/help/stats/crossval.html)
-o.cv.KFold = 10; % o.cv.Leaveout = "on";
-% Cross-validation for hyperparameter optimization
-o.cvh.KFold = 5;
-o.cvMinTrialsPerFold = 3; % minimum trials per class in each fold
-
-% Classifier hyperparameters
-o.hyper = struct;
-o.hyper.Prior = "uniform";
-if isequal(o.fun,@fitcsvm)
-    % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
-    o.hyper.KernelFunction = "linear";
-    o.hyper.BoxConstraint = 1;
-    o.hyper.KernelScale = "auto";
-    o.hyper.Standardize = false;
-    o.hyper.Solver = "SMO";
-    o.hyper.CacheSize = "maximal";
-    o.hyper.Verbose = 0;
-elseif isequal(o.fun,@fitclinear)
-    % Linear SVM hyperparameters (mathworks.com/help/stats/fitclinear.html)
-    o.hyper.Learner = "svm";
-    o.hyper.Lambda = "auto";
-    o.hyper.Regularization = "ridge";
-    o.hyper.Solver = "dual";
-    o.hyper.FitBias = true;
-    o.hyper.PostFitBias = true;
-    o.hyper.OptimizeLearnRate = true;
-    o.hyper.Verbose = 0;
-elseif isequal(o.fun,@fitcdiscr)
-    o.hyper.DiscrimType = "linear";
-    o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
-elseif isequal(o.fun,@fitcknn)
-    % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
-    o.hyper.Distance = "euclidean";
-    o.hyper.NumNeighbors = 25;
-    o.hyper.DistanceWeight = "inverse";
-    o.hyper.std = true;
-    % o.hyper.ScoreTransform = "invlogit";
-end
-
-% Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
-if isequal(o.fun,@fitcsvm)
-    o.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
-elseif isequal(o.fun,@fitclinear)
-    o.OptimizeHyperparameters = "none"; % "Lambda" "Learner"
-elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
-elseif isequal(o.fun,@fitcknn)
-    o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
-end
-o.HyperparameterOptimizationOptions =...
-    struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Repartition=false,...
-    AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
-%struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
-%AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
 
 % Task Epoching (see 'ec_epochPsy')
 o.p.epoch.float = "single"; % task metadata output floating-point precision
@@ -195,6 +119,95 @@ o.p.pre.pcaGPU = false;
 % o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 
+%%% ANALYSIS DATA SPLIT: ec_splitAnalData(...,o.s) %%%%%%%%%%%%%%%%%%%%%%%%
+
+% Analysis floating-point precision ("double"|"single"|"half")
+o.s.typeAnal = "single"; 
+
+% PCA & rank
+o.s.std = "robust"; % Standardize features within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
+o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
+o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
+o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
+o.s.pcaGPU = false; % GPU for rank calculation & PCA
+o.s.rank = true; % calculate rank if no PCA
+
+
+%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Save options
+o.typeOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
+
+% Significance testing
+o.alpha = 0.05; % Critical p-value (default=0.05)
+o.fdrTimeRng = [0 inf]; % Range of times for FDR
+o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
+
+% Observations per timepoint (o.p.timeVar)
+o.nMin = 15; % minimum observations per class within timepoint
+o.balanceConds = true; % balance sample size per class within timepoint 
+
+% Cross-validation parameters (mathworks.com/help/stats/crossval.html)
+o.cv.KFold = 10; % Num folds for CV
+o.cvh.KFold = 5; % Num folds for hyperparameter optimization CV
+o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
+o.cvNested = false; % Nested CV for hyperparemeter optimization
+
+% Classifier function handle
+o.fun = @fitclinear; % [@fitcsvm|@fitclinear|@fitcdiscr|...]
+
+% Classifier hyperparameters
+o.hyper = struct;
+o.hyper.Prior = "uniform";
+if isequal(o.fun,@fitcsvm)
+    % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
+    o.hyper.KernelFunction = "linear";
+    o.hyper.BoxConstraint = 1;
+    o.hyper.KernelScale = "auto";
+    o.hyper.Standardize = false;
+    o.hyper.Solver = "SMO";
+    o.hyper.CacheSize = "maximal";
+    o.hyper.Verbose = 0;
+elseif isequal(o.fun,@fitclinear)
+    % Linear SVM hyperparameters (mathworks.com/help/stats/fitclinear.html)
+    o.hyper.Learner = "svm";
+    o.hyper.Lambda = "auto";
+    o.hyper.Regularization = "ridge";
+    o.hyper.Solver = "dual";
+    o.hyper.FitBias = true;
+    o.hyper.PostFitBias = true;
+    o.hyper.OptimizeLearnRate = true;
+    o.hyper.Verbose = 0;
+elseif isequal(o.fun,@fitcdiscr)
+    o.hyper.DiscrimType = "linear";
+    o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
+elseif isequal(o.fun,@fitcknn)
+    % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
+    o.hyper.Distance = "euclidean";
+    o.hyper.NumNeighbors = 25;
+    o.hyper.DistanceWeight = "inverse";
+    o.hyper.std = true;
+    % o.hyper.ScoreTransform = "invlogit";
+end
+
+% Optimize hyperparameters (mathworks.com/help/stats/bayesopt.html)
+if isequal(o.fun,@fitcsvm)
+    o.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
+elseif isequal(o.fun,@fitclinear)
+    o.OptimizeHyperparameters = "none"; % "Lambda" "Learner"
+elseif isequal(o.fun,@fitcdiscr)
+    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
+elseif isequal(o.fun,@fitcknn)
+    o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
+end
+o.HyperparameterOptimizationOptions =...
+    struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Repartition=false,...
+    AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
+%struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
+%AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
+
+
 
 %% Logs
 if ~exist('logs','var')
@@ -234,8 +247,7 @@ for s = 1:height(logs)
         % Set options struct per subject
         sbj = logs.sbj(s);
         sbjID = logs.sbjID(s);
-        o.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.p.sfx);
-        o.p.dirs = o.dirs;
+        o.p.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.p.sfx);
         o.dirOut = logs.out(s);
         o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
         disp("STARTING: "+sbj);

@@ -1,5 +1,6 @@
-function [obs,sts] = ec_runClassifier(xs,obs,sts,o)
+function [sts,obs] = ec_runClassifier(xs,sts,obs,o)
 % ec_runClassifier - runs classifier for electroCUDA multivariate routines
+% s=16; xs=x{s}; sts=st(s,:); obs=ob{s};
 
 % Add CV for hyperparameter tuning opts
 oho = o.HyperparameterOptimizationOptions; % extract options

@@ -1,11 +1,11 @@
-function [ob,st] = ec_classifyTemplates(n,ep,o,tt)
+function [st,ob] = ec_classifyTemplates(n,ep,tt,o)
 % Prep
-nCond = numel(o.cond);
-nCondx = numel(o.condx);
-f0 = cast(nan,o.typeProc); % float type
+nCond = numel(o.p.cond);
+nCondx = numel(o.p.condx);
+f0 = cast(nan,o.s.typeAnal); % float type
 u0 = uint16(0); % unsigned integer
 s0 = string(missing);
-if isany(o.chConcat)
+if isany(o.p.chConcat)
     c0 = s0; % missing string for ROI
 else
     c0 = cast(0,like=n.chNfo.ch); % Chan/IC integer type
@@ -18,13 +18,13 @@ psyVars = ismember(ep.Properties.VariableNames,...
 
 %% Make analysis observations template
 ob = ep(:,psyVars);
-ob.y = categorical(ob.cnd,o.cond,Ordinal=true); % class (e.g. condition)
-ob.pred(:) = categorical("",o.cond,Ordinal=true); % predicted class
-ob.pp(:,1:numel(o.cond)) = f0; % posterior probability per class
+ob.y = categorical(ob.cnd,o.p.cond,Ordinal=true); % class (e.g. condition)
+ob.pred(:) = categorical("",o.p.cond,Ordinal=true); % predicted class
+ob.pp(:,1:numel(o.p.cond)) = f0; % posterior probability per class
 ob.pp1(:) = f0; % posterior probability difference
 ob.acc(:) = false; % accurate prediction?
-ob.use(ismember(ob.cnd,o.cond)) = true; % use if one of the main conds (train/test)
-ob.cc(ismember(ob.cnd,o.condx)) = true; % cross-classification conds
+ob.use(ismember(ob.cnd,o.p.cond)) = true; % use if one of the main conds (train/test)
+ob.cc(ismember(ob.cnd,o.p.condx)) = true; % cross-classification conds
 % Channel/IC/ROI info
 ob.ch(:) = c0;
 ob.sbjCh(:) = s0;
@@ -67,13 +67,14 @@ st.cost = cell(height(st),1);
 st.cv = st.cost;
 st.cvh = st.cost;
 st.loss(:) = f0; % average loss per fold CV
-% Channel/IC info
-st.width(:) = u0;
-st.rank(:) = u0;
-st.features(:) = u0;
+% Feature info
+if o.p.chConcat=="roi"; st.width(:) = u0; end % ROI width (chans x freqs)
+if o.s.rank||isany(o.s.pca); st.rank(:) = u0; end % Matrix rank
+if isany(o.s.pca); st.features(:) = u0; end % Number of features
+% Channel/IC/ROI info
 st.ch(:) = c0;
 st.sbjCh(:) = s0;
-st.sbjID(:) = n.sbjID;
+st.sbjID(:) = uint16(n.sbjID);
 st = movevars(st,"sbjCh","Before",1);
 st = movevars(st,"sbjID","After",width(st));
 
@@ -81,7 +82,7 @@ st = movevars(st,"sbjID","After",width(st));
 %% Check for insufficient sample sizes & unbalanced classes per timepoint
 for t = 1:height(st)
     % Indices of main conditions (classes to train/test) at this timepoint
-    idt = ob.t==st.t(t) & ismember(ob.cnd,o.cond);
+    idt = ob.t==st.t(t) & ismember(ob.cnd,o.p.cond);
     ob.use(idt) = balanceClasses_lfn(ob(idt,:),nCond,o);
 end
 
@@ -92,7 +93,7 @@ for t = 1:height(st)
 
     % Main conds
     for c = 1:nCond
-        idc = ob.cnd(idt)==o.cond(c);
+        idc = ob.cnd(idt)==o.p.cond(c);
         st.n0(t,c) = nnz(idc);
         st.n(t,c) = nnz(ob.use(idt(idc)));
     end
@@ -100,7 +101,7 @@ for t = 1:height(st)
     % Cross-classify conds
     if any(nCondx)
         for c = 1:nCondx
-            st.nx(t,c) = nnz(ob.cnd(idt)==o.condx(c));
+            st.nx(t,c) = nnz(ob.cnd(idt)==o.p.condx(c));
         end
     end
 end
@@ -145,7 +146,7 @@ for t = 1:height(st)
         st.cvh{t} = [];
     end
 end
-disp("[ec_classifyTemplates] Made classifier templates: "+o.dirs.sbj+" | toc="+toc(tt));
+disp("[ec_classifyTemplates] Made classifier templates: "+n.sbj+" | toc="+toc(tt));
 
 
 
@@ -165,7 +166,7 @@ use = obt.use;
 % Find smallest observation count across classes
 nPerClass = zeros(1,nCond);
 for c = 1:nCond
-    nPerClass(c) = nnz(obt.cnd==o.cond(c));
+    nPerClass(c) = nnz(obt.cnd==o.p.cond(c));
 end
 nMin = min(nPerClass); % smallest # obs
 
@@ -185,7 +186,7 @@ for c = 1:nCond
     if nPerClass(c)==nMin; continue; end 
 
     % Initialize
-    idc = obt.cnd==o.cond(c); % class obs indices
+    idc = obt.cnd==o.p.cond(c); % class obs indices
     trs = unique(obt.tr(idc)); % get unique trials
     trOrder = randperm(numel(trs));
     trObsKept = cell(numel(trs),1); % kept obs per trial

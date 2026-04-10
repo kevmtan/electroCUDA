@@ -1,7 +1,12 @@
 function oh = ec_extractHyperparams(mdl,o)
 % Extract hyperparameters from classifier model
-
 oh = o.hyper;
+o.OptimizeHyperparameters = string(o.OptimizeHyperparameters);
+
+% Return if no hyperparameter optimization
+if isscalar(o.OptimizeHyperparameters) && o.OptimizeHyperparameters=="none"
+    return
+end
 
 % Loop across hyperparameters
 for p = 1:numel(o.OptimizeHyperparameters)

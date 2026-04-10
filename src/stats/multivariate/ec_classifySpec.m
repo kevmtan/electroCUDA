@@ -22,9 +22,8 @@ end
 
 %% Prepare analysis data
 tt = tic; % start timer
-oo = namedargs2cell(o.p);
-[x,ep,n] = ec_prepAnalysis(tt,oo{:}); % analysis-specific preprocessing
-
+oo = namedargs2cell(o.p); % expand name-value arguments
+[x,ep,n] = ec_prepAnalysis(tt,oo{:});
 
 
 %% Make classifier templates
@@ -34,7 +33,8 @@ oo = namedargs2cell(o.p);
 
 
 %% Split variables so splits directly go into ec_runClassifier
-[x,n,st,ob] = ec_splitAnalData(x,n,st,ob,tt,o);
+oo = namedargs2cell(o.s);
+[x,n,st,ob] = ec_splitAnalData(x,n,st,ob,tt,oo{:});
 
 
 %% Classification
@@ -65,6 +65,7 @@ disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc
 
 function [st,ob] = classify_lfn(x,n,st,ob,tt,o)
 %%% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %% Compute across data splits (chans/ICs/ROIs x timepoints)
 if o.gpu
     for s = 1:n.splits
