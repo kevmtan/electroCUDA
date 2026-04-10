@@ -1,8 +1,21 @@
+% Generate wavelet
 fb = cwtfilterbank(Wavelet="Morse",SamplingFrequency=1000,SignalLength=10000,...
-    VoicesPerOctave=5,FrequencyLimits=[2 300],TimeBandwidth=20);
-frqs = fb.centerFrequencies; % CWT frequencies
-scales = fb.scales; % CWT scales
-spsi = waveletsupport(fb);
+    VoicesPerOctave=10,FrequencyLimits=[2 300],TimeBandwidth=20);
+
+% Freq info
+frqs = fb.waveletsupport(0.05); % time support
+frqs.timeHW = frqs.TimeSupport/2;
+
+% Energy-normalized time-domain SD for each wavelet
+[psi,t] = fb.wavelets;
+psi = abs(psi).^2;
+psi = psi ./ sum(psi,2);                   % normalize each row to unit total energy
+mu_t = sum(psi .* t, 2);               % should be ~0 since wavelets are centered
+frqs.coiHW = sqrt(sum(psi .* (t - mu_t).^2, 2));
+
+frqs.scales = fb.scales'; % scales
+
+
 
 %%
 [psi,t] = wavelets(fb);  
@@ -10,8 +23,8 @@ spsi = waveletsupport(fb);
 
 % pick the scale closest to 4 Hz
 [~,idx] = min(abs(frqs-6));
-w = psi(idx,:);
-env = abs(w);
+psi = psi(idx,:);
+env = abs(psi);
 env = env./max(env);
 
 % FWHM of amplitude envelope
@@ -21,11 +34,11 @@ disp(fwhm_sec)
 
 % Plot time resp
 figure; 
-plot(t,abs(w))
+plot(t,abs(psi))
 grid on
 hold on
-plot(t,real(w))
-plot(t,imag(w))
+plot(t,real(psi))
+plot(t,imag(psi))
 
 % Plot freq resp
 figure;

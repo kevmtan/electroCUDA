@@ -74,9 +74,11 @@ fb = cwtfilterbank(Wavelet=o.wavelet,SamplingFrequency=o.hz,SignalLength=height(
 
 % Extract wavelet properties
 frqs = fb.centerFrequencies; % CWT frequencies
-spsi = fb.waveletsupport(0.05); % CWT time supports
-scales = fb.scales; % CWT scales
 nFrqs = numel(frqs);
+scales = fb.scales; % CWT scales
+
+% CWT time supports
+spsi = timeSupports_lfn(fb);
 
 
 %% Run wavelet transform
@@ -181,6 +183,29 @@ if ds > 1
         xc = xc(1:ds:end,:); % decimate
     end
 end
+
+
+
+
+
+
+function spsi = timeSupports_lfn(fb)
+%%% Wavelet time supports %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Time supports per freq
+spsi = fb.waveletsupport(0.05); 
+
+% Energy-normalized time-domain SD for each wavelet
+[psi,t] = fb.wavelets;
+psi = abs(psi).^2;
+psi = psi ./ sum(psi,2);               % normalize each row to unit total energy
+mu_t = sum(psi .* t, 2);               % should be ~0 since wavelets are centered
+
+% Cone of influence half-width
+spsi.coiHW = sqrt(sum(psi .* (t - mu_t).^2, 2));
+
+% Wavelet scales
+spsi.scale = fb.scales'; % scales
 
 
 

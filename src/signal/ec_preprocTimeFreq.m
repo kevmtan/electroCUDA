@@ -158,6 +158,9 @@ if n.nFreqs > 1
     n.spect.name = "f"+(1:n.nFreqs)';
     n.spect.disp = round(n.freqs,2) + " hz";
     n.spect.freq = n.freqs;
+    n.spect.coiHW = n.cwtSupport.coiHW; % cone of influence half-width
+    n.spect.timeHW = n.cwtSupport.End; % time support half-width
+    n.spect.scale = n.cwtSupport.scale; % wavelet scales
 else
     n.spect.name = o.fName;
     n.spect.disp = o.fName;
