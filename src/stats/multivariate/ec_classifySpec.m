@@ -23,7 +23,7 @@ end
 %% Prepare analysis data
 tt = tic; % start timer
 oo = namedargs2cell(o.p); % expand name-value arguments
-[x,ep,n] = ec_prepAnalysis(tt,oo{:});
+[x,ep,n] = ec_analPrep(tt,oo{:});
 
 
 %% Make classifier templates
@@ -34,7 +34,7 @@ oo = namedargs2cell(o.p); % expand name-value arguments
 
 %% Split variables so splits directly go into ec_runClassifier
 oo = namedargs2cell(o.s);
-[x,n,st,ob] = ec_splitAnalData(x,n,st,ob,tt,oo{:});
+[x,n,st,ob] = ec_analSplit(x,n,st,ob,tt,oo{:});·
 
 
 %% Classification

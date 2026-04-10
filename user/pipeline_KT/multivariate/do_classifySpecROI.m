@@ -23,11 +23,10 @@ o.save = true; % SAVE?
 o.gpu = false; % analysis on GPU
 
 
-%%% ANALYSIS PREP: ec_prepAnalysis(...,o.p) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%% ANALYSIS PREP: ec_analPrep(...,o.p) %%%%%%%%%%%%%%%%%%%%%
 
 % Input data
 o.p.sfx = "f";
-o.p.ICA = false; % Run on ICs?
 o.p.nRmFields = "of"; % Fields to remove from 'n' to save memory
 
 % Channel Options
@@ -119,7 +118,8 @@ o.p.pre.pcaGPU = false;
 % o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 
-%%% ANALYSIS DATA SPLIT: ec_splitAnalData(...,o.s) %%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s) %%%%%%%%%%%%%%%%%%%
 
 % Analysis floating-point precision ("double"|"single"|"half")
 o.s.typeAnal = "single"; 
@@ -133,7 +133,8 @@ o.s.pcaGPU = false; % GPU for rank calculation & PCA
 o.s.rank = true; % calculate rank if no PCA
 
 
-%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
 o.typeOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]

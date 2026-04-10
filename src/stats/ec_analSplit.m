@@ -1,5 +1,5 @@
-function [x,n,sts,obs] = ec_splitAnalData(x,n,st,ob,tt,o)
-% Splits data for independent analyses (chans/ICs/ROIs x timepoints)
+function [x,n,sts,obs] = ec_analSplit(x,n,st,ob,tt,o)
+% Splits data for analyses (chans/ICs/ROIs x timepoints)
 arguments
     x                                   % EEG data (matrix or cell array)
     n struct                            % Info struct
@@ -56,8 +56,8 @@ n.splits = numel(x); % number of splits
 if isany(o.pca) && o.pcaComps 
     n.pcaWts = wts; % Save weights to n
 end
-disp("[ec_splitAnalData] Split data by "+n.splits+" independent analysis: "+...
-    n.sbj+" | toc="+toc(tt));
+disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+...
+    "for analyses: "+n.sbj+" | toc="+toc(tt));
 % c=5; xc=x{c}; stc=st; obc=ob;
 
 
