@@ -52,6 +52,7 @@ arguments
     o.freqs {islogical,isnumeric} = [];
     % PCA within-chan or within-concactenated chans (e.g., make spectral components)
     o.pca (1,1) double = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+    o.pcaStd string {mustBeMember(o.pcaStd,["robust" "zscore" "" []])} = ""; % don't standardize to keep baseline at 0
     o.pcaRobust (1,1) logical = false; % Use robust PCA
     o.pcaGPU (1,1) logical = false; % Use GPU for PCA (recommended for robustPCA)
     % Spectral dimensionality reduction into bands (skip=[])
@@ -260,7 +261,7 @@ end
 
 % Spectral PCA
 if o.pca || o.pcaRobust
-    [xc,wc,xcRank] = ec_pca(xc,rankLim=false,gpu=o.pcaGPU||o.gpu);
+    [xc,wc,xcRank] = ec_pca(xc,robust=o.pcaRobust,std=o.pcaStd,gpu=o.pcaGPU||o.gpu);
 else
     wc=[]; xcRank=nan;
 end
@@ -269,6 +270,7 @@ end
 %% Finalize
 if o.gpu || o.pcaGPU
     xc = gather(xc);
+    wc = gather(wc);
 end
 xc = cast(xc,o.typeOut);
 

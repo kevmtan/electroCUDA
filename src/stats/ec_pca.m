@@ -15,17 +15,17 @@ function [x,w,xR,xS] = ec_pca(x,a)
 arguments
     x (:,:){mustBeFloat}                % Input matrix: x(observations,features)
     a.nComps (1,1) double = 0           % Number of components [0=skip|Inf=rank]
-    a.rankLim (1,1) logical = false     % Limit num components to matrix rank
     a.robust (1,1) logical = false      % Use robust PCA
     a.exact (1,1) logical = false       % Use exact rank
     a.std string {mustBeMember(a.std,["zscore" "robust" "" []])} = "robust" % Z-score
-    a.double (1,1) logical = true       % Convert to double (single/half can be unstable!)
+    a.double (1,1) logical = false      % Convert to double (single/half can be unstable!)
     a.gpu (1,1) logical = isgpuarray(x) % Compute on GPU
+    a.gather (1,1) logical = false      % Gather outputs from GPU
 end
+if isgpuarray(x); a.gpu=true; end
 
 
 %% Prep
-w = []; % initialize PCA weights
 
 % Convert to double
 if a.double
@@ -44,7 +44,7 @@ end
 
 
 %% Standardize predictors
-if o.std=="robust"
+if a.std=="robust"
     x = normalize(x,1,"zscore","robust"); % robust z-score
 elseif isany(o.std)
     x = normalize(x,1,o.std); % standard z-score
@@ -66,13 +66,20 @@ xR = ec_rank(x,exact=a.exact);
 %% Standard PCA (dimensionality reduction)
 if a.nComps
     % Limit number of components to matrix rank
-    if a.rankLim && a.nComps>xR
+    if a.nComps > xR
         a.nComps = xR;
     end
 
     % Run standard PCA for dimensionality reduction
-    if a.nComps < width(x)
-        [w,x] = pca(x,NumComponents=a.nComps);
-        if o.gpu; w = gather(x); end
-    end
+    [w,x] = pca(x,NumComponents=a.nComps);
+else
+    w = [];
+end
+
+
+%% Gather
+if a.gpu && a.gather
+    x = gather(x);
+    w = gather(w);
+    xS = gather(xS);
 end

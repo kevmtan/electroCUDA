@@ -1,5 +1,5 @@
 function [xRank,tol,xEig,xRank1] = ec_rank(x,tol,o)
-%% ec_rank - get linear rank of 2D array
+%% ec_rank - get linear matrix rank of 2D array
 %   xRank = number of eigenvalues greater than 'tol'
 %   More consistent than built-in Matlab rank() function
 %   Solves rank computation issues on on Linux 64-bit
@@ -7,7 +7,7 @@ function [xRank,tol,xEig,xRank1] = ec_rank(x,tol,o)
 
 %% Input validation
 arguments
-    x (:,:){mustBeFloat}            % Input data: x(observations,variables)
+    x (:,:){mustBeFloat}            % Input matrix: x(observations,variables)
     tol (1,1) double = 0            % Rank tolerance (min eigenvalue)[0=auto]
     o.eig (1,1) logical = false     % Eigenvector as 1st output
     o.compare (1,1) logical = false % Compare with Matlab's rank() function
@@ -16,12 +16,20 @@ arguments
     o.double (1,1) logical = false  % Double-precision compute (FP64)
 end
 
+
 %% Prep
 if o.gpu; x = gpuArray(x); end % move to GPU
 if o.double; x = double(x); end % convert to double
 
-% Calculate rank tolerance if not specified
+% Data-driven rank tolerance
 if ~tol
+    % Warn for NaNs
+    if any(isnan(x))
+        warning("Matrix contains NaNs, rank = 0. "+...
+            "Manually specify 'tol', tolerance calculation can't handle NaNs.");
+    end
+
+    % Rank tolerance calculation
     if o.exact
         tol = max(size(x) * eps(norm(x)));
     else
