@@ -42,7 +42,7 @@ o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochP
 
 % Conditions for classification
 o.p.condVar = "cond";
-o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify (train & test)
+o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify, ORDER MATTERS 
 o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Task Epoching (see 'ec_epochPsy')
@@ -140,7 +140,7 @@ o.s.rank = true; % calculate rank if no PCA
 o.typeOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
 o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
 
-% Significance testing
+% Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
@@ -149,11 +149,13 @@ o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"i
 o.nMin = 15; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint 
 
-% Cross-validation parameters (mathworks.com/help/stats/crossval.html)
+% Cross-validation (CV) parameters (mathworks.com/help/stats/crossval.html)
+o.doCV = true; % Do CV?
+o.doNestedCV = false; % Nested CV for hyperparemeter optimization? (NOT IMPLEMENTED)
 o.cv.KFold = 10; % Num folds for CV
-o.cvh.KFold = 5; % Num folds for hyperparameter optimization CV
+o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
+o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
 o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
-o.cvNested = false; % Nested CV for hyperparemeter optimization
 
 % Classifier function handle
 o.fun = @fitclinear; % [@fitcsvm|@fitclinear|@fitcdiscr|...]

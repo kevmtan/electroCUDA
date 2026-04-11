@@ -1,7 +1,8 @@
 function [o,n,st,ob] = ec_classifySpec(o)
-% Performs classification & cross-classification within channels/ICs/ROIs
-% across time using spectral activity as features. ROI classificaiton
-% concatenates timecourses from within-ROI channels. 
+% Performs spectral classification and cross-classification
+% within-channels/ICs/ROIs, within-timepoints, and within-subjects. 
+% ROI classification uses concatenated spectral timecourses from channels
+% within an ROI.
 %
 % This function is part of the electroCUDA package:
 % https://kevmtan.github.io/electroCUDA
@@ -9,9 +10,11 @@ function [o,n,st,ob] = ec_classifySpec(o)
 % Kevin Tan, 2026
 %
 % OUTPUTS:
-%   ob = classified observations
-%   stat = classifier results & statistics per independent analysis
+%   o = options struct
+%   n = recording information struct
+%   st = classifier results & statistics per independent analysis
 %       (chans/ICs/ROIs x timepoints) 
+%   ob = classified observations
 
 %% Input arguments
 arguments
@@ -21,20 +24,20 @@ end
 
 
 %% Prepare analysis data
-tt = tic; % start timer
-oo = namedargs2cell(o.p); % expand name-value arguments
-[x,ep,n] = ec_analPrep(tt,oo{:});
+tt = tic;                           % start timer
+oo = namedargs2cell(o.p);           % expand name-value arguments
+[x,ep,n] = ec_analPrep(tt,oo{:});   % run data prep
 
 
-%% Make classifier templates
+%% Classifier prep & templates
 [st,ob] = ec_classifyTemplates(n,ep,tt,o);
 % st = statistics
 % ob = observations
 
 
-%% Split variables so splits directly go into ec_runClassifier
+%% Split data for independent model runs
 oo = namedargs2cell(o.s);
-[x,n,st,ob] = ec_analSplit(x,n,st,ob,tt,oo{:});·
+[x,n,st,ob] = ec_analSplit(x,n,st,ob,tt,oo{:}); % split by chs/ICs/ROIs x timepoints
 
 
 %% Classification
@@ -56,30 +59,26 @@ disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%% Classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-
-
-
 function [st,ob] = classify_lfn(x,n,st,ob,tt,o)
-%%% Initialize classification %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Main classification routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% Compute across data splits (chans/ICs/ROIs x timepoints)
+
+%% Classify within data splits (chans/ICs/ROIs x timepoints)
 if o.gpu
+    % GPU loop across splits
     for s = 1:n.splits
-        [st(s,:),ob{s}] = ec_runClassifier(x{s},st(s,:),ob{s},o);
+        [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
     end
 else
+    % CPU parfor loop across splits (ideally threadpool)
     parfor s = 1:n.splits
-        [st(s,:),ob{s}] = ec_runClassifier(x{s},st(s,:),ob{s},o);
+        [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
     end
 end
 disp("[ec_classifyChSpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
 
 
-%% Concactenate channel results
+%% Concatenate channel results
 ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "t"],"ascend");
 
 

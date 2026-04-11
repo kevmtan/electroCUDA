@@ -1,7 +1,32 @@
-function [st,ob] = ec_classifyTemplates(n,ep,tt,o)
-% Prep
-nCond = numel(o.p.cond);
-nCondx = numel(o.p.condx);
+function [st,ob,o] = ec_classifyTemplates(n,ep,tt,o)
+% Make templates & other prep for electroCUDA classification routines
+
+%% Prep
+o.OptimizeHyperparameters = string(o.OptimizeHyperparameters);
+
+% Convert classification scores to posterior probability via Platt scaling
+% if needed (e.g., fitclinear SVM)
+o.doPlatt = isequal(o.fun,@fitclinear) && o.hyper.Learner=="svm";
+
+% Check if hyperparameter tuning enabled
+o.doTuning = isany(o.OptimizeHyperparameters) && any(o.OptimizeHyperparameters~="none");
+
+% Do nested CV only if hyperparameter tuning enabled
+o.doNestedCV = o.doNestedCV && o.doTuning;
+
+% Do CV if doing nested CV
+if o.doNestedCV; o.doCV = true; end
+
+% Check if cross-classification enabled
+o.doCC = isany(o.p.condx);
+
+% Vars from 'ep' to include in analysis template (to save for further analysis)
+o.psyVars = ismember(ep.Properties.VariableNames,...
+    ["run" "tr" "cnd" "t" "sbjID" o.psyVars]);
+
+% Convenient variables
+nCond = numel(o.p.cond); % number of train/test classes 
+nCondx = numel(o.p.condx); % number of cross-classification classes
 f0 = cast(nan,o.s.typeAnal); % float type
 u0 = uint16(0); % unsigned integer
 s0 = string(missing);
@@ -11,15 +36,11 @@ else
     c0 = cast(0,like=n.chNfo.ch); % Chan/IC integer type
 end
 
-% Get vars from 'ep' to include in analysis template (to save for further analysis)
-psyVars = ismember(ep.Properties.VariableNames,...
-    ["run" "tr" "cnd" "t" "sbjID" o.psyVars]);
-
 
 %% Make analysis observations template
-ob = ep(:,psyVars);
+ob = ep(:,o.psyVars);
 ob.y = categorical(ob.cnd,o.p.cond,Ordinal=true); % class (e.g. condition)
-ob.pred(:) = categorical("",o.p.cond,Ordinal=true); % predicted class
+ob.pred(:) = categorical(s0,o.p.cond,Ordinal=true); % predicted class
 ob.pp(:,1:numel(o.p.cond)) = f0; % posterior probability per class
 ob.pp1(:) = f0; % posterior probability difference
 ob.acc(:) = false; % accurate prediction?
@@ -34,7 +55,6 @@ ob = movevars(ob,"sbjID","After",width(ob));
 ob.Properties.RowNames = {};
 
 
-
 %% Make stats template
 st = table;
 st.t = unique(ob.t,"stable");
@@ -44,33 +64,39 @@ st.acc_p(:) = f0; % p-value above chance
 st.acc_q(:) = f0; % FDR-corrected sig
 st.auc(:,1:nCond) = f0; % CV ROC AUC per cond
 st.auc1(:) = f0; % AUC mean
-st.auc1_CI(:,1:2) = f0; % AUC confidence interval
 st.pp(:,1:nCond) = f0; % mean posterior probability (PP)
 st.pp1(:) = f0; % PP difference
 st.pp1_SE(:) = f0; % PP diff std dev
 st.pp1_p(:) = f0; % PP not equal p-value
 st.pp1_q(:) = f0; % FDR-corrected sig
-if any(nCondx)
+if o.doCC
     % Cross-classification (CC) stats
     st.ppx(:,1:nCondx) = f0; % CC PP
     st.ppx1(:) = f0; % CC PP diff
-    st.ppx1_SE(:) = f0; % CC PP diff SD
+    st.ppx1_SE(:) = f0; % CC PP diff SE
     st.ppx1_p(:) = f0;
     st.ppx1_q(:) = f0;
 end
-st.n0(:,1:nCond) = u0;
-st.n(:,1:nCond) = f0; % samples per training cond
-if isany(nCondx)
-    st.nx(:,1:nCondx) = u0; end % samples per cross-classification cond
+st.n0(:,1:nCond) = u0; % original obs per training cond
+st.n(:,1:nCond) = f0; % obs per training cond (converted to uint later)
+if o.doCC
+    st.nx(:,1:nCondx) = u0; end % obs per cross-classification cond
 st.wt(:,1:nCond) = f0; % class weight
-st.cost = cell(height(st),1);
-st.cv = st.cost;
-st.cvh = st.cost;
+st.cost = cell(height(st),1); % cost matrix
+if o.doCV
+    st.cv = st.cost; end % cross-validation object
+if o.doTuning && (o.doCC || ~o.doCV || (o.doCV && ~o.doNestedCV))
+    st.cvh = st.cost; end % cross-validation object for hyperparameter tuning
+if o.doNestedCV
+    st.cvhn = st.cost; end % cross-validation object for nested hyperparameter tuning
 st.loss(:) = f0; % average loss per fold CV
 % Feature info
-if o.p.chConcat=="roi"; st.width(:) = u0; end % ROI width (chans x freqs)
-if o.s.rank||isany(o.s.pca); st.rank(:) = u0; end % Matrix rank
-if isany(o.s.pca); st.features(:) = u0; end % Number of features
+if o.p.chConcat=="roi"
+    st.width(:) = u0; end % ROI width (chans x freqs)
+if o.s.rank||isany(o.s.pca)
+    st.rank(:) = u0; end % Matrix rank
+if isany(o.s.pca)
+    st.features(:) = u0; end % Number of features
 % Channel/IC/ROI info
 st.ch(:) = c0;
 st.sbjCh(:) = s0;
@@ -99,7 +125,7 @@ for t = 1:height(st)
     end
 
     % Cross-classify conds
-    if any(nCondx)
+    if o.doCC
         for c = 1:nCondx
             st.nx(t,c) = nnz(ob.cnd(idt)==o.p.condx(c));
         end
@@ -132,18 +158,26 @@ for t = 1:height(st)
     if ~any(idt); continue; end % skip
 
     % Main CV partition
-    st.cv{t} = cvpartition_lfn(ob(idt,:),nCond,o.cv,o.cvMinTrialsPerFold);
-    if isempty(st.cv{t})
-        ob.use(idt) = false; % mark timepoint as unusable
-        st.cv{t} = [];
-        continue;
+    if o.doCV
+        st.cv{t} = cvPartition_lfn(ob(idt,:),nCond,o.cv,o.cvMinTrialsPerFold);
+        if isempty(st.cv{t})
+            ob.use(idt) = false; % mark timepoint as unusable
+            st.cv{t} = [];
+            continue;
+        end
     end
 
-    % Hyperparameter CV partition
-    st.cvh{t} = cvpartition_lfn(ob(idt,:),nCond,o.cvh,o.cvMinTrialsPerFold);
-    if isempty(st.cvh{t})
-        ob.use(idt) = false;
-        st.cvh{t} = [];
+    % Hyperparameter tuning CV partition (full training set)
+    if o.doTuning && (o.doCC || ~o.doCV || (o.doCV && ~o.doNestedCV))
+        st.cvh{t} = cvPartition_lfn(ob(idt,:),nCond,o.cvh,o.cvMinTrialsPerFold);
+        if isempty(st.cvh{t})
+            ob.use(idt) = false;
+            st.cvh{t} = [];
+        end
+    end
+
+    % Nested hyperparameter tuning CV partition (full training set)
+    if o.doNestedCV
     end
 end
 disp("[ec_classifyTemplates] Made classifier templates: "+n.sbj+" | toc="+toc(tt));
@@ -221,7 +255,7 @@ end
 
 
 
-function cv = cvpartition_lfn(obt,nCond,cvArgs,minTrialsPerFold)
+function cv = cvPartition_lfn(obt,nCond,cvArgs,minTrialsPerFold)
 %%% Make CV partition %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Creates a grouped CV partition where each fold has approximately equal
 % class counts. Trials are grouped (all obs from a trial go to same fold),
