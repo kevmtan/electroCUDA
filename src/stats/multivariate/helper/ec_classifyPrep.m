@@ -1,5 +1,5 @@
-function [st,ob,o] = ec_classifyTemplates(n,ep,tt,o)
-% Make templates & other prep for electroCUDA classification routines
+function [st,ob,o] = ec_classifyPrep(n,ep,tt,o)
+% Prep for electroCUDA classification routines: templates, options, etc.
 
 %% Prep
 o.OptimizeHyperparameters = string(o.OptimizeHyperparameters);

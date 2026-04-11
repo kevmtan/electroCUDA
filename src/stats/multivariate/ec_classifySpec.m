@@ -30,7 +30,7 @@ oo = namedargs2cell(o.p);           % expand name-value arguments
 
 
 %% Classifier prep & templates
-[st,ob] = ec_classifyTemplates(n,ep,tt,o);
+[st,ob] = ec_classifyPrep(n,ep,tt,o);
 % st = statistics
 % ob = observations
 
