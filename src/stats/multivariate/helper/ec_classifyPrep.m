@@ -3,6 +3,7 @@ function [st,ob,o] = ec_classifyPrep(n,ep,tt,o)
 
 %% Prep
 o.OptimizeHyperparameters = string(o.OptimizeHyperparameters);
+o.doCC = isany(o.p.condx); % Check if cross-classification enabled
 
 % Convert classification scores to posterior probability via Platt scaling
 % if needed (e.g., fitclinear SVM)
@@ -16,9 +17,6 @@ o.doNestedCV = o.doNestedCV && o.doTuning;
 
 % Do CV if doing nested CV
 if o.doNestedCV; o.doCV = true; end
-
-% Check if cross-classification enabled
-o.doCC = isany(o.p.condx);
 
 % Vars from 'ep' to include in analysis template (to save for further analysis)
 o.psyVars = ismember(ep.Properties.VariableNames,...
@@ -59,16 +57,20 @@ ob.Properties.RowNames = {};
 st = table;
 st.t = unique(ob.t,"stable");
 st.acc(:) = f0; % Cross-validation (CV) mean accuracy
-st.acc_SE(:) = f0;
+st.acc_CI(:,1:2) = f0;
 st.acc_p(:) = f0; % p-value above chance
 st.acc_q(:) = f0; % FDR-corrected sig
-st.auc(:,1:nCond) = f0; % CV ROC AUC per cond
+st.auc(:,1:nCond) = f0; % CV precision-recall AUC per cond
 st.auc1(:) = f0; % AUC mean
 st.pp(:,1:nCond) = f0; % mean posterior probability (PP)
 st.pp1(:) = f0; % PP difference
-st.pp1_SE(:) = f0; % PP diff std dev
+st.pp1_SE(:) = f0; % PP diff st
 st.pp1_p(:) = f0; % PP not equal p-value
 st.pp1_q(:) = f0; % FDR-corrected sig
+st.ppc(1:nCond) = f0; % PP per cond
+st.ppc_SE(:) = f0; 
+st.ppc_p(:) = f0;
+st.ppc_q(:) = f0;
 if o.doCC
     % Cross-classification (CC) stats
     st.ppx(:,1:nCondx) = f0; % CC PP
@@ -76,6 +78,10 @@ if o.doCC
     st.ppx1_SE(:) = f0; % CC PP diff SE
     st.ppx1_p(:) = f0;
     st.ppx1_q(:) = f0;
+    st.ppcx(1:nCond) = f0; % PP per cross classifier cond
+    st.ppcx_SE(:) = f0;
+    st.ppcx_p(:) = f0;
+    st.ppcx_q(:) = f0;
 end
 st.n0(:,1:nCond) = u0; % original obs per training cond
 st.n(:,1:nCond) = f0; % obs per training cond (converted to uint later)

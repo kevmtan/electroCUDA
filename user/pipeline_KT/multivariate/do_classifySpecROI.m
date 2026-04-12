@@ -29,6 +29,11 @@ o.gpu = false; % analysis on GPU
 o.p.sfx = "f";
 o.p.nRmFields = "of"; % Fields to remove from 'n' to save memory
 
+% Conditions for classification
+o.p.condVar = "cond";
+o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify, ORDER MATTERS 
+o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
+
 % Channel Options
 o.p.chRm = []; % channels to remove (array of chan numbers)
 o.p.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
@@ -39,11 +44,6 @@ o.p.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (n
 % Timing for classification
 o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
 o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
-
-% Conditions for classification
-o.p.condVar = "cond";
-o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify, ORDER MATTERS 
-o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Task Epoching (see 'ec_epochPsy')
 o.p.epoch.float = "single"; % task metadata output floating-point precision
@@ -142,8 +142,8 @@ o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to inclu
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
-o.fdrTimeRng = [0 inf]; % Range of times for FDR
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
+o.fdrTimeRng = [0 inf]; % Range of times for FDR
 
 % Observations per timepoint (o.p.timeVar)
 o.nMin = 15; % minimum observations per class within timepoint
@@ -157,8 +157,11 @@ o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
 o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
 o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
 
-% Classifier function handle
-o.fun = @fitclinear; % [@fitcsvm|@fitclinear|@fitcdiscr|...]
+% Classification basic options
+o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
+o.permutations = 0; % Num permutations for performance testing (0 = parametric test)
+o.testVar = "acc"; % Performance test statistic variable ("acc"=accuracy|"auc1"=PR-AUC)
+o.jeffreys = false; % Jeffreys prior penalization for Platt scaling
 
 % Classifier hyperparameters
 o.hyper = struct;
@@ -179,7 +182,7 @@ elseif isequal(o.fun,@fitclinear)
     o.hyper.Regularization = "ridge";
     o.hyper.Solver = "dual";
     o.hyper.FitBias = true;
-    o.hyper.PostFitBias = true;
+    o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
@@ -236,9 +239,9 @@ end
 
 
 %% Initialize threadpool
-try reset(gpuDevice); catch;end
 try delete(gcp("nocreate")); catch;end
 try ppool = parpool("threads"); catch;end
+%try reset(gpuDevice); catch;end
 % s=5; %sbj38
 % s=9; %sbj42
 % s=21; %sbj60

@@ -6,8 +6,60 @@ function [sts,obs] = ec_classify(xs,sts,obs,o)
 %   s=207; xs=x{s}; sts=st(s,:); obs=ob{s};
 
 
+%% Main classification routine
+[sts,obs] = main_lfn(xs,sts,obs,o,false);
+
+
+%% Permutation test for accuracy/performance significance
+if o.permutations
+    sts = permute_lfn(xs,sts,obs,o);
+end
+
+
+%% Calculate classifier metrics
+N = nnz(obs.use);
+Nx = nnz(obs.cc);
+
+% Platt scaling: classificaton scores to posterior probability
+if o.doPlatt                    
+    obs = platt_lfn(obs,sts,o); % needed for fitclinear SVM, etc
+end
+
+% Posterior probability difference across possible classes
+obs.pp1 = diff(obs.pp,1,2);
+
+
+% CV posterior probability
+sts.pp = mean(obs.pp(obs.use,:),"omitmissing");
+sts.pp1 = mean(obs.pp1(obs.use),"omitmissing");
+sts.pp1_SE = std(obs.pp1(obs.use),"omitmissing")/sqrt(N);
+[~,sts.pp1_p] = ttest(obs.pp1(obs.use));
+
+% CC posterior probability
+if any(obs.cc)
+    sts.ppx = mean(obs.pp(obs.cc,:),"omitmissing");
+    sts.ppx1 = mean(obs.pp1(obs.cc),"omitmissing");
+    sts.ppx1_SE = std(obs.pp1(obs.cc),"omitmissing")/sqrt(Nx);
+    [~,sts.ppx1_p] = ttest(obs.pp1(obs.cc));
+end
+
+
+
+
+
+
+function [sts,obs] = main_lfn(xs,sts,obs,o,isTest)
+%%% Main classification routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% isTest = currently being performed for permutation testing
+%
+% Performs classification & cross-classification
+% Necessary parts of routine are repeated for permutation testing of
+% classifier performance significance
+
+
 %% Train & optimize (full training set)
-if o.doCC || ~o.doCV || (o.doTuning && o.doCV && ~o.doNestedCV)
+if ~o.doCV || (o.doCV && ~o.doNestedCV && o.doTuning ) || (o.doCC && ~isTest)
     % Extract options
     oo = namedargs2cell(o.hyper);
     oho = o.HyperparameterOptimizationOptions; % hyperparameter tuning opts
@@ -27,7 +79,7 @@ end
 
 
 %% Cross-classify 
-if o.doCC
+if o.doCC && ~isTest
     [obs.pred(obs.cc),obs.pp(obs.cc,:)] = mdl.predict(xs(obs.cc,:));
 end
 
@@ -38,7 +90,7 @@ if o.doCV
         % Nested CV options
         oo = namedargs2cell(o.hyper);
         oho = o.HyperparameterOptimizationOptions; % hyperparameter tuning opts
-        % NOT YET IMPLEMENTED: oho.CVPartition = sts.cvhn{1}; %% inner CV partition
+        % NOT YET IMPLEMENTED: oho.CVPartition = sts.cvhn{1}; %% custom inner CV partition
 
         % Fit nested CV classifier
         mdlCV = o.fun(xs(obs.use,:),obs.y(obs.use),oo{:},'Cost',sts.cost{1},...
@@ -84,61 +136,62 @@ else
         ConfidenceIntervalType="none");
 end
 
+%% Accuracy
 
-%% Calculate classifier metrics
-N = nnz(obs.use);
-Nx = nnz(obs.cc);
+% Identify correctly-classified obsservations
+obs.acc = obs.pred==obs.y;
 
-% Platt scaling: classificaton scores to posterior probability
-if o.doPlatt                    
-    obs = platt_lfn(obs,sts,o); % needed for fitclinear SVM, etc
-end
-
-% Observation-level metrics
-obs.acc = obs.pred==obs.y; % accuracy
-obs.pp1 = diff(obs.pp,1,2); % posterior probability difference
-
-
-% CV accuracy
-sts.acc = mean(obs.acc(obs.use),"omitmissing");
-sts.acc_SE = std(obs.acc(obs.use),"omitmissing")/sqrt(N);
-sts.acc_p = 1 - binocdf(nnz(obs.acc(obs.use))-1, N, 0.5);
+% Accuracy stats (parametric)
+[sts.acc_p,sts.acc_SE,sts.acc] = ec_binomTest(obs.acc);
 
 % Precision-recall AUC
 sts.auc = rocm.auc("pr");  
 sts.auc1 = mean(sts.auc,"omitmissing");
-% figure out AUC p-value???
-% **OR** USE f1-score & its p-value?? (fit to binomial dist?)
 
 
 
 
 
 
+function sts = permute_lfn(xs,sts,obs,o)
+%%% Permutation testing for classifier performance significance %%%%%%%%%%%
 
-
-
-% CV posterior probability
-sts.pp = mean(obs.pp(obs.use,:),"omitmissing");
-sts.pp1 = mean(obs.pp1(obs.use),"omitmissing");
-sts.pp1_SE = std(obs.pp1(obs.use),"omitmissing")/sqrt(N);
-[~,sts.pp1_p] = ttest(obs.pp1(obs.use));
-
-% CC posterior probability
-if any(obs.cc)
-    sts.ppx = mean(obs.pp(obs.cc,:),"omitmissing");
-    sts.ppx1 = mean(obs.pp1(obs.cc),"omitmissing");
-    sts.ppx1_SE = std(obs.pp1(obs.cc),"omitmissing")/sqrt(Nx);
-    [~,sts.ppx1_p] = ttest(obs.pp1(obs.cc));
+% Only do permutation test for above-chance acurracy, otherwise the
+% parametric test result is kept to save compute
+%       TO DO: figure out threshold for mean PR-AUC (o.testVar=="auc1")
+if o.testVar=="acc" && sts.acc < 1/numel(o.p.cond)
+    return;
 end
 
+% Stats info
+stat = sts.(o.testVar); % actual test statistic value
+N = nnz(obs.use); % number of training set observations
 
+% Preallocate permuted distribution of statistic
+statPerm = zeros(o.permutations,like=sts.(o.testVar));
+
+% Loop across permutations
+for n = 1:o.permutations
+    % Shuffle labels
+    y = obs.y(obs.use); % extract labels
+    y = y(randperm(N)); % shuffle labels
+    obs.y(obs.use) = y; % save to observations table
+
+    % Run classification routine on shuffled labels
+    sts1 = main_lfn(xs,sts,obs,o,true);
+
+    % Save performance testing statistic
+    statPerm(n) = sts1.(o.testVar);
+end
+
+% Calculate p-value
+sts.(o.testVar+"_p") = (nnz(statPerm>=stat) + 1) / (o.permutations + 1);
 
 
 
 
 function obs = platt_lfn(obs,sts,o)
-%%% Platt scaling: classificaton scores to posterior probability %%%%%%%%%%
+%%% Platt scaling: top-level routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if width(obs.pp)~=2
     warning("Platt scaling only implemented for binary classification. "+...
         "Unbounded classification scores not converted to posterior probability.")
@@ -160,9 +213,9 @@ if ~o.doCV || o.doCC
     % If CV wasn't performed, fitting uses scores from full model (unstable)
 
     % Fit scaling coefficients on full training set
-    [b,ok] = plattFit_lfn(y,scores);
+    [b,ok] = plattFit_lfn(y,scores,o);
 
-    % Apply scaling on unpartitioned-classification scores
+    % Apply scaling on scores from full model (no CV) on training set
     if ~o.doCV && ok
         obs.pp(obs.use,:) = plattApply_lfn(b,scores);
     end
@@ -175,9 +228,9 @@ if ~o.doCV || o.doCC
 end
 
 
-%% Platt scaling for CV classification  (fold-safe using assignments in sts.cv)
+%% Platt scaling for CV classification (fold-safe using assignments in sts.cv)
 if o.doCV
-    [obs.pp(obs.use,:),ok] = plattCV_lfn(y,scores,sts.cv{1},obs.pp(obs.use,:));
+    [obs.pp(obs.use,:),ok] = plattCV_lfn(y,scores,sts.cv{1},obs.pp(obs.use,:),o);
 end
 if ~ok; warning("[ec_classify] Platt scaling not applied for CV scores: "+sts.sbjCh+" t="+sts.t); end
 
@@ -186,7 +239,7 @@ if ~ok; warning("[ec_classify] Platt scaling not applied for CV scores: "+sts.sb
 
 
 
-function [pp,okAll] = plattCV_lfn(y,scores,cv,pp)
+function [pp,okAll] = plattCV_lfn(y,scores,cv,pp,o)
 %%% Platt scaling on CV folds %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 okAll = false(cv.NumTestSets,1);
 
@@ -196,7 +249,7 @@ for k = 1:cv.NumTestSets
     idTrain = training(cv,k);
 
     % Fit scaling on fold-train scores only
-    [b,ok] = plattFit_lfn(y(idTrain),scores(idTrain));
+    [b,ok] = plattFit_lfn(y(idTrain),scores(idTrain),o);
     okAll(k) = ok;
     if ~ok; continue; end
 
@@ -209,7 +262,7 @@ okAll = all(okAll);
 
 
 
-function [b,ok] = plattFit_lfn(y,scores)
+function [b,ok] = plattFit_lfn(y,scores,o)
 %%% Fit Platt scaling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Index of useable scores
@@ -217,7 +270,11 @@ id = isfinite(scores) & ~isnan(scores);
 
 % Fit logistic regression (if more than 3 good obs)
 if nnz(id) > 3
-    b = glmfit(scores(id),y,"binomial",LikelihoodPenalty="jeffreys-prior");
+    if o.jeffreys
+        b = glmfit(scores(id),y,"binomial",LikelihoodPenalty="jeffreys-prior");
+    else
+        b = glmfit(scores(id),y,"binomial");
+    end
     ok = true;
 else
     ok = false;
@@ -251,3 +308,4 @@ for p = 1:numel(o.OptimizeHyperparameters)
     if param=="Regularization" % handle special case for Regularization
         oh.(param) = extractBefore(oh.(param)," "); end
 end
+
