@@ -19,13 +19,13 @@ o.doNestedCV = o.doNestedCV && o.doTuning;
 if o.doNestedCV; o.doCV = true; end
 
 % Vars from 'ep' to include in analysis template (to save for further analysis)
-o.psyVars = ismember(ep.Properties.VariableNames,...
+psyVars = ismember(ep.Properties.VariableNames,...
     ["run" "tr" "cnd" "t" "sbjID" o.psyVars]);
 
 % Convenient variables
 nCond = numel(o.p.cond); % number of train/test classes 
 nCondx = numel(o.p.condx); % number of cross-classification classes
-f0 = cast(nan,o.s.typeAnal); % float type
+f0 = cast(nan,o.floatAnal); % float precision
 u0 = uint16(0); % unsigned integer
 s0 = string(missing);
 if isany(o.p.chConcat)
@@ -36,14 +36,17 @@ end
 
 
 %% Make analysis observations template
-ob = ep(:,o.psyVars);
+ob = ep(:,psyVars);
 ob.y = categorical(ob.cnd,o.p.cond,Ordinal=true); % class (e.g. condition)
 ob.pred(:) = categorical(s0,o.p.cond,Ordinal=true); % predicted class
 ob.pp(:,1:numel(o.p.cond)) = f0; % posterior probability per class
 ob.pp1(:) = f0; % posterior probability difference
 ob.acc(:) = false; % accurate prediction?
 ob.use(ismember(ob.cnd,o.p.cond)) = true; % use if one of the main conds (train/test)
-ob.cc(ismember(ob.cnd,o.p.condx)) = true; % cross-classification conds
+if o.doCC
+    ob.cc(ismember(ob.cnd,o.p.condx)) = true; % cross-classification conds
+    ob.cx = categorical(string(ob.cnd),o.p.condx,Ordinal=true); % Add CC cond var to obs
+end
 % Channel/IC/ROI info
 ob.ch(:) = c0;
 ob.sbjCh(:) = s0;
@@ -57,20 +60,27 @@ ob.Properties.RowNames = {};
 st = table;
 st.t = unique(ob.t,"stable");
 st.acc(:) = f0; % Cross-validation (CV) mean accuracy
-st.acc_CI(:,1:2) = f0;
+st.acc_SE(:) = f0;
 st.acc_p(:) = f0; % p-value above chance
 st.acc_q(:) = f0; % FDR-corrected sig
 st.auc(:,1:nCond) = f0; % CV precision-recall AUC per cond
 st.auc1(:) = f0; % AUC mean
 st.pp(:,1:nCond) = f0; % mean posterior probability (PP)
-st.pp1(:) = f0; % PP difference
+% PP difference
+st.pp1(:) = f0;
 st.pp1_SE(:) = f0; % PP diff st
 st.pp1_p(:) = f0; % PP not equal p-value
 st.pp1_q(:) = f0; % FDR-corrected sig
-st.ppc(1:nCond) = f0; % PP per cond
-st.ppc_SE(:) = f0; 
-st.ppc_p(:) = f0;
-st.ppc_q(:) = f0;
+% PP per cond
+st.ppc(:,1:nCond) = f0; 
+st.ppc_SE(:,1:nCond) = f0; 
+st.ppc_p(:,1:nCond) = f0;
+st.ppc_q(:,1:nCond) = f0;
+% PP cond diff
+st.ppc1(:) = f0;
+st.ppc1_SE(:) = f0;
+st.ppc1_p(:) = f0;
+st.ppc1_q(:) = f0;
 if o.doCC
     % Cross-classification (CC) stats
     st.ppx(:,1:nCondx) = f0; % CC PP
@@ -78,10 +88,16 @@ if o.doCC
     st.ppx1_SE(:) = f0; % CC PP diff SE
     st.ppx1_p(:) = f0;
     st.ppx1_q(:) = f0;
-    st.ppcx(1:nCond) = f0; % PP per cross classifier cond
-    st.ppcx_SE(:) = f0;
-    st.ppcx_p(:) = f0;
-    st.ppcx_q(:) = f0;
+    % PP per CC cond
+    st.ppxc(:,1:nCondx) = f0;
+    st.ppxc_SE(:,1:nCondx) = f0;
+    st.ppxc_p(:,1:nCondx) = f0;
+    st.ppxc_q(:,1:nCondx) = f0;
+    % PP cond diff
+    st.ppxc1(:) = f0;
+    st.ppxc1_SE(:) = f0;
+    st.ppxc1_p(:) = f0;
+    st.ppxc1_q(:) = f0;
 end
 st.n0(:,1:nCond) = u0; % original obs per training cond
 st.n(:,1:nCond) = f0; % obs per training cond (converted to uint later)
@@ -184,7 +200,15 @@ for t = 1:height(st)
 
     % Nested hyperparameter tuning CV partition (full training set)
     if o.doNestedCV
+        error("Nested CV custom partition not implemented yet");
     end
+end
+
+%% Finalize
+
+% Custom prep function
+if ~isempty(o.prepFun)
+    [st,ob] = o.prepFun(st,ob,o);
 end
 disp("[ec_classifyTemplates] Made classifier templates: "+n.sbj+" | toc="+toc(tt));
 

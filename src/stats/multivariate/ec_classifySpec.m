@@ -44,6 +44,25 @@ oo = namedargs2cell(o.s);
 [st,ob] = classify_lfn(x,n,st,ob,tt,o);
 
 
+%% FDR
+st = fdr_lfn(st,n,o,tt);
+
+
+%% Finalize
+
+% Convert to output float precision
+st = convertvars(st,varfun(@isfloat,st,"OutputFormat","uniform"),o.floatOut);
+ob = convertvars(ob,varfun(@isfloat,ob,"OutputFormat","uniform"),o.floatOut);
+
+% Remove vars
+id = ismember(st.Properties.VariableNames,["cost" "cv" "cvh" "cvhn"]);
+st = removevars(st,id);
+
+% Rename vars
+ob = renamevars(ob,["t" "cnd"],[o.p.timeVar o.p.condVar]);
+st = renamevars(st,"t",o.p.timeVar);
+
+
 %% Save
 o.saved.st = o.dirOut+"s"+n.sbjID+"_st.mat";
 save(o.saved.st,"st","-v7");
@@ -82,10 +101,15 @@ disp("[ec_classifyChSpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
 ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "t"],"ascend");
 
 
-%% FDR
+
+
+
+
+function st = fdr_lfn(st,n,o,tt)
+%%% Run FDR correction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 vs = string(st.Properties.VariableNames);
-vsP = vs(contains(vs,"_p")); % pval vars
-vsQ = vs(contains(vs,"_q")); % fdr vars
+vsP = vs(endsWith(vs,"_p")); % pval vars
+vsQ = vs(endsWith(vs,"_q")); % fdr vars
 id = st.t>=o.fdrTimeRng(1) & st.t<=o.fdrTimeRng(2); % fdr time range
 
 % Loop across q vars
@@ -98,14 +122,3 @@ for v = 1:numel(vsQ)
     end
 end
 disp("[ec_classifyChSpec] Ran FDR: "+n.sbj+" toc="+toc(tt));
-
-
-%% Finalize
-% TO DO: convert float vars to output type
-
-% Remove vars
-st = removevars(st,["cost" "cv" "cvh"]);
-
-% Rename vars
-ob = renamevars(ob,["t" "cnd"],[o.timeVar o.condVar]);
-st = renamevars(st,"t",o.timeVar);

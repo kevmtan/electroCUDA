@@ -21,13 +21,14 @@ o.name = ""; % Analysis name (filled in subject loop)
 o.test = false; % TEST?
 o.save = true; % SAVE?
 o.gpu = false; % analysis on GPU
+o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
+o.floatOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
 
 
 %%%%%%%%%%%%%%%%% ANALYSIS PREP: ec_analPrep(...,o.p) %%%%%%%%%%%%%%%%%%%%%
 
 % Input data
 o.p.sfx = "f";
-o.p.nRmFields = "of"; % Fields to remove from 'n' to save memory
 
 % Conditions for classification
 o.p.condVar = "cond";
@@ -46,7 +47,7 @@ o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bi
 o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
 
 % Task Epoching (see 'ec_epochPsy')
-o.p.epoch.float = "single"; % task metadata output floating-point precision
+o.p.epoch.float = o.floatAnal; % task metadata output floating-point precision
 o.p.epoch.hzTarget = 0; % Target sampling rate (0=default rate)
 o.p.epoch.rmVars = ["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]; % Vars to remove from epoch table
 % Bad trial removal
@@ -72,8 +73,8 @@ o.p.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 
 % Preprocessing (see 'ec_epochPreproc')
 o.p.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
-o.p.pre.typeProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
-o.p.pre.typeOut = "double"; % output FP precision ("double"|"single"|""=same as input)
+o.p.pre.floatProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
+o.p.pre.floatOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.p.pre.hzTarget = 0; % Target sampling rate (0=default rate)
 % Normalization/transform
 o.p.pre.log = false; % Log transform
@@ -88,8 +89,8 @@ o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"m
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
-o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
+o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrTime = 3; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
@@ -122,7 +123,7 @@ o.p.pre.pcaGPU = false;
 %%%%%%%%%%%% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s) %%%%%%%%%%%%%%%%%%%
 
 % Analysis floating-point precision ("double"|"single"|"half")
-o.s.typeAnal = "single"; 
+o.s.floatAnal = o.floatAnal; 
 
 % PCA & rank
 o.s.std = "robust"; % Standardize features within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
@@ -137,8 +138,7 @@ o.s.rank = true; % calculate rank if no PCA
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
-o.typeOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in results output
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in observations output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -147,7 +147,11 @@ o.fdrTimeRng = [0 inf]; % Range of times for FDR
 
 % Observations per timepoint (o.p.timeVar)
 o.nMin = 15; % minimum observations per class within timepoint
-o.balanceConds = true; % balance sample size per class within timepoint 
+o.balanceConds = true; % balance sample size per class within timepoint
+
+% Custom function handles
+o.prepFun = @mmr_classifySpecPrep; % function for end of ec_classifyPrep
+o.metricFun = @mmr_classifySpecMetrics; % function for end of ec_classify
 
 % Cross-validation (CV) parameters (mathworks.com/help/stats/crossval.html)
 o.doCV = true; % Do CV?
@@ -160,7 +164,7 @@ o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
 % Classification basic options
 o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.permutations = 0; % Num permutations for performance testing (0 = parametric test)
-o.testVar = "acc"; % Performance test statistic variable ("acc"=accuracy|"auc1"=PR-AUC)
+o.perfVar = "acc"; % Performance test statistic variable ("acc"=accuracy|"auc1"=PR-AUC)
 o.jeffreys = false; % Jeffreys prior penalization for Platt scaling
 
 % Classifier hyperparameters
@@ -180,7 +184,7 @@ elseif isequal(o.fun,@fitclinear)
     o.hyper.Learner = "svm";
     o.hyper.Lambda = "auto";
     o.hyper.Regularization = "ridge";
-    o.hyper.Solver = "dual";
+    o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
     o.hyper.FitBias = true;
     o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = true;
@@ -201,7 +205,7 @@ end
 if isequal(o.fun,@fitcsvm)
     o.OptimizeHyperparameters = "BoxConstraint"; % "BoxConstraint" "KernelScale"
 elseif isequal(o.fun,@fitclinear)
-    o.OptimizeHyperparameters = "none"; % "Lambda" "Learner"
+    o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
     o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
 elseif isequal(o.fun,@fitcknn)

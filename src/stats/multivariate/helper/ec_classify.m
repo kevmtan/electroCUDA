@@ -3,44 +3,67 @@ function [sts,obs] = ec_classify(xs,sts,obs,o)
 %
 % TO DO: custom CV loop, custom nested CV partitioning, deal with NaNs?
 %
-%   s=207; xs=x{s}; sts=st(s,:); obs=ob{s};
+%   s=217; xs=x{s}; sts=st(s,:); obs=ob{s};
 
 
 %% Main classification routine
 [sts,obs] = main_lfn(xs,sts,obs,o,false);
-
 
 %% Permutation test for accuracy/performance significance
 if o.permutations
     sts = permute_lfn(xs,sts,obs,o);
 end
 
+%% Classifier metrics
 
-%% Calculate classifier metrics
-N = nnz(obs.use);
-Nx = nnz(obs.cc);
-
-% Platt scaling: classificaton scores to posterior probability
+% Platt scaling: classificaton scores to posterior probability (PP)
 if o.doPlatt                    
     obs = platt_lfn(obs,sts,o); % needed for fitclinear SVM, etc
 end
 
-% Posterior probability difference across possible classes
+% PP difference across class scores
 obs.pp1 = diff(obs.pp,1,2);
 
+% PP of training set classification
+sts.pp = mean(obs.pp(obs.use,:),"omitmissing"); % PP mean
+[sts.pp1,sts.pp1_p,sts.pp1_SE] = ec_ttest(obs.pp1(obs.use)); % PP difference test
 
-% CV posterior probability
-sts.pp = mean(obs.pp(obs.use,:),"omitmissing");
-sts.pp1 = mean(obs.pp1(obs.use),"omitmissing");
-sts.pp1_SE = std(obs.pp1(obs.use),"omitmissing")/sqrt(N);
-[~,sts.pp1_p] = ttest(obs.pp1(obs.use));
+% PP of cross-classification
+if o.doCC
+    sts.ppx = mean(obs.pp(obs.cc,:),"omitmissing"); % PP mean
+    [sts.ppx1,sts.ppx1_p,sts.ppx1_SE] = ec_ttest(obs.pp1(obs.cc)); % PP difference test
+end
 
-% CC posterior probability
-if any(obs.cc)
-    sts.ppx = mean(obs.pp(obs.cc,:),"omitmissing");
-    sts.ppx1 = mean(obs.pp1(obs.cc),"omitmissing");
-    sts.ppx1_SE = std(obs.pp1(obs.cc),"omitmissing")/sqrt(Nx);
-    [~,sts.ppx1_p] = ttest(obs.pp1(obs.cc));
+% PP of main conds (training set)
+for c = 1:numel(o.p.cond)
+    id = obs.cnd == o.p.cond(c);
+    [sts.ppc(1,c),sts.ppc_p(1,c),sts.ppc_SE(1,c)] = ec_ttest(obs.pp1(id));
+end
+
+% PP of cross-classification conds
+for c = 1:numel(o.p.condx)
+    id = obs.cnd == o.p.condx(c);
+    [sts.ppxc(1,c),sts.ppxc_p(1,c),sts.ppxc_SE(1,c)] = ec_ttest(obs.pp1(id));
+end
+
+% PP diff of main conds
+lm = fitlm(obs(obs.use,:),"pp1 ~ y");
+sts.ppc1(1,:) = lm.Coefficients.Estimate(2:end)';
+sts.ppc1_SE(1,:) = lm.Coefficients.SE(2:end)';
+sts.ppc1_p(1,:) = lm.Coefficients.pValue(2:end)';
+
+% PP diff of CC conds
+if o.doCC
+    lm = fitlm(obs(obs.cc,:),"pp1 ~ cx");
+    sts.ppxc1(1,:) = lm.Coefficients.Estimate(2:end)';
+    sts.ppxc1_SE(1,:) = lm.Coefficients.SE(2:end)';
+    sts.ppxc1_p(1,:) = lm.Coefficients.pValue(2:end)';
+end
+
+
+%% Custom classifier metrics
+if ~isempty(o.metricFun)
+    [sts,obs] = o.metricFun(sts,obs,o);
 end
 
 
@@ -57,9 +80,12 @@ function [sts,obs] = main_lfn(xs,sts,obs,o,isTest)
 % Necessary parts of routine are repeated for permutation testing of
 % classifier performance significance
 
+% TEST - make this more elegant
+if sts.t<0; o.doTuning=false; end
+
 
 %% Train & optimize (full training set)
-if ~o.doCV || (o.doCV && ~o.doNestedCV && o.doTuning ) || (o.doCC && ~isTest)
+if ~o.doCV || (o.doCV && ~o.doNestedCV && o.doTuning) || (o.doCC && ~isTest)
     % Extract options
     oo = namedargs2cell(o.hyper);
     oho = o.HyperparameterOptimizationOptions; % hyperparameter tuning opts
@@ -136,13 +162,13 @@ else
         ConfidenceIntervalType="none");
 end
 
-%% Accuracy
+%% Performance
 
-% Identify correctly-classified obsservations
+% Accurately-classified observations
 obs.acc = obs.pred==obs.y;
 
 % Accuracy stats (parametric)
-[sts.acc_p,sts.acc_SE,sts.acc] = ec_binomTest(obs.acc);
+[sts.acc,sts.acc_p,sts.acc_SE] = ec_binomTest(obs.acc(obs.use));
 
 % Precision-recall AUC
 sts.auc = rocm.auc("pr");  
@@ -158,17 +184,17 @@ function sts = permute_lfn(xs,sts,obs,o)
 
 % Only do permutation test for above-chance acurracy, otherwise the
 % parametric test result is kept to save compute
-%       TO DO: figure out threshold for mean PR-AUC (o.testVar=="auc1")
-if o.testVar=="acc" && sts.acc < 1/numel(o.p.cond)
+%       TO DO: figure out threshold for mean PR-AUC (o.perfVar=="auc1")
+if o.perfVar=="acc" && sts.acc < 1/numel(o.p.cond)
     return;
 end
 
 % Stats info
-stat = sts.(o.testVar); % actual test statistic value
+stat = sts.(o.perfVar); % actual perfomance statistic value
 N = nnz(obs.use); % number of training set observations
 
-% Preallocate permuted distribution of statistic
-statPerm = zeros(o.permutations,like=sts.(o.testVar));
+% Preallocate permuted performance distribution
+statPerm = zeros(o.permutations,like=sts.(o.perfVar));
 
 % Loop across permutations
 for n = 1:o.permutations
@@ -181,11 +207,11 @@ for n = 1:o.permutations
     sts1 = main_lfn(xs,sts,obs,o,true);
 
     % Save performance testing statistic
-    statPerm(n) = sts1.(o.testVar);
+    statPerm(n) = sts1.(o.perfVar);
 end
 
 % Calculate p-value
-sts.(o.testVar+"_p") = (nnz(statPerm>=stat) + 1) / (o.permutations + 1);
+sts.(o.perfVar+"_p") = (nnz(statPerm>=stat) + 1) / (o.permutations + 1);
 
 
 
