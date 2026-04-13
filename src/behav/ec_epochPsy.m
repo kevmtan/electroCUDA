@@ -41,9 +41,6 @@ o.pre=seconds(abs(o.pre)); o.post=seconds(abs(o.post)); o.dur=seconds(abs(o.dur)
 o.badTrialVars = o.badTrialVars(ismember(o.badTrialVars,... % bad trial vars
     trialNfo.Properties.VariableNames));
 
-% Confirm vars to remove from epoch table exist in psy
-o.rmVars = o.rmVars(ismember(o.rmVars,psy.Properties.VariableNames));
-
 % Resample to target sampling rate
 n.hz0 = n.hz; % save for ec_epochPreproc
 if any(o.hzTarget) && o.hzTarget~=n.hz0
@@ -147,6 +144,12 @@ if isany(o.conds2)
     trialNfo.cond = renamecats(trialNfo.cond,o.conds,o.conds2);
 end
 
+% Response (GET RID BEFORE RELEASE)
+if n.task=="MMR"
+    ep.resp = categorical(string(ep.resp),["false" "true"],Ordinal=true);
+    trialNfo.resp = categorical(string(trialNfo.resp),["false" "true"],Ordinal=true);
+end
+
 % Bin timings
 ep.frame = round(ep.latency*n.hz); % frame within trial
 ep.bin = ep.latency/o.bin;
@@ -156,15 +159,17 @@ ep.binRT = round(ep.binRT+eps(ep.binRT)) * o.bin * 1000;
 ep.binPct = ep.pct/o.binPct;
 ep.binPct = round(ep.binPct+eps(ep.binPct)) * o.binPct;
 
-% Convert vars
+% Convert to integers
+ep = convertvars(ep,"frame","int32");
+
+% Convert float vars
 if isany(o.float)
     ep = convertvars(ep,varfun(@isfloat,ep,"OutputFormat","uniform"),o.float);
     trialNfo = convertvars(trialNfo,varfun(@isfloat,trialNfo,"OutputFormat","uniform"),o.float);
 end
-ep = convertvars(ep,"frame","int32");
 
-% Remove vars
-ep(:,["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"]) = [];
+% Remove vars (confirm they exist in ep)
+ep = removevars(ep,o.rmVars(ismember(o.rmVars,ep.Properties.VariableNames)));
 
 % Reorder vars
 ep = movevars(ep,["frame" "latency" "bin" "pct" "binPct" "latRT" "binRT"],...

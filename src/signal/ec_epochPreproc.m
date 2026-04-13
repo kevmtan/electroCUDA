@@ -1,4 +1,4 @@
-function [x,n,o] = ec_epochPreproc(x,n,psy,ep,tt,o)
+function [y,n,o] = ec_epochPreproc(x,n,psy,ep,tt,o)
 % Epoch-based preprocessing routines for analysis-specific preprocessing
 %   Kevin Tan (2025) | github.com/kevmtan/electroCUDA
 %
@@ -22,9 +22,9 @@ arguments
     o.gpu (1,1) logical = false                % Run on GPU? (note: CPU appears faster)
     o.hzTarget (1,1) double = 0                % Target sampling rate (0=skip)
     % processing FP precision ("double"|"single"|default=same as input)
-    o.typeProc (1,1){mustBeMember(o.typeProc,["double" "single"])} = class(x)
+    o.floatProc (1,1){mustBeMember(o.floatProc,["double" "single"])} = class(x)
     % output FP precision ("double"|"single"|"half"|default=same as input)
-    o.typeOut (1,1){mustBeMember(o.typeOut,["double" "single" "half"])} = class(x)          
+    o.floatOut (1,1){mustBeMember(o.floatOut,["double" "single" "half"])} = class(x)          
     % Trasnform/normalization
     o.log (1,1) logical = false;               % Log transform
     o.mag2db (1,1) logical = false;            % Spectral magnitude to decibel
@@ -80,12 +80,13 @@ o.badFrameVars2 = string([]);
 
 %% Prep
 
-% Convert EEG to specified float type for processing
-x = cast(x,o.typeProc);
-
 % Groups for splitapply
 psy.runG = cast(findgroups(psy.run),like=psy.run); % runs
 ep.trG = cast(findgroups(ep.tr),like=ep.tr); % epochs/trials
+
+% Get indices
+n.trId = splitapply(@(e){e},ep.ide,ep.trG);
+n.timesId = splitapply(@(e){e},ep.ide,n.timesG);
 
 % Spectral
 if isany(o.bands)
@@ -126,7 +127,7 @@ end
 % The main within-channel routine calls within-run & within-epoch routines
 
 % Reformat/preallocate
-x = ec_dim2cell(x,2); % EEG data to channelwise cells for main preproc
+y = cell(n.xChs,1);
 wts = cell(n.xChs,1); % preallocate channel PCA weights
 ranks = nan(n.xChs,1);
 
@@ -134,18 +135,18 @@ ranks = nan(n.xChs,1);
 if o.gpu
     % GPU loop
     for ch = 1:n.xChs
-        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o,ch);
+        [y{ch},wts{ch},ranks(ch)] = withinCh_lfn(x(:,ch,:),psy,ep,n,o,ch);
     end
 else
     % CPU parallel loop (ideally threadpool)
     parfor ch = 1:n.xChs
-        [x{ch},wts{ch},ranks(ch)] = withinCh_lfn(x{ch},psy,ep,n,o,ch);
+        [y{ch},wts{ch},ranks(ch)] = withinCh_lfn(x(:,ch,:),psy,ep,n,o,ch);
     end
 end
-disp("[ec_epochBaseline] Completed main preproc: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPreproc] Completed main preproc: "+n.sbj+" time="+toc(tt));
 
 % Reformat EEG data as matrix
-x = ec_cell2dim(x,2);
+y = ec_cell2dim(y,2);
 
 
 %% Finalize
@@ -171,11 +172,13 @@ if o.pca
     n.spect.disp = "Spectral Component "+(1:n.nSpect)';
 end
 
-% Remove bad frame table
+% Remove redundant fields
+n = rmfield(n,"trId");
+n = rmfield(n,"timesId");
 if ~o.test
     n = rmfield(n,"xBad");
 end
-disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPreproc] Finished: "+n.sbj+" time="+toc(tt));
 
 
 
@@ -192,6 +195,9 @@ disp("[ec_epochBaseline] Finished: "+n.sbj+" time="+toc(tt));
 function [xc,wc,xcRank] = withinCh_lfn(xc,psy,ep,n,o,ch)
 %%% Within-channel preprocessing routine (top-level) %%%%%%%%%%%%%%%%%%%%%%
 % ch=1; xc=x{ch};
+
+% Convert EEG to specified float type for processing
+xc = cast(xc,o.floatProc);
 
 % Move EEG to GPU
 if o.gpu
@@ -226,29 +232,21 @@ xc = xc(ep.idx,:); % match 'ep' indices
 
 % Baseline correction & normalization
 if isany(o.trialNorm) || isany(o.trialBaseline)
-    % Split data by epoch
-    xc = splitapply(@(e){xc(e,:)},ep.ide,ep.trG);
-    ep = splitapply(@(e){ep(e,:)},ep.ide,ep.trG);
-
     % Loop across epochs
     for e = 1:n.nTrs
-        xc{e} = withinEpoch_lfn(xc{e},ep{e},o); % call within-trial routine
+        id = n.trId{e};
+        xc(id,:) = withinEpoch_lfn(xc(id,:),ep(id,:),o); % call within-trial routine
     end
-
-    % Concatenate epochs
-    xc = vertcat(xc{:});
-    ep = vertcat(ep{:});
 end
 
 
 %% Outliers: timepoint & condition
 if o.olThrTime || o.olThrCond
     % Call outlier detection per timepoint
-    xc = splitapply(@(xt,ct) {outliersTime_lfn(xt,ct,n,o)},...
-        xc,ep.cnd,n.timesG);
-
-    % Concatenate timepoints
-    xc = vertcat(xc{:});
+    for t = 1:n.nTimes
+        id = n.timesId{t};
+        xc(id,:) = outliersTime_lfn(xc(id,:),ep.cnd(id),n,o);
+    end
 end
 
 
@@ -256,7 +254,7 @@ end
 
 % Spectral bands
 if isany(o.bands)
-    xc = constructBands_lfn(xc,n,tt);
+    xc = constructBands_lfn(xc,n);
 end
 
 % Spectral PCA
@@ -272,7 +270,7 @@ if o.gpu || o.pcaGPU
     xc = gather(xc);
     wc = gather(wc);
 end
-xc = cast(xc,o.typeOut);
+xc = cast(xc,o.floatOut);
 
 
 
@@ -408,13 +406,13 @@ n.spect.freqs(:) = {[]};
 
 % Find frequencies within bands
 for b = 1:numel(o.bands)
-    n.spect.id(b,:) = isbetween(n.spect0,o.bandsF(b,1),o.bandsF(b,2),"openright");
+    n.spect.id(b,:) = isbetween(n.spect0.freq,o.bandsF(b,1),o.bandsF(b,2),"openright")';
     n.spect.freqs{b} = n.spect0.freq(n.spect.id(b,:));
     n.spect0.band(n.spect.id(b,:)) = n.spect.name(b);
 end
 n.spect.Properties.RowNames = n.spect.name;
 n.nSpect = height(n.spect);
-disp("[ec_epochBaseline] Found frequencies within spectral bands: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPreproc] Found frequencies within spectral bands: "+n.sbj+" time="+toc(tt));
 
 
 
@@ -449,7 +447,7 @@ n.nSpect = height(n.spect);
 if isfield(n,"cwtSupport")
     n.cwtSupport = n.cwtSupport(n.freqKeep,:);
 end
-disp("[ec_epochBaseline] Kept "+n.nSpect+"/"+n.nFreqs+" freqs: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPreproc] Kept "+n.nSpect+"/"+n.nFreqs+" freqs: "+n.sbj+" time="+toc(tt));
 
 
 
@@ -462,17 +460,17 @@ function o = downsamplingPrep_ln(n,o)
 % Downsampling factors
 [o.ds(1),o.ds(2)] = rat(o.hzTarget/n.hz0); % get factors
 if o.ds(1) > o.ds(2)
-    error("[ec_epochBaseline] downsampling target > sampling rate"); end
+    error("[ec_epochPreproc] downsampling target > sampling rate"); end
 if o.ds(1) ~= 1
-    error("[ec_epochBaseline] downsampling target must be wholly divisible by sampling rate"); end
+    error("[ec_epochPreproc] downsampling target must be wholly divisible by sampling rate"); end
 o.ds = o.ds(2);
-disp("[ec_epochBaseline] downsampling factor = "+o.ds);
+disp("[ec_epochPreproc] downsampling factor = "+o.ds);
 
 % Ensure anti-aliasing LPF
 hzNyquist = o.hzTarget/2;
 if ~o.lpf || o.lpf>hzNyquist
     o.lpf = hzNyquist;
-    disp("[ec_epochBaseline] adding downsampling anti-aliasing LPF: "+...
+    disp("[ec_epochPreproc] adding downsampling anti-aliasing LPF: "+...
         o.lpf+"hz");
 end
 
@@ -486,8 +484,8 @@ function o = makeFilters_lfn(x,n,o,tt)
 
 % Extract EEG timeseries vector from shortest run
 [~,id] = min(n.runIdxOg);
-xTmp = x(n.runIdx(1,id):n.runIdx(2,id),1,1);
-xTmp = cast(xTmp,o.typeProc);
+xTmp = x(n.runIdx(id,1):n.runIdx(id,2),1,1);
+xTmp = cast(xTmp,o.floatProc);
 if o.gpu
     xTmp = gpuArray(xTmp); % move to GPU if specified
 end
@@ -497,7 +495,7 @@ if o.hpf
     o.HPF = {};
     [o.HPF{1},o.HPF{2}] = ec_designFilt(xTmp,n.hz0,o.hpf,"highpass",...
         steepness=o.hpfSteep,impulse=o.hpfImpulse,coefOut=true);
-    disp("[ec_epochBaseline] Created high-pass filter: "+n.sbj+" time="+toc(tt));
+    disp("[ec_epochPreproc] Created high-pass filter: "+n.sbj+" time="+toc(tt));
 end
 
 % Low-pass filter
@@ -505,7 +503,7 @@ if o.lpf
     o.LPF = {};
     [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz0,o.lpf,"lowpass",...
         steepness=o.lpfSteep,impulse=o.lpfImpulse,coefOut=true);
-    disp("[ec_epochBaseline] Created low-pass filter: "+n.sbj+" time="+toc(tt));
+    disp("[ec_epochPreproc] Created low-pass filter: "+n.sbj+" time="+toc(tt));
 end
 
 
@@ -542,7 +540,7 @@ for v = o.badFrameVars
         error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
     end
 end
-disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
+disp("[ec_epochPreproc] Removed bad frames: "+n.sbj+" time="+toc(tt));
 
 
 
@@ -551,6 +549,9 @@ disp("[ec_epochBaseline] Removed bad frames: "+n.sbj+" time="+toc(tt));
 
 function x = logTransform_lfn(x,n,o,tt)
 %%% Log-transform (decibel or natural log) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Convert EEG to specified float type for processing
+x = cast(x,o.floatProc);
 
 % Find negative values & convert to eps(0)
 idNeg = x < eps(cast(0,like=x));
@@ -566,7 +567,7 @@ if o.mag2db
     if n.spectOpts.fOut=="magnitude"
         x = mag2db(x);
     elseif n.spectOpts.fOut=="decibel"
-        warning("[ec_epochBaseline] No decibel transform, EEG data already in decibels: "+...
+        warning("[ec_epochPreproc] No decibel transform, EEG data already in decibels: "+...
             n.sbj+" time="+toc(tt));
     else
         error("No decibel transform, EEG data not in magnitude: "+...
@@ -576,7 +577,7 @@ elseif o.log
     % Natural log
     x = log(x);
     if n.spectOpts.fOut=="decibel"
-        warning("[ec_epochBaseline] EEG data already in decibels, log-transforming anyways: "+...
+        warning("[ec_epochPreproc] EEG data already in decibels, log-transforming anyways: "+...
             n.sbj+" time="+toc(tt));
     end
 end

@@ -54,11 +54,16 @@ end
 
 
 %% Channel concatenation
-[x,n] = chConcat_lfn(x,n,a,tt);
+if isany(a.chConcat)
+    [x,n] = chConcat_lfn(x,n,a,tt);
+end
 
 
 %% Finalize
-n = rmfield(n,a.nRmFields); % Fields to remove from 'n' to save memory
+% try
+%     n = rmfield(n,a.nRmFields); % Fields to remove from 'n' to save memory
+% catch ME; disp(ME)
+% end
 disp("[ec_analPrep] Finished: "+n.sbj+" | toc="+toc(tt));
 
 
@@ -220,6 +225,8 @@ function [y,n] = chConcat_lfn(x,n,a,tt)
 if a.chConcat=="roi"
     %% Concatenate chs within ROI: y{roi}(times,freqs*chans)
     rv = a.roiVar;
+    spect = n.spect;
+    spect.Properties.RowNames = {}; 
 
     % Get ROIs
     if ~isany(a.ROIs)
@@ -252,7 +259,7 @@ if a.chConcat=="roi"
 
         % Column info
         for ch = 1:n.ROIs.nChs(r)
-            xi = n.spect;
+            xi = spect;
             xi.ch(:) = n.ROIs.chs{r}(ch);
             xi = movevars(xi,"ch","Before",1);
             xi = renamevars(xi,"name","spect");

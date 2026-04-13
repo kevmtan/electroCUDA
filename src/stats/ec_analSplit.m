@@ -12,7 +12,7 @@ arguments
     o.pcaRobust (1,1) logical = false   % Run robust PCA for denoising (can do without dim reduction)
     o.pcaGPU (1,1) logical = false      % GPU for rank calculation & PCA
     o.rank (1,1) logical = false        % Calculate data rank if no PCA
-    o.typeAnal string = "single"        % Floating-point precision for analysis ("double"|"single")
+    o.floatAnal string = "single"        % Floating-point precision for analysis ("double"|"single")
 end
 % Make logical flags about data
 if isfield(n,"ROIs"), o.roi=true; else; o.roi=false; end
@@ -158,6 +158,6 @@ else
 end
 
 % Convert to processing precision
-xs = cast(xs,o.typeAnal);
+xs = cast(xs,o.floatAnal);
 
 
