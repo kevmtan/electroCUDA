@@ -15,10 +15,10 @@ statusFn = "/01/lbcn/logs/preproc/resampleBadFrames_"+statusDate;
 
 status = table;
 status.sbj = sbjs;
-status.hz100(:) = false;
+status.resampled(:) = false;
 status.error = cell(height(status),1);
 
-try parpool('Processes'); catch; end
+try parpool('local12'); catch; end
 
 
 %% Subject loop
@@ -27,21 +27,19 @@ parfor s = 1:height(status)
     % Slice status table
     stat = status(s,:);
     sbj = stat.sbj;
-    o = struct;
 
     % Resample (100 hz)
-    if ~stat.hz100
-        hz = 100;
+    if ~stat.resampled    
         try
             o.suffix = "s";
-            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                save=doSave,saveN=doSave,hzTarget=hz);
+            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,...
+                saveN=doSave);
 
-            o.suffix = "is";
-            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,o,...
-                saveN=doSave,hzTarget=hz);
+            o.suffix = "f";
+            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,...
+                saveN=doSave);
 
-            stat.hz100 = true;
+            stat.resampled = true;
         catch ME
             stat.error{1} = ME;
             getReport(ME)
