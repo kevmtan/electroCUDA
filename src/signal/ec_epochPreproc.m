@@ -214,12 +214,19 @@ if isany(o.badFrameVars2)
     end
 end
 
+% Flat frames across all chans - keep as NaN
+if any(ismember(o.badFrameVars,"flatA"),"all")
+    xFlatA = full(n.xBad.flatA);
+else
+    xFlatA = false(height(xc),1);
+end
+
 
 %% Within-run preproc
 
 % Call within-run routine (outliers, missing vals, filters, downsample, z-score)
-xc = splitapply(@(xcr,stimr) {withinRun_lfn(xcr,stimr,o)},...
-    xc,psy.stim,psy.runG);
+xc = splitapply(@(xcr,stimr,xFlatR) {withinRun_lfn(xcr,stimr,xFlatR,o)},...
+    xc,psy.stim,xFlatA,psy.runG);
 
 % Concatenate runs
 xc = vertcat(xc{:});
@@ -277,7 +284,7 @@ xc = cast(xc,o.floatOut);
 
 
 
-function xcr = withinRun_lfn(xcr,stimr,o)
+function xcr = withinRun_lfn(xcr,stimr,xFlatR,o)
 %%% Within-run preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % All outliers
@@ -290,7 +297,7 @@ xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % High-pass filter
 if o.hpf
-    xcr = ec_filtfilt(xcr,o.HPF{1},o.HPF{2});
+    xcr(~xFlatR,:) = ec_filtfilt(xcr(~xFlatR,:),o.HPF{1},o.HPF{2});
 end
 
 % All outliers (2nd round)
@@ -308,7 +315,7 @@ xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % Low-pass filter / anti-aliasing
 if o.lpf
-    xcr = ec_filtfilt(xcr,o.LPF{1},o.LPF{2});
+    xcr(~xFlatR,:) = ec_filtfilt(xcr(~xFlatR,:),o.LPF{1},o.LPF{2});
 end
 
 % Downsample
@@ -537,7 +544,7 @@ for v = o.badFrameVars
             o.badFrameVars2(end+1) = v; % 2D xBad & 3D x: do within-Ch
         end
     else
-        error("n.xBad."+vars(v)+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
+        error("n.xBad."+v+" incompatible size with EEG data: "+n.sbj+" time="+toc(tt));
     end
 end
 disp("[ec_epochPreproc] Removed bad frames: "+n.sbj+" time="+toc(tt));
