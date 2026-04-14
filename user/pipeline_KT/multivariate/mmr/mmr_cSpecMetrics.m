@@ -1,4 +1,4 @@
-function [sts,obs] = mmr_classifySpecMetrics(sts,obs,o)
+function [sts,obs] = mmr_cSpecMetrics(sts,obs,o)
 
 %% Regression on PP
 
@@ -16,7 +16,6 @@ sts.ppr_RC_p = lm.Coefficients.pValue(2);
 
 
 %% Regression on CC PP
-
 if o.doCC
     % Behavioral response time
     lm = fitlm(obs(obs.cc,["pp1" "RT"]),"pp1 ~ RT");

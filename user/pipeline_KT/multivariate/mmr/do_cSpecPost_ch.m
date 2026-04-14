@@ -18,7 +18,7 @@ for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
 
             %% Do subject
             try
-                mmr_cChSpecPost(o);
+                mmr_cSpecPost(o);
                 logs.i{p}.post(s) = true;
             catch ME; getReport(ME)
                 logs.i{p}.error{s} = ME;

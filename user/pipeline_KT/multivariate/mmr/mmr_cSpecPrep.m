@@ -1,4 +1,4 @@
-function [st,ob] = mmr_classifySpecPrep(st,ob,o)
+function [st,ob] = mmr_cSpecPrep(st,ob,o)
 %%% Add extra vars in ec_classifyPrep for MMR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 svars = string(st.Properties.VariableNames);
 f0 = cast(nan,o.floatAnal);

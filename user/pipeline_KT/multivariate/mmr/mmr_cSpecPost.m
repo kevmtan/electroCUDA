@@ -1,4 +1,4 @@
-function st = mmr_cChSpecPost(o)
+function st = mmr_cSpecPost(o)
 % Further analysis on results from classifyChSpec
 arguments
     o struct
