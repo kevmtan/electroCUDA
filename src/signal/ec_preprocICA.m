@@ -62,6 +62,7 @@ arguments
 end
 % x=[]; n=[]; arg.raw=false; arg.nIn=[]; arg.save=0; arg.test=1;
 
+
 %% Initialize & load data
 reset(gpuDevice());
 errors = {};
@@ -82,6 +83,7 @@ if ~isfield(o,'fnStr');  o.fnStr="s"+dirs.sbjID+"_"+task; end % Filename ending 
 if ~isfield(o,'thrFlat'); o.thrFlat = 0; end
 if ~isfolder(o.dirOut); mkdir(o.dirOut); end
 sfxB = "";
+
 
 %% Classify bad chans & frames
 if o.doBadCh
@@ -109,6 +111,7 @@ if o.doBadCh
     sfxB = sfx;
 end
 
+
 %% Robust detrending (temporary, aggressive for better ICA decomposition)
 if nnz(o.detrendOrder)
     [x,n] = ec_detrend(x,n,order=o.detrendOrder,thr=o.detrendThr,itr=o.detrendItr,...
@@ -116,12 +119,14 @@ if nnz(o.detrendOrder)
     if arg.test; x_detr=x; end %#ok<*NASGU>
 end
 
+
 %% High-pass filtering (temporary, aggressive for better ICA decomposition)
 if nnz(o.hiPassICA) % HPF within-run to avoid edge artifacts
     [x,n] = ec_HPF(x,n,o.hiPassICA,tt,missing=o.missingInterp,gpu=o.hiPassGPU,...
         steepness=o.hiPassSteep);
     if arg.test; x_hpf=x; end
 end
+
 
 %% Prepare for ICA
 [o,n,chNfo,errors] = prepICA_lfn(x,o,n,arg,chNfo,sfxB,sfx1,errors,tt);
@@ -135,17 +140,21 @@ if arg.save
     save(fn,"n"); disp("SAVED: "+fn);
 end
 
+
 %% Reconstruct IC activity timecourses
 [x,n] = reconstructICs_lfn(xOg,o,n,tt);
+
 
 %% Get correlations between ICs & EEG chans (name ICs after closest chan)
 n = get_icChCorrs(x,xOg,n,tt);
 if ~arg.test; clear xOg; end
 
+
 %% Classify bad ICs
 if o.doBadIC
     n = classifyBadICs_lfn(n,o,tt); % Classifier doesn't like robust rereferenced data
 end
+
 
 %% Identify bad frames per IC
 if o.doBadFrames
@@ -153,6 +162,7 @@ if o.doBadFrames
         flat=o.thrFlat,sns=o.thrSNS);
     disp("Identified bad frames per IC: "+sbj); toc(tt);
 end
+
 
 %% Finalize & save
 sfx = o.suffix;
@@ -178,13 +188,18 @@ toc(tt);
 
 
 
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
-%% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 function [o,n,chNfo,errors] = prepICA_lfn(x,o,n,arg,chNfo,sfxB,sfx1,errors,tt)
+%%% Prepare for ICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ch_bad=chNfo.bad; nChs=height(chNfo); fin=0; chEig=[];
 
 % Prep chans to use for ICA
@@ -284,6 +299,7 @@ if ~fin && chRank<numel(chICA)
     end
 end
 
+
 %% PCA if still rank-deficient (using all redeemable chans)
 if o.ica_pca>=0 && (chRank<numel(chICA) || numel(chICA)<floor(chRankOg*.95))
     chICA = chICAog;
@@ -299,9 +315,14 @@ disp("keptChans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca);
 
 
 %% Outlier frames to exclude from ICA (robust covariance)
-[ol_Q,ol_idx,ol_pct] = robCov(gpuArray(x(:,chICA)),10,90);
+[ol_Q,ol_idx,ol_pct] = ec_robCov(gpuArray(x(:,chICA)),10,90);
 ol_Q = gather(ol_Q)';
 ol_idx = sparse(logical(gather(ol_idx)))';
+try
+    ol_idx(n.xBad.flatA,:) = true; % RUN ec_findBadFrames again if not exist
+catch ME
+    disp(ME);
+end
 ol_pct = 100-gather(ol_pct);
 disp("[ec_preprocICA] "+chNfo.sbj(1)+": pctExcludedOutlierFrames="+ol_pct);
 
@@ -330,8 +351,11 @@ disp("keptChans="+numel(chICA)+" | rank="+chRank+" | pca="+o.ica_pca+" | time="+
 
 
 
-%% Run CUDAICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
 function n = run_cudaica_lfn(x,n,o,arg,dirs,chNfo,tt)
+%%% Run CUDAICA %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 sbj = n.sbj;
 sfx = o.suffix+"_"+o.fnStr;
 sfx = erase(sfx,".mat");
@@ -382,8 +406,13 @@ n.icBad = [];
 n.icW = ica.w;
 
 
-%% Reconstruct IC activity %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
 function [x,n] = reconstructICs_lfn(xOg,o,n,tt)
+%%% Reconstruct IC activity %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isempty(xOg)
     xOg = ec_loadSbj(n.dirs,o.sfx_src,"x");
 end
@@ -399,8 +428,11 @@ n.icCorr = corrcov(n.icCov);
 
 
 
-%% Classify bad ICs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
 function n = classifyBadICs_lfn(n,o,tt)
+%%% Classify bad ICs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 icBad = n.icNfo(:,["order" "ic" "sbjIC"]);
 
 % Load raw EEG data (classifier doesn't work with robust referenced data)
@@ -430,8 +462,12 @@ disp("Bad ICs classifier: "); disp(icBad.ic(icBad.ai)'); toc(tt);
 
 
 
-%% Get correlations between ICs & EEG chans %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
 function n = get_icChCorrs(x,xOg,n,tt)
+%%% Get correlations between ICs & EEG chans %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 chICA = n.chICA;
 nChs = numel(chICA);
 nICs = width(x);
