@@ -86,12 +86,20 @@ function [st,ob] = classify_lfn(x,n,st,ob,tt,o)
 if o.gpu
     % GPU loop across splits
     for s = 1:n.splits
-        [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
+        try
+            [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
+        catch ME
+            disp(ME);
+        end
     end
 else
     % CPU parfor loop across splits (ideally threadpool)
     parfor s = 1:n.splits
-        [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
+        try
+            [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
+        catch ME
+            disp(ME);
+        end
     end
 end
 disp("[ec_classifyChSpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));

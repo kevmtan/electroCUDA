@@ -1,4 +1,4 @@
-function [x,n,sts,obs] = ec_analSplit(x,n,st,ob,tt,o)
+function [x,n,sts,obs] = ec_analSplit(x,n,st,ob,tt,a)
 % Splits data for analyses (chans/ICs/ROIs x timepoints)
 arguments
     x                                   % EEG data (matrix or cell array)
@@ -6,16 +6,17 @@ arguments
     st table                            % Stats table
     ob table = []                       % Observation table
     tt uint64 = tic                     % Timer
-    o.std string = ""                   % Standardize data within-split ["zscore"|"robust"|""=skip]; don't standardize to keep baseline at 0
-    o.pca string = ""                   % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
-    o.pcaComps (1,1){mustBeInteger} = 0 % Number of components (0=skip, inf=data rank)
-    o.pcaRobust (1,1) logical = false   % Run robust PCA for denoising (can do without dim reduction)
-    o.pcaGPU (1,1) logical = false      % GPU for rank calculation & PCA
-    o.rank (1,1) logical = false        % Calculate data rank if no PCA
-    o.floatAnal string = "single"        % Floating-point precision for analysis ("double"|"single")
+    a.std string = ""                   % Standardize data within-split ["zscore"|"robust"|""=skip]; don't standardize to keep baseline at 0
+    a.rank (1,1) logical = false        % Calculate data rank if no PCA
+    a.pca string = ""                   % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
+    a.pcaComps (1,1){mustBeInteger} = 0 % Number of components (0=skip, inf=data rank)
+    a.pcaRobust (1,1) logical = false   % Run robust PCA for denoising (can do without dim reduction)
+    a.pcaGPU (1,1) logical = false      % GPU for rank calculation & PCA    
+    a.pcaSaveWts (1,1) logical = true   % Save PCA weights
+    a.floatAnal (1,1) string = "single" % Floating-point precision for analysis ("double"|"single")
 end
 % Make logical flags about data
-if isfield(n,"ROIs"), o.roi=true; else; o.roi=false; end
+if isfield(n,"ROIs"), a.roi=true; else; a.roi=false; end
 
 
 %% Prep
@@ -31,15 +32,15 @@ wts = sts;
 
 
 %% Main
-if o.pcaGPU && isany(o.pca)
+if a.pcaGPU && isany(a.pca)
     % Run on GPU
     for c = 1:nCh
-        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,o,c);
+        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c);
     end
 else
     % Run on CPU threadpool
     parfor c = 1:nCh
-        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,o,c);
+        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c);
     end
 end
 
@@ -53,7 +54,7 @@ obs = vertcat(obs{:});
 n.splits = numel(x); % number of splits
 
 % Save PCA weights
-if isany(o.pca) && o.pcaComps 
+if a.savePCAwts && isany(a.pca) && a.pcaComps 
     n.pcaWts = wts; % Save weights to n
 end
 disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+...
@@ -65,11 +66,11 @@ disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+..
 
 
 
-function [xc,stc,obc,wtc] = withinCh_lfn(xc,n,stc,obc,o,c)
+function [xc,stc,obc,wtc] = withinCh_lfn(xc,n,stc,obc,a,c)
 %%% Within-channel/IC/ROI routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                           
 
 % Get info
-if o.roi
+if a.roi
     % ROI
     ch = n.ROIs.roi(c);
     sbjCh = n.ROIs.sbjROI(c);
@@ -86,21 +87,27 @@ if ~isempty(obc)
 end
 
 % ROI width
-if o.roi
+if a.roi
     stc.width(:) = width(xc);
 end
 
 
 %% Within-channel processing
-if isany(o.pca) && o.pca~="split"
+if isany(a.pca) && a.pca~="split"
     % Run PCA
-    [xc,wtc,stc.rank(:)] = ec_pca(xc,nComps=o.pcaComps,robust=o.pcaRobust,...
-        std=o.std,gpu=o.pcaGPU,gather=true,double=true);    
+    [xc,wtc,stc.rank(:)] = ec_pca(xc,nComps=a.pcaComps,robust=a.pcaRobust,...
+        std=a.std,gpu=a.pcaGPU,double=true,gather=true,exact=false);    
     % Final number of features
     stc.features(:) = width(xc);
-elseif ~isany(o.pca)
+    % Save PCA weights
+    if a.pcaSaveWts
+        wtc = single(wtc);
+    else
+        wtc = [];
+    end
+elseif ~isany(a.pca)
     % Rank calculation
-    if o.rank
+    if a.rank
         stc.rank(:) = ec_rank(xc); 
     end
     wtc = [];
@@ -115,23 +122,29 @@ end
 
 
 %% Within-split processing
-if o.pca=="split"
+if a.pca=="split"
     % PCA weight preallocation
     wtc = cell(n.nTimes,1);
 
     % Copy to GPU
-    if o.pcaGPU
+    if a.pcaGPU
         xc = cellfun(@gpuArray,xc,UniformOutput=false);
     end
 
     % Run PCA
     for t = 1:n.nTimes
-        [xc{t},stc(t,:),wtc{t}] = withinSplit_lfn(xc{t},stc(t,:),o);
+        [xc{t},stc(t,:),wtc{t}] = withinSplit_lfn(xc{t},stc(t,:),a);
     end
-elseif isany(o.std)
+
+    % Gather from GPU
+    if a.pcaGPU
+        xc = cellfun(@gather,xc,UniformOutput=false);
+        wtc = cellfun(@gather,wtc,UniformOutput=false);
+    end
+elseif isany(a.std)
     % Standardize features
     for t = 1:n.nTimes
-        xc{t} = withinSplit_lfn(xc{t},[],o);
+        xc{t} = withinSplit_lfn(xc{t},[],a);
     end
 end
 
@@ -140,24 +153,30 @@ end
 
 
 
-function [xs,sts,w] = withinSplit_lfn(xs,sts,o)
+function [xs,sts,w] = withinSplit_lfn(xs,sts,a)
 %%% Within-split routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if o.pca=="split"
+if a.pca=="split"
     % Standardize predictors, calculate rank, run PCA
-    [xs,w,sts.rank] = ec_pca(xs,nComps=o.pcaComps,robust=o.pcaRobust,...
-        std=o.std,gpu=o.pcaGPU,gather=true,double=true);
+    [xs,w,sts.rank] = ec_pca(xs,nComps=a.pcaComps,robust=a.pcaRobust,...
+        std=a.std,gpu=a.pcaGPU,double=true,gather=false,exact=true);
     % Final number of features
     sts.features = width(xs);
+    % Save PCA weights
+    if a.pcaSaveWts
+        w = single(w); % convert to single
+    else
+        w = []; % delete
+    end
 else
     % Standardize predictors
-    if o.std=="robust"
+    if a.std=="robust"
         xs = normalize(xs,1,"zscore","robust"); % robust z-score
-    elseif isany(o.std)
-        xs = normalize(xs,1,o.std); % standard z-score
+    elseif isany(a.std)
+        xs = normalize(xs,1,a.std); % standard z-score
     end
 end
 
 % Convert to processing precision
-xs = cast(xs,o.floatAnal);
+xs = cast(xs,a.floatAnal);
 
 

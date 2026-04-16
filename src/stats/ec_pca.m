@@ -27,6 +27,11 @@ if isgpuarray(x); a.gpu=true; end
 
 %% Prep
 
+% Use exact rank if GPU array & single/half (bad results otherwise)
+if a.gpu && (isa(x,"single") || isa(x,"half")) && ~a.double
+    a.exact = true;
+end
+
 % Convert to double
 if a.double
     x = double(x);
@@ -35,11 +40,6 @@ end
 % Copy to GPU
 if a.gpu && ~isgpuarray(x)
     x = gpuArray(x);
-end
-
-% Use exact rank if GPU array & single/half (bad results otherwise)
-if a.gpu && (isa(x,"single") || isa(x,"half"))
-    a.exact = true;
 end
 
 
@@ -60,7 +60,7 @@ end
 
 
 %% Matrix rank
-xR = ec_rank(x,exact=a.exact);
+xR = ec_rank(x(all(~isnan(x),2),:),exact=a.exact);
 
 
 %% Standard PCA (dimensionality reduction)
