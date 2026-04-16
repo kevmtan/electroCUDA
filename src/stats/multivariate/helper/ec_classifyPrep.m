@@ -10,7 +10,7 @@ o.doCC = isany(o.p.condx); % Check if cross-classification enabled
 o.doPlatt = isequal(o.fun,@fitclinear) && o.hyper.Learner=="svm";
 
 % Check if hyperparameter tuning enabled
-o.doTuning = isany(o.OptimizeHyperparameters) && any(o.OptimizeHyperparameters~="none");
+o.doTuning = isany(o.OptimizeHyperparameters) && ~any(o.OptimizeHyperparameters=="none");
 
 % Do nested CV only if hyperparameter tuning enabled
 o.doNestedCV = o.doNestedCV && o.doTuning;
@@ -178,10 +178,11 @@ for t = 1:height(st)
     % Get train/test indices per timepoint
     idt = ob.t==st.t(t) & ob.use;
     if ~any(idt); continue; end % skip
+    obt = ob(idt,:);
 
     % Main CV partition
     if o.doCV
-        st.cv{t} = cvPartition_lfn(ob(idt,:),nCond,o.cv,o.cvMinTrialsPerFold);
+        st.cv{t} = cvPartition_lfn(obt,nCond,o.cv,o.cvMinTrialsPerFold);
         if isempty(st.cv{t})
             ob.use(idt) = false; % mark timepoint as unusable
             st.cv{t} = [];
@@ -191,16 +192,47 @@ for t = 1:height(st)
 
     % Hyperparameter tuning CV partition (full training set)
     if o.doTuning && (o.doCC || ~o.doCV || (o.doCV && ~o.doNestedCV))
-        st.cvh{t} = cvPartition_lfn(ob(idt,:),nCond,o.cvh,o.cvMinTrialsPerFold);
+        st.cvh{t} = cvPartition_lfn(obt,nCond,o.cvh,o.cvMinTrialsPerFold);
         if isempty(st.cvh{t})
             ob.use(idt) = false;
             st.cvh{t} = [];
         end
     end
 
-    % Nested hyperparameter tuning CV partition (full training set)
+    % Nested hyperparameter tuning CV partition (inside main CV partitions)
     if o.doNestedCV
-        error("Nested CV custom partition not implemented yet");
+        % Requires outer CV partition to exist for this timepoint
+        if ~o.doCV || isempty(st.cv{t})
+            ob.use(idt) = false;
+            st.cv{t} = [];
+            st.cvhn{t} = [];
+            continue;
+        end
+
+        % Build one inner CV partition per outer fold, each fit only on the
+        % outer-train observations (true nested CV hierarchy).
+        cvOuter = st.cv{t};
+        cvInner = cell(cvOuter.NumTestSets,1);
+        doSkip = false;
+        for k = 1:cvOuter.NumTestSets
+            idOuterTrain = training(cvOuter,k);
+            obtOuterTrain = obt(idOuterTrain,:);
+
+            cvInner{k} = cvPartition_lfn(obtOuterTrain,nCond,o.cvh,o.cvMinTrialsPerFold);
+            if isempty(cvInner{k})
+                doSkip = true;
+                break;
+            end
+        end
+
+        if doSkip
+            ob.use(idt) = false;
+            st.cv{t} = [];
+            st.cvhn{t} = [];
+            continue;
+        end
+
+        st.cvhn{t} = cvInner;
     end
 end
 
@@ -210,7 +242,7 @@ end
 if ~isempty(o.prepFun)
     [st,ob] = o.prepFun(st,ob,o);
 end
-disp("[ec_classifyTemplates] Made classifier templates: "+n.sbj+" | toc="+toc(tt));
+disp("[ec_classifyPrep] Made classifier templates: "+n.sbj+" | toc="+toc(tt));
 
 
 
@@ -291,6 +323,7 @@ function cv = cvPartition_lfn(obt,nCond,cvArgs,minTrialsPerFold)
 % class counts. Trials are grouped (all obs from a trial go to same fold),
 % and trials are distributed to balance classes across folds.
 % Reduces number of folds if necessary to ensure minTrialsPerFold per class per fold.
+timepoint = obt.t(1);
 
 % Parse cvArgs for KFold
 if isfield(cvArgs,'KFold')
@@ -318,9 +351,9 @@ maxFolds = floor(minClassTrials / minTrialsPerFold);
 
 % Check if minimum requirement can be met (need at least 2 folds)
 if maxFolds < 2
-    warning("[ec_classifyTemplates] Not enough trials per class for CV: " + ...
-        "min=%d, need %d for 2-fold CV. Skipping timepoint.", ...
-        minClassTrials, minTrialsPerFold * 2);
+    warning("[ec_classifyPrep] Not enough trials per class for CV: " + ...
+        "min=%d, need %d for 2-fold CV. Skipping timepoint t=%g.", ...
+        minClassTrials, minTrialsPerFold * 2, timepoint);
     cv = [];
     return;
 end

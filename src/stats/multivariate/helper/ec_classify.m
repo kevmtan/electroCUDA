@@ -1,7 +1,7 @@
 function [sts,obs] = ec_classify(xs,sts,obs,o)
 % Run classifier for electroCUDA multivariate routines
 %
-% TO DO: custom CV loop, custom nested CV partitioning, deal with NaNs?
+% TO DO: deal with NaNs?
 %
 %   s=217; xs=x{s}; sts=st(s,:); obs=ob{s};
 
@@ -9,10 +9,12 @@ function [sts,obs] = ec_classify(xs,sts,obs,o)
 %% Main classification routine
 [sts,obs] = main_lfn(xs,sts,obs,o,false);
 
+
 %% Permutation test for accuracy/performance significance
 if o.permutations
     sts = permute_lfn(xs,sts,obs,o);
 end
+
 
 %% Classifier metrics
 
@@ -116,7 +118,7 @@ if o.doCV
         % Nested CV options
         oo = namedargs2cell(o.hyper);
         oho = o.HyperparameterOptimizationOptions; % hyperparameter tuning opts
-        % NOT YET IMPLEMENTED: oho.CVPartition = sts.cvhn{1}; %% custom inner CV partition
+        oho.CVPartition = sts.cvhn{1}; % inner CV partition
 
         % Fit nested CV classifier
         mdlCV = o.fun(xs(obs.use,:),obs.y(obs.use),oo{:},'Cost',sts.cost{1},...
@@ -216,6 +218,8 @@ sts.(o.perfVar+"_p") = (nnz(statPerm>=stat) + 1) / (o.permutations + 1);
 
 
 
+
+
 function obs = platt_lfn(obs,sts,o)
 %%% Platt scaling: top-level routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if width(obs.pp)~=2
@@ -288,6 +292,7 @@ okAll = all(okAll);
 
 
 
+
 function [b,ok] = plattFit_lfn(y,scores,o)
 %%% Fit Platt scaling %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -307,6 +312,7 @@ else
     b = [];
     warning("[ec_classify] Not enough useable scores for Platt scaling fitting");
 end
+
 
 
 

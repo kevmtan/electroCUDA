@@ -123,15 +123,18 @@ o.p.pre.pcaGPU = false;
 %%%%%%%%%%%% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s) %%%%%%%%%%%%%%%%%%%
 
 % Analysis floating-point precision ("double"|"single"|"half")
-o.s.floatAnal = o.floatAnal; 
+o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 
-% PCA & rank
-o.s.std = "robust"; % Standardize features within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
+% Standardize/normalize
+o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
+
+% PCA
+o.s.rank = true; % calculate data rank if no PCA
 o.s.pca = "split"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 100; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.s.pcaGPU = false; % GPU for rank calculation & PCA
-o.s.rank = true; % calculate rank if no PCA
+o.s.pcaGPU = true; % GPU for rank calculation & PCA
+o.s.pcaSaveWts = true; % Save PCA weights
 
 
 
@@ -274,7 +277,7 @@ for s = 1:height(logs)
 
         %% Save logs
         logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-        save(logs.fn(s),'logs','-v7');
+        save(logs.fn(s),'logs','-v7.3');
 
     else
         disp("SKIPPING: "+logs.sbj(s));
