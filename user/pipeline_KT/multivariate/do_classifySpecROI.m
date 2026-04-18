@@ -102,7 +102,7 @@ o.p.pre.lpfSteep = 0.5; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = [5 300];
-% PCA within-chan or within-concactenated chans (e.g., make spectral components)
+% PCA within-chan or within-concatenated chans (e.g., make spectral components)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0

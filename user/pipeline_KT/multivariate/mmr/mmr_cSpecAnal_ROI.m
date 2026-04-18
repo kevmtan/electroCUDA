@@ -1,5 +1,5 @@
 function stat = mmr_cSpecAnal_ROI(logs)
-% load("/01/lbcn/anal/classifySpecROI/MzAb_SVM_260413_1227/log_260413_1227.mat");
+% load("/01/lbcn/anal/classifySpecROI/MzAb_SVM_260414_0745/log_260414_0745.mat");
 % stat = mmr_cSpecAnal_ROI(logs);
 
 %% Prep
@@ -8,40 +8,23 @@ nSbj = height(logs);
 o = logs.o{1};
 
 % Preallocate
-% sta = cell(nSbj,1); % stats from all sbjs
 oba = cell(nSbj,1); % observations from all sbjs
 
 % Load data
 for s = 1:height(logs)
-    % % Stats
-    % load(logs.o{s}.saved.st,"st");
-    % sta{s} = st;
-
     % Observations
     load(logs.o{s}.saved.ob,"ob");
     oba{s} = ob;
 end
 
 % Concatenate
-% sta = vertcat(sta{:});
 oba = vertcat(oba{:});
 
 % Make ROIs ordinal categoricals in tables (ROIs in 'ch' var)
-% sta.ch = categorical(sta.ch,o.p.ROIs,Ordinal=true);
 oba.ch = categorical(oba.ch,o.p.ROIs,Ordinal=true);
 
 % Rename timevar/condvar for simplicity
-% sta = renamevars(sta,[o.p.timeVar],"t");
 oba = renamevars(oba,[o.p.timeVar o.p.condVar],["t" "cnd"]);
-
-% % Make stats table for each timepoint & ROI
-% stat = groupcounts(oba,["ch" "t"]);
-% stat = removevars(stat,"Percent");
-% stat = renamevars(stat,"GroupCount","n");
-
-% % Make stats table
-% stat = table;
-% [S,stat.roi,stat.t] = findgroups(oba.ch,oba.t);
 
 % Split observations table
 oba = splitapply(@(id) {oba(id,:)},(1:height(oba))',findgroups(oba.ch,oba.t));
@@ -112,7 +95,7 @@ sts.t = obs.t(1);
 sts.acc_q = nan;
 
 % Accuracy: Logistic mixed-effects
-lme = fitglme(obs(obs.use,:),'acc ~ 1 + (1|sbjID) + (1|sbjID:tr)',...
+lme = fitglme(obs(obs.use,["acc" "sbjID" "tr"]),'acc ~ 1 + (1|sbjID) + (1|sbjID:tr)',...
     Distribution="Binomial",Link="logit",FitMethod="REMPL");
 sts.accl = lme.Coefficients.Estimate;
 sts.accl_SE = lme.Coefficients.SE;
