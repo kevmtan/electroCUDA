@@ -95,7 +95,7 @@ sts.t = obs.t(1);
 sts.acc_q = nan;
 
 % Accuracy: Logistic mixed-effects
-lme = fitglme(obs(obs.use,["acc" "sbjID" "tr"]),'acc ~ 1 + (1|sbjID) + (1|sbjID:tr)',...
+lme = fitglme(obs(obs.use,:),"acc ~ 1 + (1|sbjID) + (1|sbjID:tr)",...
     Distribution="Binomial",Link="logit",FitMethod="REMPL");
 sts.accl = lme.Coefficients.Estimate;
 sts.accl_SE = lme.Coefficients.SE;
