@@ -23,7 +23,11 @@ ids = repmat({':'},1,ndims(x)); % subscript template
 
 % Size of array slices in output cell vector
 outSz = sz;
-outSz(dim) = [];
+if numel(outSz)<3
+    outSz(dim) = 1; % Matlab arrays always 2D
+else
+    outSz(dim) = []; % More than 2d
+end
 outScalar = prod(outSz)==1; % "x" is vector; slices are scalar, no reshape needed
 
 % Preallocate output cell vector       
