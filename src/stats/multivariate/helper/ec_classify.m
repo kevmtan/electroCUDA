@@ -6,6 +6,12 @@ function [sts,obs] = ec_classify(xs,sts,obs,o)
 %   s=217; xs=x{s}; sts=st(s,:); obs=ob{s};
 
 
+%% Early bail: no usable training observations for this split
+if ~any(obs.use)
+    return;
+end
+
+
 %% Main classification routine
 [sts,obs] = main_lfn(xs,sts,obs,o,false);
 
@@ -85,6 +91,15 @@ function [sts,obs] = main_lfn(xs,sts,obs,o,isTest)
 % TEST - make this more elegant
 if sts.t<0; o.doTuning=false; end
 
+% Bail if no training observations (defensive; ec_classify also checks)
+if ~any(obs.use); return; end
+
+% Error if the training matrix is entirely NaN (unfittable)
+if all(isnan(xs(obs.use,:)),"all")
+    error("[ec_classify] Training data is all NaN for %s t=%g (split has %d 'use' obs).",...
+        sts.sbjCh,sts.t,nnz(obs.use));
+end
+
 
 %% Train & optimize (full training set)
 if ~o.doCV || (o.doCV && ~o.doNestedCV && o.doTuning) || (o.doCC && ~isTest)
@@ -100,7 +115,12 @@ if ~o.doCV || (o.doCV && ~o.doNestedCV && o.doTuning) || (o.doCC && ~isTest)
     mdl_exist = true;
 
     % Fit SVM score to posterior probability transform
-    if isequal(o.fun,@fitcsvm); mdl = mdl.fitPosterior; end
+    if isequal(o.fun,@fitcsvm)
+        mdl = mdl.fitPosterior; end
+
+    % Save tuned hyperparameters
+    if o.doTuning && ~any(o.OptimizeHyperparameters=="auto")
+        sts = saveHyperparams_lfn(sts,mdl,o); end
 else
     mdl_exist = false;
 end
@@ -145,7 +165,8 @@ if o.doCV
     end
 
     % Fit SVM score to posterior probability transform
-    if isequal(o.fun,@fitcsvm); mdlCV = fitSVMPosterior(mdlCV); end
+    if isequal(o.fun,@fitcsvm)
+        mdlCV = fitSVMPosterior(mdlCV); end
 
     % CV predict
     [obs.pred(obs.use),obs.pp(obs.use,:)] = mdlCV.kfoldPredict;
@@ -188,28 +209,26 @@ function sts = permute_lfn(xs,sts,obs,o)
 % parametric test result is kept to save compute
 %       TO DO: figure out threshold for mean PR-AUC (o.perfVar=="auc1")
 if o.perfVar=="acc" && sts.acc < 1/numel(o.p.cond)
-    return;
-end
+    return; end
 
 % Stats info
 stat = sts.(o.perfVar); % actual perfomance statistic value
 N = nnz(obs.use); % number of training set observations
+yOg = obs.y(obs.use); % original labels
 
 % Preallocate permuted performance distribution
-statPerm = zeros(o.permutations,like=sts.(o.perfVar));
+statPerm = nan(o.permutations,1,like=sts.(o.perfVar));
 
 % Loop across permutations
-for n = 1:o.permutations
+for p = 1:o.permutations
     % Shuffle labels
-    y = obs.y(obs.use); % extract labels
-    y = y(randperm(N)); % shuffle labels
-    obs.y(obs.use) = y; % save to observations table
+    obs.y(obs.use) = yOg(randperm(N)); % save to observations table
 
     % Run classification routine on shuffled labels
     sts1 = main_lfn(xs,sts,obs,o,true);
 
     % Save performance testing statistic
-    statPerm(n) = sts1.(o.perfVar);
+    statPerm(p) = sts1.(o.perfVar);
 end
 
 % Calculate p-value
@@ -333,11 +352,33 @@ function oh = extractHyperparams_lfn(mdl,o)
 %%% Extract hyperparameters from classifier model %%%%%%%%%%%%%%%%%%%%%%%%%
 oh = o.hyper;
 
-% Loop across hyperparameters
+% Loop across tuned hyperparameters
 for p = 1:numel(o.OptimizeHyperparameters)
     param = o.OptimizeHyperparameters(p); % parameter name
-    oh.(param) = mdl.(param); % extract parameter
+    % Extract parameter
     if param=="Regularization" % handle special case for Regularization
-        oh.(param) = extractBefore(oh.(param)," "); end
+        oh.(param) = extractBefore(mdl.(param)," ");
+    else
+        oh.(param) = mdl.(param); 
+    end
+end
+
+
+
+
+
+
+function sts = saveHyperparams_lfn(sts,mdl,o)
+%%% Save tuned hyperparameters from classifier model %%%%%%%%%%%%%%%%%%%%%%
+
+% Loop across tuned hyperparameters
+for p = 1:numel(o.OptimizeHyperparameters)
+    param = o.OptimizeHyperparameters(p); % parameter name
+    % Extract parameter
+    if param=="Regularization" % handle special case for Regularization
+        sts.(param) = extractBefore(mdl.(param)," ");
+    else
+        sts.(param) = mdl.(param); 
+    end
 end
 

@@ -1,4 +1,4 @@
-function [o,n,st,ob] = ec_classifySpec(o)
+function [o,n,errs,st,ob] = ec_classifySpec(o)
 % Performs spectral classification and cross-classification
 % within-channels/ICs/ROIs, within-timepoints, and within-subjects. 
 % ROI classification uses concatenated spectral timecourses from channels
@@ -41,7 +41,7 @@ oo = namedargs2cell(o.s);
 
 
 %% Classification
-[st,ob] = classify_lfn(x,n,st,ob,tt,o);
+[st,ob,errs] = classify_lfn(x,n,st,ob,tt,o);
 
 
 %% FDR
@@ -58,19 +58,37 @@ ob = convertvars(ob,varfun(@isfloat,ob,"OutputFormat","uniform"),o.floatOut);
 id = ismember(st.Properties.VariableNames,["cost" "cv" "cvh" "cvhn"]);
 st = removevars(st,id);
 
-% Rename vars
-ob = renamevars(ob,["t" "cnd"],[o.p.timeVar o.p.condVar]);
-st = renamevars(st,"t",o.p.timeVar);
+% Rename vars (guard against no-op or collision with existing columns)
+if o.p.timeVar~="t"
+    if ismember(o.p.timeVar,string(ob.Properties.VariableNames))
+        error("[ec_classifySpec] Cannot rename ob.t to '%s': column already exists.",o.p.timeVar);
+    end
+    ob = renamevars(ob,"t",o.p.timeVar);
+    if ismember("t",string(st.Properties.VariableNames))
+        st = renamevars(st,"t",o.p.timeVar);
+    end
+end
+if o.p.condVar~="cnd"
+    if ismember(o.p.condVar,string(ob.Properties.VariableNames))
+        error("[ec_classifySpec] Cannot rename ob.cnd to '%s': column already exists.",o.p.condVar);
+    end
+    ob = renamevars(ob,"cnd",o.p.condVar);
+end
 
 
 %% Save
-o.saved.st = o.dirOut+"s"+n.sbjID+"_st.mat";
+o.saved.st = fullfile(o.dirOut,"s"+n.sbjID+"_st.mat");
 save(o.saved.st,"st","-v7");
-disp("[ec_classifyChSpec] Saved classificiation statistics: "+o.saved.st+" toc="+toc(tt));
-o.saved.ob = o.dirOut+"s"+n.sbjID+"_ob.mat";
+disp("[ec_classifySpec] Saved classification statistics: "+o.saved.st+" toc="+toc(tt));
+o.saved.ob = fullfile(o.dirOut,"s"+n.sbjID+"_ob.mat");
 save(o.saved.ob,"ob","-v7");
-disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc="+toc(tt));
-%o.saved.nfo = o.dirOut+"s"+n.sbjID+".mat";
+disp("[ec_classifySpec] Saved classification observations: "+o.saved.ob+" toc="+toc(tt));
+if ~isempty(errs) && any(~cellfun(@isempty,errs))
+    o.saved.errs = fullfile(o.dirOut,"s"+n.sbjID+"_errs.mat");
+    save(o.saved.errs,"errs","-v7");
+    disp("[ec_classifySpec] Saved classification errors: "+o.saved.errs+" toc="+toc(tt));
+end
+%o.saved.nfo = fullfile(o.dirOut,"s"+n.sbjID+".mat");
 %save(o.saved.nfo,"o","n","-v7");
 
 
@@ -78,8 +96,11 @@ disp("[ec_classifyChSpec] Saved classificiation observations: "+o.saved.ob+" toc
 
 
 
-function [st,ob] = classify_lfn(x,n,st,ob,tt,o)
+function [st,ob,errs] = classify_lfn(x,n,st,ob,tt,o)
 %%% Main classification routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Preallocate per-split error container (empty = success)
+errs = cell(n.splits,1);
 
 
 %% Classify within data splits (chans/ICs/ROIs x timepoints)
@@ -89,7 +110,8 @@ if o.gpu
         try
             [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
         catch ME
-            disp(ME);
+            errs{s} = ME;
+            fprintf(2,"[ec_classifySpec] Split %d failed:\n%s\n",s,getReport(ME));
         end
     end
 else
@@ -98,14 +120,24 @@ else
         try
             [st(s,:),ob{s}] = ec_classify(x{s},st(s,:),ob{s},o);
         catch ME
-            disp(ME);
+            errs{s} = ME;
+            fprintf(2,"[ec_classifySpec] Split %d failed:\n%s\n",s,getReport(ME));
         end
     end
 end
-disp("[ec_classifyChSpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
 
+%% Finalize
 
-%% Concatenate channel results
+% Handle errors
+nFail = nnz(~cellfun(@isempty,errs));
+if nFail>0
+    warning("[ec_classifySpec] %d of %d splits failed for %s (see errs).",nFail,n.splits,n.sbj);
+else
+    errs = [];
+end
+disp("[ec_classifySpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
+
+% Concatenate channel results
 ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "t"],"ascend");
 
 
@@ -116,9 +148,18 @@ ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "t"],"ascend");
 function st = fdr_lfn(st,n,o,tt)
 %%% Run FDR correction %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 vs = string(st.Properties.VariableNames);
-vsP = vs(endsWith(vs,"_p")); % pval vars
 vsQ = vs(endsWith(vs,"_q")); % fdr vars
+vsP = replace(vsQ,"_q","_p"); % expected matching pval vars
 id = st.t>=o.fdrTimeRng(1) & st.t<=o.fdrTimeRng(2); % fdr time range
+
+% Verify every _q has a matching _p; drop (with warning) any that don't
+hasP = ismember(vsP,vs);
+if ~all(hasP)
+    warning("[ec_classifySpec] Skipping FDR for _q vars without matching _p: %s",...
+        strjoin(vsQ(~hasP),", "));
+    vsQ = vsQ(hasP);
+    vsP = vsP(hasP);
+end
 
 % Loop across q vars
 for v = 1:numel(vsQ)
@@ -129,4 +170,4 @@ for v = 1:numel(vsQ)
             o.alpha,o.fdrDep);
     end
 end
-disp("[ec_classifyChSpec] Ran FDR: "+n.sbj+" toc="+toc(tt));
+disp("[ec_classifySpec] Ran FDR: "+n.sbj+" toc="+toc(tt));

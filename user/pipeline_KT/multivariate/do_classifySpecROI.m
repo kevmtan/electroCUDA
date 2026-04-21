@@ -8,7 +8,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "classifySpecROI";
-analName = "MzAb_SVM";
+analName = "MzAb_LDA_band";
 
 dirs = ec_getDirs(proj,task);
 
@@ -28,7 +28,7 @@ o.floatOut = "single"; % Save results at floating-point precision ["double"|"sin
 %%%%%%%%%%%%%%%%% ANALYSIS PREP: ec_analPrep(...,o.p) %%%%%%%%%%%%%%%%%%%%%
 
 % Input data
-o.p.sfx = "f";
+o.p.sfx = "s";
 
 % Conditions for classification
 o.p.condVar = "cond";
@@ -42,9 +42,12 @@ o.p.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs ou
 o.p.roiVar = "roi"; % ROI variable in chNfo
 o.p.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
 
-% Timing for classification
+% Timing for analysis
 o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
 o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
+
+% Copy trialNfo vars to 'ep'
+o.p.trialVars = ["VD" "VD1" "VD2" "K_pca1" "K_pca2" "K_pca3" "K_pca4"];
 
 % Task Epoching (see 'ec_epochPsy')
 o.p.epoch.float = o.floatAnal; % task metadata output floating-point precision
@@ -89,7 +92,7 @@ o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
@@ -101,17 +104,17 @@ o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.5; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.p.pre.freqs = [5 300];
+o.p.pre.freqs = []; %[5 300];
 % PCA within-chan or within-concatenated chans (e.g., make spectral components)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % % Spectral dimensionality reduction into bands (skip=[])
-% o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+o.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 % o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
@@ -130,18 +133,19 @@ o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % 
 
 % PCA
 o.s.rank = true; % calculate data rank if no PCA
-o.s.pca = "split"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
-o.s.pcaComps = 100; % Number of components (0=skip, inf=matrix rank)
+o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
+o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
 o.s.pcaGPU = true; % GPU for rank calculation & PCA
-o.s.pcaSaveWts = true; % Save PCA weights
+o.s.pcaSaveWts = false; % Save PCA weights
 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"]; % psy vars to include in observations output
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"...
+    "VD" "VD1" "VD2" "K_pca1" "K_pca2" "K_pca3" "K_pca4"]; % psy vars to include in observations output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -165,7 +169,7 @@ o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
 o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
 
 % Classification basic options
-o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
+o.fun = @fitcdiscr; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.permutations = 0; % Num permutations for performance testing (0 = parametric test)
 o.perfVar = "acc"; % Performance test statistic variable ("acc"=accuracy|"auc1"=PR-AUC)
 o.jeffreys = false; % Jeffreys prior penalization for Platt scaling
@@ -183,8 +187,8 @@ if isequal(o.fun,@fitcsvm)
     o.hyper.CacheSize = "maximal";
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitclinear)
-    % Linear SVM hyperparameters (mathworks.com/help/stats/fitclinear.html)
-    o.hyper.Learner = "svm";
+    % Linear classifier (mathworks.com/help/stats/fitclinear.html)
+    o.hyper.Learner = "logistic"; % "svm"
     o.hyper.Lambda = "auto";
     o.hyper.Regularization = "ridge";
     %o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
@@ -193,7 +197,8 @@ elseif isequal(o.fun,@fitclinear)
     o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
-    o.hyper.DiscrimType = "linear";
+    % Linear discriminant analysis
+    o.hyper.DiscrimType = "linear"; % "pseudolinear" "diaglinear"
     o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
 elseif isequal(o.fun,@fitcknn)
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
@@ -210,7 +215,7 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = "none"; % "Gamma" "Delta"
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
@@ -268,7 +273,7 @@ for s = 1:height(logs)
         %% Run subject
         if ~exist(logs.out(s),"dir"); mkdir(logs.out(s)); end
         try
-            [logs.o{s},logs.n{s}] = ec_classifySpec(o);
+            [logs.o{s},logs.n{s},logs.error{s}] = ec_classifySpec(o);
             logs.class(s) = true;
         catch ME; getReport(ME)
             logs.error{s} = ME;
