@@ -63,31 +63,65 @@ end
 
 % P-value info
 sz = size(p);
-n = numel(p); % number of tests
+nAll = numel(p); % total number of entries
 
-% Reshape to vector
-p = reshape(p,n,1);
+% Reshape to column vector
+p = reshape(p,nAll,1);
 
-% Parameters
+% Preallocate outputs (NaN for missing/uncorrectable entries)
+pAdj = nan(nAll,1,"like",p);
+aAdj = nan(nAll,1,"like",p);
+
+% Trivial case: single test, no correction needed
+if nAll==1
+    pAdj(:) = p;
+    aAdj(:) = a;
+    pAdj = reshape(pAdj,sz);
+    aAdj = reshape(aAdj,sz);
+    h = reshape(p < aAdj, sz);
+    return;
+end
+
+% Filter NaN p-values: FDR runs only on finite entries, NaN stays NaN
+idGood = ~isnan(p);
+nGood = nnz(idGood);
+
+% If 0 or 1 good p-values, identity correction (no multiple comparisons)
+if nGood<=1
+    pAdj(idGood) = p(idGood);
+    aAdj(idGood) = a;
+    pAdj = reshape(pAdj,sz);
+    aAdj = reshape(aAdj,sz);
+    h = reshape(p < aAdj, sz); % NaN<x -> false, so h=false for NaN entries
+    return;
+end
+
+% FDR on non-NaN p-values only
+pGood = p(idGood);
+
+% Correction factor for dependence structure
 switch dep
     case "indep";   c = 1;
     case "corr+";   c = 1;
-    case "corr-";   c = log(n)+1/(2*n)+eulergamma;
-    case "unknown"; c = sum(1./(1:n));
+    case "corr-";   c = log(nGood)+1/(2*nGood)+eulergamma;
+    case "unknown"; c = sum(1./(1:nGood));
 end
 
-% Compute the adjusted p-values
-k = (1:1:n)';
-[pSort, idx] = sort(p,'ascend');
-pAdj(idx,1) = cummin(pSort.*(c.*n./k), 'reverse');
-pAdj = reshape(pAdj,sz); % reshape to original shape
+% Compute the adjusted p-values (over good entries)
+k = (1:nGood)';
+[pSort, idx] = sort(pGood,'ascend');
+pAdjGood = nan(nGood,1,"like",p);
+aAdjGood = nan(nGood,1,"like",p);
+pAdjGood(idx,1) = cummin(pSort.*(c.*nGood./k), 'reverse');
+aAdjGood(idx,1) = a.*k./(nGood.*c);
 
-% Compute the corrected significance levels
-aAdj(idx,1) = a.*k./(n.*c);
-
-% Rejected H0
-h = p < aAdj;
+% Scatter back into full-size vectors (NaN entries remain NaN)
+pAdj(idGood) = pAdjGood;
+aAdj(idGood) = aAdjGood;
 
 % Reshape to original shape
+pAdj = reshape(pAdj,sz);
 aAdj = reshape(aAdj,sz);
-h = reshape(h,sz);
+
+% Rejected H0 (NaN<x is false, so NaN entries are not rejected)
+h = reshape(p < aAdj, sz);
