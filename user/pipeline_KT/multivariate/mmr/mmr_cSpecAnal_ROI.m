@@ -47,9 +47,18 @@ stat = vertcat(stat{:});
 
 %% FDR
 vs = string(stat.Properties.VariableNames);
-vsP = vs(endsWith(vs,"_p")); % pval vars
 vsQ = vs(endsWith(vs,"_q")); % fdr vars
+vsP = replace(vsQ,"_q","_p"); % expected matching pval vars
 id = stat.t>=o.fdrTimeRng(1) & stat.t<=o.fdrTimeRng(2); % fdr time range
+
+% Verify every _q has a matching _p; drop (with warning) any that don't
+hasP = ismember(vsP,vs);
+if ~all(hasP)
+    warning("Skipping FDR for _q vars without matching _p: %s",...
+        strjoin(vsQ(~hasP),", "));
+    vsQ = vsQ(hasP);
+    vsP = vsP(hasP);
+end
 
 % Loop across q vars
 for v = 1:numel(vsQ)

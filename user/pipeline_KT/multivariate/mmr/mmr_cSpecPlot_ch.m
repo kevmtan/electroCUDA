@@ -1,4 +1,4 @@
-function mmr_cChSpecPlot(o,op)
+function mmr_cSpecPlot_ch(o,op)
 arguments
     o struct
     op struct
