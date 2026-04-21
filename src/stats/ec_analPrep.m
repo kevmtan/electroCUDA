@@ -20,9 +20,10 @@ arguments
     a.pre struct = [] % Analysis preprocessing options (ec_epochPreproc)
     a.nRmFields (1,:) string = [] % Fields to remove from 'n' to save memory
     a.timeRng = [] % Range of times to run including baseline ([]=epochPsy output)
+    a.trialVars (1,:) string = [] % trialNfo vars to copy to 'ep'
     a.test (1,1) logical = false
 end
-% tt=tic;
+% a=o.p; tt=tic;
 
 
 %% Load data 
@@ -87,7 +88,7 @@ else
 end
 
 % Only use existing chBadVars
-a.chBadVars(ismember(a.chBadVars,n.chBad.Properties.VariableNames));
+a.chBadVars = a.chBadVars(ismember(a.chBadVars,n.chBad.Properties.VariableNames));
 
 % Find bad chans
 if isany(a.chBadVars)
@@ -154,9 +155,23 @@ oo = namedargs2cell(a.epoch);
 [ep,trialNfo,n,psy] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
 n.trialNfo = trialNfo;
 
-% Rename target time & condition variables
-ep = renamevars(ep,[a.timeVar a.condVar],["t" "cnd"]);
-n.trialNfo = renamevars(n.trialNfo,a.condVar,"cnd");
+% Rename target time & condition variables (guard against no-ops & collisions)
+if a.timeVar~="t"
+    if ismember("t",string(ep.Properties.VariableNames))
+        error("[ec_analPrep] Cannot rename ep.%s to 't': column 't' already exists.",a.timeVar);
+    end
+    ep = renamevars(ep,a.timeVar,"t");
+end
+if a.condVar~="cnd"
+    if ismember("cnd",string(ep.Properties.VariableNames))
+        error("[ec_analPrep] Cannot rename ep.%s to 'cnd': column 'cnd' already exists.",a.condVar);
+    end
+    ep = renamevars(ep,a.condVar,"cnd");
+    if ismember("cnd",string(n.trialNfo.Properties.VariableNames))
+        error("[ec_analPrep] Cannot rename n.trialNfo.%s to 'cnd': column 'cnd' already exists.",a.condVar);
+    end
+    n.trialNfo = renamevars(n.trialNfo,a.condVar,"cnd");
+end
 
 % Remove excluded conditions
 if isany(a.cond1) && isany(a.cond0)
@@ -215,7 +230,26 @@ if isany(a.timeRng) && numel(a.timeRng)==2
     n.nTimes = height(n.times); % number of times
 end
 
+% Copy trialNfo vars to 'ep'
+if isany(a.trialVars)
+    % Only copy trialNfo vars that exist
+    a.trialVars = a.trialVars(ismember(a.trialVars,n.trialNfo.Properties.VariableNames));
+    a.trialVars = setdiff(a.trialVars,"tr","stable"); % never overwrite trial number
 
+    % Map each row of 'ep' to its trial row in 'n.trialNfo' (via 'tr')
+    [tf,idx] = ismember(ep.tr,n.trialNfo.tr);
+    if ~all(tf)
+        missingTrs = unique(ep.tr(~tf));
+        error("[ec_analPrep] %d/%d ep rows reference trial numbers missing from n.trialNfo.tr (e.g., %s). Cannot align trialNfo vars.",...
+            nnz(~tf),numel(tf),strjoin(string(missingTrs(1:min(5,numel(missingTrs))))',", "));
+    end
+
+    % Copy each trialNfo variable to 'ep', aligned by trial number
+    for v = a.trialVars
+        ep.(v) = n.trialNfo.(v)(idx,:);
+    end
+    disp("[ec_analPrep] Copied trialNfo vars to 'ep': "+strjoin(a.trialVars,", ")+" | toc="+toc(tt));
+end
 
 
 
@@ -243,7 +277,7 @@ if a.chConcat=="roi"
     n.ROIs.sbjChs = cell(n.nROIs,1);
     n.ROIs.sbjROI = "s"+n.sbjID+"_"+n.ROIs.roi;
     
-    % Concactenate ROI channels
+    % Concatenate ROI channels
     for r = 1:n.nROIs
         % Find ROI chans
         id = ismember(n.chNfo.(rv),n.ROIs.roi(r));
@@ -257,18 +291,16 @@ if a.chConcat=="roi"
         % Concatenate EEG from (times,chans,freqs) to (times,freqs*chans)
         y{r} = reshape(y{r}, height(y{r}), width(y{r})*size(y{r},3));  % a-by-(b*c)
 
-        % Column info
+        % Column info (collect per-ch tables, vertcat once)
+        xiAll = cell(n.ROIs.nChs(r),1);
         for ch = 1:n.ROIs.nChs(r)
             xi = spect;
             xi.ch(:) = n.ROIs.chs{r}(ch);
             xi = movevars(xi,"ch","Before",1);
             xi = renamevars(xi,"name","spect");
-            if ch==1
-                n.ROIs.columns{r} = xi;
-            else
-                n.ROIs.columns{r} = vertcat(n.ROIs.columns{r},xi);
-            end
+            xiAll{ch} = xi;
         end
+        n.ROIs.columns{r} = vertcat(xiAll{:});
     end
     disp("[ec_analPrep] Concatenated ROI chs: "+n.sbj+" | toc="+toc(tt));
 elseif a.chConcat=="all"
@@ -283,20 +315,18 @@ elseif a.chConcat=="all"
     n.ROIs.sbjChs = {n.chNfo.sbjCh};
     n.ROIs.sbjROI = "s"+n.sbjID+"_all";
 
-    % Concactenate EEG from (times,chans,freqs) to (times,freqs*chans)
+    % Concatenate EEG from (times,chans,freqs) to (times,freqs*chans)
     y = reshape(permute(x,[1 3 2]), height(x), width(x)*size(x,3));
 
-    % Column info
+    % Column info (collect per-ch tables, vertcat once)
+    xiAll = cell(n.ROIs.nChs,1);
     for ch = 1:n.ROIs.nChs
         xi = n.spect;
         xi.ch(:) = n.ROIs.chs{1}(ch);
         xi = movevars(xi,"ch","Before",1);
         xi = renamevars(xi,"name","spect");
-        if ch==1
-            n.ROIs.columns{1} = xi;
-        else
-            n.ROIs.columns{1} = vertcat(n.ROIs.columns{1},xi);
-        end
+        xiAll{ch} = xi;
     end
+    n.ROIs.columns{1} = vertcat(xiAll{:});
     disp("[ec_analPrep] Concatenated all chs: "+n.sbj+" | toc="+toc(tt));
 end

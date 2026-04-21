@@ -25,6 +25,11 @@ if isfloat(x)
 end
 nCh = numel(x);
 
+% n.ide must be valid row indices into x; stale n.ide would misalign rows.
+assert(numel(n.ide)==size(x{1},1) && min(n.ide,[],"all")>=1 && max(n.ide,[],"all")<=size(x{1},1),...
+    "[ec_analSplit] n.ide (len=%d, range=[%d,%d]) must match x rows (%d). n.ide appears stale.",...
+    numel(n.ide),min(n.ide,[],"all"),max(n.ide,[],"all"),size(x{1},1));
+
 % Preallocate split data
 sts = cell(nCh,1);
 obs = sts;
@@ -54,7 +59,7 @@ obs = vertcat(obs{:});
 n.splits = numel(x); % number of splits
 
 % Save PCA weights
-if a.savePCAwts && isany(a.pca) && a.pcaComps 
+if a.pcaSaveWts && isany(a.pca) && a.pcaComps 
     n.pcaWts = wts; % Save weights to n
 end
 disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+...
@@ -126,21 +131,16 @@ if a.pca=="split"
     % PCA weight preallocation
     wtc = cell(n.nTimes,1);
 
-    % Copy to GPU
-    if a.pcaGPU
-        xc = cellfun(@gpuArray,xc,UniformOutput=false);
-    end
-
     % Run PCA
     for t = 1:n.nTimes
         [xc{t},stc(t,:),wtc{t}] = withinSplit_lfn(xc{t},stc(t,:),a);
     end
 
-    % Gather from GPU
-    if a.pcaGPU
-        xc = cellfun(@gather,xc,UniformOutput=false);
-        wtc = cellfun(@gather,wtc,UniformOutput=false);
-    end
+    % % Gather from GPU
+    % if a.pcaGPU
+    %     xc = cellfun(@gather,xc,UniformOutput=false);
+    %     wtc = cellfun(@gather,wtc,UniformOutput=false);
+    % end
 elseif isany(a.std)
     % Standardize features
     for t = 1:n.nTimes
@@ -158,7 +158,7 @@ function [xs,sts,w] = withinSplit_lfn(xs,sts,a)
 if a.pca=="split"
     % Standardize predictors, calculate rank, run PCA
     [xs,w,sts.rank] = ec_pca(xs,nComps=a.pcaComps,robust=a.pcaRobust,...
-        std=a.std,gpu=a.pcaGPU,double=true,gather=false,exact=true);
+        std=a.std,gpu=a.pcaGPU,double=true,gather=true,exact=true);
     % Final number of features
     sts.features = width(xs);
     % Save PCA weights

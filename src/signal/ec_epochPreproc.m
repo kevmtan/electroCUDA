@@ -145,11 +145,11 @@ else
 end
 disp("[ec_epochPreproc] Completed main preproc: "+n.sbj+" time="+toc(tt));
 
-% Reformat EEG data as matrix
-y = ec_cell2dim(y,2);
-
 
 %% Finalize
+
+% Reformat EEG data as matrix
+y = ec_cell2dim(y,2);
 
 % PCA info table
 if o.pca
@@ -194,10 +194,11 @@ disp("[ec_epochPreproc] Finished: "+n.sbj+" time="+toc(tt));
 
 function [xc,wc,xcRank] = withinCh_lfn(xc,psy,ep,n,o,ch)
 %%% Within-channel preprocessing routine (top-level) %%%%%%%%%%%%%%%%%%%%%%
-% ch=1; xc=x{ch};
+% ch=1; xc=x(:,ch,:);
 
-% Convert EEG to specified float type for processing
-xc = cast(xc,o.floatProc);
+% Convert EEG format
+xc = squeeze(xc); % squeeze
+xc = cast(xc,o.floatProc); % convert to specified float type for processing
 
 % Move EEG to GPU
 if o.gpu
@@ -273,10 +274,14 @@ end
 
 
 %% Finalize
+
+% Copy from GPU
 if o.gpu || o.pcaGPU
     xc = gather(xc);
     wc = gather(wc);
 end
+
+% Convert to output float precision
 xc = cast(xc,o.floatOut);
 
 
@@ -596,6 +601,7 @@ end
 
 function xct = outliersTime_lfn(xct,cnd,n,o)
 %%% Outliers within timepoint %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                              t=50; id=n.timesId{t}; xct=xc(id,:); cnd=ep.cnd(id);
 
 % Outliers: all-data
 if o.olThrTime
