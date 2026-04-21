@@ -52,6 +52,8 @@ arguments
     o.freqs {islogical,isnumeric} = [];
     % PCA within-chan or within-concactenated chans (e.g., make spectral components)
     o.pca (1,1) double = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+    o.pcaVarThr (1,1) double = 0; % Variance threshold for kept PCA comps (0=skip)
+    o.pcaCompLims (1,2) double = [0 Inf]; % Bounds on kept PCA comps: [lower upper]
     o.pcaStd string {mustBeMember(o.pcaStd,["robust" "zscore" "" []])} = ""; % don't standardize to keep baseline at 0
     o.pcaRobust (1,1) logical = false; % Use robust PCA
     o.pcaGPU (1,1) logical = false; % Use GPU for PCA (recommended for robustPCA)
@@ -152,7 +154,7 @@ disp("[ec_epochPreproc] Completed main preproc: "+n.sbj+" time="+toc(tt));
 y = ec_cell2dim(y,2);
 
 % PCA info table
-if o.pca
+if o.pca || o.pcaVarThr
     % Save PCA weights to nfo struct
     n.pca = n.chNfo(:,["sbjID" "ch" "sbjCh"]);
     n.pca.wts = wts;
@@ -166,7 +168,7 @@ if o.pca
     end
 
     % New spectral info struct
-    n.nSpect = o.pca;
+    n.nSpect = size(y,3);
     n.spect = table;
     n.spect.name = "pc"+(1:n.nSpect)';
     n.spect.disp = "Spectral Component "+(1:n.nSpect)';
@@ -267,7 +269,9 @@ end
 
 % Spectral PCA
 if o.pca || o.pcaRobust
-    [xc,wc,xcRank] = ec_pca(xc,robust=o.pcaRobust,std=o.pcaStd,gpu=o.pcaGPU||o.gpu);
+    [xc,wc,xcRank] = ec_pca(xc,nComps=o.pca,varThr=o.pcaVarThr,...
+        nCompLims=o.pcaCompLims,robust=o.pcaRobust,std=o.pcaStd,...
+        gpu=o.pcaGPU||o.gpu);
 else
     wc=[]; xcRank=nan;
 end

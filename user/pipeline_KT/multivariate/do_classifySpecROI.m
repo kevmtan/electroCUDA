@@ -8,7 +8,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
 proj = "lbcn";
 task = "MMR"; % task name
 analFolder = "classifySpecROI";
-analName = "MzAb_LDA_band";
+analName = "MzAb_LDA_pca";
 
 dirs = ec_getDirs(proj,task);
 
@@ -40,7 +40,7 @@ o.p.chRm = []; % channels to remove (array of chan numbers)
 o.p.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
 o.p.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
 o.p.roiVar = "roi"; % ROI variable in chNfo
-o.p.chConcat = "roi"; % Concactenate channels by ["roi"|"all"|""], default="" (none)
+o.p.chConcat = "roi"; % Concatenate channels by ["roi"|"all"|""], default="" (none)
 
 % Timing for analysis
 o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
@@ -60,7 +60,7 @@ o.p.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.p.epoch.dur = 2.025; % Duration after stim onset, supercedes 'post' [nan = no limit]
+o.p.epoch.dur = 2.025; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
 o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 5; % latency percentage bin width (<=100)
@@ -104,22 +104,24 @@ o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.5; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.p.pre.freqs = []; %[5 300];
+o.p.pre.freqs = [5 300]; %[5 300];
 % PCA within-chan or within-concatenated chans (e.g., make spectral components)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
+o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
+o.p.pre.pcaCompLims = [0 inf]; % Bounds on kept PCA comps [lower upper]
 o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
-% % Spectral dimensionality reduction into bands (skip=[])
-o.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-o.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-o.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
-
-% o.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+% Spectral dimensionality reduction into bands (skip=[])
+% o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+% o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
 %     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+% o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+
+% o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+% o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+% o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 
 
@@ -133,11 +135,13 @@ o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % 
 
 % PCA
 o.s.rank = true; % calculate data rank if no PCA
-o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
+o.s.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
+o.s.pcaVarThr = 0.95; % Variance threshold for kept PCA comps (0=skip; supersedes o.s.pcaComps)
+o.s.pcaCompLims = [30 150]; % Bounds on kept PCA comps [lower upper]
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.s.pcaGPU = true; % GPU for rank calculation & PCA
-o.s.pcaSaveWts = false; % Save PCA weights
+o.s.pcaGPU = false; % GPU for rank calculation & PCA
+o.s.pcaSaveWts = true; % Save PCA weights
 
 
 
@@ -162,7 +166,7 @@ o.metricFun = @mmr_cSpecMetrics; % inject at end of ec_classify
 
 % Cross-validation (CV) parameters (mathworks.com/help/stats/crossval.html)
 o.doCV = true; % Do CV?
-o.doNestedCV = false; % Nested CV for hyperparemeter optimization? (NOT IMPLEMENTED)
+o.doNestedCV = false; % Nested CV for hyperparemeter optimization?
 o.cv.KFold = 10; % Num folds for CV
 o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
 o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
@@ -198,7 +202,7 @@ elseif isequal(o.fun,@fitclinear)
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
     % Linear discriminant analysis
-    o.hyper.DiscrimType = "linear"; % "pseudolinear" "diaglinear"
+    o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
     o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
 elseif isequal(o.fun,@fitcknn)
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
@@ -215,7 +219,7 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "none"; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end

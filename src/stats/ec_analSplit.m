@@ -10,6 +10,8 @@ arguments
     a.rank (1,1) logical = false        % Calculate data rank if no PCA
     a.pca string = ""                   % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
     a.pcaComps (1,1){mustBeInteger} = 0 % Number of components (0=skip, inf=data rank)
+    a.pcaVarThr (1,1) double = 0        % Variance threshold for kept PCA comps (0=skip)
+    a.pcaCompLims (1,2) double = [0 Inf] % Bounds on kept PCA comps: [lower upper]
     a.pcaRobust (1,1) logical = false   % Run robust PCA for denoising (can do without dim reduction)
     a.pcaGPU (1,1) logical = false      % GPU for rank calculation & PCA    
     a.pcaSaveWts (1,1) logical = true   % Save PCA weights
@@ -59,7 +61,7 @@ obs = vertcat(obs{:});
 n.splits = numel(x); % number of splits
 
 % Save PCA weights
-if a.pcaSaveWts && isany(a.pca) && a.pcaComps 
+if a.pcaSaveWts && isany(a.pca) && (a.pcaComps || a.pcaVarThr)
     n.pcaWts = wts; % Save weights to n
 end
 disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+...
@@ -101,7 +103,8 @@ end
 if isany(a.pca) && a.pca~="split"
     % Run PCA
     [xc,wtc,stc.rank(:)] = ec_pca(xc,nComps=a.pcaComps,robust=a.pcaRobust,...
-        std=a.std,gpu=a.pcaGPU,double=true,gather=true,exact=false);    
+        varThr=a.pcaVarThr,nCompLims=a.pcaCompLims,std=a.std,...
+        gpu=a.pcaGPU,double=true,gather=true,exact=false);    
     % Final number of features
     stc.features(:) = width(xc);
     % Save PCA weights
@@ -131,16 +134,21 @@ if a.pca=="split"
     % PCA weight preallocation
     wtc = cell(n.nTimes,1);
 
+    % Copy to GPU
+    if a.pcaGPU
+        xc = cellfun(@gpuArray,xc,UniformOutput=false);
+    end
+
     % Run PCA
     for t = 1:n.nTimes
         [xc{t},stc(t,:),wtc{t}] = withinSplit_lfn(xc{t},stc(t,:),a);
     end
 
-    % % Gather from GPU
-    % if a.pcaGPU
-    %     xc = cellfun(@gather,xc,UniformOutput=false);
-    %     wtc = cellfun(@gather,wtc,UniformOutput=false);
-    % end
+    % Gather from GPU
+    if a.pcaGPU
+        xc = cellfun(@gather,xc,UniformOutput=false);
+        wtc = cellfun(@gather,wtc,UniformOutput=false);
+    end
 elseif isany(a.std)
     % Standardize features
     for t = 1:n.nTimes
@@ -158,7 +166,8 @@ function [xs,sts,w] = withinSplit_lfn(xs,sts,a)
 if a.pca=="split"
     % Standardize predictors, calculate rank, run PCA
     [xs,w,sts.rank] = ec_pca(xs,nComps=a.pcaComps,robust=a.pcaRobust,...
-        std=a.std,gpu=a.pcaGPU,double=true,gather=true,exact=true);
+        varThr=a.pcaVarThr,nCompLims=a.pcaCompLims,std=a.std,...
+        gpu=a.pcaGPU,double=true,gather=false,exact=true);
     % Final number of features
     sts.features = width(xs);
     % Save PCA weights
