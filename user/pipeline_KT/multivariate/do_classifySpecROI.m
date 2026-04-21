@@ -160,7 +160,7 @@ o.metricFun = @mmr_cSpecMetrics; % inject at end of ec_classify
 o.doCV = true; % Do CV?
 o.doNestedCV = false; % Nested CV for hyperparemeter optimization? (NOT IMPLEMENTED)
 o.cv.KFold = 10; % Num folds for CV
-o.cvh.KFold = 10; % Num folds for hyperparameter tuning CV
+o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
 o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
 o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
 

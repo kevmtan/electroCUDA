@@ -66,3 +66,11 @@ figure;
 g(1,1) = gramm(x=stat.t(id),y=stat.accl(id));
 g(1,1).geom_line();
 g.draw();
+
+
+%%
+clear g
+figure; 
+g(1,1) = gramm(x=stat.t,y=stat.acc,color=stat.roi);
+g(1,1).geom_line();
+g.draw();
