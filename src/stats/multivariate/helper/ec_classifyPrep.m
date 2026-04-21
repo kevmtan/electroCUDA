@@ -25,6 +25,8 @@ psyVars = ismember(ep.Properties.VariableNames,...
 % Convenient variables
 nCond = numel(o.p.cond); % number of train/test classes 
 nCondx = numel(o.p.condx); % number of cross-classification classes
+nPpc1 = max(nCond-1,1);
+nPpxc1 = max(nCondx-1,1);
 f0 = cast(nan,o.floatAnal); % float precision
 u0 = uint16(0); % unsigned integer
 s0 = string(missing);
@@ -42,6 +44,7 @@ ob.pred(:) = categorical(s0,o.p.cond,Ordinal=true); % predicted class
 ob.pp(:,1:numel(o.p.cond)) = f0; % posterior probability per class
 ob.pp1(:) = f0; % posterior probability difference
 ob.acc(:) = false; % accurate prediction?
+ob.fold(:) = u0; % main CV test fold index (0 = not assigned)
 ob.use(ismember(ob.cnd,o.p.cond)) = true; % use if one of the main conds (train/test)
 if o.doCC
     ob.cc(ismember(ob.cnd,o.p.condx)) = true; % cross-classification conds
@@ -76,11 +79,11 @@ st.ppc(:,1:nCond) = f0;
 st.ppc_SE(:,1:nCond) = f0; 
 st.ppc_p(:,1:nCond) = f0;
 st.ppc_q(:,1:nCond) = f0;
-% PP cond diff
-st.ppc1(:) = f0;
-st.ppc1_SE(:) = f0;
-st.ppc1_p(:) = f0;
-st.ppc1_q(:) = f0;
+% PP cond diff (fitlm returns nCond-1 coefs relative to reference level)
+st.ppc1(:,1:nPpc1) = f0;
+st.ppc1_SE(:,1:nPpc1) = f0;
+st.ppc1_p(:,1:nPpc1) = f0;
+st.ppc1_q(:,1:nPpc1) = f0;
 if o.doCC
     % Cross-classification (CC) stats
     st.ppx(:,1:nCondx) = f0; % CC PP
@@ -93,11 +96,11 @@ if o.doCC
     st.ppxc_SE(:,1:nCondx) = f0;
     st.ppxc_p(:,1:nCondx) = f0;
     st.ppxc_q(:,1:nCondx) = f0;
-    % PP cond diff
-    st.ppxc1(:) = f0;
-    st.ppxc1_SE(:) = f0;
-    st.ppxc1_p(:) = f0;
-    st.ppxc1_q(:) = f0;
+    % PP cond diff (fitlm returns nCondx-1 coefs relative to reference level)
+    st.ppxc1(:,1:nPpxc1) = f0;
+    st.ppxc1_SE(:,1:nPpxc1) = f0;
+    st.ppxc1_p(:,1:nPpxc1) = f0;
+    st.ppxc1_q(:,1:nPpxc1) = f0;
 end
 st.n0(:,1:nCond) = u0; % original obs per training cond
 st.n(:,1:nCond) = f0; % obs per training cond (converted to uint later)
@@ -119,6 +122,19 @@ if o.s.rank||isany(o.s.pca)
     st.rank(:) = u0; end % Matrix rank
 if isany(o.s.pca)
     st.features(:) = u0; end % Number of features
+% Tuned hyperparameters
+if o.doTuning && ~any(o.OptimizeHyperparameters=="auto") &&...
+        (~o.doCV || (o.doCV && ~o.doNestedCV) || o.doCC)
+    for p = 1:numel(o.OptimizeHyperparameters)
+        param = o.OptimizeHyperparameters(p); % parameter name
+        if ismember(param,["Regularization" "Learner"])
+            st.(param)(:) = s0; % string param (FIGURE OUT STRING PARAMS)
+        else
+            st.(param)(:) = f0; % float param
+        end
+    end
+end
+
 % Channel/IC/ROI info
 st.ch(:) = c0;
 st.sbjCh(:) = s0;
@@ -188,6 +204,13 @@ for t = 1:height(st)
             st.cv{t} = [];
             continue;
         end
+
+        % Mark which test fold each observation belongs to (main CV)
+        foldLocal = repmat(u0,height(obt),1);
+        for k = 1:st.cv{t}.NumTestSets
+            foldLocal(test(st.cv{t},k)) = cast(k,"like",u0);
+        end
+        ob.fold(idt) = foldLocal;
     end
 
     % Hyperparameter tuning CV partition (full training set)
@@ -389,10 +412,16 @@ for c = 1:nCond
     % Assign trials to folds, cycling through folds
     for i = 1:nClassTrials
         trialIdx = classTrials(i);
-        
-        % Find fold with fewest observations of this class
-        [~,targetFold] = min(foldClassCounts(:,c));
-        
+
+        % Find fold(s) with fewest observations of this class; break ties randomly
+        minCount = min(foldClassCounts(:,c));
+        tiedFolds = find(foldClassCounts(:,c) == minCount);
+        if isscalar(tiedFolds)
+            targetFold = tiedFolds;
+        else
+            targetFold = tiedFolds(randi(numel(tiedFolds)));
+        end
+
         foldAssign(trialIdx) = targetFold;
         foldClassCounts(targetFold,c) = foldClassCounts(targetFold,c) + trialCounts(trialIdx);
     end
