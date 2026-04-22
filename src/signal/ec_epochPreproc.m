@@ -28,15 +28,15 @@ arguments
     % Trasnform/normalization
     o.log (1,1) logical = false;               % Log transform
     o.mag2db (1,1) logical = false;            % Spectral magnitude to decibel
-    o.runNorm string {mustBeMember(o.runNorm,["robust" "zscore" "" []])} = "robust"; % Normalize run
+    o.runNorm string {mustBeMember(o.runNorm,["robust" "zscore" ""])} = "robust"; % Normalize run
     % Within-trial normalization (baseline correction)
     %   Epoch baseline period (none=[], relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
     o.baselinePre {mustBeFloat} = []            % Pre-stimulus baseline (secs from stim onset); -.2sec until onset = [-.2]; -.2sec to 1sec = [-0.2 1]
     o.baselinePost {mustBeFloat} = []           % Post-stimulus baseline (secs from stim offset); .2sec after offset = .2; .1sec to .2sec after offsetx=[0.1 0.3]
-    o.trialNorm string {mustBeMember(o.trialNorm,["robust" "zscore" "" []])} = "robust"; % Normalize trial (skip="")
+    o.trialNorm string {mustBeMember(o.trialNorm,["robust" "zscore" ""])} = "robust"; % Normalize trial (skip="")
     o.trialNormDev string {mustBeMember(o.trialNormDev,["baseline" "pre" "post" "on" "off" "all"])}...
         = "baseline"; % Timepoints for StdDev relative to stim ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
-    o.trialBaseline string {mustBeMember(o.trialBaseline,["median" "mean" "" []])} = "median"; % Subtract trial by mean or median of baseline period (skip="")
+    o.trialBaseline string {mustBeMember(o.trialBaseline,["median" "mean" ""])} = "median"; % Subtract trial by mean or median of baseline period (skip="")
     % Bad frames/outliers
     o.interp string {mustBeMember(o.interp,["nearest" "linear" "spline" "pchip" "makima"])}...
         = "linear";
@@ -54,7 +54,7 @@ arguments
     o.pca (1,1) double = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
     o.pcaVarThr (1,1) double = 0; % Variance threshold for kept PCA comps (0=skip)
     o.pcaCompLims (1,2) double = [0 Inf]; % Bounds on kept PCA comps: [lower upper]
-    o.pcaStd string {mustBeMember(o.pcaStd,["robust" "zscore" "" []])} = ""; % don't standardize to keep baseline at 0
+    o.pcaStd string {mustBeMember(o.pcaStd,["robust" "zscore" ""])} = ""; % don't standardize to keep baseline at 0
     o.pcaRobust (1,1) logical = false; % Use robust PCA
     o.pcaGPU (1,1) logical = false; % Use GPU for PCA (recommended for robustPCA)
     % Spectral dimensionality reduction into bands (skip=[])
@@ -64,7 +64,7 @@ arguments
     % Filtering (within-run):
     o.hpf (1,1) double = 0;                     % HPF cutoff in hertz (skip=0)
     o.hpfSteep (1,1) double = 0.7;              % HPF steepness
-    o.hpfImpulse {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
+    o.hpfImpulse {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "auto"; % HPF impulse: ["auto"|"fir"|"iir"]
     o.lpf (1,1) double = 0;                     % LPF cutoff in hz (skip=0)
     o.lpfSteep = 0.7;                           % LPF steepness
     o.lpfImpulse {mustBeMember(o.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]

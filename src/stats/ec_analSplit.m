@@ -104,7 +104,7 @@ if isany(a.pca) && a.pca~="split"
     % Run PCA
     [xc,wtc,stc.rank(:)] = ec_pca(xc,nComps=a.pcaComps,robust=a.pcaRobust,...
         varThr=a.pcaVarThr,nCompLims=a.pcaCompLims,std=a.std,...
-        gpu=a.pcaGPU,double=true,gather=true,exact=false);    
+        gpu=a.pcaGPU,double=true,gather=true,exact=true);    
     % Final number of features
     stc.features(:) = width(xc);
     % Save PCA weights

@@ -4,7 +4,7 @@ arguments
     tt uint64 = tic
     a.dirs struct % Subject directories struct from ec_loadSbj
     a.sfx (1,1) string = "" % Input data suffix
-    a.chConcat {mustBeMember(a.chConcat,["roi" "all" "" []])} = "" % Concactenate channels by ["roi"|"all"|""], default="" (none)
+    a.chConcat string {mustBeMember(a.chConcat,["roi" "all" ""])} = "" % Concatenate channels by ["roi"|"all"|""], default="" (none)
     a.chBadVars string = [] % Vars in n.chBad/icBad to use for bad chan removal
     a.chRm = [] % channels to remove (array of chan numbers)
     a.ROIs (1,:) string = [] % remove chs outside these ROIs
