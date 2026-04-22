@@ -83,13 +83,6 @@ disp("[ec_classifySpec] Saved classification statistics: "+o.saved.st+" toc="+to
 o.saved.ob = fullfile(o.dirOut,"s"+n.sbjID+"_ob.mat");
 save(o.saved.ob,"ob","-v7");
 disp("[ec_classifySpec] Saved classification observations: "+o.saved.ob+" toc="+toc(tt));
-if ~isempty(errs) && any(~cellfun(@isempty,errs))
-    o.saved.errs = fullfile(o.dirOut,"s"+n.sbjID+"_errs.mat");
-    save(o.saved.errs,"errs","-v7");
-    disp("[ec_classifySpec] Saved classification errors: "+o.saved.errs+" toc="+toc(tt));
-end
-%o.saved.nfo = fullfile(o.dirOut,"s"+n.sbjID+".mat");
-%save(o.saved.nfo,"o","n","-v7");
 
 
 

@@ -137,10 +137,10 @@ o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % 
 o.s.rank = true; % calculate data rank if no PCA
 o.s.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
-o.s.pcaVarThr = 0.95; % Variance threshold for kept PCA comps (0=skip; supersedes o.s.pcaComps)
-o.s.pcaCompLims = [30 150]; % Bounds on kept PCA comps [lower upper]
+o.s.pcaVarThr = 0.95; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
+o.s.pcaCompLims = [30 150]; % Bounds on number of components [lower upper]
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.s.pcaGPU = false; % GPU for rank calculation & PCA
+o.s.pcaGPU = true; % GPU for rank calculation & PCA
 o.s.pcaSaveWts = true; % Save PCA weights
 
 
