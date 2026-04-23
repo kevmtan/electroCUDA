@@ -204,25 +204,37 @@ sts.auc1 = mean(sts.auc,"omitmissing");
 
 function sts = permute_lfn(xs,sts,obs,o)
 %%% Permutation testing for classifier performance significance %%%%%%%%%%%
+%
+% TO DO:  figure out threshold for mean PR-AUC (o.perfVar=="auc1")
 
 % Only do permutation test for above-chance acurracy, otherwise the
-% parametric test result is kept to save compute
-%       TO DO: figure out threshold for mean PR-AUC (o.perfVar=="auc1")
+% parametric test result is kept to save compute)
 if o.perfVar=="acc" && sts.acc < 1/numel(o.p.cond)
     return; end
 
 % Stats info
 stat = sts.(o.perfVar); % actual perfomance statistic value
-N = nnz(obs.use); % number of training set observations
-yOg = obs.y(obs.use); % original labels
+yObsOg = obs.y(obs.use); % original labels (observation-level)
+trObs = obs.tr(obs.use); % trial IDs for training observations
+[trials,~,trIdx] = unique(trObs,"stable");
+nTrials = numel(trials);
+
+% One label per trial for grouped shuffling
+yTrialOg = yObsOg(accumarray(trIdx,(1:numel(trIdx))',[],@(ii) ii(1)));
+
+% Safety check: all observations within each trial should share one label
+if any(yObsOg ~= yTrialOg(trIdx))
+    error("[ec_classify] Training observations within a trial have inconsistent labels; cannot run trial-grouped permutation test.");
+end
 
 % Preallocate permuted performance distribution
 statPerm = nan(o.permutations,1,like=sts.(o.perfVar));
 
 % Loop across permutations
 for p = 1:o.permutations
-    % Shuffle labels
-    obs.y(obs.use) = yOg(randperm(N)); % save to observations table
+    % Shuffle labels at trial level (all obs from a trial share one label)
+    yTrialPerm = yTrialOg(randperm(nTrials));
+    obs.y(obs.use) = yTrialPerm(trIdx); % broadcast trial label to all trial observations
 
     % Run classification routine on shuffled labels
     sts1 = main_lfn(xs,sts,obs,o,true);
