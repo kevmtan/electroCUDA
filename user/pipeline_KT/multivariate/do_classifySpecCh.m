@@ -5,16 +5,17 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
     "S15_83_RR";"S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 %sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
-proj = "lbcn";
-task = "MMR"; % task name
+
 analFolder = "classifySpecCh";
 analName = "MzAb_LDA_pcaTune";
 
-dirs = ec_getDirs(proj,task);
 
 % Initialize options struct
 o = struct;
 o.name = ""; % Analysis name (filled in subject loop)
+o.proj = "lbcn"; % analysis project
+o.task = "MMR"; % analysis task
+dirs = ec_getDirs(o.proj,o.task);
 
 
 %% Options
@@ -148,8 +149,7 @@ o.s.pcaSaveWts = false; % Save PCA weights
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence"...
-    "VD" "VD1" "VD2" "K_pca1" "K_pca2" "K_pca3" "K_pca4"]; % psy vars to include in observations output
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD1" "VD2"]; % psy vars to include in observations output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -223,11 +223,9 @@ elseif isequal(o.fun,@fitcdiscr)
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
-o.HyperparameterOptimizationOptions =...
-    struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Repartition=false,...
-    AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
-%struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
-%AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
+o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
+    Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
+    MaxObjectiveEvaluations=10);
 
 
 
@@ -269,7 +267,7 @@ for s = 1:height(logs)
         % Set options struct per subject
         sbj = logs.sbj(s);
         sbjID = logs.sbjID(s);
-        o.p.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.p.sfx);
+        o.p.dirs = ec_loadSbj(sbj=sbj,proj=o.proj,task=o.task,sfx=o.p.sfx);
         o.dirOut = logs.out(s);
         o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
         disp("STARTING: "+sbj);

@@ -77,12 +77,24 @@ end
 
 
 %% Save
+
+% Select .mat version (v7 has ~2 GB per-variable limit; v7.3/HDF5 for larger)
+stVer = "-v7";
+if whos("st").bytes > 2^31
+    stVer = "-v7.3";
+end
+obVer = "-v7";
+if whos("ob").bytes > 2^31
+    obVer = "-v7.3";
+end
+
+% Save
 o.saved.st = fullfile(o.dirOut,"s"+n.sbjID+"_st.mat");
-save(o.saved.st,"st","-v7");
-disp("[ec_classifySpec] Saved classification statistics: "+o.saved.st+" toc="+toc(tt));
+save(o.saved.st,"st",stVer);
+disp("[ec_classifySpec] Saved classification statistics: "+o.saved.st+" ("+stVer+") toc="+toc(tt));
 o.saved.ob = fullfile(o.dirOut,"s"+n.sbjID+"_ob.mat");
-save(o.saved.ob,"ob","-v7");
-disp("[ec_classifySpec] Saved classification observations: "+o.saved.ob+" toc="+toc(tt));
+save(o.saved.ob,"ob",obVer);
+disp("[ec_classifySpec] Saved classification observations: "+o.saved.ob+" ("+obVer+") toc="+toc(tt));
 
 
 

@@ -4,17 +4,18 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
     "S14_74_OD";"S14_75_TB";"S14_76_AA";"S14_78_RS";"S15_81_RM";"S15_82_JB";...
     "S15_83_RR";"S15_87_RL";"S16_95_JOB";"S16_96_LF"];
-%sbjs = ["S12_38_LK";"S12_42_NC"];
-proj = "lbcn";
-task = "MMR"; % task name
-analFolder = "classifySpecROI";
-analName = "MzAb_LDA_pca";
+%sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 
-dirs = ec_getDirs(proj,task);
+analFolder = "classifySpecCh";
+analName = "MzAb_LDA_pcaTune";
+
 
 % Initialize options struct
 o = struct;
 o.name = ""; % Analysis name (filled in subject loop)
+o.proj = "lbcn"; % analysis project
+o.task = "MMR"; % analysis task
+dirs = ec_getDirs(o.proj,o.task);
 
 
 %% Options
@@ -223,11 +224,9 @@ elseif isequal(o.fun,@fitcdiscr)
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
-o.HyperparameterOptimizationOptions =...
-    struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Repartition=false,...
-    AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
-%struct(ShowPlots=false,Verbose=0,Optimizer="bayesopt",Kfold=5,Repartition=true,...
-%AcquisitionFunctionName="expected-improvement-plus",MaxObjectiveEvaluations=30);
+o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
+    Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
+    MaxObjectiveEvaluations=15);
 
 
 
@@ -269,7 +268,7 @@ for s = 1:height(logs)
         % Set options struct per subject
         sbj = logs.sbj(s);
         sbjID = logs.sbjID(s);
-        o.p.dirs = ec_loadSbj(sbj=sbj,proj=proj,task=task,sfx=o.p.sfx);
+        o.p.dirs = ec_loadSbj(sbj=sbj,proj=o.proj,task=o.task,sfx=o.p.sfx);
         o.dirOut = logs.out(s);
         o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
         disp("STARTING: "+sbj);
