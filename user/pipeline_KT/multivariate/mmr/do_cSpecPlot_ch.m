@@ -1,13 +1,22 @@
+load("/01/lbcn/anal/classifySpecCh/MzAb_LDA_pcaTune_260422_0604/log_260422_0604.mat")
+
+% Colors
 load("cdcol_2018.mat","cdcol");
 
-% Log filename
-fnLog = "/01/lbcn/anal/classifyChSpec/MzAb_regLDA_ch_251217/log_251217_0732.mat";
+op = struct;
 
-% Plot options
+
+%% Options
 op.visible = false; % !!!!!!!!!!
 op.save = true; % !!!!!!!!!!!
-op.res = [810 1080];
-op.axTxtSz = 12;
+op.sigThr = 0.05; % significance threshold
+
+% Plot
+op.res = [1440 720];
+op.txtCol = [0 0 0]; % Text color: [R G B]
+op.txtSz = 10; % text size
+op.txtSzTitle = 12;
+op.txtSzAx = 8;
 
 % Cortex opts
 op.posVar = "pialRAS"; % position variable in chNfo table (should match surfType)
@@ -23,40 +32,31 @@ op.cmap = "RdBu"; % colormap (see ec_colorsFromValues)
 op.markCol = [1 0 0];
 op.nsCol = [0 0 0]; % marker color for nonsignificant chans: [R G B]
 op.bCol = [0 0 0]; % marker border color: [R G B]
-op.txtCol = [.8 .8 .8]; % Text color: [R G B]
-op.txtSz = 14; % text size
-op.clim = [-4 4];
-op.climICA = [];
-op.climICA_z = [-6 6];
 op.align = true; % align vertex centers
 
-op.odc = ecu_genPlotParams("ERP","MMR");
-op.odc.style= ':';
-op.odc.width = 0.5;
-op.odc.wSig = 1;
-op.odc.edgestyle = ':';
-op.odc.col = [cdcol.prussian_blue; cdcol.mauve; cdcol.pastel_blue; 0 0.75 0];
-op.odc.col = ec_dim2cell(op.odc.col,1);
+% Accuracy
+op.a = struct;
+op.a.style= ':';
+op.a.edgestyle = ':';
+op.a.width = 0.5;
+op.a.wSig = 2;
+op.a.col = cdcol.spruce_green;
+op.a.col = ec_dim2cell(op.a.col,1);
 
-op.od = op.odc;
-op.od.col = cdcol.dark_green;
-op.od.col = ec_dim2cell(op.od.col,1);
+% PP per cond
+op.c = op.a;
+op.c.col = [cdcol.prussian_blue; cdcol.mauve; cdcol.pastel_blue; 0 0.75 0];
+op.c.col = ec_dim2cell(op.c.col,1);
 
-op.odc1 = op.od;
-op.odc1.col = cdcol.greenish_blue;
-op.odc1.col = ec_dim2cell(op.odc1.col,1);
+% PP cond difference
+op.d = op.c;
+op.d.col = [cdcol.violet; cdcol.greenish_blue];
+op.d.col = ec_dim2cell(op.d.col,1);
 
-op.odr = op.od;
-op.odr.col = [cdcol.carmine_lake; cdcol.fast_orange];
-op.odr.col = ec_dim2cell(op.odr.col,1);
-
-% for c = 1:numel(o.conds)
-%     op.o1D.col{c} = op.col(c,:);
-% end
-
-
-%% Load logs
-load(fnLog,"logs")
+% PP RT/RC/valence
+op.r = op.c;
+op.r.col = [cdcol.indian_red; cdcol.orange; cdcol.peacock_green];
+op.r.col = ec_dim2cell(op.r.col,1);
 
 
 %% Create parallel pool (must be processes, can't be threadpool)
@@ -65,24 +65,23 @@ try ppool = parpool("local12"); catch;end
 
 
 %% Loop across subjects & channel type
-for p = 1 %1:2 % Switch EEG data: channels (1) or independent components (2)
-    for s = 1:height(logs.i{p})
-        if logs.i{p}.class(s) %&& ~logs.i{p}.plot(s)
-            disp("STARTING: "+logs.i{p}.sbj(s));
-            o = logs.i{p}.o{s};
+for s = 1:height(logs)
+    if logs.class(s) %&& ~logs.plot(s)
+        disp("STARTING: "+logs.sbj(s));
+        n = logs.n{s};
+        o = logs.o{s};
 
-            %% Do subject
-            try
-                mmr_cChSpecPlot(o,op);
-                logs.i{p}.plot(s) = true;
-            catch ME; getReport(ME)
-                logs.i{p}.error{s} = ME;
-                logs.i{p}.plot(s) = false;
-            end
-
-            %% Save logs
-            logs.i{p}.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(logs.fn(p),'logs','-v7');
+        %% Do subject
+        try
+            mmr_cSpecPlot_ch(n,o,op);
+            logs.plot(s) = true;
+        catch ME; getReport(ME)
+            logs.error{s} = ME;
+            logs.plot(s) = false;
         end
+
+        %% Save logs
+        logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+        save(logs.fn(s),'logs','-v7.3');
     end
 end

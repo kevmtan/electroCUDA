@@ -1,25 +1,27 @@
-function mmr_cSpecPlot_ch(o,op)
+function mmr_cSpecPlot_ch(n,o,op)
 arguments
+    n struct
     o struct
     op struct
 end
+
 
 %% Initialize
 tic;
 
 % Load
-fnStats = o.dirOut+"s"+o.n.sbjID+"_stats.mat";
-load(fnStats,"stats");
+fnStats = o.dirOut+"s"+n.sbjID+"_st.mat";
+load(fnStats,"st");
 
 % Save dir
 if ~isfield(o,"dirOutSbj")
-    o.dirOutSbj = o.dirOut+"s"+o.n.sbjID+filesep; end
+    o.dirOutSbj = o.dirOut+"s"+n.sbjID+filesep; end
 if ~exist(o.dirOutSbj,"dir")
     mkdir(o.dirOutSbj); end
 
 % Rename table vars to standard names
-stats = renamevars(stats,o.timeVar,"t");
-chNfo = renamevars(o.n.chNfo,op.posVar,"pos"); 
+st = renamevars(st,o.p.timeVar,"t");
+chNfo = renamevars(n.chNfo,op.posVar,"pos"); 
 
 % Plot data table template (see 'd' vars in 'ec_plotCortex')
 d0 = chNfo(:,["sbjCh" "ch" "pos" "hem" "lat" "gyrus" "ECoG"]);
@@ -30,31 +32,27 @@ d0.sz(:) = op.nsSz; % marker size (numeric) -- see MarkerSize in MATLAB line pro
 d0.bSz(:) = op.bSz; % marker border/line size (numeric) --- see plot.LineSize in MATLAB line properties
 d0.order(:) = -inf;
 
-% Split obs by chan & timept (output from unique models) for parfor
-stats = splitapply(@(ct){stats(ct,:)},(1:height(stats))',findgroups(stats.ch));
-disp("[mmr_cChSpecPlot] Finished prep: "+o.n.sbj+" toc="+toc);
+% Split stats by chan for parfor
+st = splitapply(@(ch){st(ch,:)},(1:height(st))',findgroups(st.ch));
+disp("[mmr_cChSpecPlot] Finished prep: "+n.sbj+" toc="+toc);
 
 
 %% Loop across chans
-parfor ch = 1:height(stats)
-    plotCh_lfn(stats{ch},d0,o,op)
+parfor ch = 1:height(st)
+    plotCh_lfn(st{ch},d0,n,o,op)
 end
 
 
 
 
 
-function plotCh_lfn(st,d,o,op)
+function plotCh_lfn(stc,d,n,o,op)
 %% Plot channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ch=71; st=stats{ch}; d=d0;
-od = op.od;
-odc = op.odc;
-odc1 = op.odc1;
-odr = op.odr;
+% ch=71; stc=st{ch}; d=d0;
 
 % Channel 
-sbjCh = st.sbjCh(1);
-c = d.sbjCh==sbjCh;
+sbjCh = stc.sbjCh(1);
+c = d.sbjCh==sbjCh; % chan index
 hem = d.hem(c);
 if ~ismember(hem,["L" "R"])
     hem = ["L" "R"]; end %unique(d.hem(~isnan(d.pos(:,1)))); end
@@ -70,90 +68,156 @@ h = figure(Position=[0 0 op.res],Visible=op.visible,WindowStyle="normal",...
         Theme="light",Color="w");
 
 % Initialize tiledlayout
-ht = tiledlayout(h,3,2,TileSpacing="compact",padding="tight"); % tiledlayout
+ht = tiledlayout(h,2,4,TileSpacing="compact",padding="tight"); % tiledlayout
 
 % Title
-if any(op.txtSz)
-    title(ht,replace(sbjCh,"_"," "),FontSize=op.txtSz,FontWeight="bold"); end
+if op.txtSzTitle
+    title(ht,replace(sbjCh,"_"," "),FontSize=op.txtSzTitle,Color=op.txtCol,FontWeight="bold");
+end
+
 
 
 %% Plot cortex
 ha = nexttile(ht,[1 2]);
-ec_plotCortex(hem,["lateral","medial"],d,ht,sbj=o.n.sbj,sbjDir=o.dirs.fsSbj,......
+ec_plotCortex(hem,["lateral","medial"],d,ht,sbj=n.sbj,sbjDir=n.dirs.fsSbj,......
     surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.visible,...
     flip=false,order="ascend",align=op.align,tile=tilenum(ha),tilespan=[1 2]);
 ha.Visible="off";
 %axis(ha,"tight"); axis(ha,"equal");
 
 
-%% Accuracy
-y = st.acc;
-ySig = y;
-ySig(~(st.acc_q<o.alpha) | st.t<0) = nan;
-
-ha = nexttile(ht);
-title(ha,"Accuracy",FontSize=op.txtSz);
-ha.XLim = o.timeRng;
-mseb(st.t',y',st.acc_SE',od,1);
-hold on; axis tight;
-plot(st.t,ySig,"-","Color",od.col{1},"LineWidth",od.wSig);
-plot(xlim,[0.5 0.5],"k-","LineWidth",od.wSig);
-plot([0 0],ylim,"k-","LineWidth",od.wSig);
-
-
 %% PP per cond
-y = [st.ppc,st.ppcx];
-ySE = [st.ppc_SE,st.ppcx_SE];
+y = [stc.ppc stc.ppxc];
+ySE = [stc.ppc_SE stc.ppxc_SE];
 ySig = y;
-ySig(~(st.ppc_q(:,1)<o.alpha) | st.t<0,1) = nan; % semantic
-ySig(~(st.ppc_q(:,2)<o.alpha) | st.t<0,2) = nan; % episodic
-ySig(~(st.ppcx_q(:,1)<o.alpha) | st.t<0,3) = nan; % self
-ySig(~(st.ppcx_q(:,2)<o.alpha) | st.t<0,4) = nan; % other
+ySig(~(stc.ppc_q(:,1)<op.sigThr),1) = nan; % semantic
+ySig(~(stc.ppc_q(:,2)<op.sigThr),2) = nan; % episodic
+ySig(~(stc.ppxc_q(:,1)<op.sigThr),3) = nan; % self
+ySig(~(stc.ppxc_q(:,2)<op.sigThr),4) = nan; % other
 
+% Initialize subplot
 ha = nexttile(ht);
-title(ha,"Posterior Probability",FontSize=op.txtSz);
-ha.XLim = o.timeRng;
-mseb(st.t',y',ySE',odc,1);
+ha.FontSize=op.txtSzAx;
+if op.txtSz
+    title(ha,"Posterior Probability (PP)",...
+        FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
+end
+
+% Timecourses & error
+mseb(stc.t',y',ySE',op.c,1);
 hold on; axis tight;
-plot(st.t,ySig(:,1),"-","Color",odc.col{1},"LineWidth",odc.wSig);
-plot(st.t,ySig(:,2),"-","Color",odc.col{2},"LineWidth",odc.wSig);
-plot(st.t,ySig(:,3),"-","Color",odc.col{3},"LineWidth",odc.wSig);
-plot(st.t,ySig(:,4),"-","Color",odc.col{4},"LineWidth",odc.wSig);
-plot(xlim,[0 0],"k-","LineWidth",odc.wSig);
-plot([0 0],ylim,"k-","LineWidth",odc.wSig);
 
-
-%% RT/valence
-y = [st.ppr_RT,st.ppr_val];
-ySE = [st.ppr_RT_SE,st.ppr_val_SE];
-ySig = y;
-ySig(~(st.ppr_RT_q<o.alpha) | st.t<0,1) = nan;
-ySig(~(st.ppr_val_q<o.alpha) | st.t<0,2) = nan;
-
-ha = nexttile(ht);
-title(ha,"Posterior Probability Regression",FontSize=op.txtSz);
-ha.XLim = o.timeRng;
-mseb(st.t',y',ySE',odr,1);
-hold on; axis tight;
-plot(st.t,ySig(:,1),"-","Color",odr.col{1},"LineWidth",odr.wSig);
-plot(st.t,ySig(:,2),"-","Color",odr.col{2},"LineWidth",odr.wSig);
-plot(xlim,[0 0],"k-","LineWidth",odr.wSig);
-plot([0 0],ylim,"k-","LineWidth",odr.wSig);
+% Plot sig timepoints
+plot(stc.t,ySig(:,1),".-",Color=op.c.col{1},MarkerFaceColor=op.c.col{1},LineWidth=op.c.wSig);
+plot(stc.t,ySig(:,2),".-",Color=op.c.col{2},MarkerFaceColor=op.c.col{2},LineWidth=op.c.wSig);
+plot(stc.t,ySig(:,3),".-",Color=op.c.col{3},MarkerFaceColor=op.c.col{3},LineWidth=op.c.wSig);
+plot(stc.t,ySig(:,4),".-",Color=op.c.col{4},MarkerFaceColor=op.c.col{4},LineWidth=op.c.wSig);
+plot(xlim,[0 0],"k-","LineWidth",op.c.wSig);
+plot([0 0],ylim,"k-","LineWidth",op.c.wSig);
 
 
 %% PP cond difference
-y = st.ppr_cx;
+y = [stc.ppc1 stc.ppxc1];
+ySE = [stc.ppc1_SE stc.ppxc1_SE];
 ySig = y;
-ySig(~(st.ppr_cx_q<o.alpha) | st.t<0) = nan;
+ySig(~(stc.ppc1_q<op.sigThr),1) = nan; % Episodic-Semantic
+ySig(~(stc.ppxc1_q<op.sigThr),2) = nan; % Other-Self
 
+% Initialize subplot
 ha = nexttile(ht);
-title(ha,"Posterior Probability (Other-Self)",FontSize=op.txtSz);
-ha.XLim = o.timeRng;
-mseb(st.t',y',st.ppr_cx_SE',odc1,1);
+ha.FontSize=op.txtSzAx;
+if op.txtSz
+    title(ha,"PP Cond Diff",...
+        FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
+end
+
+% Timecourses & error
+mseb(stc.t',y',ySE',op.d,1);
 hold on; axis tight;
-plot(st.t,ySig,"-","Color",odc1.col{1},"LineWidth",odc1.wSig);
-plot(xlim,[0 0],"k-","LineWidth",odc1.wSig);
-plot([0 0],ylim,"k-","LineWidth",odc1.wSig);
+
+% Plot sig timepoints
+plot(stc.t,ySig(:,1),".-",Color=op.d.col{1},MarkerFaceColor=op.d.col{1},LineWidth=op.d.wSig);
+plot(stc.t,ySig(:,2),".-",Color=op.d.col{2},MarkerFaceColor=op.d.col{2},LineWidth=op.d.wSig);
+plot(xlim,[0 0],"k-","LineWidth",op.d.wSig);
+plot([0 0],ylim,"k-","LineWidth",op.d.wSig);
+
+
+%% Autobio PP regression: RT & RC
+y = [stc.ppr_RT,stc.ppr_RC];
+ySE = [stc.ppr_RT_SE,stc.ppr_RC_SE];
+ySig = y;
+ySig(~(stc.ppr_RT_q<op.sigThr),1) = nan;
+ySig(~(stc.ppr_RC_q<op.sigThr),2) = nan;
+
+% Initialize subplot
+ha = nexttile(ht);
+ha.FontSize=op.txtSzAx;
+if op.txtSz
+    title(ha,"Autobio PP Regression",...
+        FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
+end
+
+% Timecourses & error
+mseb(stc.t',y',ySE',op.r,1);
+hold on; axis tight;
+
+% Plot sig timepoints
+plot(stc.t,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineWidth=op.r.wSig);
+plot(stc.t,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
+plot(xlim,[0 0],"k-","LineWidth",op.r.wSig);
+plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
+
+
+%% Mentalizing (CC) PP regression: RT, RC & valence
+y = [stc.ppxr_RT,stc.ppxr_RC,stc.ppxr_val];
+ySE = [stc.ppxr_RT_SE,stc.ppxr_RC_SE,stc.ppxr_val_SE];
+ySig = y;
+ySig(~(stc.ppxr_RT_q<op.sigThr),1) = nan;
+ySig(~(stc.ppxr_RC_q<op.sigThr),2) = nan;
+ySig(~(stc.ppxr_val_q<op.sigThr),3) = nan;
+
+% Initialize subplot
+ha = nexttile(ht);
+ha.FontSize=op.txtSzAx;
+if op.txtSz
+    title(ha,"Mentalizing PP Regression",...
+        FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
+end
+
+% Timecourses & error
+mseb(stc.t',y',ySE',op.r,1);
+hold on; axis tight;
+
+% Plot sig timepoints
+plot(stc.t,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineWidth=op.r.wSig);
+plot(stc.t,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
+plot(stc.t,ySig(:,3),".-",Color=op.r.col{3},MarkerFaceColor=op.r.col{3},LineWidth=op.r.wSig);
+plot(xlim,[0 0],"k-","LineWidth",op.r.wSig);
+plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
+
+
+%% Accuracy
+y = stc.acc;
+ySE = stc.acc_SE;
+ySig = y;
+ySig(~(stc.acc_q<op.sigThr)) = nan;
+
+% Initialize subplot
+ha = nexttile(ht);
+ha.FontSize=op.txtSzAx;
+if op.txtSz
+    title(ha,"Accuracy",...
+        FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
+end
+
+% Timecourses & error
+mseb(stc.t',y',ySE',op.a,1);
+hold on; axis tight;
+
+% Sig timepoints
+plot(stc.t,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
+plot(xlim,[0.5 0.5],"k-","LineWidth",op.a.wSig);
+plot([0 0],ylim,"k-","LineWidth",op.a.wSig);
 
 
 %% Save
