@@ -7,7 +7,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
 %sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 
 analFolder = "classifySpecCh";
-analName = "MzAb_LDA_pcaTune";
+analName = "MzAb_LDA_GammaDelta";
 
 
 % Initialize options struct
@@ -89,7 +89,7 @@ o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 % Bad frames/outliers
 o.p.pre.interp = "linear"; % interpolation method
-o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
+o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
@@ -102,7 +102,7 @@ o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.7; % HPF steepness
 o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.p.pre.lpfSteep = 0.5; % LPF steepness
+o.p.pre.lpfSteep = 0.75; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = [5 300]; %[5 300];
@@ -136,9 +136,9 @@ o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % 
 
 % PCA
 o.s.rank = true; % calculate data rank if no PCA
-o.s.pca = "ch"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
+o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
-o.s.pcaVarThr = 0.95; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
+o.s.pcaVarThr = 0; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
 o.s.pcaCompLims = [5 Inf]; % Bounds on number of components [lower upper]
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
 o.s.pcaGPU = true; % GPU for rank calculation & PCA
@@ -149,7 +149,7 @@ o.s.pcaSaveWts = false; % Save PCA weights
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD1" "VD2"]; % psy vars to include in observations output
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD"]; % psy vars to include in observations output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -181,16 +181,7 @@ o.jeffreys = false; % Jeffreys prior penalization for Platt scaling
 % Classifier hyperparameters
 o.hyper = struct;
 o.hyper.Prior = "uniform";
-if isequal(o.fun,@fitcsvm)
-    % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
-    o.hyper.KernelFunction = "linear";
-    o.hyper.BoxConstraint = 1;
-    o.hyper.KernelScale = "auto";
-    o.hyper.Standardize = false;
-    o.hyper.Solver = "SMO";
-    o.hyper.CacheSize = "maximal";
-    o.hyper.Verbose = 0;
-elseif isequal(o.fun,@fitclinear)
+if isequal(o.fun,@fitclinear)
     % Linear classifier (mathworks.com/help/stats/fitclinear.html)
     o.hyper.Learner = "logistic"; % "svm"
     o.hyper.Lambda = "auto";
@@ -204,6 +195,15 @@ elseif isequal(o.fun,@fitcdiscr)
     % Linear discriminant analysis
     o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
     o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
+elseif isequal(o.fun,@fitcsvm)
+    % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
+    o.hyper.KernelFunction = "linear";
+    o.hyper.BoxConstraint = 1;
+    o.hyper.KernelScale = "auto";
+    o.hyper.Standardize = false;
+    o.hyper.Solver = "SMO";
+    o.hyper.CacheSize = "maximal";
+    o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcknn)
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
     o.hyper.Distance = "euclidean";
@@ -219,13 +219,13 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = ["Gamma" "Delta"]; % "Gamma" "Delta"
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
     Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
-    MaxObjectiveEvaluations=10);
+    MaxObjectiveEvaluations=30);
 
 
 
@@ -253,7 +253,7 @@ end
 
 
 %% Initialize threadpool
-try delete(gcp("nocreate")); catch;end
+% try delete(gcp("nocreate")); catch;end
 try ppool = parpool("threads"); catch;end
 %try reset(gpuDevice); catch;end
 % s=5; %sbj38

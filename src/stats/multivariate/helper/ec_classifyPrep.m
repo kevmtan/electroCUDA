@@ -44,8 +44,8 @@ ob.pred(:) = categorical(s0,o.p.cond,Ordinal=true); % predicted class
 ob.pp(:,1:numel(o.p.cond)) = f0; % posterior probability per class
 ob.pp1(:) = f0; % posterior probability difference
 ob.acc(:) = false; % accurate prediction?
-ob.fold(:) = u0; % main CV test fold index (0 = not assigned)
 ob.use(ismember(ob.cnd,o.p.cond)) = true; % use if one of the main conds (train/test)
+if o.doCV; ob.fold(:) = uint8(0); end % main CV test fold index (0 = not assigned)
 if o.doCC
     ob.cc(ismember(ob.cnd,o.p.condx)) = true; % cross-classification conds
     ob.cx = categorical(string(ob.cnd),o.p.condx,Ordinal=true); % Add CC cond var to obs

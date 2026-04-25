@@ -6,8 +6,8 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S15_83_RR";"S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 %sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 
-analFolder = "classifySpecCh";
-analName = "MzAb_LDA_pcaTune";
+analFolder = "classifySpecROI";
+analName = "MzAb_LDA_pcaGammaDelta";
 
 
 % Initialize options struct
@@ -89,27 +89,27 @@ o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 % Bad frames/outliers
 o.p.pre.interp = "linear"; % interpolation method
-o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
+o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"mad"|"diff"|"sns"|...]
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
 o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
+o.p.pre.olThrCond = 4; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
 o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.7; % HPF steepness
 o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.p.pre.lpfSteep = 0.5; % LPF steepness
+o.p.pre.lpfSteep = 0.75; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = [5 300]; %[5 300];
 % PCA within-chan or within-concatenated chans (e.g., make spectral components)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
-o.p.pre.pcaCompLims = [0 inf]; % Bounds on kept PCA comps [lower upper]
+o.p.pre.pcaCompLims = [5 Inf]; % Bounds on kept PCA comps [lower upper]
 o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
@@ -139,10 +139,10 @@ o.s.rank = true; % calculate data rank if no PCA
 o.s.pca = "roi"; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaVarThr = 0.95; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
-o.s.pcaCompLims = [30 150]; % Bounds on number of components [lower upper]
+o.s.pcaCompLims = [5 250]; % Bounds on number of components [lower upper]
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
 o.s.pcaGPU = true; % GPU for rank calculation & PCA
-o.s.pcaSaveWts = true; % Save PCA weights
+o.s.pcaSaveWts = false; % Save PCA weights
 
 
 
@@ -182,7 +182,21 @@ o.jeffreys = false; % Jeffreys prior penalization for Platt scaling
 % Classifier hyperparameters
 o.hyper = struct;
 o.hyper.Prior = "uniform";
-if isequal(o.fun,@fitcsvm)
+if isequal(o.fun,@fitclinear)
+    % Linear classifier (mathworks.com/help/stats/fitclinear.html)
+    o.hyper.Learner = "logistic"; % "svm"
+    o.hyper.Lambda = "auto";
+    o.hyper.Regularization = "ridge";
+    %o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
+    o.hyper.FitBias = true;
+    o.hyper.PostFitBias = false;
+    o.hyper.OptimizeLearnRate = false;
+    o.hyper.Verbose = 0;
+elseif isequal(o.fun,@fitcdiscr)
+    % Linear discriminant analysis
+    o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
+    o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
+elseif isequal(o.fun,@fitcsvm)
     % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
     o.hyper.KernelFunction = "linear";
     o.hyper.BoxConstraint = 1;
@@ -191,20 +205,6 @@ if isequal(o.fun,@fitcsvm)
     o.hyper.Solver = "SMO";
     o.hyper.CacheSize = "maximal";
     o.hyper.Verbose = 0;
-elseif isequal(o.fun,@fitclinear)
-    % Linear classifier (mathworks.com/help/stats/fitclinear.html)
-    o.hyper.Learner = "logistic"; % "svm"
-    o.hyper.Lambda = "auto";
-    o.hyper.Regularization = "ridge";
-    %o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
-    o.hyper.FitBias = true;
-    o.hyper.PostFitBias = false;
-    o.hyper.OptimizeLearnRate = true;
-    o.hyper.Verbose = 0;
-elseif isequal(o.fun,@fitcdiscr)
-    % Linear discriminant analysis
-    o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
-    o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
 elseif isequal(o.fun,@fitcknn)
     % KNN hyperparameters (mathworks.com/help/stats/fitcknn.html)
     o.hyper.Distance = "euclidean";
@@ -220,13 +220,13 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = ["Gamma" "Delta"]; % "Gamma" "Delta"
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
     Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
-    MaxObjectiveEvaluations=15);
+    MaxObjectiveEvaluations=40);
 
 
 
