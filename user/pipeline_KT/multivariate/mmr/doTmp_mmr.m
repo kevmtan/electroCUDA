@@ -1,10 +1,16 @@
-do_classifySpecROI;
+% Math vs Autobio run launcher for ROI classification experiments
+
+doTmp_MathAb_LDA;
 clear all; close all;
 
-doTmp_cSpecROI_LR_lambda;
+doTmp_MathAb_LDA_gamma;
 clear all; close all;
 
-doTmp_cSpecROI_LDA_gammaDelta;
-clear all; close all; 
+doTmp_MathAb_LDA_pca;
+clear all; close all;
 
-do_classifySpecCh;
+doTmp_MathAb_LDA_pcaGamma;
+clear all; close all;
+
+doTmp_MathAb_LDA_gammaNested;
+clear all; close all;

@@ -7,7 +7,7 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
 %sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 
 analFolder = "classifySpecROI";
-analName = "MzAb_LDA_pcaGammaDelta";
+analName = "MzMath_LDA_pcaGammaDelta";
 
 
 % Initialize options struct

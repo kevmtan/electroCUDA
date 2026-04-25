@@ -89,7 +89,7 @@ function [sts,obs] = main_lfn(xs,sts,obs,o,isTest)
 % classifier performance significance
 
 % TEST - make this more elegant
-if sts.t<0; o.doTuning=false; end
+%if sts.t<0; o.doTuning=false; end
 
 % Bail if no training observations (defensive; ec_classify also checks)
 if ~any(obs.use); return; end
@@ -135,15 +135,7 @@ end
 %% Cross-validate
 if o.doCV
     if o.doNestedCV
-        % Nested CV options
-        oo = namedargs2cell(o.hyper);
-        oho = o.HyperparameterOptimizationOptions; % hyperparameter tuning opts
-        oho.CVPartition = sts.cvhn{1}; % inner CV partition
-
-        % Fit nested CV classifier
-        mdlCV = o.fun(xs(obs.use,:),obs.y(obs.use),oo{:},'Cost',sts.cost{1},...
-            'CV',sts.cv{1},'OptimizeHyperparameters',o.OptimizeHyperparameters,...
-            'HyperparameterOptimizationOptions',oho);
+        [obs,sts] = nestedCV_lfn(xs,obs,sts,o);
     else
         % Flat CV
         if ~mdl_exist || isequal(o.fun,@fitclinear) % fitclinear must be called again for CV
@@ -164,25 +156,20 @@ if o.doCV
         end
     end
 
-    % Fit SVM score to posterior probability transform
-    if isequal(o.fun,@fitcsvm)
-        mdlCV = fitSVMPosterior(mdlCV); end
+    if ~o.doNestedCV
+        % Fit SVM score to posterior probability transform
+        if isequal(o.fun,@fitcsvm)
+            mdlCV = fitSVMPosterior(mdlCV); end
 
-    % CV predict
-    [obs.pred(obs.use),obs.pp(obs.use,:)] = mdlCV.kfoldPredict;
+        % CV predict
+        [obs.pred(obs.use),obs.pp(obs.use,:)] = mdlCV.kfoldPredict;
 
-    % CV loss
-    sts.loss = mdlCV.kfoldLoss; % (Mode="individual")'
-
-    % ROC
-    rocm = rocmetrics(mdlCV,ConfidenceIntervalType="none");
+        % CV loss
+        sts.loss = mdlCV.kfoldLoss; % (Mode="individual")'
+    end
 else
     % No CV - predict training obs with full model
     [obs.pred(obs.use),obs.pp(obs.use,:)] = mdl.predict(xs(obs.use,:));
-
-    % ROC
-    rocm = rocmetrics(obs.y(obs.use),obs.pp(obs.use,:),mdl.ClassNames,...
-        ConfidenceIntervalType="none");
 end
 
 %% Performance
@@ -193,9 +180,67 @@ obs.acc = obs.pred==obs.y;
 % Accuracy stats (parametric)
 [sts.acc,sts.acc_p,sts.acc_SE] = ec_binomTest(obs.acc(obs.use));
 
+% ROC
+if o.doCV && ~o.doNestedCV
+    % Calculate ROC for flat CV using mdlCV object
+    rocm = rocmetrics(mdlCV,ConfidenceIntervalType="none");
+else
+    % Calculate ROC for nested CV & no CV using observation-level scores
+    rocm = rocmetrics(obs.y(obs.use),obs.pp(obs.use,:),categories(obs.y(obs.use)),...
+        ConfidenceIntervalType="none");
+end
+
 % Precision-recall AUC
 sts.auc = rocm.auc("pr");  
 sts.auc1 = mean(sts.auc,"omitmissing");
+
+
+
+
+
+
+function [obs,sts] = nestedCV_lfn(xs,obs,sts,o)
+%%% Explicit nested CV outer-loop classification %%%%%%%%%%%%%%%%%%%%%%%%%%%
+cvOuter = sts.cv{1};
+cvInner = sts.cvhn{1};
+nOuter = cvOuter.NumTestSets;
+idUse = find(obs.use);
+
+% Preallocate CV outputs at "use" level then write back to obs.
+predUse = repmat(categorical(missing,categories(obs.y),Ordinal=true),numel(idUse),1);
+ppUse = nan(numel(idUse),numel(categories(obs.y)),like=obs.pp);
+foldLoss = nan(nOuter,1,like=sts.loss);
+
+for k = 1:nOuter
+    idOuterTrainLocal = training(cvOuter,k);
+    idOuterTestLocal = test(cvOuter,k);
+
+    % Build per-fold inner CV on outer-train observations
+    oo = namedargs2cell(o.hyper);
+    oho = o.HyperparameterOptimizationOptions;
+    oho.CVPartition = cvInner{k};
+
+    mdlFold = o.fun(xs(idUse(idOuterTrainLocal),:),obs.y(idUse(idOuterTrainLocal)),oo{:},'Cost',sts.cost{1},...
+        'OptimizeHyperparameters',o.OptimizeHyperparameters,...
+        'HyperparameterOptimizationOptions',oho);
+
+    % Fit SVM score-to-posterior transform for this fold model
+    if isequal(o.fun,@fitcsvm)
+        mdlFold = mdlFold.fitPosterior;
+    end
+
+    % Predict on this outer test fold
+    [predUse(idOuterTestLocal),ppUse(idOuterTestLocal,:)] = ...
+        mdlFold.predict(xs(idUse(idOuterTestLocal),:));
+
+    % Zero-one fold loss on held-out outer fold
+    foldLoss(k) = mean(predUse(idOuterTestLocal) ~= obs.y(idUse(idOuterTestLocal)));
+end
+
+% Save nested CV predictions and loss
+obs.pred(obs.use) = predUse;
+obs.pp(obs.use,:) = ppUse;
+sts.loss = mean(foldLoss,"omitmissing");
 
 
 
@@ -272,6 +317,7 @@ scores = double(obs.pp(obs.use,end)); % scores
 if ~o.doCV || o.doCC
     % If CV was performed, fitting uses scores from CV model (ideal)
     % If CV wasn't performed, fitting uses scores from full model (unstable)
+    % TO DO: handle nested CV inner fold separation
 
     % Fit scaling coefficients on full training set
     [b,ok] = plattFit_lfn(y,scores,o);
