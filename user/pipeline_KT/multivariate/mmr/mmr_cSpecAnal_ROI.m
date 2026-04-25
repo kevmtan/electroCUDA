@@ -1,5 +1,5 @@
 function stat = mmr_cSpecAnal_ROI(logs)
-% load("/01/lbcn/anal/classifySpecROI/MzAb_SVM_260414_0745/log_260414_0745.mat");
+% load("/01/lbcn/anal/classifySpecROI/MzAb_LDA_pca_260421_1611/log_260421_1611.mat")
 % stat = mmr_cSpecAnal_ROI(logs);
 
 %% Prep
@@ -86,7 +86,7 @@ disp("Saved classificiation statistics: "+fn+" toc="+toc(tt));
 function sts = analyze_lfn(obs,o)
 %%% Within-split analyses %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% obs = oba{514};
+% obs=oba{514}; obs=oba{217};
 
 % Convert to double-precision
 obs = convertvars(obs,varfun(@isfloat,obs,"OutputFormat","uniform"),"double");
@@ -95,6 +95,8 @@ obs = convertvars(obs,varfun(@isfloat,obs,"OutputFormat","uniform"),"double");
 sts = table;
 sts.roi = obs.ch(1);
 sts.t = obs.t(1);
+sts.acc = nan;
+sts.acc_SE = nan;
 
 
 %% Model performance
@@ -104,10 +106,10 @@ sts.t = obs.t(1);
 sts.acc_q = nan;
 
 % Accuracy: Logistic mixed-effects
-lme = fitglme(obs(obs.use,:),"acc ~ 1 + (1|sbjID) + (1|sbjID:tr)",...
+lme = fitglme(obs(obs.use,:),"acc ~ 1 + (1|sbjID:tr)",...
     Distribution="Binomial",Link="logit",FitMethod="REMPL");
-sts.accl = lme.Coefficients.Estimate;
-sts.accl_SE = lme.Coefficients.SE;
+sts.accl = 1/(1 + exp(-lme.Coefficients.Estimate)); % convert logit to probability
+sts.accl_SE = lme.Coefficients.SE * sts.accl * (1 - sts.accl); % logit SE to probability via delta method
 sts.accl_p = lme.Coefficients.pValue;
 sts.accl_q = nan;
 
@@ -122,21 +124,29 @@ sts.accl_q = nan;
 %% Posterior probability
 
 % PP of main conds (training set)
+lme = fitlme(obs(obs.use,:),"pp1 ~ y-1 + (y-1|sbjID:frame)",...
+    FitMethod="REML",DummyVarCoding="full");
 for c = 1:numel(o.p.cond)
-    id = obs.cnd == o.p.cond(c);
-    [sts.ppc(1,c),sts.ppc_p(1,c),sts.ppc_SE(1,c)] = ec_ttest(obs.pp1(id));
+    sts.ppc(1,c) = lme.Coefficients.Estimate(c);
+    sts.ppc_SE(1,c) = lme.Coefficients.SE(c);
+    sts.ppc_p(1,c) = lme.Coefficients.pValue(c);
     sts.ppc_q(1,c) = nan;
 end
 
 % PP of cross-classification conds
-for c = 1:numel(o.p.condx)
-    id = obs.cnd == o.p.condx(c);
-    [sts.ppxc(1,c),sts.ppxc_p(1,c),sts.ppxc_SE(1,c)] = ec_ttest(obs.pp1(id));
-    sts.ppxc_q(1,c) = nan;
+if o.doCC
+    lme = fitlme(obs(obs.cc,:),"pp1 ~ cx-1 + (cx-1|sbjID:frame)",...
+        FitMethod="REML",DummyVarCoding="full");
+    for c = 1:numel(o.p.condx)
+        sts.ppxc(1,c) = lme.Coefficients.Estimate(c);
+        sts.ppxc_SE(1,c) = lme.Coefficients.SE(c);
+        sts.ppxc_p(1,c) = lme.Coefficients.pValue(c);
+        sts.ppxc_q(1,c) = nan;
+    end
 end
 
 % PP diff of main conds
-lme = fitlme(obs(obs.use,:),"pp1 ~ y + (1|sbjID)",FitMethod="REML");
+lme = fitlme(obs(obs.use,:),"pp1 ~ y + (1|sbjID:frame)",FitMethod="REML");
 sts.ppc1 = lme.Coefficients.Estimate(2);
 sts.ppc1_SE = lme.Coefficients.SE(2);
 sts.ppc1_p = lme.Coefficients.pValue(2);
@@ -144,7 +154,7 @@ sts.ppc1_q = nan;
 
 % PP diff of CC conds
 if o.doCC
-    lme = fitlme(obs(obs.cc,:),"pp1 ~ cx + (1|sbjID)",FitMethod="REML");
+    lme = fitlme(obs(obs.cc,:),"pp1 ~ cx + (1|sbjID:frame)",FitMethod="REML");
     sts.ppxc1 = lme.Coefficients.Estimate(2);
     sts.ppxc1_SE = lme.Coefficients.SE(2);
     sts.ppxc1_p = lme.Coefficients.pValue(2);
@@ -155,14 +165,14 @@ end
 %% Regression on PP
 
 % Behavioral response time
-lme = fitlme(obs(obs.use,:),"pp1 ~ RT + (RT|sbjID:tr)",FitMethod="REML");
+lme = fitlme(obs(obs.use,:),"pp1 ~ RT + (1|sbjID:frame)",FitMethod="REML");
 sts.ppr_RT = lme.Coefficients.Estimate(2);
 sts.ppr_RT_SE = lme.Coefficients.SE(2);
 sts.ppr_RT_p = lme.Coefficients.pValue(2);
 sts.ppr_RT_q = nan;
 
 % Behavioral response choice
-lme = fitlme(obs(obs.use,:),"pp1 ~ resp + (resp|sbjID:tr)",FitMethod="REML");
+lme = fitlme(obs(obs.use,:),"pp1 ~ resp + (1|sbjID:frame)",FitMethod="REML");
 sts.ppr_RC = lme.Coefficients.Estimate(2);
 sts.ppr_RC_SE = lme.Coefficients.SE(2);
 sts.ppr_RC_p = lme.Coefficients.pValue(2);
@@ -172,21 +182,21 @@ sts.ppr_RC_q = nan;
 %% Regression on CC PP
 if o.doCC
     % Behavioral response time
-    lme = fitlme(obs(obs.cc,:),"pp1 ~ RT + (RT|sbjID:tr)",FitMethod="REML");
+    lme = fitlme(obs(obs.cc,:),"pp1 ~ RT + (1|sbjID:frame)",FitMethod="REML");
     sts.ppxr_RT = lme.Coefficients.Estimate(2);
     sts.ppxr_RT_SE = lme.Coefficients.SE(2);
     sts.ppxr_RT_p = lme.Coefficients.pValue(2);
     sts.ppxr_RT_q = nan;
 
     % Behavioral response choice
-    lme = fitlme(obs(obs.cc,:),"pp1 ~ resp + (resp|sbjID:tr)",FitMethod="REML");
+    lme = fitlme(obs(obs.cc,:),"pp1 ~ resp + (1|sbjID:frame)",FitMethod="REML");
     sts.ppxr_RC = lme.Coefficients.Estimate(2);
     sts.ppxr_RC_SE = lme.Coefficients.SE(2);
     sts.ppxr_RC_p = lme.Coefficients.pValue(2);
     sts.ppxr_RC_q = nan;
 
     % Affective valence
-    lme = fitlme(obs(obs.cc,:),"pp1 ~ valence + (valence|sbjID:tr)",FitMethod="REML");
+    lme = fitlme(obs(obs.cc,:),"pp1 ~ valence + (1|sbjID:frame)",FitMethod="REML");
     sts.ppxr_val = lme.Coefficients.Estimate(2);
     sts.ppxr_val_SE = lme.Coefficients.SE(2);
     sts.ppxr_val_p = lme.Coefficients.pValue(2);
