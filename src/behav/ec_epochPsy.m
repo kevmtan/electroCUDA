@@ -136,13 +136,25 @@ else
     ep.BLpost(:) = false;
 end
 
-% Task condition categorical order
-ep.cond = categorical(ep.cond,o.conds);
-trialNfo.cond = categorical(trialNfo.cond,o.conds);
+% Task condition categorical order/remapping
+epCond = string(ep.cond);
+trialCond = string(trialNfo.cond);
+condCats = o.conds;
 if isany(o.conds2)
-    ep.cond = renamecats(ep.cond,o.conds,o.conds2);
-    trialNfo.cond = renamecats(trialNfo.cond,o.conds,o.conds2);
+    if numel(o.conds2) ~= numel(o.conds)
+        error("[ec_epochPsy] conds2 must match conds length (%d ~= %d).",...
+            numel(o.conds2),numel(o.conds));
+    end
+
+    % Rename conditions by label, then rebuild categorical (supports many-to-one remaps).
+    [tfEp,idxEp] = ismember(epCond,o.conds);
+    epCond(tfEp) = o.conds2(idxEp(tfEp));
+    [tfTr,idxTr] = ismember(trialCond,o.conds);
+    trialCond(tfTr) = o.conds2(idxTr(tfTr));
+    condCats = unique(o.conds2,"stable");
 end
+ep.cond = categorical(epCond,condCats);
+trialNfo.cond = categorical(trialCond,condCats);
 
 % Response (GET RID BEFORE RELEASE)
 if n.task=="MMR"
