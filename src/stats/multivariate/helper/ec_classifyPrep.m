@@ -193,7 +193,10 @@ end
 for t = 1:height(st)
     % Get train/test indices per timepoint
     idt = ob.t==st.t(t) & ob.use;
-    if ~any(idt); continue; end % skip
+    if ~any(idt)
+        warning("[ec_classifyPrep] No usable observations at t=%g; skipping CV partitioning.",st.t(t));
+        continue;
+    end
     obt = ob(idt,:);
 
     % Main CV partition
@@ -202,6 +205,7 @@ for t = 1:height(st)
         if isempty(st.cv{t})
             ob.use(idt) = false; % mark timepoint as unusable
             st.cv{t} = [];
+            warning("[ec_classifyPrep] No usable observations at t=%g after CV partitioning.",st.t(t));
             continue;
         end
 
@@ -219,26 +223,18 @@ for t = 1:height(st)
         if isempty(st.cvh{t})
             ob.use(idt) = false;
             st.cvh{t} = [];
+            warning("[ec_classifyPrep] No usable observations at t=%g after hyperparameter tuning CV partitioning.",st.t(t));
         end
     end
 
     % Nested hyperparameter tuning CV partition (inside main CV partitions)
     if o.doNestedCV
-        % Requires outer CV partition to exist for this timepoint
-        if ~o.doCV || isempty(st.cv{t})
-            ob.use(idt) = false;
-            st.cv{t} = [];
-            st.cvhn{t} = [];
-            continue;
-        end
-
         % Build one inner CV partition per outer fold, each fit only on the
         % outer-train observations (true nested CV hierarchy).
-        cvOuter = st.cv{t};
-        cvInner = cell(cvOuter.NumTestSets,1);
+        cvInner = cell(st.cv{t}.NumTestSets,1);
         doSkip = false;
-        for k = 1:cvOuter.NumTestSets
-            idOuterTrain = training(cvOuter,k);
+        for k = 1:st.cv{t}.NumTestSets
+            idOuterTrain = training(st.cv{t},k);
             obtOuterTrain = obt(idOuterTrain,:);
 
             cvInner{k} = cvPartition_lfn(obtOuterTrain,nCond,o.cvh,o.cvMinTrialsPerFold);
@@ -252,10 +248,16 @@ for t = 1:height(st)
             ob.use(idt) = false;
             st.cv{t} = [];
             st.cvhn{t} = [];
+            warning("[ec_classifyPrep] No usable observations at t=%g after nested CV partitioning.",st.t(t));
             continue;
         end
 
         st.cvhn{t} = cvInner;
+    end
+
+    % Warn if this timepoint has no usable observations remaining
+    if ~any(ob.use(idt))
+        warning("[ec_classifyPrep] No usable observations at t=%g.",st.t(t));
     end
 end
 
