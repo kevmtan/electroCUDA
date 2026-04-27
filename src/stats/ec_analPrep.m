@@ -1,7 +1,7 @@
 function [x,ep,n] = ec_analPrep(tt,a)
 % ec_analPrep: prep subject data for further analyses in electroCUDA
 arguments
-    tt uint64 = tic
+    tt uint64 = tic % Timer
     a.dirs struct % Subject directories struct from ec_loadSbj
     a.sfx (1,1) string = "" % Input data suffix
     a.chConcat string {mustBeMember(a.chConcat,["roi" "all" ""])} = "" % Concatenate channels by ["roi"|"all"|""], default="" (none)
@@ -23,6 +23,7 @@ arguments
     a.trialVars (1,:) string = [] % trialNfo vars to copy to 'ep'
     a.test (1,1) logical = false
 end
+% TODO: custom epoch variable
 % a=o.p; tt=tic;
 
 
