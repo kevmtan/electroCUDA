@@ -141,7 +141,7 @@ o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaVarThr = 0; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
 o.s.pcaCompLims = [5 Inf]; % Bounds on number of components [lower upper]
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.s.pcaGPU = true; % GPU for rank calculation & PCA
+o.s.pcaGPU = false; % GPU for rank calculation & PCA
 o.s.pcaSaveWts = false; % Save PCA weights
 
 
@@ -277,7 +277,7 @@ for s = 1:height(logs)
         try
             [logs.o{s},logs.n{s},logs.error{s}] = ec_classifySpec(o);
             logs.class(s) = true;
-        catch ME; getReport(ME)
+        catch ME; warning(getReport(ME))
             logs.error{s} = ME;
             logs.class(s) = false;
         end

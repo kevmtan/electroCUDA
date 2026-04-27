@@ -42,11 +42,6 @@ if a.double
     x = double(x);
 end
 
-% Copy to GPU
-if a.gpu && ~isgpuarray(x)
-    x = gpuArray(x);
-end
-
 
 %% Standardize predictors
 if a.std=="robust"
@@ -57,6 +52,13 @@ end
 
 
 %% Robust PCA (denoising)
+
+% Copy to GPU
+if a.gpu && ~isgpuarray(x)
+    x = gpuArray(x);
+end
+
+% Run robust denoising
 if a.robust
     [x,xS] = ec_pcaRobust(x);
 else
