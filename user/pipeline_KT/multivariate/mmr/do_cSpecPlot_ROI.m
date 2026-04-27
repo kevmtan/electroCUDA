@@ -41,11 +41,17 @@ op.r.col = ec_dim2cell(op.r.col,1);
 
 %% Run
 
-analDir = "/01/lbcn/anal/classifySpecROI/MzAb_LDA_pcaGammaDelta_260423_0947/";
+analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_260425_1348/";
 mmr_cSpecPlot_ROI(analDir,op);
 
-analDir = "/01/lbcn/anal/classifySpecROI/MzAb_LR_lambda_260423_1127/";
+analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_gamma_260425_1432/";
 mmr_cSpecPlot_ROI(analDir,op);
 
-analDir = "/01/lbcn/anal/classifySpecROI/MzAb_LDA_gammaDelta_260423_1341/";
+analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_pca_260425_1932/";
+mmr_cSpecPlot_ROI(analDir,op);
+
+analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_pcaGamma_260425_1959/";
+mmr_cSpecPlot_ROI(analDir,op);
+
+analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LR_lambda_260426_1348/";
 mmr_cSpecPlot_ROI(analDir,op);

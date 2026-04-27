@@ -20,9 +20,10 @@ try mkdir(op.figDir); catch; end % make figure dir
 
 
 %% Make ROI figs
-for roi = ROIs'
+for r = 1:numel(ROIs)
+    roi = ROIs(r);
     id = stat.roi==roi;
-    plotROI_lfn(stat(id,:),op);
+    plotROI_lfn(stat(id,:),op,r);
 end
 
 
@@ -31,7 +32,7 @@ end
 
 
 %% Plot function %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotROI_lfn(stc,op)
+function plotROI_lfn(stc,op,r)
 % str = stat(stat.roi=="PCC",:);
 roi = string(stc.roi(1));
 
@@ -208,7 +209,7 @@ plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
 
 
 %% Save fig
-fn = op.figDir+roi+".jpg";
+fn = op.figDir+r+"_"+roi+".jpg";
 print(h,fn,"-djpeg","-r150");
 disp("SAVED: "+fn);
 delete(h);
