@@ -186,8 +186,7 @@ if o.doCV && ~o.doNestedCV
     rocm = rocmetrics(mdlCV,ConfidenceIntervalType="none");
 else
     % Calculate ROC for nested CV & no CV using observation-level scores
-    rocm = rocmetrics(obs.y(obs.use),obs.pp(obs.use,:),categories(obs.y(obs.use)),...
-        ConfidenceIntervalType="none");
+    rocm = rocmetrics(obs.y(obs.use),obs.pp(obs.use,:),categories(obs.y(obs.use)));
 end
 
 % Precision-recall AUC
