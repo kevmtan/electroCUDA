@@ -1,4 +1,4 @@
-function [t,p,ci,mu,stats,dist] = ec_permuttest(x,m,a)
+function [t,p,ci,mu,stats,dist] = ec_permuttest(x,m,g,a)
 % ec_permuttest: modified from PERMUTOOLS for electroCUDA (see
 %   modifications below)
 %
@@ -109,25 +109,26 @@ function [t,p,ci,mu,stats,dist] = ec_permuttest(x,m,a)
 %   - Added arguments block
 %   - Optimized speed & memory use:
 %       - Implicit expansion when possible
-%       - Blockwise randomization (sign generation, etc)
+%       - Group-constrained randomization (when groups provided)
 %       - Explicit parallelization (CPU parfor, GPU vectorization)
 
 %% Arguments validation
 arguments
-    x {mustBeFloat}
-    m {mustBeFloat} = []
-    a.alpha (1,1) double {mustBeGreaterThan(a.alpha,0),mustBeLessThan(a.alpha,1)} = 0.05
-    a.dim (1,1) double {mustBeInteger,mustBePositive} = 1
-    a.tail string {mustBeMember(a.tail,["left","both","right"])} = "both"
-    a.compare string {mustBeMember(a.compare,["zero","pairwise"])} = "zero"
-    a.nPerm (1,1) double {mustBeInteger,mustBePositive} = 1e4
-    a.correct (1,1) logical = true
-    a.rows string {mustBeMember(a.rows,["all","complete"])} = "all"
+    x {mustBeFloat} % sample data (observations x features)
+    m {mustBeFloat} = [] % comparator (scalar/null mean or paired sample)
+    g = [] % optional exchangeability group labels per observation
+    a.alpha (1,1) double {mustBeGreaterThan(a.alpha,0),mustBeLessThan(a.alpha,1)} = 0.05 % significance level
+    a.dim (1,1) double {mustBeInteger,mustBePositive} = 1 % observation dimension in input arrays
+    a.tail string {mustBeMember(a.tail,["left","both","right"])} = "both" % hypothesis tail
+    a.compare string {mustBeMember(a.compare,["zero","pairwise"])} = "zero" % one-sample comparison mode
+    a.nPerm (1,1) double {mustBeInteger,mustBePositive} = 1e4 % number of permutations
+    a.correct (1,1) logical = true % apply max-stat multiple-comparison correction
+    a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
     a.maxBlockEl (1,1) {mustBeInteger} = 5e6; % maximum block elements
-    a.mat (1,1) logical = false
-    a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "" []])} = "cpu"
-    a.verbose (1,1) logical = true
-    a.seed {mustBeSeedOption(a.seed)} = "shuffle"
+    a.mat (1,1) logical = false % return pairwise results as square matrices
+    a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "" []])} = "cpu" % execution backend
+    a.verbose (1,1) logical = true % print status messages
+    a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
 end
 % No parfor if running on GPU
 if isgpuarray(x); a.parallel="gpu"; end
@@ -144,8 +145,9 @@ end
 % Reshape data to [observations x features] for n-D safety
 xInputDims = ndims(x);
 if a.dim~=1 || xInputDims>2
-    [x,featureSize] = reshape2D_lfn(x,a.dim);
+    [x,featureSize] = ec_reshape2D(x,a.dim);
 end
+g = ec_groupIndex(g,size(x,1),"g");
 
 % Set up comparison
 if isempty(m)
@@ -168,7 +170,7 @@ else
     end
 
     if ~isscalar(m) && ~iscolumn(m)
-        [m,yFeatureSize] = reshape2D_lfn(m,a.dim);
+        [m,yFeatureSize] = ec_reshape2D(m,a.dim);
         if ~isequal(size(x),size(m))
             error("X and Y must be the same size.")
         end
@@ -182,6 +184,9 @@ end
 if a.rows == "complete"
     id = ~any(isnan(x),2);
     x = x(id,:);
+    if ~isempty(g)
+        g = g(id);
+    end
     if ~isscalar(m)
         m = m(id,:);
     end
@@ -197,13 +202,20 @@ end
 % Get data dimensions, ignoring NaNs
 [a.nObsMax,a.nVar] = size(x);
 a.nObs = sum(~isnan(x)); % ~isnan per column
+if isempty(g)
+    a.useGroups = false;
+else
+    a.useGroups = true;
+    a.groupIdx = g;
+    a.nExchGroups = max(g);
+end
 
 % Prep for permutation stats
 if nargout > 1
     % Generate random permutations
-    rng("shuffle");
+    rng(a.seed);
 
-    % Generate permutation blocks (saves memory by running blocks)
+    % Generate permutation groups (saves memory by running blocks)
     a.bPerms = max(1,floor(a.maxBlockEl/a.nObsMax));
     a.bPerms = min(a.bPerms,a.nPerm);
     bStarts = 1:a.bPerms:a.nPerm;
@@ -365,7 +377,12 @@ bEnd = min(bStart+a.bPerms-1,a.nPerm);
 nbPerms = bEnd-bStart+1;
 
 % Generate random signs
-signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
+if a.useGroups
+    groupSigns = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=x)-1;
+    signBlock = groupSigns(a.groupIdx,:);
+else
+    signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
+end
 
 % Preallocate block distances
 bDist = zeros(nbPerms,a.nVar,like=x);
@@ -380,18 +397,5 @@ end
 
 
 
-
-
-function [x2d,featureSize] = reshape2D_lfn(x,dim)
-sz = size(x);
-if numel(sz) < dim
-    sz(end+1:dim) = 1;
-    x = reshape(x,sz);
-end
-permOrder = [dim,1:dim-1,dim+1:ndims(x)];
-xPerm = permute(x,permOrder);
-featureSize = size(xPerm);
-featureSize = featureSize(2:end);
-x2d = reshape(xPerm,size(xPerm,1),[]);
 
 
