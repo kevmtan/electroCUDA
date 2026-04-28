@@ -39,7 +39,7 @@ if numel(dbstack)<2; n0=n; x0=x; trialNfo0=trialNfo; end %#ok<NASGU> % Copy orig
 [x,n] = chPrep_lfn(x,chNfo,n,a,tt);
 
 
-%% Epoching (psychobehavioral metadata)
+%% Epoch psychobehavioral metadata
 if ~isempty(a.epoch)
     [psy,ep,n] = makeEpochs_lfn(psy,trialNfo,n,a,tt);
 else
@@ -122,7 +122,6 @@ n.chKeep = all([~chBad,~chRm,chROIs],2);
 if any(~n.chKeep)
     x = x(:,n.chKeep,:);            % from EEG data
     n.chNfo = n.chNfo(n.chKeep,:);  % from chNfo
-    n.xChs = width(x);              % number of remaining chans
 
     % Remove chans from bad frames (n.xBad)
     for v = string(n.xBad.Properties.VariableNames)
@@ -140,6 +139,14 @@ if any(~n.chKeep)
             end
         end
     end
+end
+
+% Number of channels/ICs in analysis data (set even if none were removed)
+n.xChs = width(x);
+
+% Convert ROIs into categorical
+if isany(a.ROIs)
+    n.chNfo.roi = categorical(n.chNfo.(a.roiVar),a.ROIs,Ordinal=true);
 end
 disp("[ec_analPrep] Kept "+n.xChs+"/"+n.nChs+" chans: "+n.sbj+" | toc="+toc(tt));
 
@@ -174,18 +181,29 @@ if a.condVar~="cnd"
     n.trialNfo = renamevars(n.trialNfo,a.condVar,"cnd");
 end
 
-% Remove excluded conditions
-if isany(a.cond1) && isany(a.cond0)
-    ep = ep(ismember(ep.cnd,[a.cond1 a.cond0]),:);
-elseif isany(a.cond) && isany(a.condx)
-    ep = ep(ismember(ep.cnd,[a.cond a.condx]),:);
+% Delete trials marked as remove
+n.trialNfo = n.trialNfo(~n.trialNfo.removed,:);
+n.trialNfo = removevars(n.trialNfo,"removed");
+
+% Delete trials with non-analyzed conditions
+if isany(a.cond1) || isany(a.cond0)
+    n.trialNfo = n.trialNfo(ismember(n.trialNfo.cnd,[a.cond1 a.cond0]),:);
+elseif isany(a.cond) || isany(a.condx)
+    n.trialNfo = n.trialNfo(ismember(n.trialNfo.cnd,[a.cond a.condx]),:);
 elseif isany(a.conds)
-    ep = ep(ismember(ep.cnd,a.conds),:);
+    n.trialNfo = n.trialNfo(ismember(n.trialNfo.cnd,a.conds),:);
+end
+
+% Delete epochs with trials not in trialNfo
+ep = ep(ismember(ep.tr,n.trialNfo.tr),:);
+
+% Restrict epochs to analysis timerange
+if isany(a.timeRng) && numel(a.timeRng)==2
+    ep = ep(ep.t>=a.timeRng(1) & ep.t<=a.timeRng(2),:);
 end
 
 % Update epoch indices
 ep.ide = cast(1:height(ep),like=ep.ide)';
-n.ide = ep.ide;
 
 % Update nfo struct
 trs = unique(ep.tr);
@@ -215,22 +233,6 @@ else
     disp("[ec_analPrep] Skipping preproc: empty 'pre' argument | toc="+toc(tt));
 end
 
-% Keep analysis times
-if isany(a.timeRng) && numel(a.timeRng)==2
-    % Keep only analysis timerange
-    ep = ep(ep.t>=a.timeRng(1) & ep.t<=a.timeRng(2),:);
-    x = x(ep.ide,:,:);
-
-    % Update epoch indices
-    ep.ide = cast(1:height(ep),like=ep.ide)';
-    n.ide = ep.ide;
-
-    % Analysis times
-    [n.timesG,n.times] = findgroups(ep.t);
-    n.timesG = uint32(n.timesG);
-    n.nTimes = height(n.times); % number of times
-end
-
 % Copy trialNfo vars to 'ep'
 if isany(a.trialVars)
     % Only copy trialNfo vars that exist
@@ -246,11 +248,11 @@ if isany(a.trialVars)
     end
 
     % Copy each trialNfo variable to 'ep', aligned by trial number
-    for v = a.trialVars
-        ep.(v) = n.trialNfo.(v)(idx,:);
-    end
+    ep(:,a.trialVars) = n.trialNfo(idx,a.trialVars);
     disp("[ec_analPrep] Copied trialNfo vars to 'ep': "+strjoin(a.trialVars,", ")+" | toc="+toc(tt));
 end
+
+
 
 
 
@@ -265,9 +267,10 @@ if a.chConcat=="roi"
 
     % Get ROIs
     if ~isany(a.ROIs)
-        a.ROIs = unique(n.chNfo.(rv),"stable"); end
+        a.ROIs = string(unique(n.chNfo.(rv))); end
     n.ROIs = table;
-    n.ROIs.roi = intersect(a.ROIs,unique(n.chNfo.(rv)),"stable");
+    n.ROIs.roi = intersect(a.ROIs,string(unique(n.chNfo.(rv))));
+    n.ROIs.roi = categorical(n.ROIs.roi,o.p.ROIs,Ordinal=true);
     n.nROIs = height(n.ROIs);
 
     % Preallocate
@@ -276,7 +279,6 @@ if a.chConcat=="roi"
     n.ROIs.columns = cell(n.nROIs,1);
     n.ROIs.chs = cell(n.nROIs,1);
     n.ROIs.sbjChs = cell(n.nROIs,1);
-    n.ROIs.sbjROI = "s"+n.sbjID+"_"+n.ROIs.roi;
     
     % Concatenate ROI channels
     for r = 1:n.nROIs
@@ -303,6 +305,11 @@ if a.chConcat=="roi"
         end
         n.ROIs.columns{r} = vertcat(xiAll{:});
     end
+
+    % Finalize
+    n.ROIs.sbjROI = "s"+n.sbjID+"_"+n.ROIs.roi;
+    n.ROIs.sbjID = n.sbjID;
+    n.ROIs = movevars(n.ROIs,"sbjROI",Before=1);
     disp("[ec_analPrep] Concatenated ROI chs: "+n.sbj+" | toc="+toc(tt));
 elseif a.chConcat=="all"
     %% Concatenate all chs: y(times,freqs*chans)

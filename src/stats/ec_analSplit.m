@@ -27,10 +27,8 @@ if isfloat(x)
 end
 nCh = numel(x);
 
-% n.ide must be valid row indices into x; stale n.ide would misalign rows.
-assert(numel(n.ide)==size(x{1},1) && min(n.ide,[],"all")>=1 && max(n.ide,[],"all")<=size(x{1},1),...
-    "[ec_analSplit] n.ide (len=%d, range=[%d,%d]) must match x rows (%d). n.ide appears stale.",...
-    numel(n.ide),min(n.ide,[],"all"),max(n.ide,[],"all"),size(x{1},1));
+% Generate observations index
+n.ide = (1:height(x{1}))';
 
 % Preallocate split data
 sts = cell(nCh,1);
@@ -123,6 +121,9 @@ end
 
 
 %% Split data by timepoint
+assert(numel(n.timesG)==size(xc,1),...
+    "[ec_analSplit] n.timesG length (%d) must match split rows (%d). n.timesG appears desynchronized from data rows.",...
+    numel(n.timesG),size(xc,1));
 xc = splitapply(@(e){xc(e,:)},n.ide,n.timesG);
 if ~isempty(obc)
     obc = splitapply(@(e){obc(e,:)},n.ide,n.timesG);
