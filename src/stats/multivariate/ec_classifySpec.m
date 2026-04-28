@@ -12,6 +12,7 @@ function [o,n,errs,st,ob] = ec_classifySpec(o)
 % OUTPUTS:
 %   o = options struct
 %   n = recording information struct
+%   errs = split-level caught errors (cell array of MException, or [])
 %   st = classifier results & statistics per independent analysis
 %       (chans/ICs/ROIs x timepoints) 
 %   ob = classified observations

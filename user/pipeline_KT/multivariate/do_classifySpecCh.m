@@ -61,7 +61,7 @@ o.p.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.p.epoch.dur = 2.025; % Duration after stim onset, supersedes 'post' [nan = no limit]
+o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
 o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 5; % latency percentage bin width (<=100)
@@ -69,7 +69,7 @@ o.p.epoch.binPct = 5; % latency percentage bin width (<=100)
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
 o.p.epoch.baselinePre = [-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.p.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
-% Task condition ordering - all conds in data (leave blank for to leave unordered)
+% Task condition ordering: all conds in data (leave blank for to leave unordered)
 o.p.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
 o.p.epoch.conds2 = []; % custom condition names (per above order, can repeat)
 %   o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -80,9 +80,10 @@ o.p.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.p.pre.floatProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.p.pre.floatOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.p.pre.hzTarget = 0; % Target sampling rate (0=default rate)
-% Normalization/transform
+% Transform
 o.p.pre.log = false; % Log transform
 o.p.pre.mag2db = false; % Log-transform magnitude to decibel
+% Normalize/standardize
 o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
 o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
@@ -106,7 +107,7 @@ o.p.pre.lpfSteep = 0.75; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = [5 300]; %[5 300];
-% PCA within-chan or within-concatenated chans (e.g., make spectral components)
+% Spectral PCA (within-channel/IC)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
 o.p.pre.pcaCompLims = [0 inf]; % Bounds on kept PCA comps [lower upper]
@@ -131,7 +132,7 @@ o.p.pre.pcaGPU = false;
 % Analysis floating-point precision ("double"|"single"|"half")
 o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 
-% Standardize/normalize
+% Normalize/standardize
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
 
 % PCA
@@ -232,7 +233,7 @@ o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
 %% Logs
 if ~exist('logs','var')
     %%
-    date = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
+    date = datetime("now",TimeZone="local",Format="yyMMdd_HHmm");
     o.name = analName+"_"+date;
 
     logs = table;
@@ -276,6 +277,7 @@ for s = 1:height(logs)
         if ~exist(logs.out(s),"dir"); mkdir(logs.out(s)); end
         try
             [logs.o{s},logs.n{s},logs.error{s}] = ec_classifySpec(o);
+            logs.time(s) = datetime("now",TimeZone="local",Format="yyMMdd_HHmm");
             logs.class(s) = true;
         catch ME; warning(getReport(ME))
             logs.error{s} = ME;
