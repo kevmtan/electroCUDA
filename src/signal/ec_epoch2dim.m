@@ -7,15 +7,16 @@ function [y,ob,n] = ec_epoch2dim(x,ep,n,tt,a)
 
 %% Input validation
 arguments
-    x (:,:,:){mustBeFloat}
-    ep table
-    n struct
-    tt uint64 = tic % Timer
-    a.epochVar (1,1) string = "tr" % Epoch variable in ep
-    a.timeVar (1,1) string = "t" % Time variable in ep
-    a.timeGrid = [] % Canonical dim2 time grid ([]=infer from n.times/ep)
-    a.trialVars (1,:) string = [];
-    a.strict (1,1) logical = true % Strict validation and erroring
+    x                               % EEG data
+    ep table                        % Epoched psychobehavioral metadata
+    n struct                        % Subject/recording metadata
+    tt uint64 = tic                 % Timer
+    a.epochVar (1,1) string = "tr"  % Epoch variable in ep
+    a.timeVar (1,1) string = "t"    % Time variable in ep
+    a.times (:,1) = []              % Canonical time values ([]=infer from n.times/ep)
+    a.trialVars (1,:) string = [];  % n.trialNfo variables to copy to observations table
+    a.strict (1,1) logical = false  % Strict validation and erroring
+    a.test (1,1) logical = false    % Assert unobserved times remain NaN after reshape
 end
 % tt=tic;
 
@@ -23,17 +24,20 @@ end
 %% Validate metadata fields
 notes = string([]);
 
+% Check if epochVar and timeVar exist
 mustHave = [a.epochVar a.timeVar];
 if ~all(ismember(mustHave,ep.Properties.VariableNames))
     miss = mustHave(~ismember(mustHave,ep.Properties.VariableNames));
     error("[ec_epoch2dim] Missing required ep variable(s): %s",strjoin(miss,", "));
 end
+ep.t = ep.(a.timeVar);
 
 % Ensure a usable trial id for compatibility metadata
-if ~ismember("tr",string(ep.Properties.VariableNames))
+if ~ismember("tr",ep.Properties.VariableNames)
     if a.strict
-        error("[ec_epoch2dim] ep must include variable 'tr' (strict=true).");
+        error("[ec_epoch2dim] Trial variable 'ep.tr' not found (strict=true)");
     else
+        warning("[ec_epoch2dim] Trial variable 'ep.tr' not found, substituting with epochVar")
         ep.tr = ep.(a.epochVar);
     end
 end
@@ -60,25 +64,36 @@ else
     validateX_lfn(x,nRows,0);
 end
 
-
-%% Build canonical time grid
-tVal = ep.(a.timeVar);
-if isempty(a.timeGrid)
-    timeGrid = getTimeGrid_lfn(tVal,n,a.timeVar);
-else
-    timeGrid = a.timeGrid(:);
-    if isdatetime(tVal) || isduration(tVal)
-        timeGrid = sort(timeGrid);
+% Check if trials in 'ep' exist in n.trialNfo
+trIn = ismember(ep.tr,n.trialNfo.tr);
+if any(~trIn)
+    msg = "Removed rows in ep with trials not found in n.trialNfo.tr";
+    notes(end+1,1) = msg;
+    warning("[ec_epoch2dim] "+msg+": "+n.sbj);
+    ep = ep(trIn,:);
+    if isROI
+        for r = roiId(:)'
+            x{r} = x{r}(trIn,:,:);
+        end
     else
-        timeGrid = sort(unique(timeGrid));
+        x = x(trIn,:,:);
     end
 end
 
-% Find timeGrid indices of ep.timeVar
-[epIn,timeIdx] = ismember(tVal,timeGrid);
+% Canonical ordering for deterministic mapping (only if not already sorted)
+[x,ep] = sortInputRows_lfn(x,ep,isROI,a);
+
+
+%% Build canonical time grid
+else
+    times = unique(a.times,"sorted");
+end
+
+% Find time indices of ep.timeVar
+[epIn,timeIdx] = ismember(ep.t,times);
 if any(~epIn)
     % Error/warn
-    msg = sprintf("%d rows in ep.%s not present in timeGrid",nnz(~epIn),a.timeVar);
+    msg = sprintf("%d rows in ep.%s not present in times",nnz(~epIn),a.timeVar);
     if a.strict
         error(msg); %#ok<SPERR>
     else
@@ -98,45 +113,35 @@ end
 
 
 %% Index mapping (epoch, time, frame replicate)
-[epochIdx,epochVals] = findgroups(ep.(a.epochVar));
+[epochIdx,epochs] = findgroups(ep.(a.epochVar));
 nRows = height(ep);
-nEpoch = numel(epochVals);
-nTime = numel(timeGrid);
+nEpochs = numel(epochs);
+nTimes = numel(times);
 
 % Frame index within each (epoch,time) group (stable in row order)
-%   TODO: make this clearer?
-key = (epochIdx-1) * (max(nTime,1)) + timeIdx;
-[~,~,kidx] = unique(key,"stable");
+kidx = findgroups(epochIdx,timeIdx);
 frameIdx = zeros(nRows,1);
 kCount = zeros(max(kidx),1);
 for i = 1:nRows
     kk = kidx(i);
     kCount(kk) = kCount(kk) + 1;
-    frameIdx(i) = kCount(kk);
+    frameIdx(i) = kCount(kk); % frame replicate index within (epoch,time)
 end
-nObsPerEpoch = max(frameIdx);
-obsRow = (epochIdx-1)*nObsPerEpoch + frameIdx;
-nObs = nEpoch * nObsPerEpoch;
+
+% Number of observations (dynamic per epoch)
+nObsPerEpoch = accumarray(epochIdx,frameIdx,[nEpochs 1],@max,0);
+epochObsStart = [0; cumsum(nObsPerEpoch(1:end-1))];
+obsRow = epochObsStart(epochIdx) + frameIdx;
+nObs = sum(nObsPerEpoch);
 disp("[ec_epoch2dim] Mapped reshaping indices: "+n.sbj+" toc="+toc(tt));
 
 
-%% Reshape EEG data
-if isROI
-    y = x;
-    for r = roiId(:)'
-        y{r} = reshape_lfn(x{r},obsRow,timeIdx,nObs,nTime);
-    end
-else
-    y = reshape_lfn(x,obsRow,timeIdx,nObs,nTime);
-end
-disp("[ec_epoch2dim] Reshaped EEG data: "+n.sbj+" toc="+toc(tt));
-
-
 %% Observations table
-epochRep = accumarray(epochIdx,(1:nRows)',[nEpoch 1],@min);
+epochRep = accumarray(epochIdx,(1:nRows)',[nEpochs 1],@min);
 trByEpoch = ep.tr(epochRep);
-epochIdxObs = repelem((1:nEpoch)',nObsPerEpoch);
-frameIdxObs = repmat((1:nObsPerEpoch)',nEpoch,1);
+epochIdxObs = repelem((1:nEpochs)',nObsPerEpoch);
+frameIdxObs = arrayfun(@(k) (1:k)',nObsPerEpoch,UniformOutput=false);
+frameIdxObs = vertcat(frameIdxObs{:});
 
 % Initialize observations table
 ob = table;
@@ -147,29 +152,44 @@ ob.frame = frameIdxObs;
 % Find trialNfo indices of observation trials
 [obIn,trId] = ismember(ob.tr,n.trialNfo.tr);
 if any(~obIn)
-    msg = "Removed trials in 'ep' not found in 'n.trialNfo'";
-    notes(end+1,1) = msg;
-    warning("[ec_epoch2dim] "+msg+": "+n.sbj);
-
-    % Restrict to existing trials
-    ob = ob(obIn,:);
-    trId = trId(obIn);
-    nObs = height(ob);
+    error("[ec_epoch2dim] Internal mismatch: ob.tr contains trials missing from n.trialNfo.tr after ep prefilter.");
 end
 
 % Copy trialNfo vars to observation table
 ob(:,trialVars) = n.trialNfo(trId,trialVars);
 
-% Get number of timepoints (dim2) filled per observation
+% Number of filled timepoints (dim2) per observation
 [~,iu] = unique([obsRow,timeIdx],"rows","stable");
 obsUniq = obsRow(iu);
-ob.nTimes = uint16(accumarray(obsUniq,1,[nObs 1],@sum,0));
+ob.nTimes = uint16(accumarray(obsUniq,1,[height(ob) 1],@sum,0));
 disp("[ec_epoch2dim] Made observations table: "+n.sbj+" toc="+toc(tt));
 
 
+%% Reshape EEG data (using finalized observation mapping)
+if isROI
+    y = x;
+    for r = roiId(:)'
+        y{r} = reshape_lfn(x{r},obsRow,timeIdx,nObs,nTimes,a.test,r);
+    end
+else
+    y = reshape_lfn(x,obsRow,timeIdx,nObs,nTimes,a.test,0);
+end
+disp("[ec_epoch2dim] Reshaped EEG data: "+n.sbj+" toc="+toc(tt));
+
+% Test mapping integrity between y & obs
+if a.test
+    assertMappingIntegrity_lfn(y,ob,obsRow,timeIdx,isROI);
+end
+
+
 %% Finalize
+n.nEpochs = nEpochs;
 n.nObs = nObs;
 n.nObsPerEpoch = nObsPerEpoch;
+if a.epochVar=="tr"
+    [~,id] = ismember(epochs,n.trialNfo.tr);
+    n.trialNfo.nObs = nObsPerEpoch(id);
+end
 n.epoch2dim_notes = notes;
 
 
@@ -202,7 +222,64 @@ end
 
 
 
-function y = reshape_lfn(x,obsRow,timeIdx,nObs,nTime)
+function [x,ep] = sortInputRows_lfn(x,ep,isROI,a)
+%%% Sort ep/x only if needed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if ~issortedrows(ep,[a.epochVar "t"])
+    % Sort metadata
+    [ep,ord] = sortrows(ep,[a.epochVar "t"]);
+
+    % Sort EEG data
+    if isROI
+        roiId = find(~cellfun(@isempty,x,UniformOutput=true));
+        for r = roiId(:)'
+            x{r} = x{r}(ord,:,:);
+        end
+    else
+        x = x(ord,:,:);
+    end
+end
+
+
+
+
+function assertMappingIntegrity_lfn(y,ob,obsRow,timeIdx,isROI)
+%%% Invariant checks for x/ep -> y/ob mapping %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isROI
+    firstR = find(~cellfun(@isempty,y),1);
+    nObsY = size(y{firstR},1);
+else
+    nObsY = size(y,1);
+end
+assert(height(ob)==nObsY,...
+    "[ec_epoch2dim] Invariant failed: height(ob) must equal size(y,1).");
+assert(all(obsRow>=1) && all(obsRow<=height(ob)),...
+    "[ec_epoch2dim] Invariant failed: obsRow out of bounds.");
+assert(all(timeIdx>=1),...
+    "[ec_epoch2dim] Invariant failed: timeIdx must be positive.");
+obsCounts = accumarray(obsRow,1,[height(ob) 1],@sum,0);
+assert(isequal(uint16(obsCounts),ob.nTimes),...
+    "[ec_epoch2dim] Invariant failed: ob.nTimes does not match mapped rows.");
+
+
+
+
+function times = getTimes_lfn(ep,n)
+%%% Get times %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isfield(n,"times") && ~isempty(n.times)
+    % Use n.times metadata to reduce redundant recomputation and enforce consistency.
+    if ~isnumeric(n.times)
+        % Validate n.times
+        error("[ec_epoch2dim] n.times must be numeric.");
+    end
+    times = unique(n.times(:),"sorted");
+else
+    times = unique(ep.t,"sorted");
+end
+
+
+
+
+function y = reshape_lfn(x,obsRow,timeIdx,nObs,nTime,test,roiIdx)
 %%% Reshape EEG array %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 szX = size(x);
 y = nan([nObs nTime szX(2:end)],like=x); % preallocate
@@ -211,24 +288,27 @@ y = nan([nObs nTime szX(2:end)],like=x); % preallocate
 for w = 1:szX(1)
     y(obsRow(w),timeIdx(w),:,:) = x(w,:,:);
 end
+if test
+    assertMissingTimes_lfn(y,obsRow,timeIdx,nObs,nTime,roiIdx);
+end
 
 
 
 
-function timeGrid = getTimeGrid_lfn(tVal,n,timeVar)
-%%% Get timeGrid %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Prefer n metadata to reduce redundant recomputation and enforce consistency.
-if isfield(n,"times") && ~isempty(n.times)
-    nt = n.times;
-    if istable(nt)
-        if ismember(timeVar,nt.Properties.VariableNames)
-            timeGrid = nt.(timeVar);
-        elseif ismember("t",nt.Properties.VariableNames)
-            timeGrid = nt.t;
-        end
+function assertMissingTimes_lfn(y,obsRow,timeIdx,nObs,nTimes,roiIdx)
+%%% Assert unobserved obs-time slots remain NaN %%%%%%%%%%%%%%%%%%%%%%%%%%%
+present = false(nObs,nTimes);
+present(sub2ind([nObs nTimes],obsRow,timeIdx)) = true;
+missing = ~present;
+
+% Collapse feature dims to check whether any non-NaN exists at missing slots
+y2 = reshape(y,nObs,nTimes,[]);
+bad = any(~isnan(y2),3) & missing;
+if any(bad,"all")
+    nBad = nnz(bad);
+    if roiIdx>0
+        error("[ec_epoch2dim] Found %d non-NaN values in missing obs-time slots (ROI=%d).",nBad,roiIdx);
     else
-        timeGrid = nt(:);
+        error("[ec_epoch2dim] Found %d non-NaN values in missing obs-time slots.",nBad);
     end
-else
-    timeGrid = unique(tVal,"sorted");
 end
