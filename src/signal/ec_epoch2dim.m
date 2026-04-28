@@ -85,6 +85,8 @@ end
 
 
 %% Build canonical time grid
+if isempty(a.times)
+    times = getTimes_lfn(ep,n);
 else
     times = unique(a.times,"sorted");
 end
