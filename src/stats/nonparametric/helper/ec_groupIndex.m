@@ -10,34 +10,43 @@ function idx = ec_groupIndex(group,nObs,argName)
 %       have multiple label types (one per non-observation dimension).
 %       In this case IDX is based on unique label combinations.
 
-if nargin < 3 || isempty(argName)
-    argName = "group";
+%% Input validation
+arguments
+    group (:,:) % group labels
+    nObs (1,1) double {mustBeInteger,mustBePositive} % number of observations
+    argName (1,1) string = "group" % group variable name
 end
+
+% Check if group is empty
 if isempty(group)
     idx = [];
     return
 end
 
+% Check size/orientation of group
 if isvector(group)
     if numel(group) ~= nObs
         error(argName+" must have one entry per observation along DIM.")
     end
-    groupObs = group(:);
+    group = group(:);
 else
     if ~ismatrix(group)
         error(argName+" must be a vector or 2D array.")
     end
-    if size(group,1) == nObs
-        groupObs = group;
-    elseif size(group,2) == nObs
-        groupObs = group';
-    else
+
+    gSz = size(group);
+    if ~any(gSz == nObs)
         error(argName+" must have one dimension equal to number of observations.")
+    end
+
+    if size(group,2) == nObs
+        group = group';
     end
 end
 
-if isvector(groupObs)
-    [~,~,idx] = unique(groupObs,"stable");
+%% Convert group labels to contiguous integer indices
+if isvector(group)
+    [~,~,idx] = unique(group,"stable");
 else
-    [~,~,idx] = unique(groupObs,"rows","stable");
+    [~,~,idx] = unique(group,"rows","stable");
 end
