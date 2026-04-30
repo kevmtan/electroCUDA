@@ -27,7 +27,7 @@ elseif isscalar(o.cond0)
 end
 
 % Prep subject data
-[x,ep,n,o] = ec_prepAnalysis(o,tt);
+[x,ep,n,o] = ec_analPrep(dirs,tt,o);
 sbjChs = n.chNfo.sbjCh;
 
 
