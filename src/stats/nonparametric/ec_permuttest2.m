@@ -53,7 +53,7 @@ arguments
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
     a.maxBlockEl (1,1) double {mustBeInteger,mustBePositive} = 5e6 % maximum block elements
     a.mat (1,1) logical = false % return pairwise results as square matrices
-    a.parallel {mustBeMember(a.parallel,["cpu","gpu","",[]])} = "cpu" % execution backend
+    a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "none" ""])} = "" % execution backend
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
 end
@@ -65,8 +65,8 @@ if a.alpha < 1/a.nPerm
     warning("[ec_permuttest2] Specified permutations too low for alpha; running "+a.nPerm+".")
 end
 
-
 %% Prep
+
 % Reshape data to [observations x features] for n-D safety
 xInputDims = ndims(x);
 if a.dim~=1 || xInputDims>2
@@ -77,9 +77,9 @@ gx = ec_groupIndex(gx,size(x,1),"gx");
 % Set up comparison
 if isempty(y)
     if xInputDims > 2
-        error("PAIRWISE option currently supports 2-D X only.")
+        error("PAIRWISE option currently supports 2-D X only.");
     end
-    warning("Comparing all columns of X using two-tailed test...")
+    warning("[ec_permuttest2] Comparing all columns of X using two-tailed test...");
     [x,y] = ptpaircols(x);
     if ~isempty(gx)
         gy = gx;
@@ -87,20 +87,20 @@ if isempty(y)
     a.tail = "both";
     a.mat = true;
 else
-    if a.dim~=1 || ndims(y)>2
+    if a.dim~=1 || ~ismatrix(y)
         [y,yFeatureSize] = ec_reshape2D(y,a.dim);
         if size(x,2)~=size(y,2)
-            error("X and Y must have the same number of variables.")
+            error("X and Y must have the same number of variables.");
         end
         if exist("featureSize","var") && ~isequal(featureSize,yFeatureSize)
-            error("X and Y feature dimensions must match.")
+            error("X and Y feature dimensions must match.");
         end
     elseif size(x,2)~=size(y,2)
-        error("X and Y must have the same number of variables.")
+        error("X and Y must have the same number of variables.");
     end
     gy = ec_groupIndex(gy,size(y,1),"gy");
     if xor(isempty(gx),isempty(gy))
-        error("Provide both gx and gy, or neither.")
+        error("Provide both gx and gy, or neither.");
     end
 end
 
@@ -181,6 +181,7 @@ end
 
 
 %% Permutation setup
+
 % Concatenate samples for label shuffling
 z = [x;y];
 a.nObsTot = size(z,1);
@@ -190,8 +191,10 @@ rng(a.seed);
 a.bPerms = max(1,floor(a.maxBlockEl/a.nObsTot));
 a.bPerms = min(a.bPerms,a.nPerm);
 bStarts = 1:a.bPerms:a.nPerm;
-    nBlocks = numel(bStarts);
-    bSeeds = randi(intmax("uint32"),nBlocks,1,"uint32");
+nBlocks = numel(bStarts);
+bSeeds = randi(intmax("uint32"),nBlocks,1,"uint32");
+if a.verbose
+    disp("[ec_permuttest2] Number of permutation blocks: "+nBlocks); end
 
 % Check parallelization
 if a.parallel=="cpu"
@@ -222,9 +225,6 @@ else
     end
 end
 dist = vertcat(dist{:});
-if a.parallel=="gpu"
-    dist = gather(dist);
-end
 
 
 %% Final stats
@@ -245,8 +245,9 @@ switch a.tail
         pdabs = abs(dist);
         p = (sum(abs(t)<=pdabs)+1)/(a.nPerm+1);
         if nargout > 2
-            crit = prctile(pdabs,100*(1-a.alpha)).*se;
-            ci = [mu-crit;mu+crit];
+            critLo = prctile(dist,100*(a.alpha/2));
+            critHi = prctile(dist,100*(1-a.alpha/2));
+            ci = [mu-critHi.*se;mu-critLo.*se];
         end
     case "right"
         p = (sum(t<=dist)+1)/(a.nPerm+1);
@@ -257,8 +258,8 @@ switch a.tail
     case "left"
         p = (sum(t>=dist)+1)/(a.nPerm+1);
         if nargout > 2
-            crit = prctile(dist,100*(1-a.alpha)).*se;
-            ci = [-Inf(1,a.nVar);mu+crit];
+            crit = prctile(dist,100*a.alpha).*se;
+            ci = [-Inf(1,a.nVar);mu-crit];
         end
 end
 
@@ -323,8 +324,6 @@ if nargout > 4
     stats.mu = mu;
 end
 
-end
-
 
 
 
@@ -381,5 +380,9 @@ for k = 1:nbPerms
     end
     bDist(k,:) = (sum1./a.nObsX-sum2./a.nObsY)./se;
 end
+
+% Gather from GPU
+if a.parallel=="gpu"
+    bDist = gather(bDist);
 end
 

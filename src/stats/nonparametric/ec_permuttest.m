@@ -126,7 +126,7 @@ arguments
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
     a.maxBlockEl (1,1) {mustBeInteger} = 5e6; % maximum block elements
     a.mat (1,1) logical = false % return pairwise results as square matrices
-    a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "" []])} = "cpu" % execution backend
+    a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "none" ""])} = "" % execution backend
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
 end
@@ -221,6 +221,8 @@ if nargout > 1
     bStarts = 1:a.bPerms:a.nPerm;
     nBlocks = numel(bStarts);
     bSeeds = randi(intmax("uint32"),nBlocks,1,"uint32");
+    if a.verbose
+        disp("[ec_permuttest] Number of permutation blocks: "+nBlocks); end
 
     % Check parallelization
     if a.parallel=="cpu"
@@ -228,8 +230,6 @@ if nargout > 1
             disp("[ec_permuttest] Less than 5 blocks, avoiding parfor, "+...
                 "implicit parallelization likely faster");
         end
-    elseif a.parallel=="gpu"
-        x = gpuArray(x);
     end
 end
 
@@ -268,6 +268,13 @@ if a.parallel=="cpu"
         dist{b} = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bSeeds(b),a);
     end
 else
+    % Copy to GPU
+    if a.parallel=="gpu"
+        x     = gpuArray(x);
+        sx2   = gpuArray(sx2);
+        sqrtn = gpuArray(sqrtn);
+    end
+
     % Loop across blocks (CPU or GPU)
     for b = 1:nBlocks
         dist{b} = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bSeeds(b),a);
@@ -287,7 +294,7 @@ end
 dist(a.nPerm+1:2*a.nPerm,:) = -dist;
 a.nPerm = 2*a.nPerm;
 if a.verbose
-    fprintf("Adding negative of values to permutation distribution.\n")
+    fprintf("[ec_permuttest] Adding negative of values to permutation distribution.\n")
     fprintf("Number of effective permutations: %d\n",a.nPerm)
 end
 
@@ -370,7 +377,12 @@ end
 
 function bDist = runBlock_lfn(x,sx2,sqrtn,bStart,seed,a)
 %%% Permutation block %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rs = RandStream("mt19937ar","Seed",double(seed)); % seed for parfor
+if a.parallel=="gpu"
+    % Generate random numbers on GPU for this block.
+    parallel.gpu.rng(double(seed),"Philox4x32-10");
+else
+    rs = RandStream("mt19937ar","Seed",double(seed)); % seed for CPU/parfor
+end
 
 % Block indices
 bEnd = min(bStart+a.bPerms-1,a.nPerm);
@@ -378,10 +390,18 @@ nbPerms = bEnd-bStart+1;
 
 % Generate random signs
 if a.useGroups
-    groupSigns = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=x)-1;
+    if a.parallel=="gpu"
+        groupSigns = 2*cast(rand(a.nExchGroups,nbPerms,like=x)>0.5,like=x)-1;
+    else
+        groupSigns = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=x)-1;
+    end
     signBlock = groupSigns(a.groupIdx,:);
 else
-    signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
+    if a.parallel=="gpu"
+        signBlock = 2*cast(rand(a.nObsMax,nbPerms,like=x)>0.5,like=x)-1;
+    else
+        signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
+    end
 end
 
 % Preallocate block distances
@@ -394,6 +414,10 @@ for k = 1:nbPerms
     bDist(k,:) = smx./a.nObs./(sqrt(sx2-(smx.^2)./a.nObs)./sqrtn);
 end
 
+% Gather from GPU
+if a.parallel=="gpu"
+    bDist = gather(bDist);
+end
 
 
 
