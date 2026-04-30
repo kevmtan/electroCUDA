@@ -71,7 +71,7 @@ for s = 1:height(logs)
 
         %% Save logs
         logs.time(s) = datetime("now",TimeZone="local",Format="yyMMdd_HHmm");
-        save(o.outDir+"logs.mat","logs","-v7");
+        save(o.outDir+"logs_"+o.analName,"logs","-v7");
 
     else
         disp("SKIPPING: "+logs.sbj(s));
@@ -84,7 +84,7 @@ sbjROIs = vertcat(sbjROIs{:}); % concatenate sbjROIs
 
 % Save sbjROIs
 if o.save
-    save(o.outDir+"sbjROIs_"+o.analName+".mat","sbjROIs");
+    save(o.outDir+"sbjROIs_"+o.analName,"sbjROIs");
 end
 
 
@@ -112,7 +112,8 @@ end
 %% Prepare subject data
 oo = namedargs2cell(o.p);               % expand name-value arguments
 [x,ep,n] = ec_analPrep(dirs,tt,oo{:});  % run data prep
-if numel(dbstack)<2; n0=n; x0=x; end %#ok<NASGU>  % Copy origs for testing
+if isfield(n,"timesG"); n=rmfield(n,"timesG"); end % remove time group var
+% if numel(dbstack)<2; n0=n; x0=x; end %#ok<NASGU>  % Copy origs for testing
 % n=n0; x=x0; tt=tic; disp("Restored original sbj vars");
 
 
@@ -159,7 +160,7 @@ for r = 1:n.nROIs
     end
 
     %% Reshape & save ROI data
-    ROIs(r,:) = runROI_lfn(ROIs(r,:),x(:,:,id,:),ob,sLog,tt); 
+    ROIs(r,:) = runROI_lfn(ROIs(r,:),x(:,:,id,:),ob,o,sLog,tt); 
 end
 
 
@@ -178,7 +179,7 @@ save(sLog.n,"n");
 
 
 
-function ROI = runROI_lfn(ROI,xr,ob,sLog,tt)
+function ROI = runROI_lfn(ROI,xr,ob,o,sLog,tt)
 %%% Concatenate ROI chans, observations table & save %%%%%%%%%%%%%%%%%%%%%%
 %                                                    xr=x(:,:,id,:); ROI=ROIs(r,:);
 sz = size(xr);
@@ -198,8 +199,8 @@ xr = reshape(xr,[nObs*nCh nTime nSpec]); %#ok<NASGU>
 %% Generate ROI observations table
 % Repeat original observations table to match EEG ROI chan/IC concatenation
 obr = repmat(ob,nCh,1);
-obr.ch = repelem(ROI.chs{1},nObs);
-obr.sbjCh = repelem(ROI.sbjChs{1},nObs);
+obr.ch = repelem(ROI.chs{1},nObs,1);
+obr.sbjCh = repelem(ROI.sbjChs{1},nObs,1);
 obr.roi(:) = ROI.roi;
 obr.sbjROI(:) = ROI.sbjROI;
 obr = movevars(obr,["sbjROI" "sbjCh"],Before=1);
@@ -207,15 +208,16 @@ obr = movevars(obr,["sbjID" "roi" "ch"],After=width(obr));
 
 
 %% Save
+if o.save
+    % Save reshaped EEG data
+    ROI.xr = sLog.dir+"s"+ROI.sbjID+"_xr_"+string(ROI.roi)+".mat";
+    savefast(ROI.xr,'xr');
+    disp("SAVED: "+ROI.xr+" toc="+toc(tt));
 
-% Save reshaped EEG data
-ROI.xr = sLog.dir+"s"+ROI.sbjID+"_xr_"+string(ROI.roi)+".mat";
-savefast(ROI.xr,'xr');
-disp("SAVED: "+ROI.xr+" toc="+toc(tt));
 
-
-% Save reshaped observations table
-ROI.obr = sLog.dir+"s"+obr.sbjID(1)+"_obr_"+string(ROI.roi)+".mat";
-save(ROI.obr,'obr');
-disp("SAVED: "+ROI.obr+" toc="+toc(tt));
+    % Save reshaped observations table
+    ROI.obr = sLog.dir+"s"+obr.sbjID(1)+"_obr_"+string(ROI.roi)+".mat";
+    save(ROI.obr,'obr');
+    disp("SAVED: "+ROI.obr+" toc="+toc(tt));
+end
 
