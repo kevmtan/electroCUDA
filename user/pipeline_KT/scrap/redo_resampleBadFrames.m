@@ -16,7 +16,7 @@ statusFn = "/01/lbcn/logs/preproc/resampleBadFrames_"+statusDate;
 status = table;
 status.sbj = sbjs;
 status.resampled(:) = false;
-status.error = cell(height(status),1);
+status.error = cell(height(status),2);
 
 try parpool('local12'); catch; end
 
@@ -36,7 +36,7 @@ parfor s = 1:height(status)
                 saveN=doSave);
 
             o.suffix = "f";
-            [stat.error{1},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,...
+            [stat.error{2},o,n,chNfo,trialNfo,psy] = ec_initialize(sbj,proj,task,...
                 saveN=doSave);
 
             stat.resampled = true;
