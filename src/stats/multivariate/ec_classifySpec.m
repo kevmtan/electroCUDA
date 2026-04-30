@@ -25,9 +25,9 @@ end
 
 
 %% Prepare analysis data
-tt = tic;                           % start timer
-oo = namedargs2cell(o.p);           % expand name-value arguments
-[x,ep,n] = ec_analPrep(tt,oo{:});   % run data prep
+tt = tic;                                % start timer
+oo = namedargs2cell(o.p);                % expand name-value arguments
+[x,ep,n] = ec_analPrep(dirs,tt,oo{:});   % run data prep
 
 
 %% Classifier prep & templates

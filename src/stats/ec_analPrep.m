@@ -1,8 +1,8 @@
-function [x,ep,n] = ec_analPrep(tt,a)
+function [x,ep,n] = ec_analPrep(dirs,tt,a)
 % ec_analPrep: prep subject data for further analyses in electroCUDA
 arguments
+    dirs struct % Subject directories struct from ec_loadSbj
     tt uint64 = tic % Timer
-    a.dirs struct % Subject directories struct from ec_loadSbj
     a.sfx (1,1) string = "" % Input data suffix
     a.chConcat string {mustBeMember(a.chConcat,["roi" "all" ""])} = "" % Concatenate channels by ["roi"|"all"|""], default="" (none)
     a.chBadVars string = [] % Vars in n.chBad/icBad to use for bad chan removal
@@ -28,9 +28,9 @@ end
 
 
 %% Load data 
-[n,x,psy,trialNfo,chNfo] = ec_loadSbj(a.dirs,sfx=a.sfx,...
+[n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx=a.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
-disp("[ec_analPrep] Loaded data: "+a.dirs.sbj+" | toc="+toc(tt));
+disp("[ec_analPrep] Loaded data: "+dirs.sbj+" | toc="+toc(tt));
 if numel(dbstack)<2; n0=n; x0=x; trialNfo0=trialNfo; end %#ok<NASGU> % Copy origs for testing
 % n=n0; x=x0; trialNfo=trialNfo0; tt=tic; disp("Restored original sbj vars");
 
@@ -270,15 +270,20 @@ if a.chConcat=="roi"
         a.ROIs = string(unique(n.chNfo.(rv))); end
     n.ROIs = table;
     n.ROIs.roi = intersect(a.ROIs,string(unique(n.chNfo.(rv))));
-    n.ROIs.roi = categorical(n.ROIs.roi,o.p.ROIs,Ordinal=true);
+    n.ROIs.roi = categorical(n.ROIs.roi,a.ROIs,Ordinal=true);
+    n.ROIs = sortrows(n.ROIs,"roi");
     n.nROIs = height(n.ROIs);
 
-    % Preallocate
-    y = cell(n.nROIs,1);
+    % Preallocate ROI table
     n.ROIs.nChs(:) = cast(0,like=n.chNfo.ch);
-    n.ROIs.columns = cell(n.nROIs,1);
     n.ROIs.chs = cell(n.nROIs,1);
     n.ROIs.sbjChs = cell(n.nROIs,1);
+    n.ROIs.columns = cell(n.nROIs,1);
+    n.ROIs.sbjROI(:) = string(missing);
+    n.ROIs.sbjID(:) = n.sbjID;
+    n.ROIs.sbjROI = "s"+n.sbjID+"_"+string(n.ROIs.roi);
+    n.ROIs = movevars(n.ROIs,"sbjROI",Before=1);
+    y = cell(n.nROIs,1); % ROI data
     
     % Concatenate ROI channels
     for r = 1:n.nROIs
@@ -305,11 +310,6 @@ if a.chConcat=="roi"
         end
         n.ROIs.columns{r} = vertcat(xiAll{:});
     end
-
-    % Finalize
-    n.ROIs.sbjROI = "s"+n.sbjID+"_"+n.ROIs.roi;
-    n.ROIs.sbjID = n.sbjID;
-    n.ROIs = movevars(n.ROIs,"sbjROI",Before=1);
     disp("[ec_analPrep] Concatenated ROI chs: "+n.sbj+" | toc="+toc(tt));
 elseif a.chConcat=="all"
     %% Concatenate all chs: y(times,freqs*chans)

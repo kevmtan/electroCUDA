@@ -28,7 +28,7 @@ o.floatOut = "single"; % Save results at floating-point precision ["double"|"sin
 
 %%%%%%%%%%%%%%%%% ANALYSIS PREP: ec_analPrep(...,o.p) %%%%%%%%%%%%%%%%%%%%%
 
-% Input data
+% Input data suffix
 o.p.sfx = "s";
 
 % Conditions for classification
