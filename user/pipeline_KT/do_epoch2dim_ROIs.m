@@ -60,7 +60,7 @@ o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
 o.p.epoch.bin = 0.025; % latency bin width (secs)
-o.p.epoch.binPct = 5; % latency percentage bin width (<=100)
+o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
 o.p.epoch.baselinePre = -0.2; %[-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
@@ -127,4 +127,4 @@ try ppool = parpool("threads"); catch;end
 
 
 %% Run 
-ec_epoch2dim_ROIs(o);
+[sbjROIs,logs] = ec_epoch2dim_ROIs(o);
