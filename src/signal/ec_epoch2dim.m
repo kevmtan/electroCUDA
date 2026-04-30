@@ -46,7 +46,7 @@ end
 trialVars = unique(["run" "cnd" a.trialVars],"stable");
 trialVars = trialVars(ismember(trialVars,n.trialNfo.Properties.VariableNames)); % check if exist
 
-% Validate and standardize x
+% Validate input EEG data
 nRows = height(ep);
 isROI = iscell(x);
 if isROI
@@ -81,7 +81,9 @@ if any(~trIn)
 end
 
 % Canonical ordering for deterministic mapping (only if not already sorted)
-[x,ep] = sortInputRows_lfn(x,ep,isROI,a);
+if ~issortedrows(ep,[a.epochVar "t"])
+    [x,ep] = sortInputRows_lfn(x,ep,isROI,a);
+end
 
 
 %% Build canonical time grid
@@ -226,19 +228,34 @@ end
 
 function [x,ep] = sortInputRows_lfn(x,ep,isROI,a)
 %%% Sort ep/x only if needed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if ~issortedrows(ep,[a.epochVar "t"])
-    % Sort metadata
-    [ep,ord] = sortrows(ep,[a.epochVar "t"]);
 
-    % Sort EEG data
-    if isROI
-        roiId = find(~cellfun(@isempty,x,UniformOutput=true));
-        for r = roiId(:)'
-            x{r} = x{r}(ord,:,:);
-        end
-    else
-        x = x(ord,:,:);
+% Sort metadata
+[ep,ord] = sortrows(ep,[a.epochVar "t"]);
+
+% Sort EEG data
+if isROI
+    roiId = find(~cellfun(@isempty,x,UniformOutput=true));
+    for r = roiId(:)'
+        x{r} = x{r}(ord,:,:);
     end
+else
+    x = x(ord,:,:);
+end
+
+
+
+
+function times = getTimes_lfn(ep,n)
+%%% Get times %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isfield(n,"times") && ~isempty(n.times)
+    % Use n.times metadata to reduce redundant recomputation and enforce consistency.
+    if ~isnumeric(n.times)
+        % Validate n.times
+        error("[ec_epoch2dim] n.times must be numeric.");
+    end
+    times = unique(n.times(:),"sorted");
+else
+    times = unique(ep.t,"sorted");
 end
 
 
@@ -261,22 +278,6 @@ assert(all(timeIdx>=1),...
 obsCounts = accumarray(obsRow,1,[height(ob) 1],@sum,0);
 assert(isequal(uint16(obsCounts),ob.nTimes),...
     "[ec_epoch2dim] Invariant failed: ob.nTimes does not match mapped rows.");
-
-
-
-
-function times = getTimes_lfn(ep,n)
-%%% Get times %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if isfield(n,"times") && ~isempty(n.times)
-    % Use n.times metadata to reduce redundant recomputation and enforce consistency.
-    if ~isnumeric(n.times)
-        % Validate n.times
-        error("[ec_epoch2dim] n.times must be numeric.");
-    end
-    times = unique(n.times(:),"sorted");
-else
-    times = unique(ep.t,"sorted");
-end
 
 
 

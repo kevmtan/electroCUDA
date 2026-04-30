@@ -1,4 +1,4 @@
-function [y,ep1,n] = ec_epoch2dim1(x,ep,n,a)
+function [y,ep1,n] = ec_epoch2dim(x,ep,n,a)
 % ec_epoch2dim - reshape flattened epoch rows to [obs,time,channel,freq]
 %
 % Input x is aligned to rows of ep (typically ep.ide from ec_analPrep).
