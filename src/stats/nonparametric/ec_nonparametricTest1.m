@@ -6,13 +6,14 @@ function [stat,p,ci,mu,stats,dist] = ec_nonparametricTest1(x,m,g,a)
 %   Methods:
 %     - "sign"      : exact sign test (tests median difference)
 %     - "wilcoxon"  : Wilcoxon signed-rank test (assumes symmetric diffs)
-%     - "bootstrap" : one-sample recentered bootstrap test
+%     - "bootstrap" : one-sample recentered bootstrap means test
 %     - "auto"      : chooses "sign" for target="median", otherwise
 %                     "bootstrap"
 %
 %   Note: This function intentionally does not implement an exact binomial
 %   branch; use EC_BINOMTEST for binary/proportion hypotheses.
 
+%% Arguments validation
 arguments
     x {mustBeNumericOrLogical} % one-sample data (observations x features)
     m (1,1) double = 0 % null/reference value
@@ -42,6 +43,23 @@ if a.method=="auto"
     end
 end
 
+% Suggest exact binomial test for binary proportion use cases
+if a.verbose && (islogical(x) || all(isnan(x) | x==0 | x==1,"all"))
+    warning("[ec_nonparametricTest1] Binary data detected. For exact one-sample "+...
+        "proportion testing against chance (e.g., p0=0.5), consider ec_binomTest.")
+end
+
+% Warnings
+if a.verbose && (a.method=="sign" || a.method=="wilcoxon")
+    warning("[ec_nonparametricTest1] CI is not implemented for "+a.method+...
+        "; returning NaNs in CI.")
+end
+if a.verbose && (a.method=="sign" || a.method=="wilcoxon") && a.parallel~=""
+    warning("[ec_nonparametricTest1] a.parallel is only used for method='bootstrap'.")
+end
+
+%% Prep
+
 % Reshape to [observations x features] for n-D safety
 xInputDims = ndims(x);
 if a.dim~=1 || xInputDims>2
@@ -58,14 +76,15 @@ if a.rows=="complete"
     end
 end
 
-% Suggest exact binomial test for binary proportion use cases
-if a.verbose && (islogical(x) || all(isnan(x) | x==0 | x==1,"all"))
-    warning("[ec_nonparametricTest1] Binary data detected. For exact one-sample "+...
-        "proportion testing against chance (e.g., p0=0.5), consider ec_binomTest.")
+% Determine NaN handling mode
+if any(isnan(x),"all")
+    nanflag = "omitmissing";
+else
+    nanflag = "includemissing";
 end
 
+% Get data dimensions
 [~,nVar] = size(x);
-nanflag = "omitmissing";
 
 % Initialize outputs
 stat = nan(1,nVar);
@@ -74,15 +93,8 @@ mu = nan(1,nVar);
 ci = nan(2,nVar);
 dist = [];
 
-if a.verbose && (a.method=="sign" || a.method=="wilcoxon")
-    warning("[ec_nonparametricTest1] CI is not implemented for "+a.method+...
-        "; returning NaNs in CI.")
-end
-if a.verbose && (a.method=="sign" || a.method=="wilcoxon") && a.parallel~=""
-    warning("[ec_nonparametricTest1] a.parallel is only used for method=""bootstrap"".")
-end
 
-% Run selected method via dedicated local implementation
+%% Run selected testing method
 switch a.method
     case "sign"
         [stat,p,mu,stats] = signTest_ln(x,m,g,a);
@@ -91,6 +103,9 @@ switch a.method
     case "bootstrap"
         [stat,p,ci,mu,stats,dist] = bootstrap_lfn(x,m,g,a,nanflag);
 end
+
+
+%% Finalize
 
 % Restore original feature shape
 if a.dim~=1 || xInputDims>2
@@ -243,6 +258,8 @@ stats.useGroups = ~isempty(g);
 stats.groupWeights = a.groupWeights;
 
 
+
+
 function [statv,pv,civ,muv,distv] = bootstrapFeature_lfn(xv,m,g,a,nanflag,seed)
 % Per-feature bootstrap worker.
 statv = nan;
@@ -356,32 +373,32 @@ end
 
 
 function [dOut,nGroups] = summarizeByGroup_lfn(d,g,target,groupWeights)
-    % Summarize to one value per group and optionally size-weight groups.
-    ok = ~isnan(d);
-    d = d(ok);
-    gV = g(ok);
-    if isempty(d)
-        dOut = [];
-        nGroups = 0;
-        return
+% Summarize to one value per group and optionally size-weight groups.
+ok = ~isnan(d);
+d = d(ok);
+gV = g(ok);
+if isempty(d)
+    dOut = [];
+    nGroups = 0;
+    return
+end
+[~,~,gV] = unique(gV,"stable");
+nGroups = max(gV);
+dGrp = nan(nGroups,1);
+wGrp = zeros(nGroups,1);
+for gi = 1:nGroups
+    dg = d(gV==gi);
+    switch target
+        case "mean"
+            dGrp(gi) = mean(dg);
+        case "median"
+            dGrp(gi) = median(dg);
     end
-    [~,~,gV] = unique(gV,"stable");
-    nGroups = max(gV);
-    dGrp = nan(nGroups,1);
-    wGrp = zeros(nGroups,1);
-    for gi = 1:nGroups
-        dg = d(gV==gi);
-        switch target
-            case "mean"
-                dGrp(gi) = mean(dg);
-            case "median"
-                dGrp(gi) = median(dg);
-        end
-        wGrp(gi) = numel(dg);
-    end
-    switch groupWeights
-        case "equal"
-            dOut = dGrp;
-        case "size"
-            dOut = repelem(dGrp,max(1,round(wGrp)));
-    end
+    wGrp(gi) = numel(dg);
+end
+switch groupWeights
+    case "equal"
+        dOut = dGrp;
+    case "size"
+        dOut = repelem(dGrp,max(1,round(wGrp)));
+end
