@@ -20,7 +20,6 @@ end
 
 %% Finalize
 chNfoA = vertcat(chNfoA{:});
-
 fn = "/01/lbcn/anal/chNfoA_"+string(datetime('now','TimeZone','local','Format','yyMMdd'));
 save(fn,"chNfoA","-v7"); disp("SAVED: "+fn)
 
@@ -41,12 +40,16 @@ chNfo.roi(:) = "";
 
 % Visual
 id = (contains(chNfo.HCP,"_V") & ~contains(chNfo.HCP,"_VIP")) |...
-    contains(chNfo.HCP,"_ProS") | contains(chNfo.HCP,"_LO") |...
-    contains(chNfo.HCP,"_FFC") | chNfo.HCP=="R_PH" | chNfo.HCP=="L_PH" |...
-    contains(chNfo.HCP,"_FST") | contains(chNfo.HCP,"_MST") | contains(chNfo.HCP,"_MT") |...
-    contains(chNfo.HCP,"_LO3") | contains(chNfo.HCP,"_IP0") | contains(chNfo.HCP,"_IPS1") |...
-    contains(chNfo.HCP,"_PIT") | contains(chNfo.HCP,"_LO1") | contains(chNfo.HCP,"_LO2");
+    contains(chNfo.HCP,"_LO") | chNfo.HCP=="R_PH" | chNfo.HCP=="L_PH" |...
+    contains(chNfo.HCP,"_FFC") | contains(chNfo.HCP,"_FST") |...
+    contains(chNfo.HCP,"_MST") | contains(chNfo.HCP,"_MT") |...
+    contains(chNfo.HCP,"_LO1") | contains(chNfo.HCP,"_LO2") |...
+    contains(chNfo.HCP,"_LO3") | contains(chNfo.HCP,"_PIT"); 
 chNfo.roi(id) = "Visual";
+% contains(chNfo.HCP,"_IP0")
+% contains(chNfo.HCP,"_IPS1")
+% contains(chNfo.HCP,"_ProS")
+
 
 % TPJ
 id = contains(chNfo.HCP,"_PGs") | contains(chNfo.HCP,"_PGi") | contains(chNfo.HCP,"_PFm") |...
@@ -70,16 +73,17 @@ chNfo.roi(id) = "ATL";
 % amPFC
 id = chNfo.HCP=="L_a24" | chNfo.HCP=="R_a24" |...
     chNfo.HCP=="L_p32" | chNfo.HCP=="R_p32" | contains(chNfo.HCP,"_10r") |...
-    (contains(chNfo.HCP,"_10d") & chNfo.MNI(:,3)<=9 & abs(chNfo.MNI(:,1))<12);
+    (contains(chNfo.HCP,"_10d") & chNfo.MNI(:,3)<=10 & abs(chNfo.MNI(:,1))<12);
 chNfo.roi(id) = "amPFC";
 
 % dmPFC
 id = contains(chNfo.HCP,"_9m") | contains(chNfo.HCP,"_d32") | contains(chNfo.HCP,"_a32pr") |...
-    ((contains(chNfo.HCP,"_9p") | contains(chNfo.HCP,"_9a")) & abs(chNfo.MNI(:,1))<12) |...
-    (contains(chNfo.HCP,"_10d") & chNfo.MNI(:,3)>9 & abs(chNfo.MNI(:,1))<12) |...
+    contains(chNfo.HCP,"_9p") | contains(chNfo.HCP,"_9a") |...
+    (contains(chNfo.HCP,"_10d") & chNfo.MNI(:,3)>10) |...
     contains(chNfo.HCP,"_8BM") | (contains(chNfo.HCP,"_8BL"));
 %chNfo.HCP=="L_p24" | chNfo.HCP=="R_p24" | 
 id(id) = chNfo.MNI(id,2) > 28;
+id(id) = abs(chNfo.MNI(id,1))<12;
 chNfo.roi(id) = "dmPFC";
 
 % vmPFC
@@ -88,10 +92,11 @@ id = contains(chNfo.HCP,"_OFC") | contains(chNfo.HCP,"_25") | contains(chNfo.HCP
 chNfo.roi(id) = "vmPFC";
 
 % Corrections
-chNfo.roi(ismember(chNfo.sbjCh,["s33_ch97" "s47_ch17"])) = "amPFC";
+chNfo.roi(ismember(chNfo.sbjCh,["s33_ch97" "s38_ch100" "s47_ch17"])) = "amPFC";
 chNfo.roi(ismember(chNfo.sbjCh,["s53_ch68" "s33_ch1"])) = "dmPFC"; % ex-dmPFC
 chNfo.roi(ismember(chNfo.sbjCh,["s59_ch50" "s59_ch51" "s59_ch52"])) = ""; % ex-TPJ, not in brain sEEG?
-chNfo.roi(ismember(chNfo.sbjCh,["s82_ch2" "s82_ch3" "s82_ch53" "s82_ch54"])) = "";
+chNfo.roi(ismember(chNfo.sbjCh,...
+    ["s53_ch98" "s82_ch2" "s82_ch3" "s82_ch53" "s82_ch54"])) = "";
 
 
 %% ROI groups

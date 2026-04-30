@@ -1,13 +1,19 @@
-load("/01/lbcn/anal/chNfoA_260413.mat","chNfoA");
+load("/01/lbcn/anal/chNfoA_260430.mat","chNfoA");
 
 dirs = ec_loadSbj(proj="lbcn",task="MMR");
 load("cdcol_2018.mat","cdcol");
 
 
 %% Make plot data table
+pullF = 15;
+onlyECoG = true;
+
 d = chNfoA;
 d.bad = [];
 d = renamevars(d,"MNI","pos");
+if onlyECoG
+    d = d(d.ECoG==true,:);
+end
 
 % Non-ROI
 d.marker(:) = "."; % marker shape/line style (string) -- see LineStyle in MATLAB line properties
@@ -30,10 +36,12 @@ d.col(id,:) = repmat(cdcol.brown,nnz(id),1);
 % TPJ
 id = d.roi=="TPJ";
 d.col(id,:) = repmat(cdcol.gold_cadmium_yellow,nnz(id),1);
+d.lat(id) = "lateral"; %%%%
 
 % PCC
 id = d.roi=="PCC";
 d.col(id,:) = repmat(cdcol.spruce_green,nnz(id),1);
+d.lat(id) = "medial"; %%%%
 
 % ATL
 id = d.roi=="ATL";
@@ -42,14 +50,17 @@ d.col(id,:) = repmat(cdcol.indian_red,nnz(id),1);
 % amPFC
 id = d.roi=="amPFC";
 d.col(id,:) = repmat(cdcol.pastel_blue,nnz(id),1);
+d.lat(id) = "medial"; %%%%
 
 % dmPFC
 id = d.roi=="dmPFC";
 d.col(id,:) = repmat(cdcol.ultramarine,nnz(id),1);
+d.lat(id) = "medial"; %%%%
 
 % vmPFC
 id = d.roi=="vmPFC";
 d.col(id,:) = repmat(cdcol.purple_violet,nnz(id),1);
+d.lat(id) = "medial"; %%%%
 
 
 %% Plot
@@ -60,8 +71,8 @@ h = figure(Position=[0 0 1980 1080],Visible=1,WindowStyle="docked",...
 
 % Plot cortex
 ec_plotCortex("L",["lateral","medial"],d,h,sbjDir=dirs.freesurfer,...
-    surfType="pial_avg",opacity=0.9,pullF=15,visible=1,align=1,...
-    labelVars="sbjCh",flip=true,order="ascend");
+    surfType="pial_avg",opacity=0.9,pullF=pullF,visible=1,align=1,...
+    labelVars="sbjCh",flip=1,rmHidden=1,order="ascend");
 
 
 
