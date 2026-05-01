@@ -9,6 +9,7 @@ arguments
     sbj {mustBeTextOrNumeric} = ""
     sbjID (1,1) double = nan
 end
+% Ensure text subject arguments are string
 if istext(sbj); sbj=string(sbj); end
 
 %% Common paths

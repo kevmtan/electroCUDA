@@ -1,14 +1,17 @@
 function [x,ep,n] = ec_analPrep(dirs,tt,a)
 % ec_analPrep: prep subject data for further analyses in electroCUDA
 arguments
-    dirs struct % Subject directories struct from ec_loadSbj
-    tt uint64 = tic % Timer
+    dirs struct = [] % Subject directories struct from ec_getDirs/ec_loadSbj
+    tt (1,1) uint64 = tic % Timer
+    a.sbj {mustBeTextOrNumeric} = "" % Subject
+    a.proj (1,1) string = "" % Project
+    a.task (1,1) string = "" % Task
     a.sfx (1,1) string = "" % Input data suffix
-    a.chConcat string {mustBeMember(a.chConcat,["roi" "all" ""])} = "" % Concatenate channels by ["roi"|"all"|""], default="" (none)
+    a.chConcat string {mustBeMember(a.chConcat,["roi" "all" "none" ""])} = "" % Concatenate channels by ["roi"|"all"|""], default="" (none)
     a.chBadVars string = [] % Vars in n.chBad/icBad to use for bad chan removal
     a.chRm = [] % channels to remove (array of chan numbers)
     a.ROIs (1,:) string = [] % remove chs outside these ROIs
-    a.roiVar string = "roi" % ROI variable in chNfo
+    a.roiVar (1,1) string = "roi" % ROI variable in chNfo
     a.epoch struct = [] % Epoch generation options (ec_epochPsy)
     a.timeVar (1,1) string = "bin" % Timepoint variable from 'psy' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
     a.condVar (1,1) string = "cond" % Condition variable from 'psy'
@@ -21,13 +24,29 @@ arguments
     a.nRmFields (1,:) string = [] % Fields to remove from 'n' to save memory
     a.timeRng = [] % Range of times to run including baseline ([]=epochPsy output)
     a.trialVars (1,:) string = [] % trialNfo vars to copy to 'ep'
+    a.dirs struct = [] % legacy support for input-value 'dirs'
     a.test (1,1) logical = false
 end
 % TODO: custom epoch variable
 % a=o.p; tt=tic;
 
 
-%% Load data 
+%% Handle no 'dirs' input
+if isempty(dirs)
+    if ~isempty(a.dirs)        
+        dirs = a.dirs; % Legacy support for input-value 'dirs'
+    else
+        % Error if no subject/proj/task input
+        if ~isany(a.sbj) || ~isany(a.proj) || ~isany(a.task)
+            error("If no 'dirs' input, must input 'sbj','proj', and 'task'");
+        end
+
+        % Get dirs
+        dirs = ec_getDirs(a.proj,a.task,a.sbj);
+    end
+end
+
+%% Load data
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx=a.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
 disp("[ec_analPrep] Loaded data: "+dirs.sbj+" | toc="+toc(tt));
@@ -263,7 +282,7 @@ if a.chConcat=="roi"
     %% Concatenate chs within ROI: y{roi}(times,freqs*chans)
     rv = a.roiVar;
     spect = n.spect;
-    spect.Properties.RowNames = {}; 
+    spect.Properties.RowNames = {};
 
     % Get ROIs
     if ~isany(a.ROIs)
@@ -284,7 +303,7 @@ if a.chConcat=="roi"
     n.ROIs.sbjROI = "s"+n.sbjID+"_"+string(n.ROIs.roi);
     n.ROIs = movevars(n.ROIs,"sbjROI",Before=1);
     y = cell(n.nROIs,1); % ROI data
-    
+
     % Concatenate ROI channels
     for r = 1:n.nROIs
         % Find ROI chans
