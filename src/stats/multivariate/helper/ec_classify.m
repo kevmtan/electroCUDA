@@ -1,14 +1,20 @@
 function [sts,obs] = ec_classify(xs,sts,obs,o)
-% Run classifier for electroCUDA multivariate routines
+% Run classifier for electroCUDA multivariate routines, not intended to be
+% called independently
 %
-% TO DO: deal with NaNs?
-%
-%   s=217; xs=x{s}; sts=st(s,:); obs=ob{s};
+% https://github.com/kevmtan/electroCUDA
 
+%% Error checks
 
-%% Early bail: no usable training observations for this split
+% Bail if no training observations
 if ~any(obs.use)
-    return;
+    warning("[ec_classify] No observations marked for training, returning...");
+    return; 
+end
+% Error if the training matrix is entirely NaN (unfittable)
+if all(isnan(xs(obs.use,:)),"all")
+    error("Training data is all NaN for %s t=%g (split has %d 'use' obs).",...
+        sts.sbjCh,sts.t,nnz(obs.use));
 end
 
 
@@ -69,7 +75,7 @@ if o.doCC
 end
 
 
-%% Custom classifier metrics
+%% Injection point for custom classifier metrics
 if ~isempty(o.metricFun)
     [sts,obs] = o.metricFun(sts,obs,o);
 end
@@ -90,15 +96,6 @@ function [sts,obs] = main_lfn(xs,sts,obs,o,isTest)
 
 % TEST - make this more elegant
 %if sts.t<0; o.doTuning=false; end
-
-% Bail if no training observations (defensive; ec_classify also checks)
-if ~any(obs.use); return; end
-
-% Error if the training matrix is entirely NaN (unfittable)
-if all(isnan(xs(obs.use,:)),"all")
-    error("[ec_classify] Training data is all NaN for %s t=%g (split has %d 'use' obs).",...
-        sts.sbjCh,sts.t,nnz(obs.use));
-end
 
 
 %% Train & optimize (full training set)
