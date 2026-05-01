@@ -27,6 +27,7 @@ arguments
     a.groupWeights string {mustBeMember(a.groupWeights,["equal","size"])} = "equal" % group weighting mode
     a.nBoot (1,1) double {mustBeInteger,mustBePositive} = 1e4 % bootstrap/permutation iterations
     a.parallel {mustBeMember(a.parallel,["cpu","gpu","",[]])} = "" % execution backend (bootstrap only)
+    a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
     a.verbose (1,1) logical = true % print status/warning messages
 end
@@ -86,12 +87,15 @@ end
 % Get data dimensions
 [~,nVar] = size(x);
 
+% Convert to float type
+x = cast(x,a.floatType);
+
 % Initialize outputs
-stat = nan(1,nVar);
-p = nan(1,nVar);
-mu = nan(1,nVar);
-ci = nan(2,nVar);
-dist = [];
+stat = nan(1,nVar,like=x);
+p = nan(1,nVar,like=x);
+mu = nan(1,nVar,like=x);
+ci = nan(2,nVar,like=x);
+dist = nan(a.nBoot,nVar,like=x);
 
 
 %% Run selected testing method

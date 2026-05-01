@@ -124,9 +124,10 @@ arguments
     a.nPerm (1,1) double {mustBeInteger,mustBePositive} = 1e4 % number of permutations
     a.correct (1,1) logical = true % apply max-stat multiple-comparison correction
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
-    a.maxBlockEl (1,1) {mustBeInteger} = 5e6; % maximum block elements
+    a.maxBlockEl (1,1) {mustBeInteger} = 1e6; % maximum block elements
     a.mat (1,1) logical = false % return pairwise results as square matrices
     a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "none" ""])} = "" % execution backend
+    a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
 end
@@ -159,7 +160,7 @@ if isempty(m)
                 error("The PAIRWISE option currently supports 2-D X only.")
             end
             warning("Comparing all columns of X using two-tailed test...")
-            [x,m] = ptpaircols(x);
+            [x,m] = ec_ptpaircols(x);
             a.tail = "both";
             a.mat = true;
     end
@@ -232,6 +233,10 @@ if nargout > 1
         end
     end
 end
+
+% Convert to float type
+x = cast(x,a.floatType);
+m = cast(m,a.floatType);
 
 
 %% Initial stats
