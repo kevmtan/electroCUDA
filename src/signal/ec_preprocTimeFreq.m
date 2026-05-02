@@ -106,38 +106,24 @@ else
     lpfFilt = [];
 end
 
-% % Reset GPU & get free VRAM
-% if ismember(o.gpu,["matlab" "cuda"])
-% 	try reset(gpuDevice()); catch; end
-%     memMax = ec_ramAvail(true);
-% else
-%     try parpool('threads'); catch;end
-%     memMax = ec_ramAvail;
-% end
+% Preallocate
+cwtNfo = cell(n.nRuns,1);
 
 % Reshape per run
 x = mat2cell(x,n.runIdxOg);
 
 
 %% Continuous Wavelet Transform (within-run to avoid edge artifacts)
-cwtHz = cell(n.nRuns,1);
-cwtSPSI = cwtHz;
 for r = 1:n.nRuns
     % CWT on run
-    [x{r},cwtHz{r},cwtSPSI{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.voices,bandwidth=o.bandwidth,...
+    [x{r},cwtNfo{r}] = ec_wt(x{r},hz=n.hz,lims=o.fLims,voices=o.voices,bandwidth=o.bandwidth,...
         coef=o.coef,wavelet=o.wavelet,ds=ds,lpfFilt=lpfFilt,single=o.single,singleOut=o.singleOut,...
         mem=o.vram,gpu=o.gpu,tic=tt);
-    disp("[ec_preprocTimeFreq] Finished CWT: "+sbj+" "+n.runs(r)+" time="+toc(tt));
 end
 
 
 %% Organize
 x = vertcat(x{:}); % concatenate runs
-
-% Sort freqs from low to high
-if ~o.avg
-    x = flip(x,3);
-end
 
 
 %% Save spectral info to n struct
@@ -145,10 +131,8 @@ n.suffix = o.suffix;
 n.xFrames = size(x,1);
 n.xChs = size(x,2);
 n.nFreqs = size(x,3);
-n.freqs = flip(cwtHz{1});
-n.freqsRun = cwtHz;
-n.cwtSupport = sortrows(cwtSPSI{1},"CF","ascend");
-n.cwtSupportRun = cwtSPSI;
+n.freqs = cwtNfo{1}.freq;
+n.cwtNfoRun = cwtNfo;
 n.("o"+o.suffix) = o;
 n.spectOpts = o;
 
@@ -157,14 +141,11 @@ n.spect = table;
 if n.nFreqs > 1
     n.spect.name = "f"+(1:n.nFreqs)';
     n.spect.disp = round(n.freqs,2) + " hz";
-    n.spect.freq = n.freqs;
-    n.spect.coiHW = n.cwtSupport.coiHW; % cone of influence half-width
-    n.spect.timeHW = n.cwtSupport.End; % time support half-width
-    n.spect.scale = n.cwtSupport.scale; % wavelet scales
+    n.spect = [n.spect,cwtNfo{1}];
 else
     n.spect.name = o.fName;
     n.spect.disp = o.fName;
-    n.spect.freq = n.freqs;
+    n.spect.freq(1,:) = n.freqs';
 end
 
 
@@ -208,7 +189,7 @@ if o.avg
 end
 
 
-%% Save
+%% Finalize
 if o.save
     % Save chNfo
     if o.doBadFrames && ~n.ICA
@@ -227,7 +208,8 @@ end
 
 
 %% Resample behavioral data
-ec_initialize(sbj,proj,task,o,n,hzTarget=o.hzTarget,save=o.save);
+ec_initialize(sbj,proj,task,o,n,hzTarget=o.hzTarget,save=o.save,saveN=o.save);
+disp("[ec_preprocTimeFreq] FINISHED: "+sbj+" time="+toc(tt));
 
 
 

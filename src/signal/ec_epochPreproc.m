@@ -460,9 +460,6 @@ end
 x = x(:,:,n.freqKeep);
 n.spect = n.spect(n.freqKeep,:);
 n.nSpect = height(n.spect);
-if isfield(n,"cwtSupport")
-    n.cwtSupport = n.cwtSupport(n.freqKeep,:);
-end
 disp("[ec_epochPreproc] Kept "+n.nSpect+"/"+n.nFreqs+" freqs: "+n.sbj+" time="+toc(tt));
 
 
