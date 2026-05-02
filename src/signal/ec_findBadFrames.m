@@ -12,7 +12,6 @@ arguments
     thr.diff {mustBeNumeric} = 0   % 1st-order differential thresh (try 5)
     thr.flat {mustBeNumeric} = 0   % max |step| in robust-z to count as flat (try 0.01); 0 skips
     thr.sns {mustBeNumeric} = 0 % Sensor-specific noise thresh (try 5)
-    %thr.cov {mustBeNumeric} = 0 % Sensor-specific noise thresh (try 5)
 end
 %thr.mad=10; thr.diff=10; thr.sns=3;
 
@@ -55,7 +54,7 @@ if thr.flat > 0
         ol = [false(1,size(x,2)); d < thr.flat];
     end
     xBad.flat = ol;
-    xBad.flatA = sum(ol,2,"omitmissing")./width(ol) > 0.5;
+    xBad.flatA = sum(ol,2,"omitmissing")./width(ol) > 0.8;
     nf = size(x,3);
     chBad.flat = false(nChs,1);
     chBad.flatP = reshape(sum(ol,[1,3]),[],1) ./ (nFrames * nf);
@@ -79,8 +78,6 @@ if thr.sns > 0
     chBad.sns = false(nChs,1); 
     chBad.snsP = sum(ol,"omitnan")';
     chBad.sns = isoutlier(chBad.snsP,"median",ThresholdFactor=thr.sns);
-    %[~,~,thrHi] = isoutlier(ch_bad.snsP,"median",ThresholdFactor=thr.sns);
-    %ch_bad.sns = ch_bad.snsP > thrHi;
 end
 
 %% Convert to sparse

@@ -72,7 +72,7 @@ o.thrHFO = 2; % threshold for epileptic HFO detection (default=2)
 o.thrMAD = 10; % z-threshold relative to all data points to exclude timepoints (default=5)
 o.thrDiff = 10; % z-threshold for amplitude difference of consecutive timepoints (default=5)
 o.thrSNS = 3; % Threshold for low-freq spikes; Sensor-specific noise thresh (try 5)
-o.thrFlat = 0.01; % max |Δz| for flat-segment detection in ec_findBadFrames (0=off; try 0.0001)
+o.thrFlat = 0.0001; % max |Δz| for flat-segment detection in ec_findBadFrames (0=off; try 0.0001)
 
 % Interpolate missing frames (within run & channel)
 o.missingInterp = "linear";
@@ -111,7 +111,7 @@ o.cleanlineHz = [60 120];
 o.lineHz = 60; % Electricity hertz @ EEG recording site (default=50|60, skip=0)
 
 % ASR
-o.asr.do = true;
+o.asr.do = false;
 o.asr.unmodified = false; % use unmodified ASR algorithm
 o.asr.riemannian = false;
 o.asr.gpu = true; % use GPU when appropriate
