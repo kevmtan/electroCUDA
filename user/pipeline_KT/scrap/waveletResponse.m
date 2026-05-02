@@ -1,19 +1,36 @@
 % Generate wavelet
 fb = cwtfilterbank(Wavelet="Morse",SamplingFrequency=1000,SignalLength=10000,...
-    VoicesPerOctave=10,FrequencyLimits=[2 300],TimeBandwidth=20);
+    VoicesPerOctave=7,FrequencyLimits=[2 300],TimeBandwidth=20);
 
-% Freq info
+% Wavelet timesupport
 frqs = fb.waveletsupport(0.05); % time support
 frqs.timeHW = frqs.TimeSupport/2;
 
-% Energy-normalized time-domain SD for each wavelet
+% Power bandwidth (3db)
+bw = fb.powerbw;
+
+% Concatenate tables
+frqs = [frqs,bw];
+
+% Scales
+frqs.scale = fb.scales';
+
+% Cone of influence: energy-normalized time-domain SD for each wavelet
 [psi,t] = fb.wavelets;
 psi = abs(psi).^2;
 psi = psi ./ sum(psi,2);                   % normalize each row to unit total energy
 mu_t = sum(psi .* t, 2);               % should be ~0 since wavelets are centered
 frqs.coiHW = sqrt(sum(psi .* (t - mu_t).^2, 2));
 
-frqs.scales = fb.scales'; % scales
+% Organize
+frqs = renamevars(frqs,["CF" "LowFrequencyBorder" "HighFrequencyBorder"],...
+    ["freq" "freqLo" "freqHi"]);
+frqs = movevars(frqs,["freq" "freqLo" "freqHi" "timeHW" "coiHW"],Before=1);
+frqs = movevars(frqs,"coiHW",After="timeHW");
+frqs = removevars(frqs,"Frequencies");
+
+% Sort freqs low to high
+frqs = sortrows(frqs,"freq","ascend"); % sort freqs low to high
 
 
 
