@@ -21,32 +21,39 @@ end
 
 
 %% Prep
-nOg = ec_loadSbj(n.dirs,sfx="",vars="n"); % Load original nfo struct
-varNames = string(n.xBad.Properties.VariableNames); % Bad frame metric names
-[ds1,ds2] = rat(a.hzTarget/n.hz_og); % Downsample factors
-if ds1==1 && ds2==1
-    warning("[ec_resampleBadFrames] n"+n.suffix+"_"+n.fnStr+": Target & original sampling rates are equal");
-    return
-end
+
+% Load original nfo struct for runIdxOg
+nOg = ec_loadSbj(n.dirs,sfx="",vars="n");
+if height(n.xBad)~=nOg.xFrames; error("Height of n"+n.suffix+".xBad ~= n.xFrames"); end
+
+% Run indices
+id = 1:nOg.xFrames;
+id = mat2cell(id',nOg.runIdxOg);
+
+% Downsample factors
+[ds1,ds2] = rat(a.hzTarget/n.hz_og);
+
+% Bad frame metric variable names
+varNames = string(n.xBad.Properties.VariableNames);
+
+% Initialize resampled bad frames table
+xBad = table; 
 
 
-%% Main
-xBad = table; % Create new bad frames table
-
-% Loop across metrics
+%% Resample metrics
 for v = varNames
-    % Convert metric array to nonsparse double for max accuracy
-    x = double(full(n.xBad.(v)));
-    x = mat2cell(x,nOg.runIdxOg); % Split array by run
+    % Metric prep
+    x = double(full(n.xBad.(v))); % convert metric to nonsparse double for max accuracy
+    y = cell(n.nRuns,1); % preallocate resampled metric
 
     % Resample by run (avoids edge artifacts)
     for r = 1:n.nRuns
-        x{r} = resample(x{r},ds1,ds2,max([ds1 ds2 10])); % Resample w antialiasing filter
-        x{r} = sparse(x{r}>=0.5); % Convert back to sparse logical
+        z = resample(x(id{r},:,:),ds1,ds2); % resample w antialiasing filter
+        y{r} = sparse(z >= 0.5); % convert back to sparse logical
     end
 
-    % Concactenate runs, store in table
-    xBad.(v) = vertcat(x{:});
+    % Concatenate runs, store in table
+    xBad.(v) = vertcat(y{:});
 end
 
 
