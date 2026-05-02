@@ -23,7 +23,7 @@ if ~isfield(o,"suffix")
     if isfield(o,"sfx")
         o.suffix = o.sfx;
     elseif ~isempty("n") && isfield(n,"suffix")
-        o.suffix;
+        o.suffix = n.suffix;
     else
         o.suffix = "";
     end
