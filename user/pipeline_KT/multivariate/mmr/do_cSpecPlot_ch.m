@@ -1,4 +1,4 @@
-load("/01/lbcn/anal/classifySpecCh/MzAb_LDA_pcaTune_260422_0604/log_260422_0604.mat")
+load("/01/lbcn/anal/classifySpecCh/MzAb_LDA_GammaDelta_260423_1740/log_260423_1740.mat")
 
 % Colors
 load("cdcol_2018.mat","cdcol");
@@ -82,6 +82,6 @@ for s = 1:height(logs)
 
         %% Save logs
         logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-        save(logs.fn(s),'logs','-v7.3');
+        save(logs.fn(s),'logs','-v7');
     end
 end
