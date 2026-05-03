@@ -1,4 +1,4 @@
-function [o,n,errs,st,ob] = ec_classifySpec(o)
+function logs = ec_classifySpec(o,logs)
 % Performs spectral classification and cross-classification
 % within-channels/ICs/ROIs, within-timepoints, and within-subjects. 
 % ROI classification uses concatenated spectral timecourses from channels
@@ -10,24 +10,121 @@ function [o,n,errs,st,ob] = ec_classifySpec(o)
 % Kevin Tan, 2026
 %
 % OUTPUTS:
-%   o = options struct
-%   n = recording information struct
-%   errs = split-level caught errors (cell array of MException, or [])
-%   st = classifier results & statistics per independent analysis
-%       (chans/ICs/ROIs x timepoints) 
-%   ob = classified observations
+%   logs = per-subject table (sbj, sbjID, class, error, splitErrs, n, st, ob, out, time, ...)
+%
+%   logs.class(s) = true after runSbj_lfn finished (including when some splits failed).
+%   logs.splitErrs is a cell column preallocated upstream; runSbj_lfn writes row s via
+%   [st,ob,sLog.splitErrs{1}] = classify_lfn(...) (errs cell vector, or [] if no split failures).
+%   logs.error{s}  = top-level MException if runSbj_lfn threw before completion.
 
 %% Input arguments
 arguments
-    o struct = struct % options struct (description below in "Options struct validation" section)
+    o struct % options struct (description below in "Options struct validation" section)
+    logs table = table
+end
+% Ensure subject list is string array when building logs from o.sbjs
+if isempty(logs)
+    o.sbjs = string(o.sbjs);
 end
 % o.test = 1;
 
+%% Prep
+
+% Main analysis output root: dirs.anal+o.analDir+o.analName (per-subject dirs are o.analOut+"s"+n.sbjID+filesep)
+dirs = ec_getDirs(o.proj,o.task);
+o.analOut = dirs.anal+o.analDir+filesep+o.analName+filesep;
+
+% Make analysis output dir
+if o.save && ~exist(o.analOut,"dir")
+    mkdir(o.analOut);
+end
+
+% Save options struct
+if o.save
+    save(o.analOut+"o_"+o.analName+".mat","o");
+end
+
+% Make log table (nonempty logs supersedes o.sbjs, e.g. continuing an interrupted run)
+if isempty(logs)
+    nSbjs = numel(o.sbjs);
+    logs = table;
+    logs.sbj = string(o.sbjs);
+    logs.sbjID(:) = uint16(0);
+    logs.class(:) = false;
+    logs.post(:) = false;
+    logs.plot(:) = false;    
+    logs.error = cell(nSbjs,1);
+    logs.splitErrs = cell(nSbjs,1); % default [] per row (same as cell(height(logs),1))
+    logs.n = cell(nSbjs,1);
+    logs.st(:) = string(missing);
+    logs.ob(:) = string(missing);
+    logs.out(:) = string(missing);
+    logs.time(:) = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
+end
+if ~ismember("splitErrs",string(logs.Properties.VariableNames))
+    logs.splitErrs = cell(height(logs),1);
+end
+% sLog=logs(5,:); %sbj38
+% sLog=logs(9,:); %sbj42
+% sLog=logs(21,:); %sbj60
+
+
+%% Run subjects
+for s = 1:height(logs)
+    if ~logs.class(s)
+        %% Run subject
+        try
+            sLog = runSbj_lfn(o,logs(s,:));
+            logs(s,:) = sLog;
+            logs.class(s) = true;
+        catch ME
+            warning("%s",getReport(ME,"extended"));
+            logs.error{s} = ME;
+            logs.class(s) = false;
+        end
+
+        %% Save logs
+        logs.time(s) = datetime("now",TimeZone="local",Format="yyMMdd_HHmm");
+
+        % Select .mat version (v7 has ~2 GB per-variable limit; v7.3/HDF5 for larger)
+        matVer = "-v7";
+        if whos("logs").bytes>2^31; matVer="-v7.3"; end
+
+        % Save
+        save(o.analOut+"logs_"+o.analName,"logs",matVer);
+
+    else
+        disp("SKIPPING: "+logs.sbj(s));
+    end
+end
+
+
+
+
+
+
+
+function sLog = runSbj_lfn(o,sLog)
+%%% Run subject %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+disp("STARTING: "+sLog.sbj);
+tt = tic;
+
+% Subject directories/info
+dirs = ec_loadSbj(sbj=sLog.sbj,proj=o.proj,task=o.task,sfx=o.p.sfx);
+sLog.sbjID = dirs.sbjID;
+
 
 %% Prepare analysis data
-tt = tic;                                % start timer
 oo = namedargs2cell(o.p);                % expand name-value arguments
 [x,ep,n] = ec_analPrep(dirs,tt,oo{:});   % run data prep
+
+% Per-subject output dir: dirs.anal+o.analDir+o.analName+filesep+"s"+n.sbjID+filesep (= o.analOut+"s"+n.sbjID+filesep)
+sLog.out = o.analOut+"s"+n.sbjID+filesep;
+
+% Make subject output dir
+if o.save && ~exist(sLog.out,"dir")
+    mkdir(sLog.out);
+end
 
 
 %% Classifier prep & templates
@@ -41,8 +138,8 @@ oo = namedargs2cell(o.s);
 [x,n,st,ob] = ec_analSplit(x,n,st,ob,tt,oo{:}); % split by chs/ICs/ROIs x timepoints
 
 
-%% Classification
-[st,ob,errs] = classify_lfn(x,n,st,ob,tt,o);
+%% Classification (third output into preallocated logs.splitErrs cell for this row)
+[st,ob,sLog.splitErrs{1}] = classify_lfn(x,n,st,ob,tt,o);
 
 
 %% FDR
@@ -79,6 +176,9 @@ end
 
 %% Save
 
+% Save subject/recording info to log
+sLog.n{1} = n;
+
 % Select .mat version (v7 has ~2 GB per-variable limit; v7.3/HDF5 for larger)
 stVer = "-v7";
 if whos("st").bytes > 2^31
@@ -90,14 +190,12 @@ if whos("ob").bytes > 2^31
 end
 
 % Save
-o.saved.st = fullfile(o.dirOut,"s"+n.sbjID+"_st.mat");
-save(o.saved.st,"st",stVer);
-disp("[ec_classifySpec] Saved classification statistics: "+o.saved.st+" ("+stVer+") toc="+toc(tt));
-o.saved.ob = fullfile(o.dirOut,"s"+n.sbjID+"_ob.mat");
-save(o.saved.ob,"ob",obVer);
-disp("[ec_classifySpec] Saved classification observations: "+o.saved.ob+" ("+obVer+") toc="+toc(tt));
-
-
+sLog.st = fullfile(sLog.out,"s"+n.sbjID+"_st.mat");
+save(sLog.st,"st",stVer);
+disp("[ec_classifySpec] Saved classification statistics: "+sLog.st+" ("+stVer+") toc="+toc(tt));
+sLog.ob = fullfile(sLog.out,"s"+n.sbjID+"_ob.mat");
+save(sLog.ob,"ob",obVer);
+disp("[ec_classifySpec] Saved classification observations: "+sLog.ob+" ("+obVer+") toc="+toc(tt));
 
 
 
@@ -139,7 +237,7 @@ nFail = nnz(~cellfun(@isempty,errs));
 if nFail>0
     warning("[ec_classifySpec] %d of %d splits failed for %s (see errs).",nFail,n.splits,n.sbj);
 else
-    errs = [];
+    errs = []; % no split failures (empty double, same spirit as cell(...,1) prealloc)
 end
 disp("[ec_classifySpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
 

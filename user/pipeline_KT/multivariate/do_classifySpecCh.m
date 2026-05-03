@@ -1,4 +1,13 @@
-sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";...
+% Initialize options struct
+o = struct;
+o.test = false; % TEST?
+o.save = true; % SAVE?
+o.gpu = false; % analysis on GPU
+o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
+o.floatOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
+
+% Subjects
+o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT";...
     "S12_40_MJ";"S12_41_KS";"S12_42_NC";"S12_45_LR";"S13_46_JDB";"S13_47_JT2";...
     "S13_50_LGM";"S13_51_MTL";"S13_52_FVV";"S13_53_KS2";"S13_54_KDH";"S13_56_THS";...
     "S13_57_TVD";"S13_59_SRR";"S13_60_DY";"S14_62_JW";"S14_66_CZ";"S14_67_RH";...
@@ -6,30 +15,17 @@ sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_RT"
     "S15_83_RR";"S15_87_RL";"S16_95_JOB";"S16_96_LF"];
 %sbjs = ["S12_38_LK";"S12_42_NC"]; %["S12_38_LK";"S12_42_NC"];
 
-analFolder = "classifySpecCh";
-analName = "MzAb_LDA_GammaDelta";
-
-
-% Initialize options struct
-o = struct;
-o.name = ""; % Analysis name (filled in subject loop)
+% Load/save options
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
-dirs = ec_getDirs(o.proj,o.task);
+o.analDir = "classifySpecCh"; % directory name within dirs.anal
+o.analName = "zf_SemEpi_LDA_Gamma"; % autobio: Sem vs Epi; CC: Self & Other
 
 
-%% Options
-o.test = false; % TEST?
-o.save = true; % SAVE?
-o.gpu = false; % analysis on GPU
-o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
-o.floatOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
-
-
-%%%%%%%%%%%%%%%%% ANALYSIS PREP: ec_analPrep(...,o.p) %%%%%%%%%%%%%%%%%%%%%
+%% ANALYSIS PREP: ec_analPrep(...,o.p)
 
 % Input data suffix
-o.p.sfx = "s";
+o.p.sfx = "zf";
 
 % Conditions for classification
 o.p.condVar = "cond";
@@ -67,7 +63,7 @@ o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.p.epoch.baselinePre = [-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.p.epoch.baselinePre = -0.2; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.p.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering: all conds in data (leave blank for to leave unordered)
 o.p.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -80,21 +76,22 @@ o.p.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.p.pre.floatProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.p.pre.floatOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.p.pre.hzTarget = 0; % Target sampling rate (0=default rate)
-% Transform
+% Transform (keep both false when input spectra are already magnitude in dB, e.g. CWT
+%  — ec_epochPreproc warns if mag2db/log is applied to dB data)
 o.p.pre.log = false; % Log transform
-o.p.pre.mag2db = false; % Log-transform magnitude to decibel
+o.p.pre.mag2db = false; % magnitude to decibel
 % Normalize/standardize
 o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
-o.p.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+o.p.pre.trialBaseline = ""; % Subtract trial by mean or median of baseline period (skip=[])
 o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 % Bad frames/outliers
 o.p.pre.interp = "linear"; % interpolation method
-o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
+o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
@@ -103,7 +100,7 @@ o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.7; % HPF steepness
 o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.p.pre.lpfSteep = 0.75; % LPF steepness
+o.p.pre.lpfSteep = 0.5; % LPF steepness
 o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = [5 300]; %[5 300];
@@ -127,7 +124,7 @@ o.p.pre.pcaGPU = false;
 
 
 
-%%%%%%%%%%%% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s) %%%%%%%%%%%%%%%%%%%
+%% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s)
 
 % Analysis floating-point precision ("double"|"single"|"half")
 o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
@@ -135,14 +132,14 @@ o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 % Normalize/standardize
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
 
-% PCA
+% PCA (channelwise: no split-level PCA; rank helps diagnostics when o.s.pca is off)
 o.s.rank = true; % calculate data rank if no PCA
 o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaVarThr = 0; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
 o.s.pcaCompLims = [5 Inf]; % Bounds on number of components [lower upper]
 o.s.pcaRobust = false; % Run robust PCA for denoising (can do without dim reduction)
-o.s.pcaGPU = false; % GPU for rank calculation & PCA
+o.s.pcaGPU = true; % GPU for rank calculation & PCA
 o.s.pcaSaveWts = false; % Save PCA weights
 
 
@@ -150,7 +147,8 @@ o.s.pcaSaveWts = false; % Save PCA weights
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD"]; % psy vars to include in observations output
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD" "VD1" "VD2"...
+    "K_pca1" "K_pca2"]; % psy vars to include in observations output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -190,12 +188,13 @@ if isequal(o.fun,@fitclinear)
     %o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
     o.hyper.FitBias = true;
     o.hyper.PostFitBias = false;
-    o.hyper.OptimizeLearnRate = true;
+    o.hyper.OptimizeLearnRate = false; % stabler/faster when comparing to fitcdiscr
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
-    % Linear discriminant analysis
+    % Shrinkage LDA: tune Gamma first; leave Delta at 0 unless sparse coeffs are needed
     o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
     o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
+    o.hyper.Delta = 0; % no coefficient thresholding; use o.OptimizeHyperparameters="Delta" to tune
 elseif isequal(o.fun,@fitcsvm)
     % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
     o.hyper.KernelFunction = "linear";
@@ -220,75 +219,15 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = ["Gamma" "Delta"]; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
+% Repartition must be false when ec_classify passes a custom CVPartition (trial-grouped cvh)
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
     Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
-    MaxObjectiveEvaluations=30);
+    MaxObjectiveEvaluations=15,Repartition=false,UseParallel=false);
 
 
-
-%% Logs
-if ~exist('logs','var')
-    %%
-    date = datetime("now",TimeZone="local",Format="yyMMdd_HHmm");
-    o.name = analName+"_"+date;
-
-    logs = table;
-    logs.sbj = string(sbjs);
-    logs.sbjID = uint16(str2double(extractBetween(sbjs,"_","_")));
-    logs.name(:) = analName+"_"+date;
-    logs.class(:) = false;
-    logs.post(:) = false;
-    logs.plot(:) = false;
-    logs.o = cell(numel(sbjs),1);
-    logs.n = cell(numel(sbjs),1);
-    logs.time(:) = date;
-    logs.error = cell(numel(sbjs),1);
-    logs.out(:) = dirs.anal+analFolder+filesep+logs.name(1)+filesep;
-    logs.fn(:) = logs.out(1)+"log_"+date+".mat";
-end
-
-
-
-%% Initialize threadpool
-% try delete(gcp("nocreate")); catch;end
-try ppool = parpool("threads"); catch;end
-%try reset(gpuDevice); catch;end
-% s=5; %sbj38
-% s=9; %sbj42
-% s=21; %sbj60
-
-
-%% Loop across subjects
-for s = 1:height(logs)
-    if ~logs.class(s)
-        % Set options struct per subject
-        sbj = logs.sbj(s);
-        sbjID = logs.sbjID(s);
-        o.p.dirs = ec_loadSbj(sbj=sbj,proj=o.proj,task=o.task,sfx=o.p.sfx);
-        o.dirOut = logs.out(s);
-        o.dirOutSbj = o.dirOut+"s"+sbjID+filesep;
-        disp("STARTING: "+sbj);
-
-        %% Run subject
-        if ~exist(logs.out(s),"dir"); mkdir(logs.out(s)); end
-        try
-            [logs.o{s},logs.n{s},logs.error{s}] = ec_classifySpec(o);
-            logs.time(s) = datetime("now",TimeZone="local",Format="yyMMdd_HHmm");
-            logs.class(s) = true;
-        catch ME; warning(getReport(ME))
-            logs.error{s} = ME;
-            logs.class(s) = false;
-        end
-
-        %% Save logs
-        logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-        save(logs.fn(s),'logs','-v7.3');
-
-    else
-        disp("SKIPPING: "+logs.sbj(s));
-    end
-end
+%% Run
+ logs = ec_classifySpec(o);
