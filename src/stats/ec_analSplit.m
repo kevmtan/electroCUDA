@@ -37,7 +37,7 @@ wts = sts;
 
 
 %% Main
-if a.pcaGPU && isany(a.pca)
+if a.pcaGPU && (isany(a.pca) || a.rank)
     % Run on GPU
     for c = 1:nCh
         [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c);
@@ -114,7 +114,7 @@ if isany(a.pca) && a.pca~="split"
 elseif ~isany(a.pca)
     % Rank calculation
     if a.rank
-        stc.rank(:) = ec_rank(xc); 
+        stc.rank(:) = ec_rank(xc,gpu=a.pcaGPU); 
     end
     wtc = [];
 end
