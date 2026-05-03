@@ -69,9 +69,15 @@ for v = 1:numel(a.vars)
         disp("[ec_loadSbj] Loaded: "+fn); % Display preloaded n
 
         if ismember("n",a.compact)
-            n = rmfield(n,["asr" "zapline" "chDist" "fsNfo" "chCov" "chVar"...
-                "chCorr" "freqsRun"]);
-            n.o.asr = rmfield(n.o.asr,"chIgnore");
+            fieldsToRm = ["asr" "zapline" "chDist" "fsNfo" "chCov" "chVar"...
+                "chCorr" "freqsRun"];
+            fieldsToRm = fieldsToRm(isfield(n, fieldsToRm));
+            if ~isempty(fieldsToRm)
+                n = rmfield(n, fieldsToRm);
+            end
+            if isfield(n,"o") && isfield(n.o,"asr") && isfield(n.o.asr,"chIgnore")
+                n.o.asr = rmfield(n.o.asr,"chIgnore");
+            end
             disp("[ec_loadSbj] Compacted: "+fn); % Load
         end
         varargout{v} = n;
