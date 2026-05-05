@@ -73,8 +73,7 @@ o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.5; % LPF steepness
-o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
+o.pre.lpfSteep = 0.8; % LPF steepness
 
 % Stats
 o.stats.epoch = [-.2 3]; % latency range for stats

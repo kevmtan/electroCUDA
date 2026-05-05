@@ -68,7 +68,7 @@ o.pre.hpf = 0; % Hi-pass cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.5;
 o.pre.hpfImpulse = "fir"; %"iir";
 o.pre.lpf = 20; % lo-pass in hz (skip=0)
-o.pre.lpfSteep = 0.5;
+o.pre.lpfSteep = 0.8;
 o.pre.lpfImpulse = "fir";
 
 % Stats

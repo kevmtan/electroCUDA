@@ -75,7 +75,7 @@ o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.pre.lpf = 25; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.7; % LPF steepness
+o.pre.lpfSteep = 0.8; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 
 % Stats

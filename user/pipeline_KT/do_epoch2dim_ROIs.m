@@ -99,8 +99,8 @@ o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.7; % HPF steepness
 o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.p.pre.lpfSteep = 0.75; % LPF steepness
-o.p.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
+o.p.pre.lpfSteep = 0.8 % LPF steepness
+
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = []; %[5 300];
 % Spectral PCA (within-channel/IC)

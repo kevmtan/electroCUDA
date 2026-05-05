@@ -9,7 +9,9 @@ function [y,n,o] = ec_epochPreproc(x,n,psy,ep,tt,o)
 %       x(timeframe,channel/IC,freq/band/component)
 %   n = recording information
 %   trs = trial/epoch metadata per timepoint
-
+%
+% TODO: make downsampling not necessarily divisible by srate, resample()
+% doesn't work in parfor threadpool (maybe works for 2026a+?)
 
 %% Input validation
 arguments
@@ -66,8 +68,8 @@ arguments
     o.hpfSteep (1,1) double = 0.7;              % HPF steepness
     o.hpfImpulse {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "auto"; % HPF impulse: ["auto"|"fir"|"iir"]
     o.lpf (1,1) double = 0;                     % LPF cutoff in hz (skip=0)
-    o.lpfSteep = 0.7;                           % LPF steepness
-    o.lpfImpulse {mustBeMember(o.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]
+    o.lpfSteep = 0.8;                           % LPF steepness
+    %o.lpfImpulse {mustBeMember(o.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]
 end
 
 % Additional validation
@@ -106,8 +108,8 @@ else
     o.ds = false;
 end
 
-% Make temporal filters
-if o.hpf || o.lpf
+% Make high-pass filter
+if o.hpf
     o = makeFilters_lfn(x,n,o,tt);
 end
 
@@ -217,19 +219,12 @@ if isany(o.badFrameVars2)
     end
 end
 
-% Flat frames across all chans - keep as NaN
-if any(ismember(o.badFrameVars,"flatA"),"all")
-    xFlatA = full(n.xBad.flatA);
-else
-    xFlatA = false(height(xc),1);
-end
-
 
 %% Within-run preproc
 
 % Call within-run routine (outliers, missing vals, filters, downsample, z-score)
-xc = splitapply(@(xcr,stimr,xFlatR) {withinRun_lfn(xcr,stimr,xFlatR,o)},...
-    xc,psy.stim,xFlatA,psy.runG);
+xc = splitapply(@(xcr,stimr) {withinRun_lfn(xcr,stimr,n,o)},...
+    xc,psy.stim,psy.runG);
 
 % Concatenate runs
 xc = vertcat(xc{:});
@@ -293,7 +288,7 @@ xc = cast(xc,o.floatOut);
 
 
 
-function xcr = withinRun_lfn(xcr,stimr,xFlatR,o)
+function xcr = withinRun_lfn(xcr,stimr,n,o)
 %%% Within-run preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % All outliers
@@ -306,7 +301,7 @@ xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % High-pass filter
 if o.hpf
-    xcr(~xFlatR,:) = ec_filtfilt(xcr(~xFlatR,:),o.HPF{1},o.HPF{2});
+    xcr = ec_filtfilt(xcr,o.HPF{1},o.HPF{2});
 end
 
 % All outliers (2nd round)
@@ -324,7 +319,7 @@ xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % Low-pass filter / anti-aliasing
 if o.lpf
-    xcr(~xFlatR,:) = ec_filtfilt(xcr(~xFlatR,:),o.LPF{1},o.LPF{2});
+    xcr = ec_fft_lowpass(xcr,n,o.lpf,o.lpfSteep);
 end
 
 % Downsample
@@ -511,13 +506,13 @@ if o.hpf
     disp("[ec_epochPreproc] Created high-pass filter: "+n.sbj+" time="+toc(tt));
 end
 
-% Low-pass filter
-if o.lpf
-    o.LPF = {};
-    [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz0,o.lpf,"lowpass",...
-        steepness=o.lpfSteep,impulse=o.lpfImpulse,coefOut=true);
-    disp("[ec_epochPreproc] Created low-pass filter: "+n.sbj+" time="+toc(tt));
-end
+% % Low-pass filter (depreciated, uses FFT lowpass now)
+% if o.lpf
+%     o.LPF = {};
+%     [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz0,o.lpf,"lowpass",...
+%         steepness=o.lpfSteep,impulse=o.lpfImpulse,coefOut=true);
+%     disp("[ec_epochPreproc] Created low-pass filter: "+n.sbj+" time="+toc(tt));
+% end
 
 
 
@@ -542,10 +537,10 @@ for v = o.badFrameVars
 
     % Replace bad frames with nan
     if isequal(szX,szB)
-        x(full(xBad)) = nan;
+        x(xBad) = nan;
     elseif ndB < ndX && all(szB(1:ndB)==szX(1:ndB))
         if ndB==1
-            x(full(xBad),:,:) = nan;
+            x(xBad,:,:) = nan;
         else
             o.badFrameVars2(end+1) = v; % 2D xBad & 3D x: do within-Ch
         end

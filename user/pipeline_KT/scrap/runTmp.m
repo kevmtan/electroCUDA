@@ -171,7 +171,7 @@ o.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.pre.hpfSteep = 0.7; % HPF steepness
 o.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.pre.lpf = 30; % LPF cutoff in hz (skip=0)
-o.pre.lpfSteep = 0.5; % LPF steepness
+o.pre.lpfSteep = 0.8; % LPF steepness
 o.pre.lpfImpulse = "fir"; % LPF impulse: ["auto"|"fir"|"iir"]
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.pre.freqs = [4 300];
