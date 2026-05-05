@@ -1,4 +1,4 @@
-function [t,p,ci,mu,stats,dist] = ec_permuttest(x,m,g,a)
+function [t,p,ci,mu,df,sd,dist] = ec_permuttest(x,m,g,a)
 % ec_permuttest: modified from PERMUTOOLS for electroCUDA (see
 %   modifications below)
 %
@@ -105,12 +105,18 @@ function [t,p,ci,mu,stats,dist] = ec_permuttest(x,m,g,a)
 %   CNL, Albert Einstein College of Medicine, NY.
 %   TCBE, Trinity College Dublin, Ireland.
 %
-%  Modified by Kevin Tan for electroCUDA (github.com/electroCUDA):
-%   - Added arguments block
-%   - Optimized speed & memory use:
-%       - Implicit expansion when possible
-%       - Group-constrained randomization (when groups provided)
-%       - Explicit parallelization (CPU parfor, GPU vectorization)
+%  Modified by Kevin Tan for electroCUDA (github.com/kevmtan/electroCUDA):
+%   - Replaced name-value parsing with an arguments block and typed validation.
+%   - Added n-D support by reshaping to [observations x features] and restoring output shape.
+%   - Added exchangeability groups ('g') for group-constrained sign permutations.
+%   - Added blockwise permutation engine for memory scaling (blockElMax, blockMemFrac).
+%   - Added optional auto block sizing from available RAM/VRAM with upstream override (ramAvail).
+%   - Added backend controls for CPU/GPU execution and GPU gather strategy.
+%   - Switched GPU randomization to parallel.gpu.rng with block-wise deterministic seeds.
+%   - Refactored block computation into mode-specialized local kernels (CPU/GPU, grouped/ungrouped).
+%   - Vectorized block statistics via matrix multiplication (x' * signBlock).
+%   - Added precision controls (floatType) and class-consistent random sign generation.
+%   - Preserved pairwise-column mode with matrix-form output handling.
 
 %% Arguments validation
 arguments
@@ -124,9 +130,12 @@ arguments
     a.nPerm (1,1) double {mustBeInteger,mustBePositive} = 1e4 % number of permutations
     a.correct (1,1) logical = true % apply max-stat multiple-comparison correction
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
-    a.maxBlockEl (1,1) {mustBeInteger} = 1e6; % maximum block elements
+    a.blockElMax (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % maximum block elements (0=auto from available memory)
+    a.blockMemFrac (1,1) double {mustBeGreaterThan(a.blockMemFrac,0),mustBeLessThan(a.blockMemFrac,1)} = 0.2 % Fraction of available memory to use within permute blocks (for auto blockElMax)
+    a.parallel {mustBeMember(a.parallel,["none" "gpu" "cpu" ""])} = "none" % execution backend (CPU not worth it)
+    a.ramAvail (1,1) double = 0 % available RAM/VRAM bytes (override upstream if needed)
     a.mat (1,1) logical = false % return pairwise results as square matrices
-    a.parallel {mustBeMember(a.parallel,["cpu" "gpu" "none" ""])} = "" % execution backend
+    a.gather string {mustBeMember(a.gather,["block","final"])} = "block" % GPU gather strategy
     a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
@@ -138,6 +147,10 @@ if a.alpha < 1/a.nPerm
     a.nPerm = ceil(1/a.alpha);
     warning("[ec_permuttest] Specified number of permutations too low for alpha, "+...
         "running "+a.nPerm+" permutations.");
+end
+% Get available RAM/VRAM if not specified
+if isnan(a.ramAvail) || a.ramAvail<=0 
+    a.ramAvail = ec_ramAvail(a.parallel=="gpu");
 end
 
 
@@ -216,20 +229,51 @@ if nargout > 1
     % Generate random permutations
     rng(a.seed);
 
+    % Auto-size block elements from available memory if requested.
+    if a.blockElMax==0
+        switch a.floatType
+            case "double"
+                bytesPerEl = 8;
+            case "single"
+                bytesPerEl = 4;
+            case "half"
+                bytesPerEl = 2;
+        end
+        a.blockElMax = max(1,floor((double(a.ramAvail)*a.blockMemFrac)/bytesPerEl));
+        if a.verbose
+            fprintf("[ec_permuttest] Auto blockElMax=%d (%.0f%% memory fraction)\n",...
+                a.blockElMax,100*a.blockMemFrac);
+        end
+    end
+
     % Generate permutation groups (saves memory by running blocks)
-    a.bPerms = max(1,floor(a.maxBlockEl/a.nObsMax));
+    a.bPerms = max(1,floor(a.blockElMax/a.nObsMax));
     a.bPerms = min(a.bPerms,a.nPerm);
     bStarts = 1:a.bPerms:a.nPerm;
     nBlocks = numel(bStarts);
+    bEnds = min(bStarts+a.bPerms-1,a.nPerm);
     bSeeds = randi(intmax("uint32"),nBlocks,1,"uint32");
     if a.verbose
         disp("[ec_permuttest] Number of permutation blocks: "+nBlocks); end
 
     % Check parallelization
     if a.parallel=="cpu"
-        if nBlocks < 5 % feature('numcores')
-            disp("[ec_permuttest] Less than 5 blocks, avoiding parfor, "+...
-                "implicit parallelization likely faster");
+        nCores = feature("numcores");
+        if nBlocks < nCores
+            warning("[ec_permuttest] Less permutation blocks than cores, avoiding parfor, "+...
+            "implicit BLAS/LAPACK multithreading likely faster");
+            a.parallel = "none";
+        end
+    end
+
+    % Preallocate distances from mean (per block)
+    if a.parallel=="cpu"
+        dist = cell(nBlocks,1);
+    else
+        if a.parallel=="gpu" && a.gather=="final"
+            dist = [];
+        else
+            dist = zeros(a.nPerm,a.nVar,like=x);
         end
     end
 end
@@ -256,36 +300,46 @@ mu = sum(x,a.nan)./a.nObs;
 % Compute test statistic
 se = sd./sqrt(a.nObs);
 t = mu./se;
-if nargout==1; return; end % return if only p-value desired
+
+% Return if only t-value desired
+if nargout==1; return; end
 
 % Estimate sampling distribution (sum(x.^2) is invariant to sign flips)
 sx2 = sum(x.^2,a.nan);
 sqrtn = sqrt(a.nObs.*df);
 
-% Preallocate distances from mean (per block)
-dist = cell(nBlocks,1);
+% Replace NaNs with 0s for vectorization across permutations
+if a.nan=="omitmissing"
+    x(isnan(x)) = 0;
+end
 
 
 %% Permutation stats
 if a.parallel=="cpu"
     % CPU parallel loop across blocks
     parfor b = 1:nBlocks
-        dist{b} = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bSeeds(b),a);
+        dist{b} = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
     end
+    dist = vertcat(dist{:});
 else
     % Copy to GPU
     if a.parallel=="gpu"
         x     = gpuArray(x);
         sx2   = gpuArray(sx2);
         sqrtn = gpuArray(sqrtn);
+        if a.gather=="final"
+            dist = zeros(a.nPerm,a.nVar,like=x);
+        end
     end
 
     % Loop across blocks (CPU or GPU)
     for b = 1:nBlocks
-        dist{b} = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bSeeds(b),a);
+        dist(bStarts(b):bEnds(b),:) = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+    end
+    if a.parallel=="gpu" && a.gather=="final"
+        dist = gather(dist);
     end
 end
-dist = vertcat(dist{:});
 
 
 %% Final stats
@@ -295,33 +349,46 @@ if a.correct
     dist = max(abs(dist),[],2);
 end
 
-% Add negative values
-dist(a.nPerm+1:2*a.nPerm,:) = -dist;
-a.nPerm = 2*a.nPerm;
 if a.verbose
-    fprintf("[ec_permuttest] Adding negative of values to permutation distribution.\n")
-    fprintf("Number of effective permutations: %d\n",a.nPerm)
+    fprintf("Effective number of permutations: %d\n",a.nPerm)
 end
 
 % Compute p-value & CI
 switch a.tail
     case "both"
-        p = 2*(sum(abs(t)<=dist)+1)/(a.nPerm+1);
+        if a.correct
+            p = (sum(dist>=abs(t))+1)/(a.nPerm+1);
+        else
+            p = (sum(abs(dist)>=abs(t))+1)/(a.nPerm+1);
+        end
         if nargout > 2
-            crit = prctile(dist,100*(1-a.alpha/2)).*se;
+            if a.correct
+                crit = prctile(dist,100*(1-a.alpha/2)).*se;
+            else
+                crit = prctile(abs(dist),100*(1-a.alpha/2)).*se;
+            end
             ci = [mu-crit;mu+crit];
         end
     case "right"
-        p = (sum(t<=dist)+1)/(a.nPerm+1);
+        p = (sum(dist>=t)+1)/(a.nPerm+1);
         if nargout > 2
             crit = prctile(dist,100*(1-a.alpha)).*se;
             ci = [mu-crit;Inf(1,a.nVar)];
         end
     case "left"
-        p = (sum(t>=dist)+1)/(a.nPerm+1);
+        if a.correct
+            p = (sum(dist>=-t)+1)/(a.nPerm+1);
+        else
+            p = (sum(dist<=t)+1)/(a.nPerm+1);
+        end
         if nargout > 2
-            crit = prctile(dist,100*(1-a.alpha)).*se;
-            ci = [-Inf(1,a.nVar);mu+crit];
+            if a.correct
+                crit = prctile(dist,100*(1-a.alpha)).*se;
+                ci = [-Inf(1,a.nVar);mu+crit];
+            else
+                crit = prctile(dist,100*a.alpha).*se;
+                ci = [-Inf(1,a.nVar);mu-crit];
+            end
         end
 end
 
@@ -344,6 +411,8 @@ if a.mat
     end
     if nargout > 4
         df = ptvec2mat(df);
+    end
+    if nargout > 5
         sd = ptvec2mat(sd);
     end
 elseif a.dim~=1 || xInputDims>2
@@ -361,68 +430,84 @@ elseif a.dim~=1 || xInputDims>2
     end
     if nargout > 4
         df = reshape(df,outSize);
+    end
+    if nargout > 5
         sd = reshape(sd,outSize);
     end
-    if nargout > 5 && ~a.correct
+    if nargout > 6 && ~a.correct
         dist = reshape(dist,[a.nPerm featureSize]);
     end
 end
 
-% Store statistics in a structure
-if nargout > 4
-    stats.df = df;
-    stats.sd = sd;
-    stats.mu = mu;
-end
+% % Store statistics in a structure
+% if nargout > 4
+%     stats.df = df;
+%     stats.sd = sd;
+%     stats.mu = mu;
+% end
 
 
 
 
 
 
-function bDist = runBlock_lfn(x,sx2,sqrtn,bStart,seed,a)
-%%% Permutation block %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function bDist = runBlock_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
+%%% Permutation block dispatcher %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if a.parallel=="gpu"
-    % Generate random numbers on GPU for this block.
-    parallel.gpu.rng(double(seed),"Philox4x32-10");
+    if a.useGroups
+        bDist = runBlock_gpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
+    else
+        bDist = runBlock_gpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
+    end
 else
-    rs = RandStream("mt19937ar","Seed",double(seed)); % seed for CPU/parfor
+    if a.useGroups
+        bDist = runBlock_cpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
+    else
+        bDist = runBlock_cpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
+    end
 end
 
-% Block indices
-bEnd = min(bStart+a.bPerms-1,a.nPerm);
+
+function bDist = runBlock_gpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
+parallel.gpu.rng(double(seed),"Philox4x32-10");
 nbPerms = bEnd-bStart+1;
-
-% Generate random signs
-if a.useGroups
-    if a.parallel=="gpu"
-        groupSigns = 2*cast(rand(a.nExchGroups,nbPerms,like=x)>0.5,like=x)-1;
-    else
-        groupSigns = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=x)-1;
-    end
-    signBlock = groupSigns(a.groupIdx,:);
-else
-    if a.parallel=="gpu"
-        signBlock = 2*cast(rand(a.nObsMax,nbPerms,like=x)>0.5,like=x)-1;
-    else
-        signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
-    end
-end
-
-% Preallocate block distances
-bDist = zeros(nbPerms,a.nVar,like=x);
-
-% Loop across permutations
-for k = 1:nbPerms
-    xp = x.*signBlock(:,k); % implicit expansion
-    smx = sum(xp,a.nan);
-    bDist(k,:) = smx./a.nObs./(sqrt(sx2-(smx.^2)./a.nObs)./sqrtn);
-end
-
-% Gather from GPU
-if a.parallel=="gpu"
+signBlock = 2*cast(rand(a.nExchGroups,nbPerms,like=x)>0.5,like=x)-1;
+signBlock = signBlock(a.groupIdx,:);
+bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
+if a.gather=="block"
     bDist = gather(bDist);
 end
+
+
+function bDist = runBlock_gpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
+parallel.gpu.rng(double(seed),"Philox4x32-10");
+nbPerms = bEnd-bStart+1;
+signBlock = 2*cast(rand(a.nObsMax,nbPerms,like=x)>0.5,like=x)-1;
+bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
+if a.gather=="block"
+    bDist = gather(bDist);
+end
+
+
+function bDist = runBlock_cpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
+rs = RandStream("mt19937ar","Seed",double(seed));
+nbPerms = bEnd-bStart+1;
+signBlock = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=x)-1;
+signBlock = signBlock(a.groupIdx,:);
+bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
+
+
+function bDist = runBlock_cpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
+rs = RandStream("mt19937ar","Seed",double(seed));
+nbPerms = bEnd-bStart+1;
+signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
+bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
+
+
+function bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a)
+smx = x.'*signBlock; % [nVar x nbPerms]
+smx = smx.'; % [nbPerms x nVar]
+bDist = smx./a.nObs./(sqrt(sx2-(smx.^2)./a.nObs)./sqrtn);
 
 
 
