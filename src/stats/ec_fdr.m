@@ -78,7 +78,8 @@ if nAll==1
     aAdj(:) = a;
     pAdj = reshape(pAdj,sz);
     aAdj = reshape(aAdj,sz);
-    h = reshape(p < aAdj, sz);
+    p = reshape(p,sz);
+    h = p < aAdj;
     return;
 end
 
@@ -92,7 +93,8 @@ if nGood<=1
     aAdj(idGood) = a;
     pAdj = reshape(pAdj,sz);
     aAdj = reshape(aAdj,sz);
-    h = reshape(p < aAdj, sz); % NaN<x -> false, so h=false for NaN entries
+    p = reshape(p,sz);
+    h = p < aAdj; % NaN<x -> false, so h=false for NaN entries
     return;
 end
 
@@ -119,9 +121,14 @@ aAdjGood(idx,1) = a.*k./(nGood.*c);
 pAdj(idGood) = pAdjGood;
 aAdj(idGood) = aAdjGood;
 
-% Reshape to original shape
+% Reshape pFDR to original shape
 pAdj = reshape(pAdj,sz);
-aAdj = reshape(aAdj,sz);
+if nargout==1; return; end
 
-% Rejected H0 (NaN<x is false, so NaN entries are not rejected)
-h = reshape(p < aAdj, sz);
+% Reshape alpha-FDR to original shape
+aAdj = reshape(aAdj,sz);
+if nargout==2; return; end
+
+% Reject H0
+p = reshape(p,sz); % reshape original p-vals to original shape
+h = p < aAdj;
