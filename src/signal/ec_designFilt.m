@@ -97,12 +97,12 @@ if strcmp(impRespType,'iir')
         end
         params = {opts.Response+"iir", 'FilterOrder', N,...
             'PassbandFrequency', Wpass, 'PassbandRipple', Apass,...
-            'StopbandAttenuation', Astop, 'DesignMethod', 'ellip'};
+            'StopbandAttenuation', Astop, 'DesignMethod', 'butter'};
         warning(message('signal:internal:filteringfcns:SignalLengthForIIR'));
     else
         params = {opts.Response+"iir", 'PassbandFrequency', Wpass,...
             'StopbandFrequency', Wstop, 'PassbandRipple', Apass,...
-            'StopbandAttenuation', Astop, 'DesignMethod', 'ellip'};
+            'StopbandAttenuation', Astop, 'DesignMethod', 'butter'};
     end
 else
     %% FIR design
