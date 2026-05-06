@@ -65,7 +65,7 @@ arguments
     o.bandsF = [];                              % Band freq limits
     % Filtering (within-run):
     o.hpf (1,1) double = 0;                     % HPF cutoff in hertz (skip=0)
-    o.hpfSteep (1,1) double = 0.7;              % HPF steepness
+    o.hpfSteep (1,1) double = 0.8;              % HPF steepness
     o.hpfImpulse {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "auto"; % HPF impulse: ["auto"|"fir"|"iir"]
     o.lpf (1,1) double = 0;                     % LPF cutoff in hz (skip=0)
     o.lpfSteep = 0.8;                           % LPF steepness
@@ -84,20 +84,39 @@ o.badFrameVars2 = string([]);
 
 %% Prep
 
-% Groups for splitapply
-psy.runG = cast(findgroups(psy.run),like=psy.run); % runs
-ep.trG = cast(findgroups(ep.tr),like=ep.tr); % epochs/trials
+% Run indexing
+if any(o.hzTarget) && o.hzTarget~=n.hz0
+    % Downsampling: group indexing for splitapply() due to variable-length outputs
+    [psy.runG,runs] = findgroups(psy.run);
+    if ~isequal(runs(:),n.runs(:))
+        error("Mismatch between psy.run and n.runs");
+    end
+else
+    % Logical run indexing (frames x runs)
+    psy.runG = false(height(psy),n.nRuns);
+    for r = 1:n.nRuns
+        psy.runG(:,r) = psy.run==n.runs(r);
+        if ~nnz(psy.runG(:,r))
+            error("No observations found for run "+n.runs(r));
+        end
+    end
+end
 
-% Get indices
-n.trId = splitapply(@(e){e},ep.ide,ep.trG);
-n.timesId = splitapply(@(e){e},ep.ide,n.timesG);
+% Epoch/trial indexing
+trG = findgroups(ep.tr); % groups
+n.trId = splitapply(@(e){e},ep.ide,trG); % indices
+
+% Timepoint indexing (can be done upstream in ec_analPrep(), done again here for robustness)
+[n.timesG,n.times] = findgroups(ep.t);
+n.nTimes = height(n.times); % number of times
+n.timesId = splitapply(@(e){e},ep.ide,n.timesG); % timepoint indices
 
 % Spectral
 if isany(o.bands)
-    % Find spectral band frequencies in EEG
+    % Band frequency indexing
     n = findBandFreqs_lfn(n,o,tt);
 elseif isany(o.freqs)
-    % Keep only specified spectral frequencies
+    % Remove unspecified frequencies from data
     [x,n] = keepFreqs_lfn(x,n,o,tt);
 end
 
@@ -221,13 +240,18 @@ end
 
 
 %% Within-run preproc
-
-% Call within-run routine (outliers, missing vals, filters, downsample, z-score)
-xc = splitapply(@(xcr,stimr) {withinRun_lfn(xcr,stimr,n,o)},...
-    xc,psy.stim,psy.runG);
-
-% Concatenate runs
-xc = vertcat(xc{:});
+if o.ds
+    % Downsampling: variable-length output requires grouped/cell output
+    xc = splitapply(@(xcr,stimr,runr) {withinRun_lfn(xcr,stimr,n,o,runr(1))},...
+        xc,psy.stim,psy.runG,psy.runG);
+    xc = vertcat(xc{:}); % concatenate downsampled runs
+else
+    % No downsampling: process each run in place by logical indexing
+    for r = 1:n.nRuns
+        id = psy.runG(:,r);
+        xc(id,:) = withinRun_lfn(xc(id,:),psy.stim(id),n,o,r);
+    end
+end
 
 
 %% Within-epoch preproc
@@ -288,7 +312,7 @@ xc = cast(xc,o.floatOut);
 
 
 
-function xcr = withinRun_lfn(xcr,stimr,n,o)
+function xcr = withinRun_lfn(xcr,stimr,n,o,runId)
 %%% Within-run preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % All outliers
@@ -319,7 +343,12 @@ xcr = fillmissing(xcr,o.interp,1,EndValues="nearest");
 
 % Low-pass filter / anti-aliasing
 if o.lpf
-    xcr = ec_fft_lowpass(xcr,n,o.lpf,o.lpfSteep);
+    if isfield(o,"lpfMasks") && ~isempty(o.lpfMasks)
+        mask = o.lpfMasks{o.lpfRunMaskIdx(runId)};
+    else
+        mask = [];
+    end
+    xcr = ec_fft_lowpass(xcr,n,o.lpf,o.lpfSteep,mask);
 end
 
 % Downsample
@@ -506,13 +535,47 @@ if o.hpf
     disp("[ec_epochPreproc] Created high-pass filter: "+n.sbj+" time="+toc(tt));
 end
 
-% % Low-pass filter (depreciated, uses FFT lowpass now)
-% if o.lpf
-%     o.LPF = {};
-%     [o.LPF{1},o.LPF{2}] = ec_designFilt(xTmp,n.hz0,o.lpf,"lowpass",...
-%         steepness=o.lpfSteep,impulse=o.lpfImpulse,coefOut=true);
-%     disp("[ec_epochPreproc] Created low-pass filter: "+n.sbj+" time="+toc(tt));
-% end
+% FFT low-pass masks (precompute per unique run length)
+if o.lpf
+    runLens = n.runIdx(:,2)-n.runIdx(:,1)+1; % samples per run
+    [uLens,~,runMaskIdx] = unique(runLens,"stable");
+    o.lpfLens = uLens;
+    o.lpfRunMaskIdx = runMaskIdx;
+    o.lpfMasks = cell(numel(uLens),1);
+
+    % Sampling rate follows current analysis data
+    if isfield(n,"hz0")
+        fs = n.hz0;
+    else
+        fs = n.hz;
+    end
+
+    % Build one FFT mask per unique run length
+    for i = 1:numel(uLens)
+        xFrames = uLens(i);
+        fNyquist = fs/2;
+        fTrans = (0.99 - 0.98*o.lpfSteep) * (fNyquist - o.lpf);
+        freqs = (0:floor(xFrames/2)) * (fs/xFrames);
+
+        mask = ones(length(freqs),1,o.floatProc);
+        inTrans = freqs>=o.lpf & freqs<=o.lpf+fTrans;
+        if fTrans > 0
+            mask(inTrans) = 0.5 * (1 + cos(pi * (freqs(inTrans) - o.lpf) / fTrans));
+            mask(freqs>o.lpf+fTrans) = 0;
+        else
+            mask(freqs>=o.lpf) = 0;
+        end
+
+        maskFull = [mask; flipud(mask(2:end-1))];
+        o.lpfMasks{i} = maskFull(1:xFrames);
+    end
+    disp("[ec_epochPreproc] Created FFT low-pass masks ("+numel(uLens)+...
+        " unique run lengths): "+n.sbj+" time="+toc(tt));
+else
+    o.lpfMasks = {};
+    o.lpfRunMaskIdx = [];
+    o.lpfLens = [];
+end
 
 
 
