@@ -28,7 +28,7 @@ if isvector(group)
     if numel(group) ~= nObs
         error(argName+" must have one entry per observation along DIM.")
     end
-    group = group(:);
+    %group = group(:);
 else
     if ~ismatrix(group)
         error(argName+" must be a vector or 2D array.")
@@ -39,7 +39,7 @@ else
         error(argName+" must have one dimension equal to number of observations.")
     end
 
-    if size(group,2) == nObs
+    if size(group,2)==nObs
         group = group';
     end
 end

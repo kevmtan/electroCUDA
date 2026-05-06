@@ -131,18 +131,20 @@ arguments
     a.correct (1,1) logical = true % apply max-stat multiple-comparison correction
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
     a.blockElMax (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % maximum block elements (0=auto from available memory)
+    a.nBlocks (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % explicit number of permutation blocks (0=derive from blockElMax)
     a.blockMemFrac (1,1) double {mustBeGreaterThan(a.blockMemFrac,0),mustBeLessThan(a.blockMemFrac,1)} = 0.2 % Fraction of available memory to use within permute blocks (for auto blockElMax)
     a.parallel {mustBeMember(a.parallel,["none" "gpu" "cpu" ""])} = "none" % execution backend (CPU not worth it)
     a.ramAvail (1,1) double = 0 % available RAM/VRAM bytes (override upstream if needed)
     a.mat (1,1) logical = false % return pairwise results as square matrices
     a.gather string {mustBeMember(a.gather,["block","final"])} = "block" % GPU gather strategy
+    a.idxType string {mustBeMember(a.idxType,["double","uint32"])} = "double" % grouped index-buffer type
     a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
 end
 % No parfor if running on GPU
 if isgpuarray(x); a.parallel="gpu"; end
-% Make sure alpha 
+% Make sure alpha is above 
 if a.alpha < 1/a.nPerm
     a.nPerm = ceil(1/a.alpha);
     warning("[ec_permuttest] Specified number of permutations too low for alpha, "+...
@@ -220,7 +222,12 @@ if isempty(g)
     a.useGroups = false;
 else
     a.useGroups = true;
-    a.groupIdx = g;
+    switch a.idxType
+        case "double"
+            a.groupIdx = g;
+        case "uint32"
+            a.groupIdx = uint32(g);
+    end
     a.nExchGroups = max(g);
 end
 
@@ -229,26 +236,33 @@ if nargout > 1
     % Generate random permutations
     rng(a.seed);
 
-    % Auto-size block elements from available memory if requested.
-    if a.blockElMax==0
-        switch a.floatType
-            case "double"
-                bytesPerEl = 8;
-            case "single"
-                bytesPerEl = 4;
-            case "half"
-                bytesPerEl = 2;
-        end
-        a.blockElMax = max(1,floor((double(a.ramAvail)*a.blockMemFrac)/bytesPerEl));
+    if a.nBlocks>0
+        a.bPerms = max(1,ceil(a.nPerm/a.nBlocks));
         if a.verbose
-            fprintf("[ec_permuttest] Auto blockElMax=%d (%.0f%% memory fraction)\n",...
-                a.blockElMax,100*a.blockMemFrac);
+            fprintf("[ec_permuttest] Using explicit nBlocks=%d (bPerms=%d)\n",...
+                a.nBlocks,a.bPerms);
         end
+    else
+        % Auto-size block elements from available memory if requested.
+        if a.blockElMax==0
+            switch a.floatType
+                case "double"
+                    bytesPerEl = 8;
+                case "single"
+                    bytesPerEl = 4;
+                case "half"
+                    bytesPerEl = 2;
+            end
+            a.blockElMax = max(1,floor((double(a.ramAvail)*a.blockMemFrac)/bytesPerEl));
+            if a.verbose
+                fprintf("[ec_permuttest] Auto blockElMax=%d (%.0f%% memory fraction)\n",...
+                    a.blockElMax,100*a.blockMemFrac);
+            end
+        end
+        % Generate permutation groups (saves memory by running blocks)
+        a.bPerms = max(1,floor(a.blockElMax/a.nObsMax));
+        a.bPerms = min(a.bPerms,a.nPerm);
     end
-
-    % Generate permutation groups (saves memory by running blocks)
-    a.bPerms = max(1,floor(a.blockElMax/a.nObsMax));
-    a.bPerms = min(a.bPerms,a.nPerm);
     bStarts = 1:a.bPerms:a.nPerm;
     nBlocks = numel(bStarts);
     bEnds = min(bStarts+a.bPerms-1,a.nPerm);
@@ -354,12 +368,20 @@ if a.verbose
 end
 
 % Compute p-value & CI
+if a.verbose
+    if a.correct
+        fprintf("[ec_permuttest] Computing max-corrected p-values (serial threshold counting)...\n");
+    else
+        fprintf("[ec_permuttest] Computing uncorrected p-values/CI from full permutation distribution...\n");
+    end
+end
 switch a.tail
     case "both"
         if a.correct
-            p = (sum(dist>=abs(t))+1)/(a.nPerm+1);
+            p = (countGE_lfn(dist,abs(t))+1)/(a.nPerm+1);
         else
-            p = (sum(abs(dist)>=abs(t))+1)/(a.nPerm+1);
+            tAbs = abs(t);
+            p = (sum((dist>=tAbs) | (dist<=-tAbs))+1)/(a.nPerm+1);
         end
         if nargout > 2
             if a.correct
@@ -370,14 +392,18 @@ switch a.tail
             ci = [mu-crit;mu+crit];
         end
     case "right"
-        p = (sum(dist>=t)+1)/(a.nPerm+1);
+        if a.correct
+            p = (countGE_lfn(dist,t)+1)/(a.nPerm+1);
+        else
+            p = (sum(dist>=t)+1)/(a.nPerm+1);
+        end
         if nargout > 2
             crit = prctile(dist,100*(1-a.alpha)).*se;
             ci = [mu-crit;Inf(1,a.nVar)];
         end
     case "left"
         if a.correct
-            p = (sum(dist>=-t)+1)/(a.nPerm+1);
+            p = (countGE_lfn(dist,-t)+1)/(a.nPerm+1);
         else
             p = (sum(dist<=t)+1)/(a.nPerm+1);
         end
@@ -508,6 +534,24 @@ function bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a)
 smx = x.'*signBlock; % [nVar x nbPerms]
 smx = smx.'; % [nbPerms x nVar]
 bDist = smx./a.nObs./(sqrt(sx2-(smx.^2)./a.nObs)./sqrtn);
+
+
+function c = countGE_lfn(nullDist,vals)
+d = sort(nullDist(:));
+n = numel(d);
+v = vals(:);
+[vSort,ord] = sort(v);
+cSort = zeros(size(vSort));
+i = 1;
+for j = 1:numel(vSort)
+    while i<=n && d(i)<vSort(j)
+        i = i+1;
+    end
+    cSort(j) = n-i+1;
+end
+c = zeros(size(v));
+c(ord) = cSort;
+c = reshape(c,size(vals));
 
 
 
