@@ -1,4 +1,4 @@
-function [h,p,ci,difference,se,tstat,stdDev,degFree,nx,ny] = ttest2_KT(x,y,varargin)
+function [t,p,se,mu,df,ci,h,nx,ny] = ec_ttest2(x,y,varargin)
 %TTEST2 Two-sample t-test with pooled or unpooled variance estimate.
 %   H = TTEST2(X,Y) performs a t-test of the hypothesis that two
 %   independent samples, in the vectors X and Y, come from distributions
@@ -169,56 +169,41 @@ else
     ny = size(y,dim); % a scalar, => a scalar call to tinv
 end
 
-
-s2x = nanvar(x,[],dim);
-s2y = nanvar(y,[],dim);
-xmean = nanmean(x,dim);
-ymean = nanmean(y,dim);
-difference = xmean - ymean;
+% Stats
+s2x = var(x,[],dim,"omitmissing");
+s2y = var(y,[],dim,"omitmissing");
+xmean = mean(x,dim,"omitmissing");
+ymean = mean(y,dim,"omitmissing");
+mu = xmean - ymean;
 
 % Check for rounding issues causing spurious differences                                                                                  -
 sqrtn = sqrt(nx)+sqrt(ny);
-fix = (difference~=0) & ...                                     % non-zero
-    (abs(difference) < sqrtn.*100.*max(eps(xmean),eps(ymean))); % but small                                                                                 -
+fix = (mu~=0) & ...                                     % non-zero
+    (abs(mu) < sqrtn.*100.*max(eps(xmean),eps(ymean))); % but small                                                                                 -
 if any(fix(:))
     % Fix any columns that are constant, even if computed difference is
     % non-zero but small
     constvalue = min(x,[],dim);
     fix = fix & all(x==constvalue | isnan(x),dim) ...
               & all(y==constvalue | isnan(y),dim);
-    difference(fix) = 0;
+    mu(fix) = 0;
 end
 
 if vartype == 1 % equal variances
-    dfe = nx + ny - 2;
-    sPooled = sqrt(((nx-1) .* s2x + (ny-1) .* s2y) ./ dfe);
+    df = nx + ny - 2;
+    sPooled = sqrt(((nx-1) .* s2x + (ny-1) .* s2y) ./ df);
     sPooled(fix) = 0;
     
     se = sPooled .* sqrt(1./nx + 1./ny);
-    ratio = difference ./ se;
+    t = mu ./ se;
 
-    if (nargout>3)
-        stats = struct('tstat', ratio, 'df', cast(dfe,'like',ratio), ...
-                       'sd', sPooled);
-        if isscalar(dfe) && ~isscalar(ratio)
-            stats.df = repmat(stats.df,size(ratio));
-        end       
-    end
 elseif vartype == 2 % unequal variances
     s2xbar = s2x ./ nx;
     s2ybar = s2y ./ ny;
-    dfe = (s2xbar + s2ybar) .^2 ./ (s2xbar.^2 ./ (nx-1) + s2ybar.^2 ./ (ny-1));
+    df = (s2xbar + s2ybar) .^2 ./ (s2xbar.^2 ./ (nx-1) + s2ybar.^2 ./ (ny-1));
     se = sqrt(s2xbar + s2ybar);
     se(fix) = 0;
-    ratio = difference ./ se;
-
-    if (nargout>3)
-        stats = struct('tstat', ratio, 'df', cast(dfe,'like',ratio), ...
-                       'sd', sqrt(cat(dim, s2x, s2y)));
-        if isscalar(dfe) && ~isscalar(ratio)
-            stats.df = repmat(stats.df,size(ratio));
-        end
-    end    
+    t = mu ./ se;    
     
     % Satterthwaite's approximation breaks down when both samples have zero
     % variance, so we may have gotten a NaN dfe.  But if the difference in
@@ -226,36 +211,34 @@ elseif vartype == 2 % unequal variances
     % that don't depend on the dfe, so give dfe a dummy value.  If difference
     % in means is zero, the hypothesis test returns NaN.  The CI can be
     % computed ok in either case.
-    if all(se(:) == 0), dfe = 1; end
+    if all(se(:) == 0)
+        df = 1;
+    end
 end
 
 % Compute the correct p-value for the test, and confidence intervals
 % if requested.
 if tail == 0 % two-tailed test
-    p = 2 * tcdf(-abs(ratio),dfe);
-    if nargout > 2
-        spread = tinv(1 - alpha ./ 2, dfe) .* se;
-        ci = cat(dim, difference-spread, difference+spread);
+    p = 2 * tcdf(-abs(t),df);
+    if nargout>5
+        spread = tinv(1 - alpha ./ 2, df) .* se;
+        ci = cat(dim, mu-spread, mu+spread);
     end
 elseif tail == 1 % right one-tailed test
-    p = tcdf(-ratio,dfe);
-    if nargout > 2
-        spread = tinv(1 - alpha, dfe) .* se;
-        ci = cat(dim, difference-spread, Inf(size(p)));
+    p = tcdf(-t,df);
+    if nargout>5
+        spread = tinv(1 - alpha, df) .* se;
+        ci = cat(dim, mu-spread, Inf(size(p)));
     end
 elseif tail == -1 % left one-tailed test
-    p = tcdf(ratio,dfe);
-    if nargout > 2
-        spread = tinv(1 - alpha, dfe) .* se;
-        ci = cat(dim, -Inf(size(p)), difference+spread);
+    p = tcdf(t,df);
+    if nargout>5
+        spread = tinv(1 - alpha, df) .* se;
+        ci = cat(dim, -Inf(size(p)), mu+spread);
     end
 end
 
-% Determine if the actual significance exceeds the desired significance
-h = cast(p <= alpha, 'like', p);
-h(isnan(p)) = false; % p==NaN => neither <= alpha nor > alpha
+if nargout<7; return; end
 
-tstat = ratio;
-stdDev = stats.sd;
-degFree = stats.df;
-end
+% H0 rejection
+h = p<=alpha;

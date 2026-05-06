@@ -1,4 +1,4 @@
-function [xdiff,p,ser,stats] = ec_ttest(x,m,varargin)
+function [t,p,se,mu,df,ci,h,sd] = ec_ttest(x,m,varargin)
 %TTEST  One-sample and paired-sample t-test.
 %   H = TTEST(X) performs a t-test of the hypothesis that the data in the
 %   vector X come from a distribution with mean zero, and returns the
@@ -131,15 +131,17 @@ if any(nans(:))
 else
     samplesize = size(x,dim); % a scalar, => a scalar call to tinv
 end
+
+% Stats
 df = max(samplesize - ones("like",x), 0); % make sure df is the same type as X
-xmean = nanmean(x,dim);
-sdpop = nanstd(x,[],dim);
+xmean = mean(x,dim,"omitmissing");
+sd = std(x,[],dim,"omitmissing");
 sqrtn = sqrt(samplesize);
-xdiff = (xmean - m);
+mu = (xmean - m);
 
 % Check for rounding issues causing spurious differences
-fix = (xdiff~=0) ...                                     % a difference
-    & (abs(xdiff) < 100*sqrtn.*max(eps(xmean),eps(m)));  % but a small one
+fix = (mu~=0) ...                                     % a difference
+    & (abs(mu) < 100*sqrtn.*max(eps(xmean),eps(m)));  % but a small one
 if any(fix(:))
     % Fix any columns that are constant, even if computed difference is
     % non-zero but small
@@ -148,44 +150,49 @@ if any(fix(:))
 end
 if any(fix(:))
     % Set difference and standard deviation to 0, and recompute mean
-    xdiff(fix) = 0;
-    sdpop(fix) = 0;
-    xmean = xdiff+m;
+    mu(fix) = 0;
+    sd(fix) = 0;
+    xmean = mu+m;
 end
 
-ser = sdpop ./ sqrtn;
-tval = xdiff ./ ser;
+se = sd ./ sqrtn;
+t = mu ./ se;
 
 % Compute the correct p-value for the test, and confidence intervals
 % if requested.
 if tail == 0 % two-tailed test
-    p = 2 * tcdf(-abs(tval), df);
-    if nargout > 3
-        crit = tinv((1 - alpha / 2), df) .* ser;
+    p = 2 * tcdf(-abs(t), df);
+    if nargout>5
+        crit = tinv((1 - alpha / 2), df) .* se;
         ci = cat(dim, xmean - crit, xmean + crit);
     end
 elseif tail == 1 % right one-tailed test
-    p = tcdf(-tval, df);
-    if nargout > 3
-        crit = tinv(1 - alpha, df) .* ser;
+    p = tcdf(-t, df);
+    if nargout>5
+        crit = tinv(1 - alpha, df) .* se;
         ci = cat(dim, xmean - crit, Inf(size(p)));
     end
 elseif tail == -1 % left one-tailed test
-    p = tcdf(tval, df);
-    if nargout > 3
-        crit = tinv(1 - alpha, df) .* ser;
+    p = tcdf(t, df);
+    if nargout>5
+        crit = tinv(1 - alpha, df) .* se;
         ci = cat(dim, -Inf(size(p)), xmean + crit);
     end
 end
 
-% Stats struct
-if nargout > 3
-    % Determine if the actual significance exceeds the desired significance
-    h = cast(p <= alpha, "like", p);
-    %h(isnan(p)) = NaN; % p==NaN => neither <= alpha nor > alpha
+if nargout<8; return; end
 
-    stats = struct('tstat',tval,'df',df,'sd',sdpop,'ci',ci,'h',h);
-    if isscalar(df) && ~isscalar(tval)
-        stats.df = repmat(stats.df,size(tval));
-    end
-end
+% H0 rejection
+h = p <= alpha;
+
+% % Stats struct
+% if nargout > 3
+%     % Determine if the actual significance exceeds the desired significance
+%     h = cast(p <= alpha, "like", p);
+%     %h(isnan(p)) = NaN; % p==NaN => neither <= alpha nor > alpha
+% 
+%     stats = struct('tstat',tval,'df',df,'sd',sdpop,'ci',ci,'h',h);
+%     if isscalar(df) && ~isscalar(tval)
+%         stats.df = repmat(stats.df,size(tval));
+%     end
+% end

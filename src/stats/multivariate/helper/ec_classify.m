@@ -40,24 +40,24 @@ obs.pp1 = diff(obs.pp,1,2);
 
 % PP of training set classification
 sts.pp = mean(obs.pp(obs.use,:),"omitmissing"); % PP mean
-[sts.pp1,sts.pp1_p,sts.pp1_SE] = ec_ttest(obs.pp1(obs.use)); % PP difference test
+[~,sts.pp1_p,sts.pp1_SE,sts.pp1] = ec_ttest(obs.pp1(obs.use)); % PP difference test
 
 % PP of cross-classification
 if o.doCC
     sts.ppx = mean(obs.pp(obs.cc,:),"omitmissing"); % PP mean
-    [sts.ppx1,sts.ppx1_p,sts.ppx1_SE] = ec_ttest(obs.pp1(obs.cc)); % PP difference test
+    [~,sts.ppx1_p,sts.ppx1_SE,sts.ppx1] = ec_ttest(obs.pp1(obs.cc)); % PP difference test
 end
 
 % PP of main conds (training set)
 for c = 1:numel(o.p.cond)
     id = obs.cnd == o.p.cond(c);
-    [sts.ppc(1,c),sts.ppc_p(1,c),sts.ppc_SE(1,c)] = ec_ttest(obs.pp1(id));
+    [~,sts.ppc_p(1,c),sts.ppc_SE(1,c),sts.ppc(1,c)] = ec_ttest(obs.pp1(id));
 end
 
 % PP of cross-classification conds
 for c = 1:numel(o.p.condx)
     id = obs.cnd == o.p.condx(c);
-    [sts.ppxc(1,c),sts.ppxc_p(1,c),sts.ppxc_SE(1,c)] = ec_ttest(obs.pp1(id));
+    [~,sts.ppxc_p(1,c),sts.ppxc_SE(1,c),sts.ppxc(1,c)] = ec_ttest(obs.pp1(id));
 end
 
 % PP diff of main conds
