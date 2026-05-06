@@ -67,7 +67,7 @@ end
 
 
 %% Preprocessing (analysis-specific)
-if exist("ep","var") && ~isempty(ep)
+if ~isempty(a.pre) && exist("ep","var") && ~isempty(ep)
     [x,ep,n] = preproc_lfn(x,n,psy,ep,a,tt);
 else
     disp("[ec_analPrep] Skipping preproc: 'ep' var is empty or nonexistent | toc="+toc(tt));
@@ -233,7 +233,6 @@ n.nCnds = numel(n.cnds);
 
 % Analysis times
 [n.timesG,n.times] = findgroups(ep.t);
-n.timesG = uint32(n.timesG);
 n.nTimes = height(n.times); % number of times
 
 

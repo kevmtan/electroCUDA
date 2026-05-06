@@ -66,7 +66,7 @@ parfor t = 1:trs
     [ep{t},trialNfo(t,:)] = makeEpoch_lfn(trialNfo(t,:),psy,trs,idxOns,t,n,o);
 end
 
-% Concactenate epochs
+% Concatenate epochs
 ep = vertcat(ep{:});
 
 

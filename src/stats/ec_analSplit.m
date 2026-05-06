@@ -19,6 +19,10 @@ arguments
 end
 % Make logical flags about data
 if isfield(n,"ROIs"), a.roi=true; else; a.roi=false; end
+% Assert time grouping index exists
+assert(numel(n.timesG)==size(x,1),...
+    "[ec_analSplit] n.timesG length (%d) must match split rows (%d). n.timesG appears desynchronized from data rows.",...
+    numel(n.timesG),size(x,1));
 
 
 %% Prep
@@ -51,8 +55,9 @@ end
 
 
 %% Finalize
+n = rmfield(n,"timesG");
 
-% Vertically concatenate: each element corresponds to each independent analysis
+% Vertically concatenate splits
 x = vertcat(x{:});
 sts = vertcat(sts{:});
 obs = vertcat(obs{:});
@@ -121,9 +126,6 @@ end
 
 
 %% Split data by timepoint
-assert(numel(n.timesG)==size(xc,1),...
-    "[ec_analSplit] n.timesG length (%d) must match split rows (%d). n.timesG appears desynchronized from data rows.",...
-    numel(n.timesG),size(xc,1));
 xc = splitapply(@(e){xc(e,:)},n.ide,n.timesG);
 if ~isempty(obc)
     obc = splitapply(@(e){obc(e,:)},n.ide,n.timesG);
