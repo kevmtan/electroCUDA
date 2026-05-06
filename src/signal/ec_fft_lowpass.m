@@ -1,4 +1,4 @@
-function y = ec_fft_lowpass(x,n,passband,steepness)
+function y = ec_fft_lowpass(x,n,passband,steepness,mask_full)
 % FFT-based lowpass filter (zero-phase, temporally symmetrical)
 % Filters over 1st dimension
 %
@@ -12,13 +12,13 @@ arguments
     passband (1,1) double % Passband edge (hz)
     steepness (1,1) double ...
         {mustBeGreaterThanOrEqual(steepness,0.5),mustBeLessThan(steepness,1)} = 0.85
+    mask_full = [] % Optional precomputed FFT mask (length=size(x,1))
 end
 
 %% Prep
 szX = size(x);
 xFrames = szX(1);
-% 1×F row logical (same shape as n.spect.freq > passband from a table)
-id = true(1, szX(end));
+id = true(szX(end),1); % Index of last dim filter (e.g. freqs)
 
 % Extract info from 'n' recording metadata struct
 if isstruct(n)
@@ -51,24 +51,38 @@ idnan = isnan(x);
 x(idnan) = 0;
 
 
-%% Construct filter
-fNyquist = fs/2; % nyquist frequency
-fTrans = (0.99 - 0.98*steepness) * (fNyquist - passband); % transition bandwidth
-freqs = (0:floor(xFrames/2)) * (fs/xFrames);
+%% Construct filter (or use precomputed mask)
+if isempty(mask_full)
+    fNyquist = fs/2; % nyquist frequency
+    fTrans = (0.99 - 0.98*steepness) * (fNyquist - passband); % transition bandwidth
+    freqs = (0:floor(xFrames/2)) * (fs/xFrames);
 
-% Cosine-tapered mask
-mask = ones(length(freqs),1,like=x);
-in_trans = freqs>=passband & freqs<=passband+fTrans;
-if fTrans > 0
-    mask(in_trans) = 0.5 * (1 + cos(pi * (freqs(in_trans) - passband) / fTrans));
-    mask(freqs>passband+fTrans) = 0;
+    % Cosine-tapered mask
+    mask = ones(length(freqs),1,like=x);
+    in_trans = freqs>=passband & freqs<=passband+fTrans;
+    if fTrans > 0
+        mask(in_trans) = 0.5 * (1 + cos(pi * (freqs(in_trans) - passband) / fTrans));
+        mask(freqs>passband+fTrans) = 0;
+    else
+        mask(freqs>=passband) = 0;
+    end
+
+    % Apply symmetrically to two-sided spectrum
+    mask_full = [mask; flipud(mask(2:end-1))];  % mirror for negative freqs
+    mask_full = mask_full(1:xFrames);           % handle odd/even n
 else
-    mask(freqs>=passband) = 0;
+    if numel(mask_full)~=xFrames
+        error("Precomputed mask length (%d) must equal size(x,1) (%d)",...
+            numel(mask_full),xFrames);
+    end
+    mask_full = reshape(mask_full,[],1);
+    if isa(x,"gpuArray") && ~isa(mask_full,"gpuArray")
+        mask_full = gpuArray(mask_full);
+    elseif ~isa(x,"gpuArray") && isa(mask_full,"gpuArray")
+        mask_full = gather(mask_full);
+    end
+    mask_full = cast(mask_full,like=x);
 end
-
-% Apply symmetrically to two-sided spectrum
-mask_full = [mask; flipud(mask(2:end-1))];  % mirror for negative freqs
-mask_full = mask_full(1:xFrames);                 % handle odd/even n
 
 
 %% Apply filter to input data
