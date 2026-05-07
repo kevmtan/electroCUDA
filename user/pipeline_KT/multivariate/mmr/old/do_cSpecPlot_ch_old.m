@@ -1,16 +1,12 @@
-oFns = [
-,...
-    "/01/lbcn/anal/classifySpecCh/zf_SemEpi_LR_nestedLambda/o_zf_SemEpi_LR_nestedLambda.mat",...
-    "/01/lbcn/anal/classifySpecCh/zf_MathAb_LR_nestedLambda/o_zf_MathAb_LR_nestedLambda.mat",...
-    "/01/lbcn/anal/classifySpecCh/zf_SemEpi_LDA_nestedGamma/o_zf_SemEpi_LDA_nestedGamma.mat",...
-    "/01/lbcn/anal/classifySpecCh/zf_MathAb_LDA_nestedGamma/o_zf_MathAb_LDA_nestedGamma.mat"
-    ];
+load("/01/lbcn/anal/classifySpecCh/MzAb_LDA_GammaDelta_260423_1740/log_260423_1740.mat")
 
-load("cdcol_2018.mat","cdcol"); % colors
+% Colors
+load("cdcol_2018.mat","cdcol");
+
+op = struct;
+
 
 %% Options
-op = struct;
-op.figDir = "figs";
 op.visible = false; % !!!!!!!!!!
 op.save = true; % !!!!!!!!!!!
 op.sigThr = 0.05; % significance threshold
@@ -64,31 +60,28 @@ op.r.col = ec_dim2cell(op.r.col,1);
 
 
 %% Create parallel pool (must be processes, can't be threadpool)
-try delete(gcp("nocreate")); catch;end
-try ppool = parpool("Processes",20); catch;end
+%try delete(gcp("nocreate")); catch;end
+try ppool = parpool("local12"); catch;end
 
-%% Loop across specified model runs
-for io = 1:numel(oFns)
-    load(oFns(io),"o");
-    load(o.analOut+"logs_"+o.analName,"logs"); % logs
-    
-    %% Loop across subjects & channel type
-    for s = 1:height(logs)
-        if logs.class(s) %&& ~logs.plot(s)
-            disp("STARTING: "+logs.sbj(s));
-            
-            %% Do subject
-            try
-                mmr_cSpecPlot_ch(logs(s,:),op,o);
-                logs.plot(s) = true;
-            catch ME; getReport(ME)
-                logs.error{s} = ME;
-                logs.plot(s) = false;
-            end
-            
-            %% Save logs
-            logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
-            save(o.analOut+"logs_"+o.analName,'logs','-v7');
+
+%% Loop across subjects & channel type
+for s = 1:height(logs)
+    if logs.class(s) %&& ~logs.plot(s)
+        disp("STARTING: "+logs.sbj(s));
+        n = logs.n{s};
+        o = logs.o{s};
+
+        %% Do subject
+        try
+            mmr_cSpecPlot_ch(n,o,op);
+            logs.plot(s) = true;
+        catch ME; getReport(ME)
+            logs.error{s} = ME;
+            logs.plot(s) = false;
         end
+
+        %% Save logs
+        logs.time(s) = datetime('now','TimeZone','local','Format','yyMMdd_HHmm');
+        save(logs.fn(s),'logs','-v7');
     end
 end

@@ -1,8 +1,8 @@
-function mmr_cSpecPlot_ch(sLog,op,o)
+function mmr_cSpecPlot_ch(n,o,op)
 arguments
-    sLog table
-    op struct
+    n struct
     o struct
+    op struct
 end
 
 
@@ -10,13 +10,14 @@ end
 tic;
 
 % Load
-n = sLog.n{1};
-load(sLog.st,"st");
+fnStats = o.dirOut+"s"+n.sbjID+"_st.mat";
+load(fnStats,"st");
 
-% Fig dir
-op.figOutSbj = o.analOut+op.figDir+filesep+"s"+n.sbjID+filesep;
-if ~isfolder(op.figOutSbj)
-    mkdir(op.figOutSbj); end
+% Save dir
+if ~isfield(o,"dirOutSbj")
+    o.dirOutSbj = o.dirOut+"s"+n.sbjID+filesep; end
+if ~exist(o.dirOutSbj,"dir")
+    mkdir(o.dirOutSbj); end
 
 % Rename table vars to standard names
 st = renamevars(st,o.p.timeVar,"t");
@@ -38,14 +39,14 @@ disp("[mmr_cChSpecPlot] Finished prep: "+n.sbj+" toc="+toc);
 
 %% Loop across chans
 parfor ch = 1:height(st)
-    plotCh_lfn(st{ch},d0,n,op)
+    plotCh_lfn(st{ch},d0,n,o,op)
 end
 
 
 
 
 
-function plotCh_lfn(stc,d,n,op)
+function plotCh_lfn(stc,d,n,o,op)
 %% Plot channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ch=71; stc=st{ch}; d=d0;
 
@@ -220,7 +221,7 @@ plot([0 0],ylim,"k-","LineWidth",op.a.wSig);
 
 
 %% Save
-fn = op.figOutSbj+sbjCh+".jpg";
+fn = o.dirOutSbj+sbjCh+".jpg";
 print(h,fn,"-djpeg","-r150");
 disp("SAVED: "+fn);
 delete(h);
