@@ -16,7 +16,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "ROIs"; % directory name within dirs.anal
-o.analName = "ep_xs"; % directory name within o.analDir
+o.analName = "ep_zf_hpf"; % directory name within o.analDir
 o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
 o.floatOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
 
@@ -29,7 +29,7 @@ o.trialVars = ["run" "cnd" "category" "RT" "resp" "acu" "valence"...
 %% ANALYSIS PREP OPTIONS: ec_analPrep(...,o.p) 
 
 % Input data suffix
-o.p.sfx = "s";
+o.p.sfx = "zf";
 
 % Conditions for classification
 o.p.condVar = "cond";
@@ -63,7 +63,7 @@ o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.p.epoch.baselinePre = -0.2; %[-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.p.epoch.baselinePre = [-0.125 -0.025]; %[-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.p.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering: all conds in data (leave blank for to leave unordered)
 o.p.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -88,18 +88,18 @@ o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"po
 o.p.pre.interp = "linear"; % interpolation method
 o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
 o.p.pre.olCenter = "median";
-o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
-o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
+o.p.pre.olThr = 5; % Outlier threshold (pre-HPF)
+o.p.pre.olThr2 = 5; % Outlier threshold (post-HPF,pre-BL)
 o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
-o.p.pre.hpfSteep = 0.7; % HPF steepness
-o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
+o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpfSteep = 0.8; % HPF steepness
+o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
-o.p.pre.lpfSteep = 0.8 % LPF steepness
+o.p.pre.lpfSteep = 0.8; % LPF steepness
 
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = []; %[5 300];
