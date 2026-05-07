@@ -35,14 +35,18 @@ function [t,p,ci,mu,df,sd,dist] = ec_permuttest2(x,y,gx,gy,a)
 %   - Replaced name-value parsing with an arguments block and typed validation.
 %   - Added n-D support by reshaping to [observations x features] and restoring output shape.
 %   - Added grouped exchangeability support via gx/gy-constrained label shuffling.
-%   - Added blockwise permutation engine for memory scaling (blockElMax, blockMemFrac).
-%   - Added optional auto block sizing from available RAM/VRAM with upstream override (ramAvail).
+%   - Added blockwise permutation engine with explicit nBlocks and stream-aware memory sizing.
+%   - Added auto block sizing from available RAM/VRAM with upstream override (ramAvail, blockMemFrac).
 %   - Added backend controls for CPU/GPU execution and GPU gather strategy.
 %   - Added core-count heuristic to avoid inefficient parfor for too few blocks.
 %   - Refactored block computation into mode-specialized local kernels (GPU, CPU grouped, CPU ungrouped).
-%   - Reduced per-permutation data movement by reusing pooled sums/sumsq for fast moments.
+%   - Reduced per-permutation data movement by reusing pooled sums/sumsq in fast kernels.
 %   - Added optional numerically stable variance path (stableVar) with separate fast/stable kernels.
-%   - Added precision controls (floatType) and reduced grouped-index allocation churn.
+%   - Added precision/index controls (floatType, idxType) and cached grouped metadata/offsets.
+%   - Added full streaming p-value path with nargout-aware fallback and exact/approx CI modes.
+%   - Added one-sort corrected counting helpers (tail-aware max/min/abs handling).
+%   - Reduced grouped CPU peak memory by tiling permutation columns within each block.
+%   - Replaced streaming parfor cell accumulators with numeric sliced arrays to reduce overhead.
 
 %% Arguments validation
 arguments
@@ -154,14 +158,22 @@ else
     gAll = [gx;gy];
     [~,~,gAll] = unique(gAll,"stable");
     a.nExchGroups = max(gAll);
-    a.groupRows = cell(a.nExchGroups,1);
-    a.nXPerGroup = zeros(a.nExchGroups,1);
-    for gi = 1:a.nExchGroups
-        idxg = find(gAll==gi);
-        a.groupRows{gi} = idxg;
-        a.nXPerGroup(gi) = sum(idxg<=a.nObsXMax);
-    end
-    if a.verbose && any(a.nXPerGroup==0 | a.nXPerGroup==cellfun(@numel,a.groupRows))
+
+    % Group rows in O(nObsTot) via sort + counts (instead of repeated find).
+    [gSorted,sortIdx] = sort(gAll);
+    counts = accumarray(gSorted,1);
+    a.groupRows = mat2cell(sortIdx,counts,1);
+
+    % Per-group X/Y counts via accumarray on the (X-arm) indicator.
+    isXArm = (1:(a.nObsXMax+a.nObsYMax)).' <= a.nObsXMax;
+    a.nXPerGroup = accumarray(gAll,double(isXArm));
+    a.nYPerGroup = counts - a.nXPerGroup;
+
+    % Cumulative offsets used by grouped permutation kernels (cache once).
+    a.xOffsets = [0; cumsum(a.nXPerGroup(1:end-1))];
+    a.yOffsets = [0; cumsum(a.nYPerGroup(1:end-1))];
+
+    if a.verbose && any(a.nXPerGroup==0 | a.nXPerGroup==counts)
         warning("[ec_permuttest2] Some groups contain only one sample label; those labels are fixed.")
     end
 end
@@ -200,6 +212,7 @@ switch a.vartype
         sd = sqrt([varX;varY]);
         se = sqrt(se2X+se2Y);
 end
+a.df = df;
 
 % Compute mean difference and test statistic
 mu = sumX./a.nObsX - sumY./a.nObsY;
@@ -223,6 +236,12 @@ else
     sumZ = sum(z,a.nan);
     sumZ2 = sum(z.^2,a.nan);
 end
+
+% Output requirements also determine whether streaming can be used.
+a.needCI = nargout > 2;
+a.needDist = nargout > 6;
+a.needApproxCI = a.needCI && a.ciMode=="approx";
+a.stream = a.stream && ~a.needDist && (~a.needCI || a.needApproxCI);
 
 % Generate permutation blocks (saves memory by running blocks)
 rng(a.seed);
@@ -259,16 +278,16 @@ end
 bStarts = 1:a.bPerms:a.nPerm;
 nBlocks = numel(bStarts);
 bEnds = min(bStarts+a.bPerms-1,a.nPerm);
-bSeeds = randi(intmax("uint32"),nBlocks,1,"uint32");
+bSeeds = double(randi(intmax("uint32"),nBlocks,1,"uint32"));
 if a.verbose
-    disp("[ec_permuttest2] Number of permutation blocks: "+nBlocks); end
+    fprintf("[ec_permuttest2] Number of permutation blocks: %d\n",nBlocks);
+end
 
 % Check parallelization
 if a.parallel=="cpu"
     nCores = feature("numcores");
     if nBlocks < ceil(nCores/2)
-        disp("[ec_permuttest2] Less permutation blocks than cores, avoiding parfor, "+...
-            "implicit BLAS/LAPACK multithreading likely faster");
+        fprintf("[ec_permuttest2] Less permutation blocks than cores, avoiding parfor; implicit BLAS/LAPACK multithreading likely faster\n");
         a.parallel = "none";
     end
 elseif a.parallel=="gpu"
@@ -280,32 +299,21 @@ elseif a.parallel=="gpu"
     end
 end
 
-needCI = nargout > 2;
-needDist = nargout > 6;
-useStreaming = a.stream && ~needDist && (~needCI || a.ciMode=="approx");
-
 % Preallocate distances from mean (per block)
-if useStreaming
+if a.stream
     % Stream per-block statistics instead of storing full permutation dist.
     dist = [];
-    switch a.tail
-        case "both"
-            countExt = zeros(1,a.nVar);
-        case "right"
-            countExt = zeros(1,a.nVar);
-        case "left"
-            countExt = zeros(1,a.nVar);
-    end
-    if needCI && a.ciMode=="approx"
-        if a.correct
-            nullSum = 0;
-            nullSumSq = 0;
-        else
-            nullSum = zeros(1,a.nVar);
-            nullSumSq = zeros(1,a.nVar);
+    nSeen = 0;
+    if a.correct
+        % Keep one tail-extremal null value per permutation; sort once later.
+        dist = zeros(a.nPerm,1,"like",x);
+    else
+        countExt = zeros(1,a.nVar,"like",x);
+        if a.needApproxCI
+            nullSum = zeros(1,a.nVar,"like",x);
+            nullSumSq = zeros(1,a.nVar,"like",x);
         end
     end
-    nSeen = 0;
 else
     if a.parallel=="cpu"
         dist = cell(nBlocks,1);
@@ -320,32 +328,72 @@ end
 
 
 %% Permutation stats
-if useStreaming
-    if a.parallel=="cpu"
-        blkCount = cell(nBlocks,1);
-        blkN    = zeros(nBlocks,1);
-        blkSum   = cell(nBlocks,1);
-        blkSumSq = cell(nBlocks,1);
-        parfor b = 1:nBlocks
-            bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a,df);
-            blkN(b) = size(bDist,1);
-            [blkCount{b},blkSum{b},blkSumSq{b}] = streamBlockReduce_lfn(bDist,t,a,needCI);
-        end
-        nSeen    = nSeen    + sum(blkN);
-        countExt = countExt + sum(vertcat(blkCount{:}),1);
-        if needCI && a.ciMode=="approx"
-            nullSum   = nullSum   + sum(vertcat(blkSum{:}),1);
-            nullSumSq = nullSumSq + sum(vertcat(blkSumSq{:}),1);
+if a.stream
+    if a.correct
+        if a.parallel=="cpu"
+            blkDist = cell(nBlocks,1);
+            blkN = zeros(nBlocks,1);
+            parfor b = 1:nBlocks
+                bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
+                blkDist{b} = blockTailExtreme_lfn(bDist,a);
+                blkN(b) = numel(blkDist{b});
+            end
+            dist = cell2mat(blkDist);
+            nSeen = sum(blkN);
+        else
+            for b = 1:nBlocks
+                bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
+                d1 = blockTailExtreme_lfn(bDist,a);
+                if isa(d1,"gpuArray")
+                    d1 = gather(d1);
+                end
+                dist(bStarts(b):bEnds(b)) = d1;
+                nSeen = nSeen + numel(d1);
+            end
         end
     else
-        for b = 1:nBlocks
-            bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a,df);
-            nSeen = nSeen + size(bDist,1);
-            [cnt,s,ssq] = streamBlockReduce_lfn(bDist,t,a,needCI);
-            countExt = countExt + cnt;
-            if needCI && a.ciMode=="approx"
-                nullSum   = nullSum   + s;
-                nullSumSq = nullSumSq + ssq;
+        if a.parallel=="cpu"
+            blkCount = zeros(nBlocks,a.nVar,"like",x);
+            blkN = zeros(nBlocks,1);
+            blkSum = [];
+            blkSumSq = [];
+            if a.needApproxCI
+                blkSum = zeros(nBlocks,a.nVar,"like",x);
+                blkSumSq = zeros(nBlocks,a.nVar,"like",x);
+            end
+            parfor b = 1:nBlocks
+                bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
+                [cnt,s,ssq] = streamBlockReduce_lfn(bDist,t,a);
+                blkCount(b,:) = cnt;
+                blkN(b) = size(bDist,1);
+                if a.needApproxCI
+                    blkSum(b,:) = s;
+                    blkSumSq(b,:) = ssq;
+                end
+            end
+            countExt = sum(blkCount,1);
+            nSeen = sum(blkN);
+            if a.needApproxCI
+                nullSum = sum(blkSum,1);
+                nullSumSq = sum(blkSumSq,1);
+            end
+        else
+            for b = 1:nBlocks
+                bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
+                nSeen = nSeen + size(bDist,1);
+                [cnt,s,ssq] = streamBlockReduce_lfn(bDist,t,a);
+                if isa(cnt,"gpuArray")
+                    cnt = gather(cnt);
+                    if a.needApproxCI
+                        s = gather(s);
+                        ssq = gather(ssq);
+                    end
+                end
+                countExt = countExt + cnt;
+                if a.needApproxCI
+                    nullSum   = nullSum   + s;
+                    nullSumSq = nullSumSq + ssq;
+                end
             end
         end
     end
@@ -353,9 +401,9 @@ else
     if a.parallel=="cpu"
         % CPU parallel loop over permute blocks
         parfor b = 1:nBlocks
-            dist{b} = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a,df);
+            dist{b} = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
         end
-        dist = vertcat(dist{:});
+        dist = cell2mat(dist);
     else
         % Preallocate distances in GPU
         if a.parallel=="gpu" && a.gather=="final"
@@ -363,7 +411,7 @@ else
 
         % CPU/GPU normal loop over permute blocks
         for b = 1:nBlocks
-            dist(bStarts(b):bEnds(b),:) = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a,df);
+            dist(bStarts(b):bEnds(b),:) = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
         end
 
         % Gather distances from GPU
@@ -374,40 +422,76 @@ end
 
 
 %% Final stats
-if useStreaming
+if a.stream
     if a.verbose
         fprintf("[ec_permuttest2] Streaming reductions complete over %d permutations.\n",nSeen);
     end
-    p = (countExt + 1) / (nSeen + 1);
-    if needCI && a.ciMode=="approx"
-        nullMu = nullSum ./ nSeen;
-        nullVar = max(0, nullSumSq ./ nSeen - nullMu.^2);
-        nullSd = sqrt(nullVar);
+    if a.correct
+        d = sort(dist(~isnan(dist)));
         switch a.tail
             case "both"
-                qLo = normInv_lfn(a.alpha/2, nullMu, nullSd);
-                qHi = normInv_lfn(1-a.alpha/2, nullMu, nullSd);
-                ci = [mu-qHi.*se; mu-qLo.*se];
+                countExt = countGE_lfn_sorted(d,abs(t));
             case "right"
-                q = normInv_lfn(1-a.alpha, nullMu, nullSd);
-                ci = [mu-q.*se; Inf(1,a.nVar)];
+                countExt = countGE_lfn_sorted(d,t);
             case "left"
-                q = normInv_lfn(a.alpha, nullMu, nullSd);
-                ci = [-Inf(1,a.nVar); mu-q.*se];
+                countExt = countLE_lfn_sorted(d,t);
         end
-    elseif needCI
-        error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
+        p = (countExt + 1) / (nSeen + 1);
+        if a.needApproxCI
+            switch a.tail
+                case "both"
+                    critLo = prctile(d,100*(a.alpha/2));
+                    critHi = prctile(d,100*(1-a.alpha/2));
+                    ci = [mu-critHi.*se;mu-critLo.*se];
+                case "right"
+                    crit = prctile(d,100*(1-a.alpha)).*se;
+                    ci = [mu-crit;Inf(1,a.nVar)];
+                case "left"
+                    crit = prctile(d,100*a.alpha).*se;
+                    ci = [-Inf(1,a.nVar);mu-crit];
+            end
+        elseif a.needCI
+            error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
+        end
+    else
+        p = (countExt + 1) / (nSeen + 1);
+        if a.needApproxCI
+            nullMu = nullSum ./ nSeen;
+            nullVar = max(0, nullSumSq ./ nSeen - nullMu.^2);
+            nullSd = sqrt(nullVar);
+            switch a.tail
+                case "both"
+                    qLo = normInv_lfn(a.alpha/2, nullMu, nullSd);
+                    qHi = normInv_lfn(1-a.alpha/2, nullMu, nullSd);
+                    ci = [mu-qHi.*se; mu-qLo.*se];
+                case "right"
+                    q = normInv_lfn(1-a.alpha, nullMu, nullSd);
+                    ci = [mu-q.*se; Inf(1,a.nVar)];
+                case "left"
+                    q = normInv_lfn(a.alpha, nullMu, nullSd);
+                    ci = [-Inf(1,a.nVar); mu-q.*se];
+            end
+        elseif a.needCI
+            error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
+        end
     end
 else
     % Apply max correction if specified
     if a.correct
-        [~,idx] = max(abs(dist),[],2);
-        csvar = [0;cumsum(ones(a.nPerm-1,1)*a.nVar)];
-        dist = dist';
-        dist = dist(idx+csvar);
+        switch a.tail
+            case "both"
+                [~,idx] = max(abs(dist),[],2);
+                csvar = [0;cumsum(ones(a.nPerm-1,1)*a.nVar)];
+                dist = dist';
+                dist = dist(idx+csvar);
+            case "right"
+                dist = max(dist,[],2);
+            case "left"
+                dist = min(dist,[],2);
+        end
     end
     if a.verbose
-        fprintf("Number of effective permutations: %d\n",a.nPerm)
+        fprintf("[ec_permuttest2] Number of effective permutations: %d\n",a.nPerm)
     end
 
     % Compute p-value & CI
@@ -508,80 +592,71 @@ elseif a.dim~=1 || xInputDims>2
             sd = reshape(sd,outSize);
         end
     end
-    if nargout > 6 && ~a.correct
+    if a.needDist && ~a.correct
         dist = reshape(dist,[a.nPerm featureSize]);
     end
 end
 
-% % Store statistics in a structure
-% if nargout > 4
-%     stats.df = df;
-%     stats.sd = sd;
-%     stats.mu = mu;
-% end
 
 
-
-
-
-function bDist = runBlock_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df)
+function bDist = runBlock_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
 %%% Permutation block %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if a.parallel=="gpu"
-    bDist = runBlock_gpu_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df);
+    bDist = runBlock_gpu_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a);
 elseif a.useGroups
-    bDist = runBlock_cpu_grouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df);
+    bDist = runBlock_cpu_grouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a);
 else
-    bDist = runBlock_cpu_ungrouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df);
+    bDist = runBlock_cpu_ungrouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a);
 end
 
 
-function bDist = runBlock_gpu_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df)
+function bDist = runBlock_gpu_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
 nbPerms = bEnd-bStart+1;
-parallel.gpu.rng(double(seed),"Philox4x32-10");
+parallel.gpu.rng(seed,"Philox4x32-10");
 [~,idx] = sort(rand(a.nObsTot,nbPerms,like=z),1);
-bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a,df);
+bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
 if a.gather=="block"
     bDist = gather(bDist);
 end
 
 
-function bDist = runBlock_cpu_ungrouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df)
+function bDist = runBlock_cpu_ungrouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
 nbPerms = bEnd-bStart+1;
-rs = RandStream("mt19937ar","Seed",double(seed));
+rs = RandStream("mt19937ar","Seed",seed);
 [~,idx] = sort(rand(rs,a.nObsTot,nbPerms,like=z),1);
-bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a,df);
+bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
 
 
-function bDist = runBlock_cpu_grouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a,df)
-% Grouped permutation on CPU
+function bDist = runBlock_cpu_grouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
+% Grouped permutation on CPU. Uses pre-cached a.xOffsets/a.yOffsets/a.nXPerGroup.
 nbPerms = bEnd-bStart+1;
-rs = RandStream("mt19937ar","Seed",double(seed));
-idx = zeros(a.nObsTot,nbPerms,a.idxType);
+rs = RandStream("mt19937ar","Seed",seed);
+bDist = zeros(nbPerms,a.nVar,"like",z);
 
-% Cumulative offsets so each group can fill its slice of idx without a k-loop.
-nYPerGroup = cellfun(@numel,a.groupRows,"UniformOutput",true) - a.nXPerGroup;
-xOffsets = [0; cumsum(a.nXPerGroup(1:end-1))];
-yOffsets = [0; cumsum(nYPerGroup(1:end-1))];
-
-% Loop over groups (nExchGroups << nbPerms): generate [ng x nbPerms] rand,
-% sort each column for a uniform permutation, then fill idx in one shot.
-for gi = 1:a.nExchGroups
-    rows = a.groupRows{gi};          % [ng x 1] absolute row indices into z
-    ng   = numel(rows);
-    nXg  = a.nXPerGroup(gi);
-    nYg  = ng - nXg;
-    [~,perm] = sort(rand(rs,ng,nbPerms),1);  % [ng x nbPerms] permutation indices
-    pg = rows(perm);                          % [ng x nbPerms] absolute row indices
-    xR = xOffsets(gi)          + (1:nXg);
-    yR = a.nObsXMax+yOffsets(gi) + (1:nYg);
-    idx(xR,:) = pg(1:nXg,:);
-    idx(yR,:) = pg(nXg+1:end,:);
+% Tile permutation columns to reduce grouped-path peak memory in parfor.
+tilePerms = max(1,ceil(nbPerms/4));
+for tpStart = 1:tilePerms:nbPerms
+    tpEnd = min(tpStart+tilePerms-1,nbPerms);
+    nt = tpEnd-tpStart+1;
+    idx = zeros(a.nObsXMax+a.nObsYMax,nt,a.idxType);
+    % Loop over groups (nExchGroups << nt): generate [ng x nt] rand,
+    % sort each column for a uniform permutation, then fill idx.
+    for gi = 1:a.nExchGroups
+        rows = a.groupRows{gi};          % [ng x 1] absolute row indices into z
+        ng   = numel(rows);
+        nXg  = a.nXPerGroup(gi);
+        [~,perm] = sort(rand(rs,ng,nt),1);  % [ng x nt] permutation indices
+        pg = rows(perm);                    % [ng x nt] absolute row indices
+        xR = a.xOffsets(gi)              + (1:nXg);
+        yR = a.nObsXMax + a.yOffsets(gi) + (1:(ng-nXg));
+        idx(xR,:) = pg(1:nXg,:);
+        idx(yR,:) = pg(nXg+1:end,:);
+    end
+    bDist(tpStart:tpEnd,:) = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
 end
-bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a,df);
 
 
-function bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a,df)
-%nbPerms = size(idx,2);
+function bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a)
 if a.stableVar
     if a.vartype=="equal"
         bDist = blockDist_equal_stable_lfn(z,idx,a);
@@ -590,16 +665,16 @@ if a.stableVar
     end
 else
     if a.vartype=="equal"
-        bDist = blockDist_equal_fast_lfn(z,idx,sumZ,sumZ2,a,df);
+        bDist = blockDist_equal_fast_lfn(z,idx,sumZ,sumZ2,a);
     else
         bDist = blockDist_unequal_fast_lfn(z,idx,sumZ,sumZ2,a);
     end
 end
 
 
-function bDist = blockDist_equal_fast_lfn(z,idx,sumZ,sumZ2,a,df)
+function bDist = blockDist_equal_fast_lfn(z,idx,sumZ,sumZ2,a)
 [sum1,sum2,var1,var2] = blockMoments_fast_batch_lfn(z,idx,sumZ,sumZ2,a);
-se = sqrt((a.dfX.*var1+a.dfY.*var2)./df).*...
+se = sqrt((a.dfX.*var1+a.dfY.*var2)./a.df).*...
     sqrt((a.nObsX+a.nObsY)./(a.nObsX.*a.nObsY));
 bDist = (sum1./a.nObsX-sum2./a.nObsY)./se;
 
@@ -638,26 +713,32 @@ var2 = (sumsq2-(sum2.^2)./a.nObsY)./a.dfY;
 
 
 function [sum1,sum2,var1,var2,n1,n2] = blockMoments_stable_batch_lfn(z,idx,a)
+% Reshape to [nObs(X|Y)Max x nbPerms x nVar] for batched moment reductions.
 nbPerms = size(idx,2);
 idx1 = idx(1:a.nObsXMax,:);
 idx2 = idx(a.nObsXMax+1:end,:);
-x1 = reshape(z(idx1(:),:), a.nObsXMax, nbPerms, a.nVar);       % [nObsXMax x nbPerms x nVar]
-x2 = reshape(z(idx2(:),:), a.nObsYMax, nbPerms, a.nVar);       % [nObsYMax x nbPerms x nVar]
-sum1 = reshape(sum(x1, 1, a.nan), nbPerms, a.nVar);             % [nbPerms x nVar]
+x1 = reshape(z(idx1(:),:), a.nObsXMax, nbPerms, a.nVar);
+x2 = reshape(z(idx2(:),:), a.nObsYMax, nbPerms, a.nVar);
+sum1 = reshape(sum(x1, 1, a.nan), nbPerms, a.nVar);
 sum2 = reshape(sum(x2, 1, a.nan), nbPerms, a.nVar);
 if a.nan=="omitmissing"
     n1 = reshape(sum(~isnan(x1), 1), nbPerms, a.nVar);
     n2 = reshape(sum(~isnan(x2), 1), nbPerms, a.nVar);
+    mu1 = reshape(sum1./n1, 1, nbPerms, a.nVar);
+    mu2 = reshape(sum2./n2, 1, nbPerms, a.nVar);
+    var1 = reshape(sum((x1-mu1).^2, 1, a.nan), nbPerms, a.nVar) ./ max(n1-1,1);
+    var2 = reshape(sum((x2-mu2).^2, 1, a.nan), nbPerms, a.nVar) ./ max(n2-1,1);
+    var1(n1<=1) = NaN;
+    var2(n2<=1) = NaN;
 else
-    n1 = repmat(a.nObsXMax, nbPerms, a.nVar);
-    n2 = repmat(a.nObsYMax, nbPerms, a.nVar);
+    % Fixed counts: keep as scalars; downstream broadcasts naturally.
+    n1 = a.nObsXMax;
+    n2 = a.nObsYMax;
+    mu1 = reshape(sum1./n1, 1, nbPerms, a.nVar);
+    mu2 = reshape(sum2./n2, 1, nbPerms, a.nVar);
+    var1 = reshape(sum((x1-mu1).^2, 1), nbPerms, a.nVar) ./ max(n1-1,1);
+    var2 = reshape(sum((x2-mu2).^2, 1), nbPerms, a.nVar) ./ max(n2-1,1);
 end
-mu1 = reshape(sum1./n1, 1, nbPerms, a.nVar);                    % [1 x nbPerms x nVar] for broadcast
-mu2 = reshape(sum2./n2, 1, nbPerms, a.nVar);
-var1 = reshape(sum((x1-mu1).^2, 1, a.nan), nbPerms, a.nVar) ./ max(n1-1,1);
-var2 = reshape(sum((x2-mu2).^2, 1, a.nan), nbPerms, a.nVar) ./ max(n2-1,1);
-var1(n1<=1) = NaN;
-var2(n2<=1) = NaN;
 
 
 function [varX,varY] = observedVar_fast_lfn(x,y,sumX,sumY,a)
@@ -681,11 +762,14 @@ c = countCmp_lfn(nullDist,vals,false);
 
 
 function c = countCmp_lfn(nullDist,vals,isGE)
-d = sort(nullDist(:));
+d = nullDist(:);
+d = sort(d(~isnan(d)));
 n = numel(d);
 v = vals(:);
-[vSort,ord] = sort(v);
-cSort = zeros(size(vSort));
+ok = ~isnan(v);
+[vSort,ord] = sort(v(ok));
+okIdx = find(ok);
+cSort = zeros(size(vSort),like=vals);
 if isGE
     i = 1;
     for j = 1:numel(vSort)
@@ -703,41 +787,71 @@ else
         cSort(j) = i;
     end
 end
-c = zeros(size(v));
-c(ord) = cSort;
+c = nan(size(v),like=vals);
+c(okIdx(ord)) = cSort;
 c = reshape(c,size(vals));
 
 
-function [cnt,blkSum,blkSumSq] = streamBlockReduce_lfn(bDist,t,a,needCI)
-% Per-block streaming reduction shared by the parfor and for loops.
-% When a.correct, computes d1=max(|bDist|,[],2) once and reuses it for
-% both the extremal count and the optional approx-CI running moments.
-if a.correct
-    d1 = max(abs(bDist),[],2);
-    switch a.tail
-        case "both";  cnt = countGE_lfn(d1,abs(t));
-        case "right"; cnt = countGE_lfn(d1,t);
-        case "left";  cnt = countLE_lfn(d1,t);
-    end
-    if needCI && a.ciMode=="approx"
-        blkSum   = sum(d1,1);
-        blkSumSq = sum(d1.^2,1);
-    else
-        blkSum = []; blkSumSq = [];
-    end
-else
-    switch a.tail
-        case "both";  cnt = sum((bDist>=abs(t)) | (bDist<=-abs(t)),1);
-        case "right"; cnt = sum(bDist>=t,1);
-        case "left";  cnt = sum(bDist<=t,1);
-    end
-    if needCI && a.ciMode=="approx"
-        blkSum   = sum(bDist,1);
-        blkSumSq = sum(bDist.^2,1);
-    else
-        blkSum = []; blkSumSq = [];
-    end
+function [cnt,blkSum,blkSumSq] = streamBlockReduce_lfn(bDist,t,a)
+% Per-block uncorrected streaming reduction (per-feature counts + optional
+% running first/second moments for approx-CI).
+switch a.tail
+    case "both";  cnt = sum((bDist>=abs(t)) | (bDist<=-abs(t)),1);
+    case "right"; cnt = sum(bDist>=t,1);
+    case "left";  cnt = sum(bDist<=t,1);
 end
+if a.needApproxCI
+    blkSum   = sum(bDist,1);
+    blkSumSq = sum(bDist.^2,1);
+else
+    blkSum = []; blkSumSq = [];
+end
+
+
+function d1 = blockTailExtreme_lfn(bDist,a)
+switch a.tail
+    case "both";  d1 = max(abs(bDist),[],2);
+    case "right"; d1 = max(bDist,[],2);
+    case "left";  d1 = min(bDist,[],2);
+end
+
+
+function c = countGE_lfn_sorted(d,vals)
+n = numel(d);
+v = vals(:);
+ok = ~isnan(v);
+[vSort,ord] = sort(v(ok));
+okIdx = find(ok);
+cSort = zeros(size(vSort),like=vals);
+i = 1;
+for j = 1:numel(vSort)
+    while i<=n && d(i)<vSort(j)
+        i = i+1;
+    end
+    cSort(j) = n-i+1;
+end
+c = nan(size(v),like=vals);
+c(okIdx(ord)) = cSort;
+c = reshape(c,size(vals));
+
+
+function c = countLE_lfn_sorted(d,vals)
+n = numel(d);
+v = vals(:);
+ok = ~isnan(v);
+[vSort,ord] = sort(v(ok));
+okIdx = find(ok);
+cSort = zeros(size(vSort),like=vals);
+i = n;
+for j = numel(vSort):-1:1
+    while i>=1 && d(i)>vSort(j)
+        i = i-1;
+    end
+    cSort(j) = i;
+end
+c = nan(size(v),like=vals);
+c(okIdx(ord)) = cSort;
+c = reshape(c,size(vals));
 
 
 function x = normInv_lfn(p,mu,sigma)
@@ -765,8 +879,13 @@ budgetBytes = max(0,double(a.ramAvail)*double(a.blockMemFrac));
 
 % Fixed memory retained during permutation stage.
 fixedBytes = 0;
-% Full dist is retained in current non-streaming design.
-fixedBytes = fixedBytes + double(a.nPerm)*double(a.nVar)*bytesFloat;
+% Full dist is retained only on the non-streaming path.
+if ~a.stream
+    fixedBytes = fixedBytes + double(a.nPerm)*double(a.nVar)*bytesFloat;
+elseif a.correct
+    % Streaming+corrected retains one extremal value per permutation.
+    fixedBytes = fixedBytes + double(a.nPerm)*bytesFloat;
+end
 % Concatenated sample matrix.
 fixedBytes = fixedBytes + double(a.nObsTot)*double(a.nVar)*bytesFloat;
 

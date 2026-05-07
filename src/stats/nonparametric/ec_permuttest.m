@@ -109,13 +109,17 @@ function [t,p,ci,mu,df,sd,dist] = ec_permuttest(x,m,g,a)
 %   - Replaced name-value parsing with an arguments block and typed validation.
 %   - Added n-D support by reshaping to [observations x features] and restoring output shape.
 %   - Added exchangeability groups ('g') for group-constrained sign permutations.
-%   - Added blockwise permutation engine for memory scaling (blockElMax, blockMemFrac).
-%   - Added optional auto block sizing from available RAM/VRAM with upstream override (ramAvail).
+%   - Added blockwise permutation engine with explicit nBlocks and stream-aware memory sizing.
+%   - Added auto block sizing from available RAM/VRAM with upstream override (ramAvail, blockMemFrac).
 %   - Added backend controls for CPU/GPU execution and GPU gather strategy.
-%   - Switched GPU randomization to parallel.gpu.rng with block-wise deterministic seeds.
+%   - Switched GPU randomization to parallel.gpu.rng with deterministic per-block seeds.
 %   - Refactored block computation into mode-specialized local kernels (CPU/GPU, grouped/ungrouped).
-%   - Vectorized block statistics via matrix multiplication (x' * signBlock).
-%   - Added precision controls (floatType) and class-consistent random sign generation.
+%   - Vectorized block statistics via matrix multiplication and grouped-sum kernels.
+%   - Added precision/index controls (floatType, idxType) with class-consistent allocations.
+%   - Added streaming p-value path (including corrected max-stat streaming) with nargout-aware fallback.
+%   - Added exact/approx CI split for streaming mode (ciMode) and one-sort corrected counting helpers.
+%   - Improved NaN handling for paired complete-row filtering and per-block reductions.
+%   - Reduced memory traffic via numeric parfor accumulators, GPU-side reductions, and fewer temporaries.
 %   - Preserved pairwise-column mode with matrix-form output handling.
 
 %% Arguments validation
@@ -137,6 +141,8 @@ arguments
     a.ramAvail (1,1) double = 0 % available RAM/VRAM bytes (override upstream if needed)
     a.mat (1,1) logical = false % return pairwise results as square matrices
     a.gather string {mustBeMember(a.gather,["block","final"])} = "block" % GPU gather strategy
+    a.stream (1,1) logical = true % stream p-value reductions when exact dist/CI is not required
+    a.ciMode string {mustBeMember(a.ciMode,["exact","approx"])} = "exact" % CI mode when streaming
     a.idxType string {mustBeMember(a.idxType,["double","uint32"])} = "double" % grouped index-buffer type
     a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.verbose (1,1) logical = true % print status messages
@@ -163,7 +169,9 @@ xInputDims = ndims(x);
 if a.dim~=1 || xInputDims>2
     [x,featureSize] = ec_reshape2D(x,a.dim);
 end
-g = ec_groupIndex(g,size(x,1),"g");
+
+% Get group indices
+a.groupIdx = cast(ec_groupIndex(g,size(x,1),"g"),a.idxType);
 
 % Set up comparison
 if isempty(m)
@@ -190,7 +198,7 @@ else
         if ~isequal(size(x),size(m))
             error("X and Y must be the same size.")
         end
-        if ~isequal(featureSize,yFeatureSize)
+        if exist("featureSize","var") && ~isequal(featureSize,yFeatureSize)
             error("X and Y feature dimensions must match.")
         end
     end
@@ -198,17 +206,32 @@ end
 
 % Use only rows with no NaN values if specified
 if a.rows == "complete"
-    id = ~any(isnan(x),2);
+    if isscalar(m)
+        id = ~any(isnan(x),2);
+    else
+        id = ~any(isnan(x) | isnan(m),2);
+    end
     x = x(id,:);
-    if ~isempty(g)
-        g = g(id);
+    if ~isempty(a.groupIdx)
+        a.groupIdx = a.groupIdx(id);
     end
     if ~isscalar(m)
         m = m(id,:);
     end
 end
 
-% For efficiency, only omit NaNs if necessary
+% Convert to target precision before allocating permutation buffers.
+x = cast(x,a.floatType);
+m = cast(m,a.floatType);
+
+% Work with the one-sample/paired difference from this point onward.
+% Skip the subtraction when m is exactly the scalar zero null.
+if ~(isscalar(m) && m==0)
+    x = x-m;
+end
+
+% For efficiency, only omit NaNs if necessary. Paired-sample NaNs are now
+% represented in the difference matrix, so counts/statistics stay aligned.
 if any(isnan(x),"all")
     a.nan = "omitmissing";
 else
@@ -218,89 +241,15 @@ end
 % Get data dimensions, ignoring NaNs
 [a.nObsMax,a.nVar] = size(x);
 a.nObs = sum(~isnan(x)); % ~isnan per column
-if isempty(g)
+if isempty(a.groupIdx)
     a.useGroups = false;
 else
     a.useGroups = true;
-    switch a.idxType
-        case "double"
-            a.groupIdx = g;
-        case "uint32"
-            a.groupIdx = uint32(g);
-    end
-    a.nExchGroups = max(g);
+    a.nExchGroups = max(a.groupIdx);
 end
-
-% Prep for permutation stats
-if nargout > 1
-    % Generate random permutations
-    rng(a.seed);
-
-    if a.nBlocks>0
-        a.bPerms = max(1,ceil(a.nPerm/a.nBlocks));
-        if a.verbose
-            fprintf("[ec_permuttest] Using explicit nBlocks=%d (bPerms=%d)\n",...
-                a.nBlocks,a.bPerms);
-        end
-    else
-        % Auto-size block elements from available memory if requested.
-        if a.blockElMax==0
-            switch a.floatType
-                case "double"
-                    bytesPerEl = 8;
-                case "single"
-                    bytesPerEl = 4;
-                case "half"
-                    bytesPerEl = 2;
-            end
-            a.blockElMax = max(1,floor((double(a.ramAvail)*a.blockMemFrac)/bytesPerEl));
-            if a.verbose
-                fprintf("[ec_permuttest] Auto blockElMax=%d (%.0f%% memory fraction)\n",...
-                    a.blockElMax,100*a.blockMemFrac);
-            end
-        end
-        % Generate permutation groups (saves memory by running blocks)
-        a.bPerms = max(1,floor(a.blockElMax/a.nObsMax));
-        a.bPerms = min(a.bPerms,a.nPerm);
-    end
-    bStarts = 1:a.bPerms:a.nPerm;
-    nBlocks = numel(bStarts);
-    bEnds = min(bStarts+a.bPerms-1,a.nPerm);
-    bSeeds = randi(intmax("uint32"),nBlocks,1,"uint32");
-    if a.verbose
-        disp("[ec_permuttest] Number of permutation blocks: "+nBlocks); end
-
-    % Check parallelization
-    if a.parallel=="cpu"
-        nCores = feature("numcores");
-        if nBlocks < nCores
-            warning("[ec_permuttest] Less permutation blocks than cores, avoiding parfor, "+...
-            "implicit BLAS/LAPACK multithreading likely faster");
-            a.parallel = "none";
-        end
-    end
-
-    % Preallocate distances from mean (per block)
-    if a.parallel=="cpu"
-        dist = cell(nBlocks,1);
-    else
-        if a.parallel=="gpu" && a.gather=="final"
-            dist = [];
-        else
-            dist = zeros(a.nPerm,a.nVar,like=x);
-        end
-    end
-end
-
-% Convert to float type
-x = cast(x,a.floatType);
-m = cast(m,a.floatType);
 
 
 %% Initial stats
-
-% Compute difference between samples
-x = x-m;
 
 % Compute degrees of freedom
 df = a.nObs - 1;
@@ -318,6 +267,13 @@ t = mu./se;
 % Return if only t-value desired
 if nargout==1; return; end
 
+%% Permutation setup
+
+a.needCI = nargout > 2;
+a.needDist = nargout > 6;
+a.needApproxCI = a.needCI && a.ciMode=="approx";
+a.stream = a.stream && ~a.needDist && (~a.needCI || a.needApproxCI);
+
 % Estimate sampling distribution (sum(x.^2) is invariant to sign flips)
 sx2 = sum(x.^2,a.nan);
 sqrtn = sqrt(a.nObs.*df);
@@ -327,28 +283,164 @@ if a.nan=="omitmissing"
     x(isnan(x)) = 0;
 end
 
+% Grouped sign-flips only need one summed row per exchangeability group.
+groupSums = [];
+if a.useGroups
+    groupSums = groupSums_lfn(x,a);
+end
 
-%% Permutation stats
-if a.parallel=="cpu"
-    % CPU parallel loop across blocks
-    parfor b = 1:nBlocks
-        dist{b} = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+% Generate random permutations
+rng(a.seed);
+
+if a.nBlocks>0
+    a.bPerms = max(1,ceil(a.nPerm/a.nBlocks));
+    if a.verbose
+        fprintf("[ec_permuttest] Using explicit nBlocks=%d (bPerms=%d)\n",...
+            a.nBlocks,a.bPerms);
     end
-    dist = vertcat(dist{:});
 else
-    % Copy to GPU
-    if a.parallel=="gpu"
-        x     = gpuArray(x);
-        sx2   = gpuArray(sx2);
-        sqrtn = gpuArray(sqrtn);
-        if a.gather=="final"
-            dist = zeros(a.nPerm,a.nVar,like=x);
+    if a.blockElMax==0
+        a.bPerms = estimateBlockPermCap_lfn(a);
+        if a.verbose
+            fprintf("[ec_permuttest] Auto bPerms=%d (%.0f%% memory fraction)\n",...
+                a.bPerms,100*a.blockMemFrac);
+        end
+    else
+        signRows = a.nObsMax;
+        if a.useGroups
+            signRows = a.nExchGroups;
+        end
+        a.bPerms = max(1,floor(a.blockElMax/(signRows+a.nVar)));
+        a.bPerms = min(a.bPerms,a.nPerm);
+    end
+end
+bStarts = 1:a.bPerms:a.nPerm;
+nBlocks = numel(bStarts);
+bEnds = min(bStarts+a.bPerms-1,a.nPerm);
+bSeeds = double(randi(intmax("uint32"),nBlocks,1,"uint32"));
+if a.verbose
+    fprintf("[ec_permuttest] Number of permutation blocks: %d\n",nBlocks);
+end
+
+% Check parallelization
+if a.parallel=="cpu"
+    nCores = feature("numcores");
+    if nBlocks < nCores
+        warning("[ec_permuttest] Less permutation blocks than cores, avoiding parfor, "+...
+        "implicit BLAS/LAPACK multithreading likely faster");
+        a.parallel = "none";
+    end
+end
+
+% Move data to GPU once if requested (used by both streaming and full paths).
+if a.parallel=="gpu"
+    sx2   = gpuArray(sx2);
+    sqrtn = gpuArray(sqrtn);
+    if a.useGroups
+        groupSums = gpuArray(groupSums);
+    else
+        x = gpuArray(x);
+    end
+end
+
+if a.stream
+    nSeen = 0;
+    if a.correct
+        % Materialize one column: max-/min-statistic per permutation (tail-aware).
+        if a.parallel=="cpu"
+            blkD1 = cell(nBlocks,1);
+            blkN  = zeros(nBlocks,1);
+            parfor b = 1:nBlocks
+                bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+                blkD1{b} = blockMaxStat_lfn(bDist,a);
+                blkN(b)  = numel(blkD1{b});
+            end
+            dist  = cell2mat(blkD1);
+            nSeen = sum(blkN);
+        else
+            dist = zeros(a.nPerm,1,like=x);
+            for b = 1:nBlocks
+                bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+                d1 = blockMaxStat_lfn(bDist,a);
+                if a.parallel=="gpu" && isa(d1,"gpuArray")
+                    d1 = gather(d1);
+                end
+                dist(bStarts(b):bEnds(b)) = d1;
+                nSeen = nSeen + numel(d1);
+            end
+        end
+    else
+        % Uncorrected: per-feature streaming counts (and approx-CI moments).
+        dist = [];
+        countExt = zeros(1,a.nVar,like=x);
+        if a.needApproxCI
+            nullSum   = zeros(1,a.nVar,like=x);
+            nullSumSq = zeros(1,a.nVar,like=x);
+        end
+        if a.parallel=="cpu"
+            blkCount = zeros(nBlocks,a.nVar,like=x);
+            blkN     = zeros(nBlocks,1);
+            blkSum = []; blkSumSq = [];
+            if a.needApproxCI
+                blkSum   = zeros(nBlocks,a.nVar,like=x);
+                blkSumSq = zeros(nBlocks,a.nVar,like=x);
+            end
+            parfor b = 1:nBlocks
+                bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+                [cnt,s,ssq] = streamBlockReduce_lfn(bDist,t,a);
+                blkCount(b,:) = cnt;
+                blkN(b)       = size(bDist,1);
+                if a.needApproxCI
+                    blkSum(b,:)   = s;
+                    blkSumSq(b,:) = ssq;
+                end
+            end
+            countExt = sum(blkCount,1);
+            nSeen    = sum(blkN);
+            if a.needApproxCI
+                nullSum   = sum(blkSum,1);
+                nullSumSq = sum(blkSumSq,1);
+            end
+        else
+            for b = 1:nBlocks
+                bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+                [cnt,s,ssq] = streamBlockReduce_lfn(bDist,t,a);
+                if a.parallel=="gpu"
+                    cnt = gather(cnt);
+                    if a.needApproxCI
+                        s   = gather(s);
+                        ssq = gather(ssq);
+                    end
+                end
+                countExt = countExt + cnt;
+                nSeen    = nSeen    + size(bDist,1);
+                if a.needApproxCI
+                    nullSum   = nullSum   + s;
+                    nullSumSq = nullSumSq + ssq;
+                end
+            end
         end
     end
-
-    % Loop across blocks (CPU or GPU)
+elseif a.parallel=="cpu"
+    % CPU parallel loop across blocks (full distribution path)
+    dist = cell(nBlocks,1);
+    parfor b = 1:nBlocks
+        dist{b} = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+    end
+    dist = cell2mat(dist);
+else
+    % Preallocate full distribution and run blocks serially (or on GPU)
+    if a.parallel=="gpu" && a.gather=="final"
+        if a.useGroups
+            dist = zeros(a.nPerm,a.nVar,like=groupSums);
+        else
+            dist = zeros(a.nPerm,a.nVar,like=x);
+        end
+    else
+        dist = zeros(a.nPerm,a.nVar,like=x);
+    end
     for b = 1:nBlocks
-        dist(bStarts(b):bEnds(b),:) = runBlock_lfn(x,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
+        dist(bStarts(b):bEnds(b),:) = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
     end
     if a.parallel=="gpu" && a.gather=="final"
         dist = gather(dist);
@@ -358,64 +450,106 @@ end
 
 %% Final stats
 
-% Apply max correction if specified
-if a.correct
-    dist = max(abs(dist),[],2);
-end
-
-if a.verbose
-    fprintf("Effective number of permutations: %d\n",a.nPerm)
-end
-
-% Compute p-value & CI
-if a.verbose
-    if a.correct
-        fprintf("[ec_permuttest] Computing max-corrected p-values (serial threshold counting)...\n");
-    else
-        fprintf("[ec_permuttest] Computing uncorrected p-values/CI from full permutation distribution...\n");
+if a.stream
+    if a.verbose
+        fprintf("[ec_permuttest] Streaming reductions complete over %d permutations.\n",nSeen);
     end
-end
-switch a.tail
-    case "both"
-        if a.correct
-            p = (countGE_lfn(dist,abs(t))+1)/(a.nPerm+1);
-        else
-            tAbs = abs(t);
-            p = (sum((dist>=tAbs) | (dist<=-tAbs))+1)/(a.nPerm+1);
+    if a.correct
+        % nullDist is the tail-aware extremal distribution; sort once.
+        d = sort(dist(~isnan(dist)));
+        switch a.tail
+            case "both";  countExt = countGE_lfn_sorted(d,abs(t));
+            case "right"; countExt = countGE_lfn_sorted(d,t);
+            case "left";  countExt = countLE_lfn_sorted(d,t);
         end
-        if nargout > 2
-            if a.correct
-                crit = prctile(dist,100*(1-a.alpha/2)).*se;
-            else
-                crit = prctile(abs(dist),100*(1-a.alpha/2)).*se;
+        p = (countExt + 1) / (nSeen + 1);
+        if a.needApproxCI
+            switch a.tail
+                case "both"
+                    crit = prctile(d,100*(1-a.alpha/2)).*se;
+                    ci = [mu-crit;mu+crit];
+                case "right"
+                    crit = prctile(d,100*(1-a.alpha)).*se;
+                    ci = [mu-crit;Inf(1,a.nVar)];
+                case "left"
+                    crit = prctile(d,100*a.alpha).*se;
+                    ci = [-Inf(1,a.nVar);mu-crit];
             end
-            ci = [mu-crit;mu+crit];
         end
-    case "right"
+    else
+        p = (countExt + 1) / (nSeen + 1);
+        if a.needApproxCI
+            nullMu = nullSum ./ nSeen;
+            nullVar = max(0, nullSumSq ./ nSeen - nullMu.^2);
+            nullSd = sqrt(nullVar);
+            switch a.tail
+                case "both"
+                    crit = normInv_lfn(1-a.alpha/2,nullMu,nullSd).*se;
+                    ci = [mu-crit;mu+crit];
+                case "right"
+                    crit = normInv_lfn(1-a.alpha,nullMu,nullSd).*se;
+                    ci = [mu-crit;Inf(1,a.nVar)];
+                case "left"
+                    crit = normInv_lfn(a.alpha,nullMu,nullSd).*se;
+                    ci = [-Inf(1,a.nVar);mu-crit];
+            end
+        end
+    end
+else
+    % Apply tail-aware max-correction if specified.
+    if a.correct
+        switch a.tail
+            case "both";  dist = max(abs(dist),[],2);
+            case "right"; dist = max(dist,[],2);
+            case "left";  dist = min(dist,[],2);
+        end
+    end
+
+    if a.verbose
+        fprintf("Effective number of permutations: %d\n",a.nPerm)
         if a.correct
-            p = (countGE_lfn(dist,t)+1)/(a.nPerm+1);
+            fprintf("[ec_permuttest] Computing max-corrected p-values (serial threshold counting)...\n");
         else
-            p = (sum(dist>=t)+1)/(a.nPerm+1);
+            fprintf("[ec_permuttest] Computing uncorrected p-values/CI from full permutation distribution...\n");
         end
-        if nargout > 2
-            crit = prctile(dist,100*(1-a.alpha)).*se;
-            ci = [mu-crit;Inf(1,a.nVar)];
-        end
-    case "left"
-        if a.correct
-            p = (countGE_lfn(dist,-t)+1)/(a.nPerm+1);
-        else
-            p = (sum(dist<=t)+1)/(a.nPerm+1);
-        end
-        if nargout > 2
+    end
+    switch a.tail
+        case "both"
             if a.correct
-                crit = prctile(dist,100*(1-a.alpha)).*se;
-                ci = [-Inf(1,a.nVar);mu+crit];
+                p = (countGE_lfn(dist,abs(t))+1)/(a.nPerm+1);
             else
+                tAbs = abs(t);
+                p = (sum((dist>=tAbs) | (dist<=-tAbs))+1)/(a.nPerm+1);
+            end
+            if a.needCI
+                if a.correct
+                    crit = prctile(dist,100*(1-a.alpha/2)).*se;
+                else
+                    crit = prctile(abs(dist),100*(1-a.alpha/2)).*se;
+                end
+                ci = [mu-crit;mu+crit];
+            end
+        case "right"
+            if a.correct
+                p = (countGE_lfn(dist,t)+1)/(a.nPerm+1);
+            else
+                p = (sum(dist>=t)+1)/(a.nPerm+1);
+            end
+            if a.needCI
+                crit = prctile(dist,100*(1-a.alpha)).*se;
+                ci = [mu-crit;Inf(1,a.nVar)];
+            end
+        case "left"
+            if a.correct
+                p = (countLE_lfn(dist,t)+1)/(a.nPerm+1);
+            else
+                p = (sum(dist<=t)+1)/(a.nPerm+1);
+            end
+            if a.needCI
                 crit = prctile(dist,100*a.alpha).*se;
                 ci = [-Inf(1,a.nVar);mu-crit];
             end
-        end
+    end
 end
 
 
@@ -460,99 +594,188 @@ elseif a.dim~=1 || xInputDims>2
     if nargout > 5
         sd = reshape(sd,outSize);
     end
-    if nargout > 6 && ~a.correct
+    if a.needDist && ~a.correct
         dist = reshape(dist,[a.nPerm featureSize]);
     end
 end
 
-% % Store statistics in a structure
-% if nargout > 4
-%     stats.df = df;
-%     stats.sd = sd;
-%     stats.mu = mu;
-% end
 
 
 
-
-
-
-function bDist = runBlock_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
+function bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStart,bEnd,seed,a)
 %%% Permutation block dispatcher %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if a.parallel=="gpu"
     if a.useGroups
-        bDist = runBlock_gpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
+        bDist = runBlock_gpu_grouped_lfn(groupSums,sx2,sqrtn,bStart,bEnd,seed,a);
     else
         bDist = runBlock_gpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
     end
 else
     if a.useGroups
-        bDist = runBlock_cpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
+        bDist = runBlock_cpu_grouped_lfn(groupSums,sx2,sqrtn,bStart,bEnd,seed,a);
     else
         bDist = runBlock_cpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a);
     end
 end
 
 
-function bDist = runBlock_gpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
-parallel.gpu.rng(double(seed),"Philox4x32-10");
+function bDist = runBlock_gpu_grouped_lfn(groupSums,sx2,sqrtn,bStart,bEnd,seed,a)
+parallel.gpu.rng(seed,"Philox4x32-10");
 nbPerms = bEnd-bStart+1;
-signBlock = 2*cast(rand(a.nExchGroups,nbPerms,like=x)>0.5,like=x)-1;
-signBlock = signBlock(a.groupIdx,:);
-bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
-if a.gather=="block"
-    bDist = gather(bDist);
-end
+signBlock = 2*cast(rand(a.nExchGroups,nbPerms,like=groupSums)>0.5,like=groupSums)-1;
+bDist = blockDist_fromGroupSigns_lfn(groupSums,sx2,sqrtn,signBlock,a);
 
 
 function bDist = runBlock_gpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
-parallel.gpu.rng(double(seed),"Philox4x32-10");
+parallel.gpu.rng(seed,"Philox4x32-10");
 nbPerms = bEnd-bStart+1;
 signBlock = 2*cast(rand(a.nObsMax,nbPerms,like=x)>0.5,like=x)-1;
 bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
-if a.gather=="block"
-    bDist = gather(bDist);
-end
 
 
-function bDist = runBlock_cpu_grouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
-rs = RandStream("mt19937ar","Seed",double(seed));
+function bDist = runBlock_cpu_grouped_lfn(groupSums,sx2,sqrtn,bStart,bEnd,seed,a)
+rs = RandStream("mt19937ar","Seed",seed);
 nbPerms = bEnd-bStart+1;
-signBlock = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=x)-1;
-signBlock = signBlock(a.groupIdx,:);
-bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
+signBlock = 2*cast(rand(rs,a.nExchGroups,nbPerms)>0.5,like=groupSums)-1;
+bDist = blockDist_fromGroupSigns_lfn(groupSums,sx2,sqrtn,signBlock,a);
 
 
 function bDist = runBlock_cpu_ungrouped_lfn(x,sx2,sqrtn,bStart,bEnd,seed,a)
-rs = RandStream("mt19937ar","Seed",double(seed));
+rs = RandStream("mt19937ar","Seed",seed);
 nbPerms = bEnd-bStart+1;
 signBlock = 2*cast(rand(rs,a.nObsMax,nbPerms)>0.5,like=x)-1;
 bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a);
 
 
 function bDist = blockDist_fromSigns_lfn(x,sx2,sqrtn,signBlock,a)
-smx = x.'*signBlock; % [nVar x nbPerms]
-smx = smx.'; % [nbPerms x nVar]
+smx = signBlock.'*x; % [nbPerms x nVar]
 bDist = smx./a.nObs./(sqrt(sx2-(smx.^2)./a.nObs)./sqrtn);
 
 
+function bDist = blockDist_fromGroupSigns_lfn(groupSums,sx2,sqrtn,signBlock,a)
+smx = signBlock.'*groupSums; % [nbPerms x nVar]
+bDist = smx./a.nObs./(sqrt(sx2-(smx.^2)./a.nObs)./sqrtn);
+
+
+function groupSums = groupSums_lfn(x,a)
+groupMat = sparse(double(a.groupIdx),1:a.nObsMax,1,a.nExchGroups,a.nObsMax);
+groupSums = cast(groupMat*x,like=x);
+
+
+function d1 = blockMaxStat_lfn(bDist,a)
+% Tail-aware extremal statistic per permutation row of a block.
+switch a.tail
+    case "both";  d1 = max(abs(bDist),[],2);
+    case "right"; d1 = max(bDist,[],2);
+    case "left";  d1 = min(bDist,[],2);
+end
+
+
+function [cnt,blkSum,blkSumSq] = streamBlockReduce_lfn(bDist,t,a)
+% Per-block uncorrected streaming reduction (per-feature counts + optional
+% running first/second moments for approx-CI).
+switch a.tail
+    case "both";  cnt = sum((bDist>=abs(t)) | (bDist<=-abs(t)),1);
+    case "right"; cnt = sum(bDist>=t,1);
+    case "left";  cnt = sum(bDist<=t,1);
+end
+if a.needApproxCI
+    blkSum   = sum(bDist,1);
+    blkSumSq = sum(bDist.^2,1);
+else
+    blkSum = []; blkSumSq = [];
+end
+
+
 function c = countGE_lfn(nullDist,vals)
-d = sort(nullDist(:));
+d = nullDist(:);
+d = sort(d(~isnan(d)));
+c = countGE_lfn_sorted(d,vals);
+
+
+function c = countLE_lfn(nullDist,vals)
+d = nullDist(:);
+d = sort(d(~isnan(d)));
+c = countLE_lfn_sorted(d,vals);
+
+
+function c = countGE_lfn_sorted(d,vals)
+% Two-pointer scan: how many d(i) >= vals(j); d must be sorted ascending NaN-free.
 n = numel(d);
 v = vals(:);
-[vSort,ord] = sort(v);
-cSort = zeros(size(vSort));
+ok = ~isnan(v);
+[vSort,ord] = sort(v(ok));
+okIdx = find(ok);
+c = nan(size(v),like=vals);
 i = 1;
 for j = 1:numel(vSort)
     while i<=n && d(i)<vSort(j)
         i = i+1;
     end
-    cSort(j) = n-i+1;
+    c(okIdx(ord(j))) = n-i+1;
 end
-c = zeros(size(v));
-c(ord) = cSort;
 c = reshape(c,size(vals));
 
+
+function c = countLE_lfn_sorted(d,vals)
+% Two-pointer scan: how many d(i) <= vals(j); d must be sorted ascending NaN-free.
+n = numel(d);
+v = vals(:);
+ok = ~isnan(v);
+[vSort,ord] = sort(v(ok));
+okIdx = find(ok);
+c = nan(size(v),like=vals);
+i = n;
+for j = numel(vSort):-1:1
+    while i>=1 && d(i)>vSort(j)
+        i = i-1;
+    end
+    c(okIdx(ord(j))) = i;
+end
+c = reshape(c,size(vals));
+
+
+function x = normInv_lfn(p,mu,sigma)
+x = norminv(p,mu,sigma);
+
+
+function bPerms = estimateBlockPermCap_lfn(a)
+% Conservative per-block cap from fixed + variable memory terms.
+switch a.floatType
+    case "double"
+        bytesFloat = 8;
+    case "single"
+        bytesFloat = 4;
+    case "half"
+        bytesFloat = 2;
+end
+
+budgetBytes = max(0,double(a.ramAvail)*double(a.blockMemFrac));
+
+fixedBytes = double(a.nObsMax)*double(a.nVar)*bytesFloat; % difference data
+fixedBytes = fixedBytes + double(a.nVar)*bytesFloat*5;    % sx2, se, stats
+if a.useGroups
+    fixedBytes = fixedBytes + double(a.nExchGroups)*double(a.nVar)*bytesFloat;
+end
+if ~a.stream
+    fixedBytes = fixedBytes + double(a.nPerm)*double(a.nVar)*bytesFloat;
+end
+
+signRows = a.nObsMax;
+if a.useGroups
+    signRows = a.nExchGroups;
+end
+perPermBytes = double(signRows)*bytesFloat;       % signBlock
+perPermBytes = perPermBytes + double(a.nVar)*bytesFloat; % bDist row
+perPermBytes = perPermBytes * 1.5;                % temporary headroom
+
+availForBlock = max(0,budgetBytes-fixedBytes);
+if perPermBytes<=0
+    bPerms = 1;
+else
+    bPerms = max(1,floor(availForBlock/perPermBytes));
+end
+bPerms = min(bPerms,a.nPerm);
 
 
 
