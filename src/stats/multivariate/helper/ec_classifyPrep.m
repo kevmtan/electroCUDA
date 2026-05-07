@@ -237,7 +237,7 @@ for t = 1:height(st)
             idOuterTrain = training(st.cv{t},k);
             obtOuterTrain = obt(idOuterTrain,:);
 
-            cvInner{k} = cvPartition_lfn(obtOuterTrain,nCond,o.cvh,o.cvMinTrialsPerFold);
+            cvInner{k} = cvPartition_lfn(obtOuterTrain,nCond,o.cvhn,o.cvMinTrialsPerFold);
             if isempty(cvInner{k})
                 doSkip = true;
                 break;

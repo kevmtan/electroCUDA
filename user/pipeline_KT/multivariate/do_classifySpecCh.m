@@ -19,7 +19,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "classifySpecCh"; % directory name within dirs.anal
-o.analName = "zf_SemEpi_LDA_Gamma"; % autobio: Sem vs Epi; CC: Self & Other
+o.analName = "zf_SemEpi_LR_nestedLambda"; % autobio: Sem vs Epi; CC: Self & Other
 
 
 %% ANALYSIS PREP: ec_analPrep(...,o.p)
@@ -34,7 +34,7 @@ o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Channel Options
 o.p.chRm = []; % channels to remove (array of chan numbers)
-o.p.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
+o.p.chBadVars = ["ai" "empty" "nan"]; % Vars in n.chBad/icBad to use for bad chan removal
 o.p.ROIs = []; % remove chs outside these ROIs
 o.p.roiVar = "roi"; % ROI variable in chNfo
 o.p.chConcat = ""; % Concatenate channels by ["roi"|"all"|""], default="" (none)
@@ -59,7 +59,7 @@ o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.025; % latency bin width (secs)
+o.p.epoch.bin = 0.050; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -84,7 +84,7 @@ o.p.pre.mag2db = false; % magnitude to decibel
 o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialBaseline = ""; % Subtract trial by mean or median of baseline period (skip=[])
 o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
-o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+o.p.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 % Bad frames/outliers
 o.p.pre.interp = "linear"; % interpolation method
 o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
@@ -93,7 +93,7 @@ o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
 o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
+o.p.pre.olThrCond = 2.5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
 o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
@@ -132,7 +132,7 @@ o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
 
 % PCA (channelwise: no split-level PCA; rank helps diagnostics when o.s.pca is off)
-o.s.rank = true; % calculate data rank if no PCA
+o.s.rank = false; % calculate data rank if no PCA
 o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaVarThr = 0; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
@@ -164,14 +164,14 @@ o.metricFun = @mmr_cSpecMetrics; % inject at end of ec_classify
 
 % Cross-validation (CV) parameters (mathworks.com/help/stats/crossval.html)
 o.doCV = true; % Do CV?
-o.doNestedCV = false; % Nested CV for hyperparemeter optimization?
+o.doNestedCV = true; % Nested CV for hyperparemeter optimization?
 o.cv.KFold = 10; % Num folds for CV
 o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
-o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
+o.cvhn.KFold = 3; % Num folds for nested hyperparameter tuning CV (inner loop)
 o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
 
 % Classification basic options
-o.fun = @fitcdiscr; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
+o.fun = @fitclinear; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
 o.permutations = 0; % Num permutations for performance testing (0 = parametric test)
 o.perfVar = "acc"; % Performance test statistic variable ("acc"=accuracy|"auc1"=PR-AUC)
 o.jeffreys = false; % Jeffreys prior penalization for Platt scaling
@@ -184,7 +184,7 @@ if isequal(o.fun,@fitclinear)
     o.hyper.Learner = "logistic"; % "svm"
     o.hyper.Lambda = "auto";
     o.hyper.Regularization = "ridge";
-    %o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
+    o.hyper.Solver = "lbfgs"; % "lbfgs"/"bfgs" for chs (small p), "dual" for ROIs (large p)
     o.hyper.FitBias = true;
     o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = false; % stabler/faster when comparing to fitcdiscr
