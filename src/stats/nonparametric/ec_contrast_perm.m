@@ -1,6 +1,16 @@
 function sc = ec_contrast_perm(x,ob,n,o,c,tt)
 % Run permutation contrast - called by high-level electroCUDA permutation
-% functions
+% functions. Not intended to be called independently.
+
+%% Input validation
+arguments
+    x {mustBeFloat}
+    ob table
+    n struct
+    o struct
+    c (1,1) double = 1
+    tt (1,1) uint64 = tic
+end
 
 con = o.contrasts(c); % contrast name 
 
@@ -46,7 +56,7 @@ else
             vartype=o.varType);
     end
 end
-disp("[ec_condConROI_perm] Finished contrast: "+con+" | toc="+toc(tt));
+disp("[ec_contrast_perm] Finished contrast: "+con+" | toc="+toc(tt));
 
 %% Stats results table
 sc = table;
@@ -90,4 +100,4 @@ end
 
 % Run FDR
 sc.q(id,:,:,:) = ec_fdr(sc.p(id,:,:,:),o.alpha,o.fdrDep);
-disp("[ec_condConROI_perm] Ran FDR: "+con+" | toc="+toc(tt));
+disp("[ec_contrast_perm] Ran FDR: "+con+" | toc="+toc(tt));
