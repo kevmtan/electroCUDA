@@ -16,7 +16,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "ROIs"; % directory name within dirs.anal
-o.analName = "ep_zf_hpf"; % directory name within o.analDir
+o.analName = "ep_zf_bin5ms_hpf_robustNormBL"; % directory name within o.analDir
 o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
 o.floatOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
 
@@ -37,7 +37,7 @@ o.p.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"];
 
 % Channel Options
 o.p.chRm = []; % channels to remove (array of chan numbers)
-o.p.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
+o.p.chBadVars = ["ai" "empty" "nan"]; % Vars in n.chBad/icBad to use for bad chan removal
 o.p.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
 o.p.roiVar = "roi"; % ROI variable in chNfo
 o.p.chConcat = ""; % Concatenate channels by ["roi"|"all"|""], default="" (none)
@@ -59,11 +59,11 @@ o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.025; % latency bin width (secs)
+o.p.epoch.bin = 0.005; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.p.epoch.baselinePre = [-0.125 -0.025]; %[-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.p.epoch.baselinePre = -0.2; %[-0.125 -0.025]; %[-0.15 -0.05]; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.p.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering: all conds in data (leave blank for to leave unordered)
 o.p.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
@@ -81,12 +81,12 @@ o.p.pre.log = false; % Log transform
 o.p.pre.mag2db = false; % Log-transform magnitude to decibel
 % Normalization/standardization
 o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
-o.p.pre.trialBaseline = "mean"; % Subtract trial by mean or median of baseline period (skip=[])
-o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
-o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+o.p.pre.trialBaseline = "median"; % Subtract trial by mean or median of baseline period (skip=[])
+o.p.pre.trialNorm = "robust"; % Normalize trial ["robust"|"zscore"|""]; skip=""
+o.p.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 % Bad frames/outliers
 o.p.pre.interp = "linear"; % interpolation method
-o.p.pre.badFrameVars = "hfo"; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
+o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 5; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 5; % Outlier threshold (post-HPF,pre-BL)
@@ -96,7 +96,7 @@ o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
 o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
-o.p.pre.hpfSteep = 0.8; % HPF steepness
+o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness

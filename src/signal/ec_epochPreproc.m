@@ -244,7 +244,7 @@ if o.ds
     % Downsampling: variable-length output requires grouped/cell output
     xc = splitapply(@(xcr,stimr,runr) {withinRun_lfn(xcr,stimr,n,o,runr(1))},...
         xc,psy.stim,psy.runG,psy.runG);
-    xc = vertcat(xc{:}); % concatenate downsampled runs
+    xc = cell2mat(xc); % concatenate downsampled runs
 else
     % No downsampling: process each run in place by logical indexing
     for r = 1:n.nRuns
