@@ -5,6 +5,11 @@ load("cdcol_2018.mat","cdcol");
 %% Options
 op.visible = false; % !!!!!!!!!!
 op.save = true; % !!!!!!!!!!!
+
+% Load/save
+op.figDir = "figs";
+op.statFn = "stat";
+
 op.sigThr = 0.05; % significance threshold
 
 % Plot
@@ -41,17 +46,5 @@ op.r.col = ec_dim2cell(op.r.col,1);
 
 %% Run
 
-analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_260425_1348/";
-mmr_cSpecPlot_ROI(analDir,op);
-
-analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_gamma_260425_1432/";
-mmr_cSpecPlot_ROI(analDir,op);
-
-analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_pca_260425_1932/";
-mmr_cSpecPlot_ROI(analDir,op);
-
-analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LDA_pcaGamma_260425_1959/";
-mmr_cSpecPlot_ROI(analDir,op);
-
-analDir = "/01/lbcn/anal/classifySpecROI/MathAb_LR_lambda_260426_1348/";
+analDir = "/01/lbcn/anal/classifySpecROI/zf_hpfBands_50ms_SemEpi_LDA_gamma";
 mmr_cSpecPlot_ROI(analDir,op);

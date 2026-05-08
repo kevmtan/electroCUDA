@@ -1,21 +1,22 @@
-% load("/01/lbcn/anal/classifySpecROI/MathAb_LDA_260425_1348/log_260425_1348.mat")
-% stat = mmr_cSpecAnal_ROI(logs);
-% clear all; close all;
-% 
-% load("/01/lbcn/anal/classifySpecROI/MathAb_LDA_gamma_260425_1432/log_260425_1432.mat")
-% stat = mmr_cSpecAnal_ROI(logs);
-% clear all; close all;
-%
-% load("/01/lbcn/anal/classifySpecROI/MzMath_LR_lambda_260426_1348/log_260426_1348.mat")
-% stat = mmr_cSpecAnal_ROI(logs);
-% clear all; close all; 
-% 
-% load("/01/lbcn/anal/classifySpecROI/MathAb_LDA_pca_260425_1932/log_260425_1932.mat")
-% doTmp_MathAb_LDA_pca;
-% stat = mmr_cSpecAnal_ROI(logs);
-% clear all; close all;
-% 
-% load("/01/lbcn/anal/classifySpecROI/MathAb_LDA_pcaGamma_260425_1959/log_260425_1959.mat")
-% doTmp_MathAb_LDA_pca;
-% stat = mmr_cSpecAnal_ROI(logs);
-% clear all; close all;
+% oFns = [
+%     "/01/lbcn/anal/classifySpecCh/zf_50ms_SemEpi_LR_lambda/o_zf_50ms_SemEpi_LR_lambda.mat",...
+%     "/01/lbcn/anal/classifySpecCh/zf_50ms_MathAb_LR_lambda/o_zf_50ms_MathAb_LR_lambda.mat",...
+%     "/01/lbcn/anal/classifySpecCh/zf_50ms_SemEpi_LDA_gamma/o_zf_50ms_SemEpi_LDA_gamma.mat",...
+%     "/01/lbcn/anal/classifySpecCh/zf_50ms_MathAb_LDA_gamma/o_zf_50ms_MathAb_LDA_gamma.mat"
+%     ];
+oFns = "/01/lbcn/anal/classifySpecROI/zf_hpfBands_50ms_SemEpi_LDA_gamma/o_zf_hpfBands_50ms_SemEpi_LDA_gamma.mat";
+
+
+%% Analysis options
+oa = struct;
+oa.timeVar="latency";
+
+
+%% Loop across runs
+for io = 1:numel(oFns)
+    % Load
+    load(oFns(io),"o");
+
+    %% Run post-analysis on classification run
+    mmr_cSpecAnal_ROI(o,oa);
+end

@@ -1,11 +1,9 @@
-function stat = mmr_cSpecAnal_ROI(logs)
-% load("/01/lbcn/anal/classifySpecROI/MzAb_LDA_pca_260421_1611/log_260421_1611.mat")
-% stat = mmr_cSpecAnal_ROI(logs);
-
-%% Prep
+function stat = mmr_cSpecAnal_ROI(o,oa)
 tt = tic; % start timer
+
+% Load logs
+load(o.analOut+"logs_"+o.analName,"logs"); 
 nSbj = height(logs);
-o = logs.o{1};
 
 % Preallocate
 oba = cell(nSbj,1); % observations from all sbjs
@@ -13,7 +11,7 @@ oba = cell(nSbj,1); % observations from all sbjs
 % Load data
 for s = 1:height(logs)
     % Observations
-    load(logs.o{s}.saved.ob,"ob");
+    load(logs.ob(s),"ob");
     oba{s} = ob;
 end
 
@@ -24,10 +22,15 @@ oba = vertcat(oba{:});
 oba.ch = categorical(oba.ch,o.p.ROIs,Ordinal=true);
 
 % Rename timevar/condvar for simplicity
-oba = renamevars(oba,[o.p.timeVar o.p.condVar],["t" "cnd"]);
+oba = renamevars(oba,[oa.timeVar o.p.condVar],["time" "cnd"]);
+
+% If timeVar is latency, convert to milliseconds
+if oa.timeVar=="latency"
+    oba.time = oba.time*1000;
+end
 
 % Split observations table
-oba = splitapply(@(id) {oba(id,:)},(1:height(oba))',findgroups(oba.ch,oba.t));
+oba = splitapply(@(id) {oba(id,:)},(1:height(oba))',findgroups(oba.ch,oba.time));
 splits = height(oba);
 
 % Preallocate stats table
@@ -49,7 +52,7 @@ stat = vertcat(stat{:});
 vs = string(stat.Properties.VariableNames);
 vsQ = vs(endsWith(vs,"_q")); % fdr vars
 vsP = replace(vsQ,"_q","_p"); % expected matching pval vars
-id = stat.t>=o.fdrTimeRng(1) & stat.t<=o.fdrTimeRng(2); % fdr time range
+id = stat.time>=o.fdrTimeRng(1) & stat.time<=o.fdrTimeRng(2); % fdr time range
 
 % Verify every _q has a matching _p; drop (with warning) any that don't
 hasP = ismember(vsP,vs);
@@ -73,7 +76,7 @@ disp("Ran FDR: toc="+toc(tt));
 
 
 %% Save
-fn = o.dirOut+"stat.mat";
+fn = o.analOut+"stat.mat";
 save(fn,"stat","-v7");
 disp("Saved classificiation statistics: "+fn+" toc="+toc(tt));
 
@@ -86,7 +89,7 @@ disp("Saved classificiation statistics: "+fn+" toc="+toc(tt));
 function sts = analyze_lfn(obs,o)
 %%% Within-split analyses %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% obs=oba{514}; obs=oba{217};
+% obs=oba{1320}; obs=oba{514}; obs=oba{217};
 
 % Convert to double-precision
 obs = convertvars(obs,varfun(@isfloat,obs,"OutputFormat","uniform"),"double");
@@ -94,7 +97,7 @@ obs = convertvars(obs,varfun(@isfloat,obs,"OutputFormat","uniform"),"double");
 % Initialize stats table
 sts = table;
 sts.roi = obs.ch(1);
-sts.t = obs.t(1);
+sts.time = obs.time(1);
 sts.acc = nan;
 sts.acc_SE = nan;
 
@@ -106,7 +109,7 @@ sts.acc_SE = nan;
 sts.acc_q = nan;
 
 % Accuracy: Logistic mixed-effects
-lme = fitglme(obs(obs.use,:),"acc ~ 1 + (1|sbjID:tr)",...
+lme = fitglme(obs(obs.use,:),"acc ~ 1 + (1|sbjID)",...
     Distribution="Binomial",Link="logit",FitMethod="REMPL");
 sts.accl = 1/(1 + exp(-lme.Coefficients.Estimate)); % convert logit to probability
 sts.accl_SE = lme.Coefficients.SE * sts.accl * (1 - sts.accl); % logit SE to probability via delta method
@@ -134,7 +137,7 @@ for c = 1:numel(o.p.cond)
 end
 
 % PP of cross-classification conds
-if o.doCC
+if isany(o.p.condx)
     lme = fitlme(obs(obs.cc,:),"pp1 ~ cx-1 + (cx-1|sbjID:frame)",...
         FitMethod="REML",DummyVarCoding="full");
     for c = 1:numel(o.p.condx)
@@ -153,7 +156,7 @@ sts.ppc1_p = lme.Coefficients.pValue(2);
 sts.ppc1_q = nan;
 
 % PP diff of CC conds
-if o.doCC
+if isany(o.p.condx)
     lme = fitlme(obs(obs.cc,:),"pp1 ~ cx + (1|sbjID:frame)",FitMethod="REML");
     sts.ppxc1 = lme.Coefficients.Estimate(2);
     sts.ppxc1_SE = lme.Coefficients.SE(2);
@@ -180,7 +183,7 @@ sts.ppr_RC_q = nan;
 
 
 %% Regression on CC PP
-if o.doCC
+if isany(o.p.condx)
     % Behavioral response time
     lme = fitlme(obs(obs.cc,:),"pp1 ~ RT + (1|sbjID:frame)",FitMethod="REML");
     sts.ppxr_RT = lme.Coefficients.Estimate(2);

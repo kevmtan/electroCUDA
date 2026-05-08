@@ -2,10 +2,10 @@ function mmr_cSpecPlot_ROI(analDir,op)
 % analDir = "/01/lbcn/anal/classifySpecROI/MzAb_LDA_band_260421_1255/"
 
 % Analysis Directory
-op.analDir = analDir; % "/" at end!
+op.analDir = analDir+filesep;
 
 % Fig directory
-op.figDir = op.analDir+"figs/";
+op.figDir = op.analDir+op.figDir+filesep;
 
 
 %% Create parallel pool (must be processes, can't be threadpool)
@@ -14,7 +14,7 @@ op.figDir = op.analDir+"figs/";
 
 
 %% Prep
-load(op.analDir+"stat.mat","stat"); % load stat
+load(op.analDir+op.statFn,"stat"); % load stat
 ROIs = unique(stat.roi); % list ROIs
 try mkdir(op.figDir); catch; end % make figure dir
 
@@ -65,11 +65,11 @@ if op.txtSz
 end
 
 % Timecourses & error
-mseb(stc.t',y',ySE',op.a,1);
+mseb(stc.time',y',ySE',op.a,1);
 hold on; axis tight;
 
 % Sig timepoints
-plot(stc.t,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
+plot(stc.time,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
 plot(xlim,[0.5 0.5],"k-","LineWidth",op.a.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.a.wSig);
 
@@ -89,11 +89,11 @@ if op.txtSz
 end
 
 % Timecourses & error
-mseb(stc.t',y',ySE',op.a,1);
+mseb(stc.time',y',ySE',op.a,1);
 hold on; axis tight;
 
 % Sig timepoints
-plot(stc.t,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
+plot(stc.time,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
 plot(xlim,[0.5 0.5],"k-","LineWidth",op.a.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.a.wSig);
 
@@ -116,14 +116,14 @@ if op.txtSz
 end
 
 % Timecourses & error
-mseb(stc.t',y',ySE',op.c,1);
+mseb(stc.time',y',ySE',op.c,1);
 hold on; axis tight;
 
 % Plot sig timepoints
-plot(stc.t,ySig(:,1),".-",Color=op.c.col{1},MarkerFaceColor=op.c.col{1},LineWidth=op.c.wSig);
-plot(stc.t,ySig(:,2),".-",Color=op.c.col{2},MarkerFaceColor=op.c.col{2},LineWidth=op.c.wSig);
-plot(stc.t,ySig(:,3),".-",Color=op.c.col{3},MarkerFaceColor=op.c.col{3},LineWidth=op.c.wSig);
-plot(stc.t,ySig(:,4),".-",Color=op.c.col{4},MarkerFaceColor=op.c.col{4},LineWidth=op.c.wSig);
+plot(stc.time,ySig(:,1),".-",Color=op.c.col{1},MarkerFaceColor=op.c.col{1},LineWidth=op.c.wSig);
+plot(stc.time,ySig(:,2),".-",Color=op.c.col{2},MarkerFaceColor=op.c.col{2},LineWidth=op.c.wSig);
+plot(stc.time,ySig(:,3),".-",Color=op.c.col{3},MarkerFaceColor=op.c.col{3},LineWidth=op.c.wSig);
+plot(stc.time,ySig(:,4),".-",Color=op.c.col{4},MarkerFaceColor=op.c.col{4},LineWidth=op.c.wSig);
 plot(xlim,[0 0],"k-","LineWidth",op.c.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.c.wSig);
 
@@ -144,12 +144,12 @@ if op.txtSz
 end
 
 % Timecourses & error
-mseb(stc.t',y',ySE',op.d,1);
+mseb(stc.time',y',ySE',op.d,1);
 hold on; axis tight;
 
 % Plot sig timepoints
-plot(stc.t,ySig(:,1),".-",Color=op.d.col{1},MarkerFaceColor=op.d.col{1},LineWidth=op.d.wSig);
-plot(stc.t,ySig(:,2),".-",Color=op.d.col{2},MarkerFaceColor=op.d.col{2},LineWidth=op.d.wSig);
+plot(stc.time,ySig(:,1),".-",Color=op.d.col{1},MarkerFaceColor=op.d.col{1},LineWidth=op.d.wSig);
+plot(stc.time,ySig(:,2),".-",Color=op.d.col{2},MarkerFaceColor=op.d.col{2},LineWidth=op.d.wSig);
 plot(xlim,[0 0],"k-","LineWidth",op.d.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.d.wSig);
 
@@ -170,12 +170,12 @@ if op.txtSz
 end
 
 % Timecourses & error
-mseb(stc.t',y',ySE',op.r,1);
+mseb(stc.time',y',ySE',op.r,1);
 hold on; axis tight;
 
 % Plot sig timepoints
-plot(stc.t,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineWidth=op.r.wSig);
-plot(stc.t,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
+plot(stc.time,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineWidth=op.r.wSig);
+plot(stc.time,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
 plot(xlim,[0 0],"k-","LineWidth",op.r.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
 
@@ -197,13 +197,13 @@ if op.txtSz
 end
 
 % Timecourses & error
-mseb(stc.t',y',ySE',op.r,1);
+mseb(stc.time',y',ySE',op.r,1);
 hold on; axis tight;
 
 % Plot sig timepoints
-plot(stc.t,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineWidth=op.r.wSig);
-plot(stc.t,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
-plot(stc.t,ySig(:,3),".-",Color=op.r.col{3},MarkerFaceColor=op.r.col{3},LineWidth=op.r.wSig);
+plot(stc.time,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineWidth=op.r.wSig);
+plot(stc.time,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
+plot(stc.time,ySig(:,3),".-",Color=op.r.col{3},MarkerFaceColor=op.r.col{3},LineWidth=op.r.wSig);
 plot(xlim,[0 0],"k-","LineWidth",op.r.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
 

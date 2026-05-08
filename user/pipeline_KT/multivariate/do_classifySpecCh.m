@@ -19,7 +19,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "classifySpecCh"; % directory name within dirs.anal
-o.analName = "zf_SemEpi_LR_nestedLambda"; % autobio: Sem vs Epi; CC: Self & Other
+o.analName = "zf_50ms_SemEpi_LR_lambda"; % autobio: Sem vs Epi; CC: Self & Other
 
 
 %% ANALYSIS PREP: ec_analPrep(...,o.p)
@@ -96,13 +96,13 @@ o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 2.5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
-o.p.pre.hpfSteep = 0.7; % HPF steepness
-o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
+o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpfSteep = 0.75; % HPF steepness
+o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.p.pre.freqs = [5 300]; %[5 300];
+o.p.pre.freqs = []; %[5 300];
 % Spectral PCA (within-channel/IC)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
@@ -111,16 +111,16 @@ o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % Spectral dimensionality reduction into bands (skip=[])
+o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+
+
 % o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
 %     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
 % o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
-
-% o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
-
 
 
 %% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s)
@@ -164,7 +164,7 @@ o.metricFun = @mmr_cSpecMetrics; % inject at end of ec_classify
 
 % Cross-validation (CV) parameters (mathworks.com/help/stats/crossval.html)
 o.doCV = true; % Do CV?
-o.doNestedCV = true; % Nested CV for hyperparemeter optimization?
+o.doNestedCV = false; % Nested CV for hyperparemeter optimization?
 o.cv.KFold = 10; % Num folds for CV
 o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
 o.cvhn.KFold = 3; % Num folds for nested hyperparameter tuning CV (inner loop)
@@ -184,7 +184,7 @@ if isequal(o.fun,@fitclinear)
     o.hyper.Learner = "logistic"; % "svm"
     o.hyper.Lambda = "auto";
     o.hyper.Regularization = "ridge";
-    o.hyper.Solver = "lbfgs"; % "lbfgs"/"bfgs" for chs (small p), "dual" for ROIs (large p)
+    o.hyper.Solver = "bfgs"; % "lbfgs"/"bfgs" for chs (small p), "dual" for ROIs (large p)
     o.hyper.FitBias = true;
     o.hyper.PostFitBias = false;
     o.hyper.OptimizeLearnRate = false; % stabler/faster when comparing to fitcdiscr
@@ -224,8 +224,9 @@ elseif isequal(o.fun,@fitcknn)
 end
 % Repartition must be false when ec_classify passes a custom CVPartition (trial-grouped cvh)
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
-    Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
-    MaxObjectiveEvaluations=15,Repartition=false,UseParallel=false);
+    Optimizer="gridsearch",NumGridDivisions=15,Repartition=false,UseParallel=false);
+    %Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
+    %MaxObjectiveEvaluations=15,Repartition=false,UseParallel=false);
 
 
 %% Run

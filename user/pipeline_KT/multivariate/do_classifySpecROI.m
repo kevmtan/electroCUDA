@@ -19,7 +19,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "classifySpecROI"; % directory name within dirs.anal
-o.analName = "zf_MzAb_LDA_Gamma"; % directory name within o.analDir
+o.analName = "zf_hpfBands_50ms_SemEpi_LDA_gamma"; % directory name within o.analDir
 
 
 %% ANALYSIS PREP: ec_analPrep(...,o.p)
@@ -34,10 +34,10 @@ o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Channel Options
 o.p.chRm = []; % channels to remove (array of chan numbers)
-o.p.chBadVars = "bad"; % Vars in n.chBad/icBad to use for bad chan removal
-o.p.ROIs = []; % remove chs outside these ROIs
+o.p.chBadVars = ["ai" "empty" "nan"]; % Vars in n.chBad/icBad to use for bad chan removal
+o.p.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
 o.p.roiVar = "roi"; % ROI variable in chNfo
-o.p.chConcat = ""; % Concatenate channels by ["roi"|"all"|""], default="" (none)
+o.p.chConcat = "roi"; % Concatenate channels by ["roi"|"all"|""], default="" (none)
 
 % Timing for analysis
 o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
@@ -59,7 +59,7 @@ o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.025; % latency bin width (secs)
+o.p.epoch.bin = 0.05; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -83,7 +83,7 @@ o.p.pre.mag2db = false; % Log-transform magnitude to decibel
 o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialBaseline = ""; % Subtract trial by mean or median of baseline period (skip=[])
 o.p.pre.trialNorm = ""; % Normalize trial ["robust"|"zscore"|""]; skip=""
-o.p.pre.trialNormDev = "baseline"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
+o.p.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"on"|"off"|"all"] (default="baseline")
 % Bad frames/outliers
 o.p.pre.interp = "linear"; % interpolation method
 o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
@@ -92,16 +92,16 @@ o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
 o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.p.pre.olThrCond = 3; % Outlier threshold for conditions within timepts
+o.p.pre.olThrCond = 2.5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
-o.p.pre.hpfSteep = 0.7; % HPF steepness
-o.p.pre.hpfImpulse = "fir"; % HPF impulse: ["auto"|"fir"|"iir"]
+o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpfSteep = 0.75; % HPF steepness
+o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.p.pre.freqs = [5 300]; %[5 300];
+o.p.pre.freqs = []; %[5 300];
 % Spectral PCA (within-channel/IC)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
@@ -110,15 +110,15 @@ o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % Spectral dimensionality reduction into bands (skip=[])
+o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
+
 % o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
 %     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
-
-% o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+% o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
 
 
 
@@ -154,7 +154,7 @@ o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"i
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 
 % Observations per timepoint (o.p.timeVar)
-o.nMin = 15; % minimum observations per class within timepoint
+o.nMin = 100; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint
 
 % Function handles to inject into classifier routines
@@ -163,11 +163,11 @@ o.metricFun = @mmr_cSpecMetrics; % inject at end of ec_classify
 
 % Cross-validation (CV) parameters (mathworks.com/help/stats/crossval.html)
 o.doCV = true; % Do CV?
-o.doNestedCV = false; % Nested CV for hyperparemeter optimization?
+o.doNestedCV = true; % Nested CV for hyperparemeter optimization?
 o.cv.KFold = 10; % Num folds for CV
 o.cvh.KFold = 5; % Num folds for hyperparameter tuning CV
-o.cvhn.KFold = 5; % Num folds for nested hyperparameter tuning CV (inner loop)
-o.cvMinTrialsPerFold = 3; % Min trials per class in each fold
+o.cvhn.KFold = 3; % Num folds for nested hyperparameter tuning CV (inner loop)
+o.cvMinTrialsPerFold = 2; % Min trials per class in each fold
 
 % Classification basic options
 o.fun = @fitcdiscr; % Classifier function handle [@fitcsvm|@fitclinear|@fitcdiscr|...]
@@ -220,9 +220,9 @@ elseif isequal(o.fun,@fitcdiscr)
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
+% Repartition must be false when ec_classify passes a custom CVPartition (trial-grouped cvh)
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
-    Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
-    MaxObjectiveEvaluations=15);
+    Optimizer="gridsearch",NumGridDivisions=15,Repartition=false,UseParallel=false);
 
 
 %% Run
