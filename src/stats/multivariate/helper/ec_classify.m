@@ -8,13 +8,13 @@ function [sts,obs] = ec_classify(xs,sts,obs,o)
 
 % Bail if no training observations
 if ~any(obs.use)
-    warning("[ec_classify] No observations marked for training, returning...");
+    %warning("[ec_classify] No observations marked for training, returning...");
     return; 
 end
 % Error if the training matrix is entirely NaN (unfittable)
 if all(isnan(xs(obs.use,:)),"all")
-    error("Training data is all NaN for %s t=%g (split has %d 'use' obs).",...
-        sts.sbjCh,sts.t,nnz(obs.use));
+    error("Training data is all NaN for %s time=%g (split has %d 'use' obs).",...
+        sts.sbjCh,sts.time,nnz(obs.use));
 end
 
 
@@ -168,6 +168,7 @@ else
     % No CV - predict training obs with full model
     [obs.pred(obs.use),obs.pp(obs.use,:)] = mdl.predict(xs(obs.use,:));
 end
+
 
 %% Performance
 
@@ -327,7 +328,7 @@ if ~o.doCV || o.doCC
     if o.doCC && ok
         obs.pp(obs.cc,:) = plattApply_lfn(b,obs.pp(obs.cc,end));
     end
-    if ~ok; warning("[ec_classify] Platt scaling not applied for CC/noCV scores: "+sts.sbjCh+" t="+sts.t); end
+    if ~ok; warning("[ec_classify] Platt scaling not applied for CC/noCV scores: "+sts.sbjCh+" time="+sts.time); end
 end
 
 
@@ -335,7 +336,7 @@ end
 if o.doCV
     [obs.pp(obs.use,:),ok] = plattCV_lfn(y,scores,sts.cv{1},obs.pp(obs.use,:),o);
 end
-if ~ok; warning("[ec_classify] Platt scaling not applied for CV scores: "+sts.sbjCh+" t="+sts.t); end
+if ~ok; warning("[ec_classify] Platt scaling not applied for CV scores: "+sts.sbjCh+" time="+sts.time); end
 
 
 

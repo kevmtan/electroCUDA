@@ -107,7 +107,7 @@ trG = findgroups(ep.tr); % groups
 n.trId = splitapply(@(e){e},ep.ide,trG); % indices
 
 % Timepoint indexing (can be done upstream in ec_analPrep(), done again here for robustness)
-[n.timesG,n.times] = findgroups(ep.t);
+[n.timesG,n.times] = findgroups(ep.time);
 n.nTimes = height(n.times); % number of times
 n.timesId = splitapply(@(e){e},ep.ide,n.timesG); % timepoint indices
 

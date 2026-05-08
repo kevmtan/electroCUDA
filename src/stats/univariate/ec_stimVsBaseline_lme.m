@@ -25,7 +25,7 @@ if o.test; disp("[ec_stimVsBaseline_lme] TESTING: "+o.dirs.sbj); end
 [x,ep,n,o] = ec_prepAnalysis(o,tt);
 
 % Organize
-ep.t = string(ep.(o.timeVar)); % keep this???
+ep.time = string(ep.time);
 ep.Properties.RowNames = {};
 sbjChs = n.chNfo.sbjCh;
 
@@ -83,7 +83,7 @@ end
 %%% Within-channel routines %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [chAvg,chST] = withinCh_lfn(xCh,sbjCh,ep,n,o,tt)
 % ch=104; xCh=squeeze(x(:,ch,:)); sbjCh=sbjChs(ch);
-tVar = o.timeVar;
+tVar = "time";
 
 % Preallocate chan results
 chAvg = cell(n.nConds,1);
@@ -208,7 +208,7 @@ disp("[ec_stimVsBaseline] Ran: "+sbjCh+" time="+toc(tt));
 function [cAvg,cST] = lme_TvsBL_lfn(xCh,ep,n,o,c)
 cond = n.conds(c);
 idc = ep.cond==cond;
-times = unique(ep.t(idc),"stable");
+times = unique(ep.time(idc),"stable");
 nTimes = numel(times);
 
 % Preallocate cond results
@@ -217,13 +217,13 @@ cST = cell(nTimes*n.nSpect,1);
 
 % Get baseline timepoints
 ep0 = ep(idc & (ep.BLpre|ep.BLpost),:);
-ep0.t(:) = "BL"; % Mark baseline in time regressor
+ep0.time(:) = "BL"; % Mark baseline in time regressor
 
 %% Loop across times
 for t = 1:nTimes
     % Get epoch time
-    ep1 = [ep0; ep(idc & ep.t==times(t),:)];
-    if nnz(ep1.t==times(t))<15; continue; end
+    ep1 = [ep0; ep(idc & ep.time==times(t),:)];
+    if nnz(ep1.time==times(t))<15; continue; end
 
     %% Loop across spectral columns (freqs/bands/PCs)
     for f = 1:n.nSpect
@@ -233,10 +233,10 @@ for t = 1:nTimes
         % Run model
         if ~o.randomEffectsOnly
             % Linear mixed-effects model (trial-averaged & single-trial)
-            lme = fitlme(ep1,"x ~ t + (t|tr)",FitMethod="REML");
+            lme = fitlme(ep1,"x ~ time + (time|tr)",FitMethod="REML");
         else
             % Linear random effects model (single-trial effects only)
-            lme = fitlme(ep1,"x ~ -1 + (t|tr)",FitMethod="REML");
+            lme = fitlme(ep1,"x ~ -1 + (time|tr)",FitMethod="REML");
         end
 
         %% Extract & organize results
@@ -278,7 +278,7 @@ cST = vertcat(cST{:});
 function [cAvg,cST] = lme_Tvs0_lfn(xCh,ep,n,o,c)
 cond = n.conds(c);
 idc = ep.cond==cond;
-times = unique(ep.t(idc),"stable");
+times = unique(ep.time(idc),"stable");
 nTimes = numel(times);
 
 % Preallocate cond results
@@ -289,8 +289,8 @@ cST = cell(nTimes*n.nSpect,1);
 %% Loop across times
 for t = 1:nTimes
     % Get epoch time
-    ep1 = ep(idc & ep.t==times(t),:);
-    if nnz(ep1.t==times(t))<15; continue; end
+    ep1 = ep(idc & ep.time==times(t),:);
+    if nnz(ep1.time==times(t))<15; continue; end
 
     %% Loop across spectral columns (freqs/bands/PCs)
     for f = 1:n.nSpect
@@ -300,11 +300,11 @@ for t = 1:nTimes
         % Run model
         if ~o.randomEffectsOnly
             % Linear mixed-effects model (trial-averaged & single-trial)
-            lme = fitlme(ep1,"x ~ -1+t + (-1+t|tr)",DummyVarCoding="full",...
+            lme = fitlme(ep1,"x ~ -1+time + (-1+time|tr)",DummyVarCoding="full",...
                 FitMethod="REML");
         else
             % Linear random effects model (single-trial effects only)
-            lme = fitlme(ep1,"x ~ -1 + (-1+t|tr)",DummyVarCoding="full",...
+            lme = fitlme(ep1,"x ~ -1 + (-1+time|tr)",DummyVarCoding="full",...
                 FitMethod="REML");
         end
 

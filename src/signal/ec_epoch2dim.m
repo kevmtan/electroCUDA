@@ -12,7 +12,7 @@ arguments
     n struct                        % Subject/recording metadata
     tt uint64 = tic                 % Timer
     a.epochVar (1,1) string = "tr"  % Epoch variable in ep
-    a.timeVar (1,1) string = "t"    % Time variable in ep
+    a.timeVar (1,1) string = "time" % Time variable in ep
     a.times (:,1) = []              % Canonical time values ([]=infer from n.times/ep)
     a.trialVars (1,:) string = [];  % n.trialNfo variables to copy to observations table
     a.strict (1,1) logical = false  % Strict validation and erroring
@@ -30,7 +30,7 @@ if ~all(ismember(mustHave,ep.Properties.VariableNames))
     miss = mustHave(~ismember(mustHave,ep.Properties.VariableNames));
     error("[ec_epoch2dim] Missing required ep variable(s): %s",strjoin(miss,", "));
 end
-ep.t = ep.(a.timeVar);
+ep.time = ep.(a.timeVar);
 
 % Ensure a usable trial id for compatibility metadata
 if ~ismember("tr",ep.Properties.VariableNames)
@@ -81,7 +81,7 @@ if any(~trIn)
 end
 
 % Canonical ordering for deterministic mapping (only if not already sorted)
-if ~issortedrows(ep,[a.epochVar "t"])
+if ~issortedrows(ep,[a.epochVar "time"])
     [x,ep] = sortInputRows_lfn(x,ep,isROI,a);
 end
 
@@ -94,7 +94,7 @@ else
 end
 
 % Find time indices of ep.timeVar
-[epIn,timeIdx] = ismember(ep.t,times);
+[epIn,timeIdx] = ismember(ep.time,times);
 if any(~epIn)
     % Error/warn
     msg = sprintf("%d rows in ep.%s not present in times",nnz(~epIn),a.timeVar);
@@ -230,7 +230,7 @@ function [x,ep] = sortInputRows_lfn(x,ep,isROI,a)
 %%% Sort ep/x only if needed %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Sort metadata
-[ep,ord] = sortrows(ep,[a.epochVar "t"]);
+[ep,ord] = sortrows(ep,[a.epochVar "time"]);
 
 % Sort EEG data
 if isROI
@@ -255,7 +255,7 @@ if isfield(n,"times") && ~isempty(n.times)
     end
     times = unique(n.times(:),"sorted");
 else
-    times = unique(ep.t,"sorted");
+    times = unique(ep.time,"sorted");
 end
 
 

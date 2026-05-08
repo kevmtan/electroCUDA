@@ -128,16 +128,16 @@ tVar = o.timeVar;
 nFrq = o.n.nSpect;
 
 % Epochs for conditions in contrast
-epc = ep(ismember(ep.cond,[cond0 cond1]),["t" "cond" "ide"]);
+epc = ep(ismember(ep.cond,[cond0 cond1]),["time" "cond" "ide"]);
 
 % Create contrast regressor
 epc.con(:) = false;
 epc.con(ismember(epc.cond,cond1)) = true;
 
 % Get time info
-times = groupcounts(epc,["t" "con"],IncludeEmptyGroups=isany(cond0));
-timeL = unique(times.t(times.GroupCount < o.minN)); % Times without enough samples
-times = unique(times.t);
+times = groupcounts(epc,["time" "con"],IncludeEmptyGroups=isany(cond0));
+timeL = unique(times.time(times.GroupCount < o.minN)); % Times without enough samples
+times = unique(times.time);
 times(ismember(times,timeL)) = []; % exclude times with too small samples
 nTimes = numel(times);
 
@@ -161,7 +161,7 @@ sc.qc = nan(nTimes,nFrq,like=xCh);
 %% Loop across times
 for t = 1:nTimes
     time = times(t);
-    ept = epc(epc.t==time,["ide" "con"]);
+    ept = epc(epc.time==time,["ide" "con"]);
 
     %% Loop across spectral columns (freqs/bands/PCs)
     for f = 1:nFrq

@@ -20,7 +20,7 @@ if o.doNestedCV; o.doCV = true; end
 
 % Vars from 'ep' to include in analysis template (to save for further analysis)
 psyVars = ismember(ep.Properties.VariableNames,...
-    ["run" "tr" "cnd" "t" "sbjID" o.psyVars]);
+    ["run" "tr" "cnd" "time" "sbjID" o.psyVars]);
 
 % Convenient variables
 nCond = numel(o.p.cond); % number of train/test classes 
@@ -61,7 +61,7 @@ ob.Properties.RowNames = {};
 
 %% Make stats template
 st = table;
-st.t = unique(ob.t,"stable");
+st.time = unique(ob.time,"stable");
 st.acc(:) = f0; % Cross-validation (CV) mean accuracy
 st.acc_SE(:) = f0;
 st.acc_p(:) = f0; % p-value above chance
@@ -146,14 +146,14 @@ st = movevars(st,"sbjID","After",width(st));
 %% Check for insufficient sample sizes & unbalanced classes per timepoint
 for t = 1:height(st)
     % Indices of main conditions (classes to train/test) at this timepoint
-    idt = ob.t==st.t(t) & ismember(ob.cnd,o.p.cond);
+    idt = ob.time==st.time(t) & ismember(ob.cnd,o.p.cond);
     ob.use(idt) = balanceClasses_lfn(ob(idt,:),nCond,o);
 end
 
 
 %% Find sample counts per training & CC cond (after balancing)
 for t = 1:height(st)
-    idt = find(ob.t==st.t(t));
+    idt = find(ob.time==st.time(t));
 
     % Main conds
     for c = 1:nCond
@@ -192,9 +192,9 @@ end
 %% Make cross-validation objects per timepoint
 for t = 1:height(st)
     % Get train/test indices per timepoint
-    idt = ob.t==st.t(t) & ob.use;
+    idt = ob.time==st.time(t) & ob.use;
     if ~any(idt)
-        warning("[ec_classifyPrep] No usable observations at t=%g; skipping CV partitioning.",st.t(t));
+        warning("[ec_classifyPrep] No usable observations at time=%g; skipping CV partitioning.",st.time(t));
         continue;
     end
     obt = ob(idt,:);
@@ -205,7 +205,7 @@ for t = 1:height(st)
         if isempty(st.cv{t})
             ob.use(idt) = false; % mark timepoint as unusable
             st.cv{t} = [];
-            warning("[ec_classifyPrep] No usable observations at t=%g after CV partitioning.",st.t(t));
+            warning("[ec_classifyPrep] No usable observations at time=%g after CV partitioning.",st.time(t));
             continue;
         end
 
@@ -223,7 +223,7 @@ for t = 1:height(st)
         if isempty(st.cvh{t})
             ob.use(idt) = false;
             st.cvh{t} = [];
-            warning("[ec_classifyPrep] No usable observations at t=%g after hyperparameter tuning CV partitioning.",st.t(t));
+            warning("[ec_classifyPrep] No usable observations at time=%g after hyperparameter tuning CV partitioning.",st.time(t));
         end
     end
 
@@ -248,7 +248,7 @@ for t = 1:height(st)
             ob.use(idt) = false;
             st.cv{t} = [];
             st.cvhn{t} = [];
-            warning("[ec_classifyPrep] No usable observations at t=%g after nested CV partitioning.",st.t(t));
+            warning("[ec_classifyPrep] No usable observations at time=%g after nested CV partitioning.",st.time(t));
             continue;
         end
 
@@ -257,7 +257,7 @@ for t = 1:height(st)
 
     % Warn if this timepoint has no usable observations remaining
     if ~any(ob.use(idt))
-        warning("[ec_classifyPrep] No usable observations at t=%g.",st.t(t));
+        warning("[ec_classifyPrep] No usable observations at time=%g.",st.time(t));
     end
 end
 
@@ -348,7 +348,7 @@ function cv = cvPartition_lfn(obt,nCond,cvArgs,minTrialsPerFold)
 % class counts. Trials are grouped (all obs from a trial go to same fold),
 % and trials are distributed to balance classes across folds.
 % Reduces number of folds if necessary to ensure minTrialsPerFold per class per fold.
-timepoint = obt.t(1);
+timepoint = obt.time(1);
 
 % Parse cvArgs for KFold
 if isfield(cvArgs,'KFold')
@@ -377,7 +377,7 @@ maxFolds = floor(minClassTrials / minTrialsPerFold);
 % Check if minimum requirement can be met (need at least 2 folds)
 if maxFolds < 2
     warning("[ec_classifyPrep] Not enough trials per class for CV: " + ...
-        "min=%d, need %d for 2-fold CV. Skipping timepoint t=%g.", ...
+        "min=%d, need %d for 2-fold CV. Skipping timepoint time=%g.", ...
         minClassTrials, minTrialsPerFold * 2, timepoint);
     cv = [];
     return;

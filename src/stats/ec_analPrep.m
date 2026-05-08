@@ -183,11 +183,11 @@ oo = namedargs2cell(a.epoch);
 n.trialNfo = trialNfo;
 
 % Rename target time & condition variables (guard against no-ops & collisions)
-if a.timeVar~="t"
-    if ismember("t",string(ep.Properties.VariableNames))
-        error("[ec_analPrep] Cannot rename ep.%s to 't': column 't' already exists.",a.timeVar);
+if a.timeVar~="time"
+    if ismember("time",string(ep.Properties.VariableNames))
+        error("[ec_analPrep] Cannot rename ep.%s to 'time': column 'time' already exists.",a.timeVar);
     end
-    ep = renamevars(ep,a.timeVar,"t");
+    ep = renamevars(ep,a.timeVar,"time");
 end
 if a.condVar~="cnd"
     if ismember("cnd",string(ep.Properties.VariableNames))
@@ -218,7 +218,7 @@ ep = ep(ismember(ep.tr,n.trialNfo.tr),:);
 
 % Restrict epochs to analysis timerange
 if isany(a.timeRng) && numel(a.timeRng)==2
-    ep = ep(ep.t>=a.timeRng(1) & ep.t<=a.timeRng(2),:);
+    ep = ep(ep.time>=a.timeRng(1) & ep.time<=a.timeRng(2),:);
 end
 
 % Update epoch indices
@@ -232,7 +232,7 @@ n.cnds = unique(n.trialNfo.cnd);
 n.nCnds = numel(n.cnds);
 
 % Analysis times
-[n.timesG,n.times] = findgroups(ep.t);
+[n.timesG,n.times] = findgroups(ep.time);
 n.nTimes = height(n.times); % number of times
 
 

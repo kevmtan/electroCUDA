@@ -157,13 +157,13 @@ id = ismember(st.Properties.VariableNames,["cost" "cv" "cvh" "cvhn"]);
 st = removevars(st,id);
 
 % Rename vars (guard against no-op or collision with existing columns)
-if o.p.timeVar~="t"
+if o.p.timeVar~="time"
     if ismember(o.p.timeVar,string(ob.Properties.VariableNames))
-        error("[ec_classifySpec] Cannot rename ob.t to '%s': column already exists.",o.p.timeVar);
+        error("[ec_classifySpec] Cannot rename ob.time to '%s': column already exists.",o.p.timeVar);
     end
-    ob = renamevars(ob,"t",o.p.timeVar);
-    if ismember("t",string(st.Properties.VariableNames))
-        st = renamevars(st,"t",o.p.timeVar);
+    ob = renamevars(ob,"time",o.p.timeVar);
+    if ismember("time",string(st.Properties.VariableNames))
+        st = renamevars(st,"time",o.p.timeVar);
     end
 end
 if o.p.condVar~="cnd"
@@ -242,7 +242,7 @@ end
 disp("[ec_classifySpec] Ran classifiers: "+n.sbj+" toc="+toc(tt));
 
 % Concatenate channel results
-ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "t"],"ascend");
+ob = vertcat(ob{:}); % sortrows(vertcat(ob{:}),["ch" "tr" "time"],"ascend");
 
 
 
@@ -254,7 +254,7 @@ function st = fdr_lfn(st,n,o,tt)
 vs = string(st.Properties.VariableNames);
 vsQ = vs(endsWith(vs,"_q")); % fdr vars
 vsP = replace(vsQ,"_q","_p"); % expected matching pval vars
-id = st.t>=o.fdrTimeRng(1) & st.t<=o.fdrTimeRng(2); % fdr time range
+id = st.time>=o.fdrTimeRng(1) & st.time<=o.fdrTimeRng(2); % fdr time range
 
 % Verify every _q has a matching _p; drop (with warning) any that don't
 hasP = ismember(vsP,vs);
