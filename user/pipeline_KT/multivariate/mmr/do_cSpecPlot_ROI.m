@@ -7,10 +7,12 @@ op.visible = false; % !!!!!!!!!!
 op.save = true; % !!!!!!!!!!!
 
 % Load/save
-op.figDir = "figs";
-op.statFn = "stat";
+op.figDir = "figsLatency_p";
+op.statFn = "statLatency";
 
+% Significance
 op.sigThr = 0.05; % significance threshold
+op.sigVar = "p";
 
 % Plot
 op.res = [1280 720];

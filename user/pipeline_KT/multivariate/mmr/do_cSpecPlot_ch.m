@@ -12,7 +12,10 @@ op = struct;
 op.figDir = "figs";
 op.visible = false; % !!!!!!!!!!
 op.save = true; % !!!!!!!!!!!
+
+% Significance
 op.sigThr = 0.05; % significance threshold
+op.sigVar = "p";
 
 % Plot
 op.res = [1440 720];

@@ -10,6 +10,7 @@ oFns = "/01/lbcn/anal/classifySpecROI/zf_hpfBands_50ms_SemEpi_LDA_gamma/o_zf_hpf
 %% Analysis options
 oa = struct;
 oa.timeVar="latency";
+oa.statFn="statLatency";
 
 
 %% Loop across runs

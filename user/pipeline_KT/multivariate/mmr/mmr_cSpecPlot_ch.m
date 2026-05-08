@@ -48,6 +48,7 @@ end
 function plotCh_lfn(stc,d,n,op)
 %% Plot channel %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ch=71; stc=st{ch}; d=d0;
+sigVar = "_" + string(op.sigVar);
 
 % Channel 
 sbjCh = stc.sbjCh(1);
@@ -89,10 +90,10 @@ ha.Visible="off";
 y = [stc.ppc stc.ppxc];
 ySE = [stc.ppc_SE stc.ppxc_SE];
 ySig = y;
-ySig(~(stc.ppc_q(:,1)<op.sigThr),1) = nan; % semantic
-ySig(~(stc.ppc_q(:,2)<op.sigThr),2) = nan; % episodic
-ySig(~(stc.ppxc_q(:,1)<op.sigThr),3) = nan; % self
-ySig(~(stc.ppxc_q(:,2)<op.sigThr),4) = nan; % other
+ySig(~(stc.("ppc"+sigVar)(:,1)<op.sigThr),1) = nan; % semantic
+ySig(~(stc.("ppc"+sigVar)(:,2)<op.sigThr),2) = nan; % episodic
+ySig(~(stc.("ppxc"+sigVar)(:,1)<op.sigThr),3) = nan; % self
+ySig(~(stc.("ppxc"+sigVar)(:,2)<op.sigThr),4) = nan; % other
 
 % Initialize subplot
 ha = nexttile(ht);
@@ -119,8 +120,8 @@ plot([0 0],ylim,"k-","LineWidth",op.c.wSig);
 y = [stc.ppc1 stc.ppxc1];
 ySE = [stc.ppc1_SE stc.ppxc1_SE];
 ySig = y;
-ySig(~(stc.ppc1_q<op.sigThr),1) = nan; % Episodic-Semantic
-ySig(~(stc.ppxc1_q<op.sigThr),2) = nan; % Other-Self
+ySig(~(stc.("ppc1"+sigVar)<op.sigThr),1) = nan; % Episodic-Semantic
+ySig(~(stc.("ppxc1"+sigVar)<op.sigThr),2) = nan; % Other-Self
 
 % Initialize subplot
 ha = nexttile(ht);
@@ -145,8 +146,8 @@ plot([0 0],ylim,"k-","LineWidth",op.d.wSig);
 y = [stc.ppr_RT,stc.ppr_RC];
 ySE = [stc.ppr_RT_SE,stc.ppr_RC_SE];
 ySig = y;
-ySig(~(stc.ppr_RT_q<op.sigThr),1) = nan;
-ySig(~(stc.ppr_RC_q<op.sigThr),2) = nan;
+ySig(~(stc.("ppr_RT"+sigVar)<op.sigThr),1) = nan;
+ySig(~(stc.("ppr_RC"+sigVar)<op.sigThr),2) = nan;
 
 % Initialize subplot
 ha = nexttile(ht);
@@ -171,9 +172,9 @@ plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
 y = [stc.ppxr_RT,stc.ppxr_RC,stc.ppxr_val];
 ySE = [stc.ppxr_RT_SE,stc.ppxr_RC_SE,stc.ppxr_val_SE];
 ySig = y;
-ySig(~(stc.ppxr_RT_q<op.sigThr),1) = nan;
-ySig(~(stc.ppxr_RC_q<op.sigThr),2) = nan;
-ySig(~(stc.ppxr_val_q<op.sigThr),3) = nan;
+ySig(~(stc.("ppxr_RT"+sigVar)<op.sigThr),1) = nan;
+ySig(~(stc.("ppxr_RC"+sigVar)<op.sigThr),2) = nan;
+ySig(~(stc.("ppxr_val"+sigVar)<op.sigThr),3) = nan;
 
 % Initialize subplot
 ha = nexttile(ht);
@@ -199,7 +200,7 @@ plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
 y = stc.acc;
 ySE = stc.acc_SE;
 ySig = y;
-ySig(~(stc.acc_q<op.sigThr)) = nan;
+ySig(~(stc.("acc"+sigVar)<op.sigThr)) = nan;
 
 % Initialize subplot
 ha = nexttile(ht);
