@@ -15,22 +15,27 @@ o.gather = "block"; % Gather data from GPU ["block"=each permute block|"final"=e
 o.stream = true;
 o.ramAvail = ec_ramAvail(o.parallel=="gpu"); % Available memory in bytes
 o.ramAvail2 = ec_ramAvail(o.parallel2=="gpu"); % Available memory in bytes
+o.saveDF = true;
 
 % ROI source dirs
 o.roiDir = "ROIs"; % directory name within dirs.anal
-o.roiName = "ep_xs"; % directory name within o.roiDir
+o.roiName = "ep_zf_hpf"; % directory name within o.roiDir
 
 % Analysis dirs
 o.analDir = "condConROI"; % directory name within dirs.anal
-o.analName = "xs"; % directory name within o.analDir
+o.analName = "zf_hpf_sbjCh"; % directory name within o.analDir
 
 % ROIs
 o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; 
 
 % Variables in observations table
 o.condVar = "cnd";              % condition variable
-o.grpVars = ["sbjCh" "tr"];   % group variables for 1-sample grouped/nested stats
-o.grpVars2 = ["sbjCh" "run"];  % group variables for 2-sample grouped/nested stats
+o.grpVars = "sbjID"; %["sbjCh" "tr"];   % group variables for 1-sample grouped/nested stats
+o.grpVars2 = "sbjID"; %["sbjCh" "run"];  % group variables for 2-sample grouped/nested stats
+
+% Average observations across these variables
+o.avgVars = "sbjCh";
+o.avgType = "mean";
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)

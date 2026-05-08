@@ -1,16 +1,15 @@
-% Math vs Autobio run launcher for ROI classification experiments
 
-doTmp_MathAb_LDA;
+do_classifySpecCh;
 clear all; close all;
 
-doTmp_MathAb_LDA_gamma;
+doTmp_zf_50ms_MathAb_LR_lambda;
 clear all; close all;
 
-doTmp_MathAb_LDA_pca;
+doTmp_zf_50ms_SemEpi_LDA_gamma;
 clear all; close all;
 
-doTmp_MathAb_LDA_pcaGamma;
+doTmp_zf_50ms_MathAb_LDA_gamma;
 clear all; close all;
 
-doTmp_MathAb_LDA_gammaNested;
-clear all; close all;
+do_cSpecPlot_ch;
+try delete(gcp("nocreate")); catch;end
