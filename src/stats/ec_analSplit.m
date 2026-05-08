@@ -20,9 +20,15 @@ end
 % Make logical flags about data
 if isfield(n,"ROIs"), a.roi=true; else; a.roi=false; end
 % Assert time grouping index exists
-assert(numel(n.timesG)==size(x,1),...
-    "[ec_analSplit] n.timesG length (%d) must match split rows (%d). n.timesG appears desynchronized from data rows.",...
-    numel(n.timesG),size(x,1));
+if iscell(x)
+    assert(numel(n.timesG)==height(x{1}),...
+        "[ec_analSplit] n.timesG length (%d) must match split rows (%d). n.timesG appears desynchronized from data rows.",...
+        numel(n.timesG),height(x{1}));
+else
+    assert(numel(n.timesG)==height(x),...
+        "[ec_analSplit] n.timesG length (%d) must match split rows (%d). n.timesG appears desynchronized from data rows.",...
+        numel(n.timesG),height(x));
+end
 
 
 %% Prep
@@ -32,7 +38,7 @@ end
 nCh = numel(x);
 
 % Generate observations index
-n.ide = (1:height(x{1}))';
+ide = (1:height(x{1}))';
 
 % Preallocate split data
 sts = cell(nCh,1);
@@ -44,12 +50,12 @@ wts = sts;
 if a.pcaGPU && (isany(a.pca) || a.rank)
     % Run on GPU
     for c = 1:nCh
-        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c);
+        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c,ide);
     end
 else
     % Run on CPU threadpool
     parfor c = 1:nCh
-        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c);
+        [x{c},sts{c},obs{c},wts{c}] = withinCh_lfn(x{c},n,st,ob,a,c,ide);
     end
 end
 
@@ -76,7 +82,7 @@ disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+..
 
 
 
-function [xc,stc,obc,wtc] = withinCh_lfn(xc,n,stc,obc,a,c)
+function [xc,stc,obc,wtc] = withinCh_lfn(xc,n,stc,obc,a,c,ide)
 %%% Within-channel/IC/ROI routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                           
 
 % Get info
@@ -126,9 +132,9 @@ end
 
 
 %% Split data by timepoint
-xc = splitapply(@(e){xc(e,:)},n.ide,n.timesG);
+xc = splitapply(@(e){xc(e,:)},ide,n.timesG);
 if ~isempty(obc)
-    obc = splitapply(@(e){obc(e,:)},n.ide,n.timesG);
+    obc = splitapply(@(e){obc(e,:)},ide,n.timesG);
 end
 
 
