@@ -5,5 +5,5 @@ function mustBeTextOrNumeric(input)
 % Kevin Tan, 2025
 
 if ~(istext(input) || isnumeric(input))
-    error('Input must be text or numeric');
+    error("Input must be text or numeric");
 end

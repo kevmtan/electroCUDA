@@ -1,4 +1,4 @@
-function y = isNumOrLogical(x)
+function y = isNumericOrLogical(x)
 % Is numeric or logical?
 %
 % This function is part of the electroCUDA package:
@@ -7,18 +7,17 @@ function y = isNumOrLogical(x)
 % Kevin Tan, 2025
 
 if istable(x) || istimetable(x)
-    x = table2cell(x(1,:));
+    y = varfun(@lfn,x,OutputFormat="uniform");
 elseif isstruct(x)
-    x = struct2cell(x);
-end
-
-if iscell(x)
+    y = structfun(@lfn,x);
+elseif iscell(x)
     y = cellfun(@lfn,x,UniformOutput=true);
 else
     y = lfn(x);
 end
 
-%%
+
+% Check if numeric or logical
 function y = lfn(x)
 if isnumeric(x) || islogical(x)
     y = true;

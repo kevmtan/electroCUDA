@@ -143,7 +143,7 @@ nTimes = numel(times);
 
 % Move to GPU
 if o.gpu
-    epc = convertvars(epc,@isNumOrLogical,@gpuArray);
+    epc = convertvars(epc,isNumericOrLogical(epc),@gpuArray);
     times=gpuArray(times); nTimes=gpuArray(nTimes); nFrq=nFrq(nFrq);
 end
 

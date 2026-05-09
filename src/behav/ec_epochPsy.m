@@ -12,7 +12,7 @@ arguments
     % Variables to remove from epoch table
     o.rmVars = ["Time" "onHz" "photodiode" "trial" "timeR" "noPdio"];
     % Bad trial removal
-    o.rmTrials {isNumOrLogical} = []; % Trials to remove (numeric array or logical index)
+    o.rmTrials (:,1){mustBeNumericOrLogical} = []; % Trials to remove (numeric array or logical index)
     o.rmTrialsFun = {} % Function handle for removing trials (using trialNfo vars)
     o.badTrialVars (1,:) string = ""; % Bad trial variables in trialNfo
     % Epoch time limits (secs) [nan=variable, 0=none]
@@ -74,7 +74,7 @@ ep = vertcat(ep{:});
 trialNfo.removed(:) = false;
 
 % Specified trials numbers to remove
-if isany(o.rmTrials)
+if any(o.rmTrials)
     if islogical(o.rmTrials) % Logical index
         if length(o.rmTrials)==trs
             trialNfo.removed(o.rmTrials) = true;

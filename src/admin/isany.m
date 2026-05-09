@@ -7,48 +7,42 @@ function y = isany(x,dim)
 %
 % Kevin Tan, 2025
 
-%% Input validation
+% Input validation
 arguments
     x % Variable to check if empty
-    dim (1,1) {isnumeric,istext} = "all" % Dimension to check, "all" for entire file
+    dim (1,1) {mustBeTextOrNumeric} = "all" % Dimension to check, "all" for entire file
 end
 
-% Return if empty
+% Main checks: non-empty, non-zero, non-missing, and text ~= ""
 if isempty(x)
     y = false;
-    return
-end
-
-%% Main
-
-% Convert to cell
-if istable(x) || istimetable(x)
-    x = table2cell(x);
-elseif isstruct(x)
-    x = struct2cell(x);
-end
-
-% Find non-empty, non-zero numeric vals, or text~=""
-if isnumeric(x) || islogical(x)
-    if any(x,dim)
-        y = true; 
-    else
-        y = false;
-    end
+elseif isnumeric(x) || islogical(x)
+    y = any(x,dim);
 elseif istext(x)
-    if any(x~="" & ~ismissing(x),dim) 
-        y = true;
-    else
-        y = false;
-    end
-elseif any(isobject(x),dim)
+    y = any(x~="" & ~ismissing(x),dim);
+elseif isobject(x)
     y = true;
+elseif istable(x) || istimetable(x)
+    y = any(varfun(@(xi) lfn(xi,dim),x,OutputFormat="uniform"),dim);
+elseif isstruct(x)
+    y = any(structfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
 elseif iscell(x)
-    if any(cellfun(@nnz,x(cellfun(@isnumeric,x))),dim) ||...
-            any(cellfun(@(xx) xx~="" & ~ismissing(xx), x(cellfun(@istext,x))),dim) ||...
-            any(cellfun(@isobject,x),dim)
-        y = true;
-    else
-        y = false;
-    end
+    y = any(cellfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
+else
+    error("Unsupported input type");
+end
+
+
+% Nested checks subfunction
+function yi = lfn(xi,dim)
+if isempty(xi)
+    yi = false;
+elseif isnumeric(xi) || islogical(xi)
+    yi = any(xi,dim);
+elseif istext(xi)
+    yi = any(xi~="" & ~ismissing(xi),dim);
+elseif isobject(xi)
+    yi = true;
+else
+    error("Unsupported input type");
 end
