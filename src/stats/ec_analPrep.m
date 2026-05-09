@@ -22,7 +22,7 @@ arguments
     a.conds (1,:) string = []
     a.pre struct = [] % Analysis preprocessing options (ec_epochPreproc)
     a.nRmFields (1,:) string = [] % Fields to remove from 'n' to save memory
-    a.timeRng = [] % Range of times to run including baseline ([]=epochPsy output)
+    a.timeRng (1,:) double = [] % Range of times to run including baseline ([min max]; []=epochPsy output)
     a.trialVars (1,:) string = [] % trialNfo vars to copy to 'ep'
     a.dirs struct = [] % legacy support for input-value 'dirs'
     a.test (1,1) logical = false
@@ -67,10 +67,10 @@ end
 
 
 %% Preprocessing (analysis-specific)
-if ~isempty(a.pre) && exist("ep","var") && ~isempty(ep)
+if ~isempty(a.pre)
     [x,ep,n] = preproc_lfn(x,n,psy,ep,a,tt);
 else
-    disp("[ec_analPrep] Skipping preproc: 'ep' var is empty or nonexistent | toc="+toc(tt));
+    disp("[ec_analPrep] Skipping preproc: 'ep' is empty or 'pre' not set | toc="+toc(tt));
 end
 
 
@@ -81,10 +81,13 @@ end
 
 
 %% Finalize
-% try
-%     n = rmfield(n,a.nRmFields); % Fields to remove from 'n' to save memory
-% catch ME; disp(ME)
-% end
+% Remove specified fields from 'n' to save memory (only those that exist)
+if isany(a.nRmFields)
+    rmFields = a.nRmFields(isfield(n,a.nRmFields));
+    if isany(rmFields)
+        n = rmfield(n,rmFields);
+    end
+end
 disp("[ec_analPrep] Finished: "+n.sbj+" | toc="+toc(tt));
 
 
@@ -96,7 +99,7 @@ function [x,n] = chPrep_lfn(x,chNfo,n,a,tt)
 %%% Channel info & removal %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Channel/IC info
-if n.ICA
+if isfield(n,"ICA") && n.ICA
     % IC info
     n.chNfo = n.icNfo;
     n.chNfo = renamevars(n.chNfo,["ic" "sbjIC"],["ch" "sbjCh"]);
@@ -135,27 +138,24 @@ else
 end
 
 % Collate chans to keep/remove
-n.chKeep = all([~chBad,~chRm,chROIs],2);
+n.chKeep = ~chBad & ~chRm & chROIs;
 
 % Remove chans
 if any(~n.chKeep)
     x = x(:,n.chKeep,:);            % from EEG data
     n.chNfo = n.chNfo(n.chKeep,:);  % from chNfo
 
-    % Remove chans from bad frames (n.xBad)
+    % Remove chans from bad frames (n.xBad).
+    % Sparse 2D column slice S(:,keepCols) is O(nnz_kept) — uses sparse
+    % column pointers, no full() materialization. MATLAB sparse is 2D-only,
+    % so any higher-D xBad must be dense and is sliced in place.
     for v = string(n.xBad.Properties.VariableNames)
-        % Get number of dims for var
-        nd = ndims(n.xBad.(v));
-
-        % Remove chans from var
-        if width(n.xBad.(v))==n.nChs
-            if nd==3 % 3D
-                xBad = full(n.xBad.(v));
-                xBad = xBad(:,n.chKeep,:);
-                n.xBad.(v) = sparse(xBad);
-            elseif nd==2 % 2D
-                n.xBad.(v) = n.xBad.(v)(:,n.chKeep);
-            end
+        xBad = n.xBad.(v);
+        if size(xBad,2) ~= n.nChs; continue; end
+        if ismatrix(xBad)
+            n.xBad.(v) = xBad(:,n.chKeep);
+        else
+            n.xBad.(v) = xBad(:,n.chKeep,:);
         end
     end
 end
@@ -182,19 +182,31 @@ oo = namedargs2cell(a.epoch);
 [ep,trialNfo,n,psy] = ec_epochPsy(psy,trialNfo,n,tt,oo{:});
 n.trialNfo = trialNfo;
 
-% Rename target time & condition variables (guard against no-ops & collisions)
+% Rename target time & condition variables (guard against no-ops, missing sources, & collisions)
 if a.timeVar~="time"
-    if ismember("time",string(ep.Properties.VariableNames))
+    epVars = string(ep.Properties.VariableNames);
+    if ~ismember(a.timeVar,epVars)
+        error("[ec_analPrep] ep.%s does not exist; cannot rename to 'time'.",a.timeVar);
+    end
+    if ismember("time",epVars)
         error("[ec_analPrep] Cannot rename ep.%s to 'time': column 'time' already exists.",a.timeVar);
     end
     ep = renamevars(ep,a.timeVar,"time");
 end
 if a.condVar~="cnd"
-    if ismember("cnd",string(ep.Properties.VariableNames))
+    epVars = string(ep.Properties.VariableNames);
+    if ~ismember(a.condVar,epVars)
+        error("[ec_analPrep] ep.%s does not exist; cannot rename to 'cnd'.",a.condVar);
+    end
+    if ismember("cnd",epVars)
         error("[ec_analPrep] Cannot rename ep.%s to 'cnd': column 'cnd' already exists.",a.condVar);
     end
     ep = renamevars(ep,a.condVar,"cnd");
-    if ismember("cnd",string(n.trialNfo.Properties.VariableNames))
+    tnVars = string(n.trialNfo.Properties.VariableNames);
+    if ~ismember(a.condVar,tnVars)
+        error("[ec_analPrep] n.trialNfo.%s does not exist; cannot rename to 'cnd'.",a.condVar);
+    end
+    if ismember("cnd",tnVars)
         error("[ec_analPrep] Cannot rename n.trialNfo.%s to 'cnd': column 'cnd' already exists.",a.condVar);
     end
     n.trialNfo = renamevars(n.trialNfo,a.condVar,"cnd");
@@ -216,8 +228,8 @@ end
 % Delete epochs with trials not in trialNfo
 ep = ep(ismember(ep.tr,n.trialNfo.tr),:);
 
-% Restrict epochs to analysis timerange
-if isany(a.timeRng) && numel(a.timeRng)==2
+% Restrict epochs to analysis timerange (numel guaranteed by argument validator)
+if ~isempty(a.timeRng)
     ep = ep(ep.time>=a.timeRng(1) & ep.time<=a.timeRng(2),:);
 end
 
@@ -243,13 +255,9 @@ n.nTimes = height(n.times); % number of times
 function [x,ep,n] = preproc_lfn(x,n,psy,ep,a,tt)
 %%% Analysis-specific preprocessing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Run preprocessing
-if ~isempty(a.pre)
-    oo = namedargs2cell(a.pre);
-    [x,n] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=a.test);
-else
-    disp("[ec_analPrep] Skipping preproc: empty 'pre' argument | toc="+toc(tt));
-end
+% Run preprocessing (~isempty(a.pre) already gated by caller)
+oo = namedargs2cell(a.pre);
+[x,n,n.preproc] = ec_epochPreproc(x,n,psy,ep,tt,oo{:},test=a.test);
 
 % Copy trialNfo vars to 'ep'
 if isany(a.trialVars)
@@ -297,7 +305,6 @@ if a.chConcat=="roi"
     n.ROIs.chs = cell(n.nROIs,1);
     n.ROIs.sbjChs = cell(n.nROIs,1);
     n.ROIs.columns = cell(n.nROIs,1);
-    n.ROIs.sbjROI(:) = string(missing);
     n.ROIs.sbjID(:) = n.sbjID;
     n.ROIs.sbjROI = "s"+n.sbjID+"_"+string(n.ROIs.roi);
     n.ROIs = movevars(n.ROIs,"sbjROI",Before=1);
@@ -317,16 +324,13 @@ if a.chConcat=="roi"
         % Concatenate EEG from (times,chans,freqs) to (times,freqs*chans)
         y{r} = reshape(y{r}, height(y{r}), width(y{r})*size(y{r},3));  % a-by-(b*c)
 
-        % Column info (collect per-ch tables, vertcat once)
-        xiAll = cell(n.ROIs.nChs(r),1);
-        for ch = 1:n.ROIs.nChs(r)
-            xi = spect;
-            xi.ch(:) = n.ROIs.chs{r}(ch);
-            xi = movevars(xi,"ch","Before",1);
-            xi = renamevars(xi,"name","spect");
-            xiAll{ch} = xi;
-        end
-        n.ROIs.columns{r} = vertcat(xiAll{:});
+        % Column info (one tile of 'spect' per ROI ch; ch column via repelem)
+        nSpect = height(spect);
+        xi = repmat(spect,n.ROIs.nChs(r),1);
+        xi.ch = repelem(n.ROIs.chs{r}(:),nSpect);
+        xi = movevars(xi,"ch",Before=1);
+        xi = renamevars(xi,"name","spect");
+        n.ROIs.columns{r} = xi;
     end
     disp("[ec_analPrep] Concatenated ROI chs: "+n.sbj+" | toc="+toc(tt));
 elseif a.chConcat=="all"
@@ -344,15 +348,12 @@ elseif a.chConcat=="all"
     % Concatenate EEG from (times,chans,freqs) to (times,freqs*chans)
     y = reshape(permute(x,[1 3 2]), height(x), width(x)*size(x,3));
 
-    % Column info (collect per-ch tables, vertcat once)
-    xiAll = cell(n.ROIs.nChs,1);
-    for ch = 1:n.ROIs.nChs
-        xi = n.spect;
-        xi.ch(:) = n.ROIs.chs{1}(ch);
-        xi = movevars(xi,"ch","Before",1);
-        xi = renamevars(xi,"name","spect");
-        xiAll{ch} = xi;
-    end
-    n.ROIs.columns{1} = vertcat(xiAll{:});
+    % Column info (one tile of n.spect per ch; ch column via repelem)
+    nSpect = height(n.spect);
+    xi = repmat(n.spect,n.ROIs.nChs,1);
+    xi.ch = repelem(n.ROIs.chs{1}(:),nSpect);
+    xi = movevars(xi,"ch",Before=1);
+    xi = renamevars(xi,"name","spect");
+    n.ROIs.columns{1} = xi;
     disp("[ec_analPrep] Concatenated all chs: "+n.sbj+" | toc="+toc(tt));
 end
