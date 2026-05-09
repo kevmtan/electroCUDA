@@ -19,11 +19,11 @@ o.saveDF = true;
 
 % ROI source dirs
 o.roiDir = "ROIs"; % directory name within dirs.anal
-o.roiName = "ep_zf_hpf"; % directory name within o.roiDir
+o.roiName = "ep_zf_bin5ms_hpf"; % directory name within o.roiDir
 
 % Analysis dirs
 o.analDir = "condConROI"; % directory name within dirs.anal
-o.analName = "zf_hpf_sbjCh"; % directory name within o.analDir
+o.analName = "zf_bin5ms_hpf"; % directory name within o.analDir
 
 % ROIs
 o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; 
@@ -34,8 +34,13 @@ o.grpVars = "sbjID"; %["sbjCh" "tr"];   % group variables for 1-sample grouped/n
 o.grpVars2 = "sbjID"; %["sbjCh" "run"];  % group variables for 2-sample grouped/nested stats
 
 % Average observations across these variables
-o.avgVars = "sbjCh";
+o.avgVars = []; %"sbjCh";
 o.avgType = "mean";
+
+% Pooled baseline correction (across trials)
+o.baseline = -200;
+o.baselineType = "mean";
+o.baselineNorm = "robust";
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)

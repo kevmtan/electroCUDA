@@ -46,7 +46,7 @@ save(fn,"o","-v7");
 disp("[ec_condConROI_perm] Saved: "+fn+" | toc="+toc(tt));
 
 
-%%
+%% Contrast conditions
 
 % Convert o.condx cells to nContrasts-by-maxWidth string array (pad with missing)
 if iscell(o.cond1)
@@ -117,6 +117,43 @@ str = cell(nCons,1); % Statistical contrasts
 
 
 %% Load subject data
+[x,ob] = loadSbjData_lfn(x,ob,ROI,o,tt);
+
+
+%% Average across observations
+if isany(o.avgVars)
+    [x,ob] = avgObs_lfn(x,ob,roi,o,tt);
+end
+
+%% Pooled baseline correction (across trials)
+if isany(o.baseline)
+    x = baselineCorr_lfn(x,ob,n,roi,o,tt);
+end
+
+
+%% Run contrasts
+for c = 1:nCons
+    str{c} = ec_contrast_perm(x,ob,n,o,c,tt);
+end
+
+
+%% Finalize
+str = vertcat(str{:}); % concatenate across contrasts
+str.roi(:) = ROI.roi(1); % add ROI name
+str = movevars(str,"roi",Before=1); % move to first column
+disp("[ec_condConROI_perm] Finished contrasts for: "+roi+" | toc="+toc(tt));
+
+
+
+
+
+function [x,ob] = loadSbjData_lfn(x,ob,ROI,o,tt)
+%%% Load subject ROI data %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+roi = string(ROI.roi(1));
+nSbjs = height(ROI);
+
+
+%% Load across subjects
 for s = 1:nSbjs
     % Load EEG
     load(ROI.xr(s),"xr");
@@ -141,31 +178,11 @@ ob.cnd = ob.(o.condVar);
 disp("[ec_condConROI_perm] Concatenated subject data for: "+roi+" | toc="+toc(tt));
 
 
-%% Average across observations
-if isany(o.avgVars)
-    [x,ob] = avgObs_lfn(x,ob,roi,o,tt);
-end
-
-
-%% Run contrasts
-for c = 1:nCons
-    str{c} = ec_contrast_perm(x,ob,n,o,c,tt);
-end
-
-
-%% Finalize
-str = vertcat(str{:}); % concatenate across contrasts
-str.roi(:) = ROI.roi(1); % add ROI name
-str = movevars(str,"roi",Before=1); % move to first column
-disp("[ec_condConROI_perm] Finished contrasts for: "+roi+" | toc="+toc(tt));
-
-
-
 
 
 
 function [x,ob] = avgObs_lfn(x,ob,roi,o,tt)
-%%% Average acros observations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Average across observations %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Validate avgVars exist in ob
 grpByVars = unique([string(o.avgVars(:))', "cnd"], 'stable');
@@ -179,10 +196,10 @@ grpByVars = grpByVars(idVars);
 [~, ia, grpIdx] = unique(ob(:, grpByVars), 'rows', 'stable');
 nGrps = numel(ia);
 
-% Preallocate
+% Preallocate (accumulate in double to avoid single-precision roundoff)
 sz = size(x);
-xFlat = reshape(x, sz(1), []);
-xAvg = zeros(nGrps, size(xFlat,2), class(x));
+xFlat = cast(reshape(x, sz(1), []),o.floatAnal);
+xAvg = zeros(nGrps, size(xFlat,2),o.floatAnal);
 
 % Reshape 2D x(obs,:), average within groups
 for g = 1:nGrps
@@ -193,8 +210,82 @@ for g = 1:nGrps
     end
 end
 
-% Restore original shape
+% Restore original shape and cast back to input precision
 x = reshape(xAvg, [nGrps, sz(2:end)]);
 ob = ob(ia,:); % first row per group — preserves all metadata columns (sbjID etc.)
 disp("[ec_condConROI_perm] Averaged by: "+join(grpByVars,",")+...
     " | nObs: "+sz(1)+"->"+nGrps+" | roi: "+roi+" | toc="+toc(tt));
+
+
+
+
+
+function x = baselineCorr_lfn(x,ob,n,roi,o,tt)
+%%% Pooled baseline correction across trials within condition %%%%%%%%%%%%%
+
+% Baseline time range
+if isscalar(o.baseline)
+    blRng = [o.baseline, 0];
+else
+    blRng = o.baseline(1:2);
+end
+
+% Baseline time indices (dim 2 of x)
+idBL = n.times >= blRng(1) & n.times <= blRng(2);
+if ~any(idBL)
+    warning("[ec_condConROI_perm] No timepoints in baseline range ["+blRng(1)+", "+blRng(2)+"]");
+    return
+end
+
+% Pooling groups: [sbjROI, sbjCh, cnd] — pool across trials within each
+% channel × condition to remove condition-specific pre-stimulus offsets
+sdGrpVars = ["sbjROI","sbjCh","cnd"];
+sdGrpVars = sdGrpVars(ismember(sdGrpVars, string(ob.Properties.VariableNames)));
+
+if isempty(sdGrpVars)
+    sdGrpIdx = ones(height(ob),1);
+else
+    [~,~,sdGrpIdx] = unique(ob(:,sdGrpVars),'rows','stable');
+end
+nSdGrps = max(sdGrpIdx);
+
+% Reshape to obs × times × rest so trailing dims stay independent
+sz = size(x);
+xFlat = cast(reshape(x, sz(1), sz(2), []),o.floatAnal);
+nRest = size(xFlat,3);
+
+for g = 1:nSdGrps
+    idg = sdGrpIdx == g;
+
+    % Pool all baseline samples across trials for this channel group:
+    % (nInGrp*nBL) × 1 × nRest — stable estimate from many more samples
+    poolBL = reshape(xFlat(idg,idBL,:), [], 1, nRest);
+
+    % Pooled baseline central tendency → 1 × 1 × nRest
+    switch o.baselineType
+        case "mean";   blMean = mean(poolBL, 1, "omitmissing");
+        case "median"; blMean = median(poolBL, 1, "omitmissing");
+    end
+
+    % Pooled baseline variability → 1 × 1 × nRest
+    if isany(o.baselineNorm)
+        if o.baselineNorm=="robust"
+            blSd = mad(poolBL, 1, 1);  c = 0.6745;
+        elseif o.baselineNorm=="zscore"
+            blSd = std(poolBL, 1, 1, "omitmissing");  c = 1;
+        end
+        % Zero variance: skip normalization for those elements
+        if any(blSd==0,"all")
+            warning("[ec_condConROI_perm] blSd=0 for "+nnz(blSd==0)+...
+                " element(s) in channel group "+g+", skipping normalization for those");
+            blSd(blSd==0) = 1;
+        end
+        xFlat(idg,:,:) = c .* (xFlat(idg,:,:) - blMean) ./ blSd;
+    else
+        xFlat(idg,:,:) = xFlat(idg,:,:) - blMean;
+    end
+end
+
+x = reshape(xFlat, sz);
+disp("[ec_condConROI_perm] Baseline ["+blRng(1)+","+blRng(2)+"]"+...
+    " | roi: "+roi+" | toc="+toc(tt));
