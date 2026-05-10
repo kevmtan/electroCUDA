@@ -174,7 +174,7 @@ function sc = contrast_lfn(x,ob,n,o,c,tt)
 
 % Run contrast
 [sc,t,p,mu,ci,q,df] = ec_contrast_perm(x,ob,n,o,c,tt);
-
+szOg = size(p); % size of 'p' before channel concatenation 
 
 %% Organize
 
@@ -205,7 +205,13 @@ if ~isempty(q)
     sc = movevars(sc,"q",After="p");
 end
 if ~isempty(df)
-    sc.df = catChs_lfn(df,false);
+    if isscalar(df)
+        sc.df(size(p)) = df;
+    elseif isequal(size(df),szOg)
+        sc.df = catChs_lfn(df,false);
+    else
+        warning("[ec_condConChs_perm] df size mismatch vs [time×channel]; omitting sc.df");
+    end
 end
 
 

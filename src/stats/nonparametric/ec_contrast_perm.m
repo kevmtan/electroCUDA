@@ -1,5 +1,6 @@
-function sc = ec_contrast_perm(x,ob,n,o,c,tt)
-% Run permutation contrast - called by high-level electroCUDA permutation
+function [sc,t,p,mu,ci,q,df] = ec_contrast_perm(x,ob,n,o,c,tt)
+% ec_contarast_perm - dispatcher for running permutation contrasts
+% This function is called by high-level electroCUDA permutation
 % functions. Not intended to be called independently.
 
 %% Input validation
@@ -37,7 +38,7 @@ if ~any(id0,"all")
             idxType=o.idxType,verbose=o.verbose);
     else
         % 1-sample parametric test
-        [t,p,se,mu,df] = ec_ttest(cast(x(id1,:,:,:),o.floatAnal),0,...
+        [t,p,ci,mu,df] = ec_ttest(cast(x(id1,:,:,:),o.floatAnal),0,...
             dim=1,alpha=o.alpha,tail=o.tail);
     end
 else
@@ -51,53 +52,87 @@ else
             stream=o.stream,ciMode=o.ciMode,floatType=o.floatAnal,idxType=o.idxType2,verbose=o.verbose);
     else
         % 2-sample parametric test 
-        [t,p,se,mu,df] = ec_ttest2(cast(x(id1,:,:,:),o.floatAnal),...
+        [t,p,ci,mu,df] = ec_ttest2(cast(x(id1,:,:,:),o.floatAnal),...
             cast(x(id0,:,:,:),o.floatAnal),dim=1,alpha=o.alpha,tail=o.tail,...
             vartype=o.varType);
     end
 end
+
+% Organize results
+t = squeeze(cast(t,o.floatOut));
+p = squeeze(p);
+mu = squeeze(cast(mu,o.floatOut));
+ci = squeeze(cast(ci,o.floatOut));
+% Degrees of freedom: honor o.saveDF for all nargout (multi-output callers
+% e.g. ec_condConChs_perm attach df to sc themselves).
+if isfield(o,"saveDF") && ~o.saveDF
+    df = [];
+else
+    df = squeeze(cast(df,o.floatOut));
+end
 disp("[ec_contrast_perm] Finished contrast: "+con+" | toc="+toc(tt));
+
+
+%% FDR if no max correction
+if ~o.maxCorrect
+    % Preallocate FDR-adjusted p-values
+    q = nan(size(p));
+
+    % Indices within FDR time range
+    if numel(o.fdrTimeRng)==2
+        id = n.times>=o.fdrTimeRng(1) & n.times<=o.fdrTimeRng(2);
+    else
+        id = true(height(n.times),1);
+    end
+
+    % Run FDR
+    q(id,:,:) = ec_fdr(p(id,:,:),o.alpha,o.fdrDep);
+    q = cast(q,o.floatOut);
+    disp("[ec_contrast_perm] Ran FDR: "+con+" | toc="+toc(tt));
+else
+    q = [];
+end
+
 
 %% Stats results table
 sc = table;
+sc.time = n.times;
 sc.contrast(1:n.nTimes) = con;
 if isany(o.cond0)
     sc.cond0 = repmat(o.cond0(c,:),n.nTimes,1);
 end
 sc.cond1 = repmat(o.cond1(c,:),n.nTimes,1);
-sc.time = n.times;
-sc.t = squeeze(cast(t,o.floatOut));
-sc.p = squeeze(p);
-sc.q = nan(size(sc.p),o.floatOut);
-sc.qa = nan(size(sc.p),o.floatOut);
-sc.mu = squeeze(cast(mu,o.floatOut));
-if o.nPerm
-    sc.ciL = squeeze(cast(ci(1,:,:,:),o.floatOut));
-    sc.ciH = squeeze(cast(ci(2,:,:,:),o.floatOut));
-else
-    sc.se = squeeze(cast(se,o.floatOut));
-end
 
-% Save degrees of freedom
-if ~isfield(o,"saveDF") || o.saveDF
-    if ~isequal(size(df),size(p))
-        sc.df = nan(size(sc.p),o.floatOut);
-        sc.df(size(sc.p)) = squeeze(cast(df,o.floatOut));
+% Save stats to results table (if stats table is the only output)
+if nargout == 1
+    sc.t = t;
+    sc.p = p;
+    sc.mu = mu;
+
+    % Confidence intervals / standard errors
+    if o.nPerm
+        % Permutation CIs
+        sc.ciL = ci(1,:,:);
+        sc.ciH = ci(2,:,:);
     else
-        sc.df = squeeze(cast(df,o.floatOut));
+        % Parametric SEs
+        sc.se = ci;
+    end
+
+    % Save degrees of freedom (df already [] when ~o.saveDF)
+    if ~isempty(df)
+        if isscalar(df)
+            sc.df(size(p)) = df; % scalar DF, expand to number of tests
+        elseif isequal(size(df),size(p))
+            sc.df = df;
+        else
+            warning("[ec_contrast_perm] degrees-of-freedom size incompatibility, not saving,,,")
+        end
+    end
+
+    % Copy FDR p-values
+    if ~o.maxCorrect
+        sc.q = q;
+        sc = movevars(sc,"q",After="p");
     end
 end
-
-
-%% FDR (across timepoints & sites, within-ch/IC/ROI per contrast)
-
-% Indices within FDR time range
-if numel(o.fdrTimeRng)==2
-    id = sc.time>=o.fdrTimeRng(1) & sc.time<=o.fdrTimeRng(2);
-else
-    id = true(height(sc),1);
-end
-
-% Run FDR
-sc.q(id,:,:,:) = ec_fdr(sc.p(id,:,:,:),o.alpha,o.fdrDep);
-disp("[ec_contrast_perm] Ran FDR: "+con+" | toc="+toc(tt));
