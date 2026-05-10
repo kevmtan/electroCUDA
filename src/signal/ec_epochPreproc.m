@@ -57,8 +57,8 @@ arguments
     o.pcaRobust (1,1) logical = false; % Use robust PCA
     o.pcaGPU (1,1) logical = false; % Use GPU for PCA (recommended for robustPCA)
     % Spectral dimensionality reduction into bands (skip=[])
-    o.bands (1,1) string = "";                % Band name
-    o.bands2 (1,1) string = "";               % Band display name
+    o.bands (1,:) string = "";                % Band name
+    o.bands2 (1,:) string = "";               % Band display name
     o.bandsF double = [];                     % Band freq limits
     % Filtering (within-run):
     o.hpf (1,1) double = 0;                   % HPF cutoff in hertz (skip=0)
@@ -66,13 +66,13 @@ arguments
     o.hpfImpulse (1,1) string {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "auto"; % HPF impulse: ["auto"|"fir"|"iir"]
     o.lpf (1,1) double = 0;                   % LPF cutoff in hz (skip=0)
     o.lpfSteep (1,1) double = 0.8;            % LPF steepness
+    o.antialiasing (1,1) double = 0           % Target Fs (Hz) for FFT AA mask in ec_fft_lowpass (e.g. future downsample rate)
     %o.lpfImpulse {mustBeMember(o.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]
 end
 
 % Additional validation
 if ~isfield(n,"hz0"); error("Must run 'ec_epochPsy' first with same downsampling (if any)"); end
 if ~isany(o.hpf); o.hpf=false; end
-if ~isany(o.lpf); o.lpf=false; end
 
 % Check bad frame table variables
 o.badFrameVars = o.badFrameVars(ismember(o.badFrameVars,n.xBad.Properties.VariableNames));
@@ -121,13 +121,13 @@ end
 
 % Downsampling
 if any(o.hzTarget) && o.hzTarget~=n.hz0
-    o = downsamplingPrep_ln(n,o); % downsampling factors & anti-aliasing
+    o = downsamplingPrep_ln(n,o); % downsampling factors & anti-aliasing target Fs
 else
     o.ds = false;
 end
 
-% Make high-pass filter
-if o.hpf
+% Design HPF coefficients and/or precompute FFT LPF masks (AA uses o.antialiasing → ec_fft_lowpass)
+if isany([o.hpf o.lpf o.antialiasing])
     o = makeFilters_lfn(x,n,o,tt);
 end
 
@@ -231,7 +231,7 @@ if o.ds
     % Downsampling: variable-length output requires grouped/cell output
     xc = splitapply(@(xcr,stimr,runr) {withinRun_lfn(xcr,stimr,n,o,runr(1))},...
         xc,psy.stim,psy.runG,psy.runG);
-    xc = cell2mat(xc); % concatenate downsampled runs
+    xc = vertcat(xc{:}); % concatenate downsampled runs
 else
     % No downsampling: process each run in place by logical indexing
     for r = 1:n.nRuns
@@ -427,8 +427,8 @@ n.spect0.band(:) = string(missing);
 
 % New spectral struct with band info
 n.spect = table;
-n.spect.name = o.bands';
-n.spect.disp = o.bands2';
+n.spect.name = o.bands(:);
+n.spect.disp = o.bands2(:);
 n.spect.freqs(:) = {[]};
 
 % Find frequencies within bands
@@ -490,13 +490,17 @@ if o.ds(1) ~= 1
 o.ds = o.ds(2);
 disp("[ec_epochPreproc] downsampling factor = "+o.ds);
 
-% Ensure anti-aliasing LPF
-hzNyquist = o.hzTarget/2;
-if ~o.lpf || o.lpf>hzNyquist
-    o.lpf = hzNyquist;
-    disp("[ec_epochPreproc] adding downsampling anti-aliasing LPF: "+...
-        o.lpf+"hz");
+% If downsampling here: warn if user AA target is looser than in-stage o.hzTarget
+if isany(o.antialiasing) && isany(o.hzTarget) && o.antialiasing > o.hzTarget
+    warning("[ec_epochPreproc] o.antialiasing (%.3g Hz) > o.hzTarget (%.3g Hz); FFT AA mask still uses o.antialiasing (may be looser than this stage's target rate).",...
+        o.antialiasing,o.hzTarget);
 end
+% hzNyquist = o.hzTarget/2;
+% if ~o.lpf || o.lpf>hzNyquist
+%     o.lpf = hzNyquist;
+%     disp("[ec_epochPreproc] adding downsampling anti-aliasing LPF: "+...
+%         o.lpf+"hz");
+% end
 
 
 
@@ -522,39 +526,34 @@ if o.hpf
     disp("[ec_epochPreproc] Created high-pass filter: "+n.sbj+" time="+toc(tt));
 end
 
-% FFT low-pass masks (precompute per unique run length)
-if o.lpf
-    runLens = n.runIdx(:,2)-n.runIdx(:,1)+1; % samples per run
+% FFT low-pass masks (precompute per unique run length via ec_fft_lowpass)
+if isany([o.lpf o.antialiasing])
+    aaTargetFs = 0;
+    if isany(o.antialiasing)
+        aaTargetFs = o.antialiasing;
+    end
+    runLens = n.runIdxOg; % samples per run
     [uLens,~,runMaskIdx] = unique(runLens,"stable");
     o.lpfLens = uLens;
     o.lpfRunMaskIdx = runMaskIdx;
     o.lpfMasks = cell(numel(uLens),1);
 
-    % Sampling rate follows current analysis data
-    if isfield(n,"hz0")
-        fs = n.hz0;
-    else
-        fs = n.hz;
-    end
-
-    % Build one FFT mask per unique run length
     for i = 1:numel(uLens)
-        xFrames = uLens(i);
-        fNyquist = fs/2;
-        fTrans = (0.99 - 0.98*o.lpfSteep) * (fNyquist - o.lpf);
-        freqs = (0:floor(xFrames/2)) * (fs/xFrames);
-
-        mask = ones(length(freqs),1,o.floatProc);
-        inTrans = freqs>=o.lpf & freqs<=o.lpf+fTrans;
-        if fTrans > 0
-            mask(inTrans) = 0.5 * (1 + cos(pi * (freqs(inTrans) - o.lpf) / fTrans));
-            mask(freqs>o.lpf+fTrans) = 0;
-        else
-            mask(freqs>=o.lpf) = 0;
+        ir = find(n.runIdxOg==uLens(i),1,"first");
+        xTmp = x(n.runIdx(ir,1):n.runIdx(ir,2),1,1);
+        xTmp = cast(xTmp,o.floatProc);
+        if o.gpu
+            xTmp = gpuArray(xTmp);
         end
-
-        maskFull = [mask; flipud(mask(2:end-1))];
-        o.lpfMasks{i} = maskFull(1:xFrames);
+        [~, mf, pb] = ec_fft_lowpass(xTmp,n,o.lpf,o.lpfSteep,[],maskOnly=true,...
+            antialiasing=aaTargetFs);
+        if i==1
+            o.lpf = pb;
+        end
+        if isa(mf,"gpuArray")
+            mf = gather(mf);
+        end
+        o.lpfMasks{i} = mf;
     end
     disp("[ec_epochPreproc] Created FFT low-pass masks ("+numel(uLens)+...
         " unique run lengths): "+n.sbj+" time="+toc(tt));
