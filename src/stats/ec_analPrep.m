@@ -50,7 +50,7 @@ end
 [n,x,psy,trialNfo,chNfo] = ec_loadSbj(dirs,sfx=a.sfx,...
     vars=["n" "x" "psy" "trialNfo" "chNfo"],compact="n");
 disp("[ec_analPrep] Loaded data: "+dirs.sbj+" | toc="+toc(tt));
-if numel(dbstack)<2; n0=n; x0=x; trialNfo0=trialNfo; end %#ok<NASGU> % Copy origs for testing
+%if numel(dbstack)<2; n0=n; x0=x; trialNfo0=trialNfo; end %#ok<NASGU> % Copy origs for testing
 % n=n0; x=x0; trialNfo=trialNfo0; tt=tic; disp("Restored original sbj vars");
 
 
@@ -143,7 +143,8 @@ n.chKeep = ~chBad & ~chRm & chROIs;
 % Remove chans
 if any(~n.chKeep)
     x = x(:,n.chKeep,:);            % from EEG data
-    n.chNfo = n.chNfo(n.chKeep,:);  % from chNfo
+    n.chNfo = n.chNfo(n.chKeep,:);  % from channel info
+    n.chBad = n.chBad(n.chKeep,:);  % from bad channels
 
     % Remove chans from bad frames (n.xBad).
     % Sparse 2D column slice S(:,keepCols) is O(nnz_kept) — uses sparse
