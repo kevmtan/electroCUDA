@@ -43,6 +43,12 @@ elseif istext(xi)
     yi = any(xi~="" & ~ismissing(xi),dim);
 elseif isobject(xi)
     yi = true;
+elseif istable(xi) || istimetable(xi)
+    yi = any(varfun(@(xi) lfn(xi,dim),x,OutputFormat="uniform"),dim);
+elseif isstruct(xi)
+    yi = any(structfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
+elseif iscell(xi)
+    yi = any(cellfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
 else
     error("Unsupported input type");
 end
