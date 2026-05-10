@@ -76,21 +76,25 @@ for r = 1:nROIs
     st{r} = runROI_lfn(sbjROIs(idr,:),n,o,tt);
 end
 
+% Concatenate across ROIs
+st = vertcat(st{:});
 
-%% FDR
-st = vertcat(st{:}); % concatenate across ROIs
 
-% Loop across contrasts
-for c = 1:nCons
-    % Indices for contrast
-    id = st.contrast==o.contrasts(c);
-    if numel(o.fdrTimeRng)==2
-        % Indices within FDR time range
-        id = id & st.time>=o.fdrTimeRng(1) & st.time<=o.fdrTimeRng(2);
+%% FDR across all tests
+if ~o.maxCorrect
+    % Loop across contrasts
+    for c = 1:nCons
+        % Indices for contrast
+        id = st.contrast==o.contrasts(c);
+        if numel(o.fdrTimeRng)==2
+            % Indices within FDR time range
+            id = id & st.time>=o.fdrTimeRng(1) & st.time<=o.fdrTimeRng(2);
+        end
+
+        % Run FDR for contrast across ROIs, timepoints & frequencies
+        st.qa = nan(size(st.p),o.floatOut);
+        st.qa(id,:) = ec_fdr(st.p(id,:),o.alpha,o.fdrDep);
     end
-
-    % Run FDR for contrast across ROIs, timepoints & frequencies
-    st.qa(id,:,:,:) = ec_fdr(st.p(id,:,:,:),o.alpha,o.fdrDep);
 end
 
 
