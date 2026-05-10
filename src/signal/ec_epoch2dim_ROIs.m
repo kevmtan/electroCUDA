@@ -169,10 +169,12 @@ end
 % ROI table
 sLog.ROIs = sLog.dir+"s"+n.sbjID+"_ROIs.mat";
 save(sLog.ROIs,"ROIs");
+disp("[ec_epoch2dim_ROIs] Saved: "+sLog.ROIs+" | toc="+toc(tt));
 
 % Subject/recording info
 sLog.n = sLog.dir+"s"+n.sbjID+"_n.mat";
 save(sLog.n,"n");
+disp("[ec_epoch2dim_ROIs] Saved: "+sLog.n+" | toc="+toc(tt));
 
 
 
