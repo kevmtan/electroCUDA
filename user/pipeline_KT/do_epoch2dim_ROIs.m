@@ -59,7 +59,7 @@ o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.005; % latency bin width (secs)
+o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -100,7 +100,7 @@ o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness
-
+o.p.pre.antialiasing = 40; % Target sampling rate for AA passband calculation
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = []; %[5 300];
 % Spectral PCA (within-channel/IC)

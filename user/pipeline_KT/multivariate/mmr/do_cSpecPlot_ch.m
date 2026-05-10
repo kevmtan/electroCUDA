@@ -1,21 +1,21 @@
 oFns = [
-    "/01/lbcn/anal/classifySpecCh/zf_50ms_SemEpi_LR_lambda/o_zf_50ms_SemEpi_LR_lambda.mat",...
-    "/01/lbcn/anal/classifySpecCh/zf_50ms_MathAb_LR_lambda/o_zf_50ms_MathAb_LR_lambda.mat",...
-    "/01/lbcn/anal/classifySpecCh/zf_50ms_SemEpi_LDA_gamma/o_zf_50ms_SemEpi_LDA_gamma.mat",...
-    "/01/lbcn/anal/classifySpecCh/zf_50ms_MathAb_LDA_gamma/o_zf_50ms_MathAb_LDA_gamma.mat"
+    "/01/lbcn/anal/classifySpecCh/zf_50ms_SemEpi_LDA_bandsGamma/o_zf_50ms_SemEpi_LDA_bandsGamma.mat",...
+    "/01/lbcn/anal/classifySpecCh/zf_50ms_SemEpi_LDA_pcaGamma/o_zf_50ms_SemEpi_LDA_pcaGamma.mat",...
+    "/01/lbcn/anal/classifySpecCh/zf_50ms_MathAb_LDA_bandsGamma/o_zf_50ms_MathAb_LDA_bandsGamma.mat",...
+    "/01/lbcn/anal/classifySpecCh/zf_50ms_MathAb_LDA_pcaGamma/o_zf_50ms_MathAb_LDA_pcaGamma.mat"
     ];
 
 load("cdcol_2018.mat","cdcol"); % colors
 
 %% Options
 op = struct;
-op.figDir = "figs";
+op.figDir = "figs_q05";
 op.visible = false; % !!!!!!!!!!
 op.save = true; % !!!!!!!!!!!
 
 % Significance
 op.sigThr = 0.05; % significance threshold
-op.sigVar = "p";
+op.sigVar = "q";
 
 % Plot
 op.res = [1440 720];
@@ -67,12 +67,32 @@ op.r.col = ec_dim2cell(op.r.col,1);
 
 %% Create parallel pool (must be processes, can't be threadpool)
 try delete(gcp("nocreate")); catch;end
-try ppool = parpool("Processes",20); catch;end
+try ppool = parpool("Processes",22); catch;end
 
 %% Loop across specified model runs
 for io = 1:numel(oFns)
-    load(oFns(io),"o");
-    load(o.analOut+"logs_"+o.analName,"logs"); % logs
+    if ~isfile(oFns(io))
+        warning("[do_cSpecPlot_ch] Missing analysis options file, skipping: %s",oFns(io));
+        continue;
+    end
+    try
+        load(oFns(io),"o");
+    catch ME
+        warning("[do_cSpecPlot_ch] Failed loading options file, skipping: %s\n%s",oFns(io),ME.message);
+        continue;
+    end
+
+    logsFn = o.analOut+"logs_"+o.analName+".mat";
+    if ~isfile(logsFn)
+        warning("[do_cSpecPlot_ch] Missing logs file, skipping: %s",logsFn);
+        continue;
+    end
+    try
+        load(logsFn,"logs"); % logs
+    catch ME
+        warning("[do_cSpecPlot_ch] Failed loading logs file, skipping: %s\n%s",logsFn,ME.message);
+        continue;
+    end
     
     %% Loop across subjects & channel type
     for s = 1:height(logs)

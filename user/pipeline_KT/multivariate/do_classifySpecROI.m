@@ -88,11 +88,11 @@ o.p.pre.trialNormDev = "all"; % Timepoints for StdDev ["baseline"|"pre"|"post"|"
 o.p.pre.interp = "linear"; % interpolation method
 o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use ["hfo"|"flatA"|"mad"|"diff"|"sns"|...]
 o.p.pre.olCenter = "median";
-o.p.pre.olThr = 0; % Outlier threshold (pre-HPF)
+o.p.pre.olThr = 5; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.p.pre.olThrBL = 2; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrBL = 3; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.p.pre.olThrCond = 2.5; % Outlier threshold for conditions within timepts
+o.p.pre.olThrCond = 5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
 o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
@@ -100,8 +100,9 @@ o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness
+o.p.pre.antialiasing = 0; % Target sampling rate for AA passband calculation
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.p.pre.freqs = []; %[5 300];
+o.p.pre.freqs = [5 300]; %[5 300];
 % Spectral PCA (within-channel/IC)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
