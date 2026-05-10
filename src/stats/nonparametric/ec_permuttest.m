@@ -229,6 +229,7 @@ m = cast(m,a.floatType);
 if ~(isscalar(m) && m==0)
     x = x-m;
 end
+m = [];  % paired m is [nObsMax x nVar]; not needed after difference is in x
 
 % For efficiency, only omit NaNs if necessary. Paired-sample NaNs are now
 % represented in the difference matrix, so counts/statistics stay aligned.

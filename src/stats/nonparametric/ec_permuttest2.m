@@ -227,6 +227,7 @@ if nargout==1; return; end
 % Concatenate samples for label shuffling
 z = [x;y];
 a.nObsTot = size(z,1);
+clear x y  % all stats extracted into locals/a.*; free ~|z| of memory
 if a.stableVar
     % Stable-variance kernels compute moments directly per permutation.
     sumZ = [];
@@ -242,6 +243,16 @@ a.needCI = nargout > 2;
 a.needDist = nargout > 6;
 a.needApproxCI = a.needCI && a.ciMode=="approx";
 a.stream = a.stream && ~a.needDist && (~a.needCI || a.needApproxCI);
+
+% Selection-matmul path avoids the [nObsXMax x bPerms x nVar] gather intermediate.
+% Restricted to: no groups (grouped path has its own tiling), no stableVar.
+% NaNs are handled by zeroing them in z after sumZ/sumZ2 are computed, so A*z
+% gives the same result as sum(x1,1,"omitmissing").
+a.useMatmul = ~a.stableVar && ~a.useGroups && ...
+    double(a.nObsXMax)*double(a.nVar) > 5e6;
+if a.useMatmul && a.nan=="omitmissing"
+    z(isnan(z)) = 0;
+end
 
 % Generate permutation blocks (saves memory by running blocks)
 rng(a.seed);
@@ -306,12 +317,12 @@ if a.stream
     nSeen = 0;
     if a.correct
         % Keep one tail-extremal null value per permutation; sort once later.
-        dist = zeros(a.nPerm,1,"like",x);
+        dist = zeros(a.nPerm,1,a.floatType);
     else
-        countExt = zeros(1,a.nVar,"like",x);
+        countExt = zeros(1,a.nVar,a.floatType);
         if a.needApproxCI
-            nullSum = zeros(1,a.nVar,"like",x);
-            nullSumSq = zeros(1,a.nVar,"like",x);
+            nullSum = zeros(1,a.nVar,a.floatType);
+            nullSumSq = zeros(1,a.nVar,a.floatType);
         end
     end
 else
@@ -321,7 +332,7 @@ else
         if a.parallel=="gpu" && a.gather=="final"
             dist = [];
         else
-            dist = zeros(a.nPerm,a.nVar,"like",x);
+            dist = zeros(a.nPerm,a.nVar,a.floatType);
         end
     end
 end
@@ -353,13 +364,13 @@ if a.stream
         end
     else
         if a.parallel=="cpu"
-            blkCount = zeros(nBlocks,a.nVar,"like",x);
+            blkCount = zeros(nBlocks,a.nVar,a.floatType);
             blkN = zeros(nBlocks,1);
             blkSum = [];
             blkSumSq = [];
             if a.needApproxCI
-                blkSum = zeros(nBlocks,a.nVar,"like",x);
-                blkSumSq = zeros(nBlocks,a.nVar,"like",x);
+                blkSum = zeros(nBlocks,a.nVar,a.floatType);
+                blkSumSq = zeros(nBlocks,a.nVar,a.floatType);
             end
             parfor b = 1:nBlocks
                 bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
@@ -613,8 +624,15 @@ end
 function bDist = runBlock_gpu_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
 nbPerms = bEnd-bStart+1;
 parallel.gpu.rng(seed,"Philox4x32-10");
-[~,idx] = sort(rand(a.nObsTot,nbPerms,like=z),1);
-bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
+if a.useMatmul
+    [~,idx1] = mink(rand(a.nObsTot,nbPerms,like=z),a.nObsXMax,1);
+    idx1 = cast(idx1,a.idxType);
+    bDist = blockDist_matmul_lfn(z,idx1,sumZ,sumZ2,a);
+else
+    [~,idx] = sort(rand(a.nObsTot,nbPerms,like=z),1);
+    idx = cast(idx,a.idxType);
+    bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
+end
 if a.gather=="block"
     bDist = gather(bDist);
 end
@@ -623,8 +641,15 @@ end
 function bDist = runBlock_cpu_ungrouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
 nbPerms = bEnd-bStart+1;
 rs = RandStream("mt19937ar","Seed",seed);
-[~,idx] = sort(rand(rs,a.nObsTot,nbPerms,like=z),1);
-bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
+if a.useMatmul
+    [~,idx1] = mink(rand(rs,a.nObsTot,nbPerms,like=z),a.nObsXMax,1);
+    idx1 = cast(idx1,a.idxType);
+    bDist = blockDist_matmul_lfn(z,idx1,sumZ,sumZ2,a);
+else
+    [~,idx] = sort(rand(rs,a.nObsTot,nbPerms,like=z),1);
+    idx = cast(idx,a.idxType);
+    bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
+end
 
 
 function bDist = runBlock_cpu_grouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
@@ -654,6 +679,28 @@ for tpStart = 1:tilePerms:nbPerms
     end
     bDist(tpStart:tpEnd,:) = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
 end
+
+
+function bDist = blockDist_matmul_lfn(z,idx1,sumZ,sumZ2,a)
+% Selection-matmul path: idx1 is [nObsXMax x nbPerms] from mink (X-arm only).
+% Builds a [nbPerms x nObsTot] binary selection matrix and uses A*z instead of
+% a 3D gather, avoiding the [nObsXMax x nbPerms x nVar] intermediate.
+nbPerms = size(idx1,2);
+A = zeros(nbPerms, a.nObsTot, like=z);
+linIdx = (1:nbPerms) + (double(idx1)-1)*nbPerms;        % [nObsXMax x nbPerms], broadcast
+A(linIdx(:)) = 1;                                       % [nbPerms x nObsTot]
+sum1   = A * z;                                         % [nbPerms x nVar]
+sumsq1 = A * (z.^2);                                   % z.^2 is [nObsTot x nVar]
+sum2   = sumZ   - sum1;
+sumsq2 = sumZ2  - sumsq1;
+var1 = (sumsq1-(sum1.^2)./a.nObsX)./a.dfX;
+var2 = (sumsq2-(sum2.^2)./a.nObsY)./a.dfY;
+if a.vartype=="equal"
+    se = sqrt((a.dfX.*var1+a.dfY.*var2)./a.df).*sqrt((a.nObsX+a.nObsY)./(a.nObsX.*a.nObsY));
+else
+    se = sqrt(var1./a.nObsX+var2./a.nObsY);
+end
+bDist = (sum1./a.nObsX-sum2./a.nObsY)./se;
 
 
 function bDist = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a)
@@ -871,8 +918,10 @@ end
 switch a.idxType
     case "double"
         bytesIdx = 8;
-    case "uint32"
+    case {"single","uint32"}
         bytesIdx = 4;
+    case "uint16"
+        bytesIdx = 2;
 end
 
 budgetBytes = max(0,double(a.ramAvail)*double(a.blockMemFrac));
@@ -898,6 +947,19 @@ perPermBytes = perPermBytes + double(a.nVar)*bytesFloat;
 % Ungrouped paths build dense random-key matrices before sort.
 if ~a.useGroups
     perPermBytes = perPermBytes + double(a.nObsTot)*bytesFloat;
+end
+
+if a.useMatmul
+    % Matmul path: A [nbPerms x nObsTot] selection matrix (tiny) + z.^2 temporary
+    % [nObsTot x nVar] computed once per block — treat as fixed overhead.
+    fixedBytes = fixedBytes + double(a.nObsTot)*double(a.nVar)*bytesFloat;
+else
+    % Gather intermediate [nObsXMax x bPerms x nVar] + element-wise temporary.
+    if a.stableVar
+        perPermBytes = perPermBytes + 2*double(a.nObsTot)*double(a.nVar)*bytesFloat;
+    else
+        perPermBytes = perPermBytes + 2*double(a.nObsXMax)*double(a.nVar)*bytesFloat;
+    end
 end
 
 % Headroom for temporary workspaces/allocator effects.
