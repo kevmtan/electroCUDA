@@ -2,8 +2,8 @@ function keep = ec_selectChsBySig(chSel,sbjID,chNfo)
 % Per-subject channel selection mask for downstream analyses.
 %
 % Two input sources:
-%   "table" — precomputed channel-feature table with logical columns (e.g. output
-%             of ec_condConChs_sigChs, or a separately built task-vs-baseline table).
+%   "table" — precomputed channel-feature table (e.g. chNfoA from ec_condConChs_sigChs
+%             or a separately built task-vs-baseline table with _act/_dea columns).
 %   "perm"  — raw ec_condConChs_perm results on disk; thresholding done inline
 %             via ec_sigChsFromPerm.
 %
@@ -12,32 +12,49 @@ function keep = ec_selectChsBySig(chSel,sbjID,chNfo)
 %   "roi"     — when paired with topN, ranks/caps within each ROI separately.
 %               Without topN, equivalent to "subject" (criteria are per-channel).
 %
+% Column resolution (mirrors chSelMask_lfn in ec_condConChsROI_perm):
+%   cond1Sample = "any":         use ALL _act/_dea columns (least circular).
+%   cond1Sample = "self":        columns prefixed by chSel.cond (training conditions).
+%                                e.g. cond=["Semantic" "Episodic"] selects
+%                                Semantic_act/dea + Episodic_act/dea.
+%                                Auto-populated from o.p.cond in ec_classifySpec.
+%   cond1Sample = "condAndCondx": channels with any act/dea in chSel.cond AND any
+%                                act/dea in chSel.condx (cross-classification conds).
+%                                Recommended for cross-classification — keeps only
+%                                channels responsive to BOTH condition pairs.
+%                                chSel.condx auto-populated from o.p.condx.
+%   cond1Sample = "condOrCondx": same but OR — any response in either group.
+%
 % INPUTS:
 %   chSel   struct with fields:
-%             .scope      ("subject"|"roi", default "subject")
-%             .source     ("table"|"perm", default "table")
-%             .combine    ("or"|"and", default "or") — across .vars (table mode)
-%             .topN       (scalar, optional)        — cap per scope group
-%             .rankVar    (string, optional)        — column to rank by (table mode);
-%                                                     auto-derived in perm mode.
+%             .scope       ("subject"|"roi", default "subject")
+%             .source      ("table"|"perm", default "table")
+%             .cond1Sample ("any"|"self", default "any") — column resolution mode
+%             .cond        (string array, optional)      — training conditions;
+%                                                          auto-set from o.p.cond
+%             .condx       (string array, optional)      — cross-classification conds;
+%                                                          auto-set from o.p.condx
+%             .combine     ("or"|"and", default "or")   — across resolved columns
+%             .topN        (scalar, optional)            — cap per scope group
+%             .rankVar     (string, optional)            — col to rank by (table mode);
+%                                                          auto-derived in perm mode
 %             % source="table":
-%             .chTable    (table | filepath)        — chNfoA or path to .mat
-%             .chTableVar (string, default "chNfoA") — variable name inside .mat
-%             .vars       (string array)            — logical columns to consume.
-%                                                     Matrix-valued columns are
-%                                                     collapsed via any(...,2).
-%             .bandIdx    (vector, optional)        — restrict matrix columns to
-%                                                     these column indices first.
+%             .chTable     (table | filepath)            — chNfoA or path to .mat
+%             .chTableVar  (string, default "chNfoA")    — variable name inside .mat
+%             .vars        (string array, optional)      — explicit column list;
+%                                                          if absent, auto-derived via
+%                                                          cond1Sample/cond logic
+%             .bandIdx     (vector, optional)            — restrict matrix cols to
+%                                                          these column indices first
 %             % source="perm":
-%             .srcDir     (string)                  — dirs.anal/<analDir>/<analName>/
-%             .logsVar    (string, default "logs")  — logs variable in logs_*.mat
-%             .contrasts  (string array, optional)
-%             .sigVar     (string, default "q")
-%             .sigThr     (scalar, default 0.05)
-%             .sigDur     (scalar ms, default 50)
-%             .mVar       (string, default "mu")
-%             .sigTimeRng ([min max] ms, optional)
-%             .direction  ("act"|"dea"|"any", default "any") — which event(s) qualify
+%             .srcDir      (string)                      — path to condConChs analysis
+%             .logsVar     (string, default "logs")      — logs variable in logs_*.mat
+%             .contrasts   (string array, optional)
+%             .sigVar      (string, default "q")
+%             .sigThr      (scalar, default 0.05)
+%             .sigDur      (scalar ms, default 50)
+%             .mVar        (string, default "mu")
+%             .sigTimeRng  ([min max] ms, optional)
 %   sbjID   subject ID (numeric or string; used to find this subject's rows/files)
 %   chNfo   subject's channel info table (must have sbjCh; needs roi for scope="roi")
 %
@@ -51,13 +68,15 @@ arguments
 end
 
 % Defaults
-if ~isfield(chSel,"scope")   || ~isany(chSel.scope);   chSel.scope   = "subject"; end
-if ~isfield(chSel,"source")  || ~isany(chSel.source);  chSel.source  = "table"; end
-if ~isfield(chSel,"combine") || ~isany(chSel.combine); chSel.combine = "or"; end
+if ~isfield(chSel,"scope")       || ~isany(chSel.scope);       chSel.scope       = "subject"; end
+if ~isfield(chSel,"source")      || ~isany(chSel.source);      chSel.source      = "table";   end
+if ~isfield(chSel,"combine")     || ~isany(chSel.combine);     chSel.combine     = "or";      end
+if ~isfield(chSel,"cond1Sample") || ~isany(chSel.cond1Sample); chSel.cond1Sample = "any";     end
 
-chSel.scope   = string(chSel.scope);
-chSel.source  = string(chSel.source);
-chSel.combine = string(chSel.combine);
+chSel.scope       = string(chSel.scope);
+chSel.source      = string(chSel.source);
+chSel.combine     = string(chSel.combine);
+chSel.cond1Sample = string(chSel.cond1Sample);
 
 % Validate channel info has the columns we need
 if ~ismember("sbjCh",string(chNfo.Properties.VariableNames))
@@ -138,20 +157,43 @@ if ~any(tf)
     return;
 end
 
-% Validate vars
-if ~isfield(chSel,"vars") || isempty(chSel.vars)
-    error("[ec_selectChsBySig] source='table' requires chSel.vars (column names to combine).");
-end
-chSel.vars = string(chSel.vars);
-missingVars = chSel.vars(~ismember(chSel.vars,string(chTable.Properties.VariableNames)));
-if ~isempty(missingVars)
-    error("[ec_selectChsBySig] chTable missing vars: %s",strjoin(missingVars,", "));
+% Guard: chTable must have _act/_dea columns (added by ec_condConChs_sigChs).
+% If absent, ec_condConChs_sigChs likely hasn't been run yet for this analysis.
+if ~any(endsWith(string(chTable.Properties.VariableNames),"_act") | ...
+        endsWith(string(chTable.Properties.VariableNames),"_dea"))
+    warning("[ec_selectChsBySig] chTable has no _act/_dea columns — " + ...
+        "run ec_condConChs_sigChs to augment the chNfoA before using channel selection. " + ...
+        "Returning all-false (no channel selection applied) for %s.",string(sbjID));
+    return;
 end
 
-% Optional band index for matrix-valued columns
+% Optional band index — resolved early, needed by both single- and multi-group paths
 bandIdx = [];
 if isfield(chSel,"bandIdx") && ~isempty(chSel.bandIdx)
     bandIdx = chSel.bandIdx(:)';
+end
+
+% Multi-group AND/OR: each group is OR'd within, then groups are combined.
+% "condAndCondx": channels responsive to BOTH training AND cross-classification conds.
+% "condOrCondx":  channels responsive to EITHER condition group.
+if ismember(chSel.cond1Sample, ["condAndCondx" "condOrCondx"])
+    varNames  = string(chTable.Properties.VariableNames);
+    adVars    = varNames(endsWith(varNames,"_act") | endsWith(varNames,"_dea"));
+    rowKeep   = multiGroupMask_lfn(chTable,idx(tf),adVars,chSel,bandIdx);
+    keep(tf)  = rowKeep;
+    return; % rankScore not computed for multi-group mode; topN is skipped
+end
+
+% Resolve which columns to check: explicit list takes precedence; otherwise
+% auto-derive from cond1Sample/cond (same logic as chSelMask_lfn).
+if ~isfield(chSel,"vars") || isempty(chSel.vars)
+    chSel.vars = resolveVars_lfn(chTable,chSel);
+else
+    chSel.vars = string(chSel.vars);
+    missingVars = chSel.vars(~ismember(chSel.vars,string(chTable.Properties.VariableNames)));
+    if ~isempty(missingVars)
+        error("[ec_selectChsBySig] chTable missing vars: %s",strjoin(missingVars,", "));
+    end
 end
 
 % Evaluate each var to a per-row logical for the rows we matched
@@ -264,32 +306,19 @@ if isfield(chSel,"sigTimeRng") && ~isempty(chSel.sigTimeRng); op.sigTimeRng = ch
 % Run kernel to get augmented chNfo (with _act/_dea/peak<mVar> columns)
 chNfoSig = ec_sigChsFromPerm(st,chNfo,op);
 
-% Resolve which contrasts/conNames are in the augmented table
-contrasts = string(op.contrasts);
-conNames  = regexprep(contrasts,"[^a-zA-Z0-9_]","");
-
-% Direction selector
-direction = "any";
-if isfield(chSel,"direction") && isany(chSel.direction)
-    direction = string(chSel.direction);
+% Multi-group AND/OR (perm mode: operates on augmented chNfoSig from the kernel)
+if ismember(chSel.cond1Sample, ["condAndCondx" "condOrCondx"])
+    varNames = string(chNfoSig.Properties.VariableNames);
+    adVars   = varNames(endsWith(varNames,"_act") | endsWith(varNames,"_dea"));
+    bandIdx  = [];
+    if isfield(chSel,"bandIdx") && ~isempty(chSel.bandIdx); bandIdx = chSel.bandIdx(:)'; end
+    keep = multiGroupMask_lfn(chNfoSig,1:height(chNfoSig),adVars,chSel,bandIdx);
+    return; % rankScore not computed for multi-group mode; topN is skipped
 end
 
-% Build var list across contrasts
-vars = strings(0,1);
-switch direction
-    case "act"
-        for c = 1:numel(conNames); vars(end+1,1) = conNames(c)+"_act"; end %#ok<AGROW>
-    case "dea"
-        for c = 1:numel(conNames); vars(end+1,1) = conNames(c)+"_dea"; end %#ok<AGROW>
-    otherwise
-        for c = 1:numel(conNames)
-            vars(end+1,1) = conNames(c)+"_act"; %#ok<AGROW>
-            vars(end+1,1) = conNames(c)+"_dea"; %#ok<AGROW>
-        end
-end
-
-% Drop vars not present (shouldn't happen if kernel ran, but defensive)
-vars = vars(ismember(vars,string(chNfoSig.Properties.VariableNames)));
+% Resolve which _act/_dea columns to check (same logic as chSelMask_lfn /
+% resolveVars_lfn — cond1Sample "any" uses all; "self" filters by chSel.cond)
+vars = resolveVars_lfn(chNfoSig,chSel);
 if isempty(vars)
     warning("[ec_selectChsBySig] No matching _act/_dea columns after kernel run; returning all-false.");
     return;
@@ -320,21 +349,12 @@ else
     keep = any(M,2);
 end
 
-% Rank score: peak |mVar| across qualifying directions/contrasts
+% Rank score: max peak |mVar| across the same columns resolved above
 mVar = "mu";
 if isfield(op,"mVar"); mVar = string(op.mVar); end
-peakVars = strings(0,1);
-switch direction
-    case "act"
-        for c = 1:numel(conNames); peakVars(end+1,1) = conNames(c)+"_peakA_"+mVar; end %#ok<AGROW>
-    case "dea"
-        for c = 1:numel(conNames); peakVars(end+1,1) = conNames(c)+"_peakD_"+mVar; end %#ok<AGROW>
-    otherwise
-        for c = 1:numel(conNames)
-            peakVars(end+1,1) = conNames(c)+"_peakA_"+mVar; %#ok<AGROW>
-            peakVars(end+1,1) = conNames(c)+"_peakD_"+mVar; %#ok<AGROW>
-        end
-end
+% Map _act→_peakA_<mVar>, _dea→_peakD_<mVar> for each resolved var
+peakVars = regexprep(vars,"_act$","_peakA_"+mVar);
+peakVars = regexprep(peakVars,"_dea$","_peakD_"+mVar);
 peakVars = peakVars(ismember(peakVars,string(chNfoSig.Properties.VariableNames)));
 if ~isempty(peakVars)
     rankScore = nan(height(chNfoSig),numel(peakVars));
@@ -351,6 +371,73 @@ if ~isempty(peakVars)
         rankScore(:,v) = col;
     end
     rankScore = max(rankScore,[],2,"omitnan");
+end
+
+
+
+
+function mask = multiGroupMask_lfn(chTable,idxRows,actDeaVars,chSel,bandIdx)
+%%% Two-group AND/OR mask (condAndCondx / condOrCondx) %%%%%%%%%%%%%%%%%%%%
+cond  = [];
+condx = [];
+if isfield(chSel,"cond")  && ~isempty(chSel.cond);  cond  = string(chSel.cond(:)');  end
+if isfield(chSel,"condx") && ~isempty(chSel.condx); condx = string(chSel.condx(:)'); end
+m1 = colMask_lfn(chTable, idxRows, actDeaForConds_lfn(actDeaVars,cond),  bandIdx);
+m2 = colMask_lfn(chTable, idxRows, actDeaForConds_lfn(actDeaVars,condx), bandIdx);
+if chSel.cond1Sample=="condAndCondx"
+    mask = m1 & m2;
+else
+    mask = m1 | m2;
+end
+
+
+
+
+function vars = actDeaForConds_lfn(actDeaVars,conds)
+%%% _act/_dea vars matching sanitized condition name prefixes %%%%%%%%%%%%%
+if isempty(conds); vars = strings(0,1); return; end
+checkPfx = regexprep(string(conds(:)),"[^a-zA-Z0-9_]","");
+colBase  = regexprep(actDeaVars,"_(act|dea)$","");
+vars     = actDeaVars(ismember(colBase,checkPfx));
+
+
+
+
+function mask = colMask_lfn(chTable,idxRows,vars,bandIdx)
+%%% OR mask across a set of act/dea columns for specified rows %%%%%%%%%%%%
+mask = false(numel(idxRows),1);
+for v = 1:numel(vars)
+    col = chTable.(vars(v))(idxRows,:);
+    if ~isempty(bandIdx) && size(col,2)>1; col = col(:,bandIdx); end
+    if size(col,2)>1; col = any(col,2); end
+    mask = mask | logical(col(:));
+end
+
+
+
+
+function vars = resolveVars_lfn(chTable,chSel)
+%%% Resolve _act/_dea columns to check (port of chSelMask_lfn) %%%%%%%%%%%%
+% "any":  all _act/_dea columns present in chTable (least circular).
+% "self": only columns whose base-name prefix matches sanitized chSel.cond
+%         (e.g. cond=["Semantic" "Episodic"] → Semantic_act/dea, Episodic_act/dea).
+varNames   = string(chTable.Properties.VariableNames);
+actDeaVars = varNames(endsWith(varNames,"_act") | endsWith(varNames,"_dea"));
+
+cond1Sample = "any";
+if isfield(chSel,"cond1Sample") && isany(chSel.cond1Sample)
+    cond1Sample = string(chSel.cond1Sample);
+end
+
+if cond1Sample=="self" && isfield(chSel,"cond") && ~isempty(chSel.cond)
+    vars = actDeaForConds_lfn(actDeaVars, string(chSel.cond(:))');
+    if isempty(vars)
+        warning("[ec_selectChsBySig] No _act/_dea cols matched for cond [%s]; using all",...
+            strjoin(string(chSel.cond),", "));
+        vars = actDeaVars;
+    end
+else
+    vars = actDeaVars;  % "any" — use all act/dea columns
 end
 
 

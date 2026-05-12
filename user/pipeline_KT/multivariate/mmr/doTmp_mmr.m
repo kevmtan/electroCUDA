@@ -1,17 +1,9 @@
 
-do_classifySpecCh;
+do_classifySpecROI;
 clear all; close all;
 
-doTmp_50ms_SemEpi_LDA_pcaGamma;
+doTmp_zf_bands_50ms_MathAb_LDA_gammaDelta;
 clear all; close all;
 
-doTmp_50ms_MathAb_LDA_bandsGamma;
-clear all; close all;
+do_condConChsROI_tfce;
 
-doTmp_50ms_MathAb_LDA_pcaGamma;
-clear all; close all;
-
-do_cSpecPlot_ch;
-try delete(gcp("nocreate")); catch;end
-
-quit;

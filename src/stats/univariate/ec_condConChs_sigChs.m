@@ -1,4 +1,4 @@
-function ec_condConChs_sigChs(oa)
+function chNfoA = ec_condConChs_sigChs(oa)
 arguments
     oa struct
 end
@@ -61,8 +61,8 @@ function chNfo = runSbj_lfn(sLog,op,tt)
 %                                                       s=5; sLog=logs(s,:);
 
 % Load stats & metadata
-S = load(sLog.st,"st"); st = S.st;
-N = load(sLog.n,"n");   n  = N.n;
+load(sLog.st,"st")
+load(sLog.n,"n");
 disp("[ec_condConChs_sigChs] Loaded sbj: "+sLog.sbj+" | toc="+toc(tt));
 
 % Per-subject sig-channels augmentation (shared kernel)

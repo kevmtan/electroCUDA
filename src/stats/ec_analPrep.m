@@ -326,9 +326,10 @@ if a.chConcat=="roi"
         y{r} = reshape(y{r}, height(y{r}), width(y{r})*size(y{r},3));  % a-by-(b*c)
 
         % Column info (one tile of 'spect' per ROI ch; ch column via repelem)
-        nSpect = height(spect);
-        xi = repmat(spect,n.ROIs.nChs(r),1);
-        xi.ch = repelem(n.ROIs.chs{r}(:),nSpect);
+        nSpect  = height(spect);
+        nChs_r  = numel(n.ROIs.chs{r});   % derive from cell directly, avoids type-cast mismatch with nChs column
+        xi = repmat(spect,nChs_r,1);
+        xi.ch = repelem(n.ROIs.chs{r}(:),nSpect,1); % ,1 forces column output for single-ch ROIs (repelem(scalar,n) returns row)
         xi = movevars(xi,"ch",Before=1);
         xi = renamevars(xi,"name","spect");
         n.ROIs.columns{r} = xi;

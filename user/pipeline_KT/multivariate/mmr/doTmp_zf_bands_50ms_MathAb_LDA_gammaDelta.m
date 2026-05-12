@@ -18,32 +18,39 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 % Load/save options
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
-o.analDir = "classifySpecCh"; % directory name within dirs.anal
-o.analName = "zf_50ms_SemEpi_LDA_bandsGamma"; % autobio: Sem vs Epi; CC: Self & Other
+o.analDir = "classifySpecROI"; % directory name within dirs.anal
+o.analName = "zf_bands_50ms_MathAb_LDA_gammaDelta"; % directory name within o.analDir
 
 
 %% CHANNEL SELECTION: ec_selectChsBySig(...,o.chSel)
 % Mirrors ec_condConChsROI_perm channel selection (chSelection_lfn + chSelMask_lfn).
-% ec_classifySpec.runSbj_lfn resolves chSelDir/chSelName → full chNfoA path and
-% auto-propagates o.p.cond and o.p.condx — no need to set chSel.cond/condx manually.
+% Channels are selected if they had significant activation/deactivation in a SOURCE
+% analysis (use a DIFFERENT analysis to reduce circularity — e.g. bands analysis
+% to select channels for a full-spectrum run).
+%
+% ec_classifySpec.runSbj_lfn resolves chSelDir/chSelName → full chNfoA path
+% (dirs.anal/chSelDir/chSelName/chNfoA_<chSelName>.mat) and auto-propagates
+% o.p.cond and o.p.condx — no need to set chSel.cond/condx manually.
 %
 %   cond1Sample = "any":          any act/dea across ALL contrasts (least circular).
 %   cond1Sample = "self":         act/dea for o.p.cond conditions only.
 %   cond1Sample = "condAndCondx": act/dea in o.p.cond AND act/dea in o.p.condx.
-%   cond1Sample = "condOrCondx":  act/dea in EITHER condition group.
+%                                 Recommended for cross-classification — keeps only
+%                                 channels responsive to BOTH condition pairs.
+%   cond1Sample = "condOrCondx":  act/dea in EITHER condition group (less restrictive).
 %
 % PRIMARY MODE — auto column resolution via chSelDir/chSelName:
 o.chSel = struct;
 o.chSel.scope       = "subject";          % "subject" | "roi"
 o.chSel.chSelDir    = "condConCh";        % subdir under dirs.anal (source chNfoA)
-o.chSel.chSelName   = "";                 % analName of source chNfoA — FILL IN
-o.chSel.cond1Sample = "condAndCondx";    % recommended for cross-classification
+o.chSel.chSelName   = "zf_hpfLPF_bandsParam"; % analName of source chNfoA
+o.chSel.cond1Sample = "condAndCondx";    % "Autobio" matches chNfoA column name from do_condConChs_bandsParam
 % o.chSel.topN      = [];               % optional cap per scope group
 %
 % MANUAL OVERRIDE — explicit column list (takes precedence over cond1Sample):
 % o.chSel.vars     = ["SemanticvsEpisodic_act" "SemanticvsEpisodic_dea"];
 % o.chSel.combine  = "or";              % "or" | "and" across vars
-% o.chSel.bandIdx  = [5 6];            % restrict matrix-valued cols to band indices
+o.chSel.bandIdx  = 2:6;            % restrict matrix-valued cols to band indices
 % o.chSel.rankVar  = "SemanticvsEpisodic_peakA_mu"; % rank for topN
 %
 % PERM SOURCE — threshold raw ec_condConChs_perm results inline:
@@ -62,15 +69,15 @@ o.p.sfx = "zf";
 
 % Conditions for classification
 o.p.condVar = "cond";
-o.p.cond = ["Semantic" "Episodic"]; % Conditions to classify, ORDER MATTERS 
+o.p.cond = ["Math" "Autobio"]; % Conditions to classify, ORDER MATTERS
 o.p.condx = ["Self" "Other"];       % Conditions to cross-classify (predict)
 
 % Channel Options
 o.p.chRm = []; % channels to remove (array of chan numbers)
 o.p.chBadVars = ["ai" "empty" "nan"]; % Vars in n.chBad/icBad to use for bad chan removal
-o.p.ROIs = []; % remove chs outside these ROIs
+o.p.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; % remove chs outside these ROIs
 o.p.roiVar = "roi"; % ROI variable in chNfo
-o.p.chConcat = ""; % Concatenate channels by ["roi"|"all"|""], default="" (none)
+o.p.chConcat = "roi"; % Concatenate channels by ["roi"|"all"|""], default="" (none)
 
 % Timing for analysis
 o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
@@ -92,15 +99,15 @@ o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.050; % latency bin width (secs)
+o.p.epoch.bin = 0.05; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
-o.p.epoch.baselinePre = -0.2; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
+o.p.epoch.baselinePre = []; %-0.2; % Pre-stimulus baseline (secs from stim onset): inf=ITI; [-.2]; [-0.2 1]
 o.p.epoch.baselinePost = []; % Post-stimulus baseline (secs from stim offset): inf=ITI; [.2]; [0.1 0.3]
 % Task condition ordering: all conds in data (leave blank for to leave unordered)
 o.p.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
-o.p.epoch.conds2 = []; % custom condition names (per above order, can repeat)
+o.p.epoch.conds2 = ["Other" "Self" "Autobio" "Autobio" "Math" "Rest"]; % custom condition names (per above order, can repeat)
 %   o.epoch.conds = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % order
 %   o.epoch.conds2 = ["Mz" "Mz" "Ab" "Ab" "Math" "Rest"]; % custom condition names (per above order, can repeat)
 
@@ -109,10 +116,9 @@ o.p.pre.gpu = false; % Run on GPU? (note: CPU appears faster)
 o.p.pre.floatProc = "double"; % processing FP precision ("double"|"single"|""=same as input)
 o.p.pre.floatOut = "double"; % output FP precision ("double"|"single"|""=same as input)
 o.p.pre.hzTarget = 0; % Target sampling rate (0=default rate)
-% Transform (keep both false when input spectra are already magnitude in dB, e.g. CWT
-%  — ec_epochPreproc warns if mag2db/log is applied to dB data)
+% Transform
 o.p.pre.log = false; % Log transform
-o.p.pre.mag2db = false; % magnitude to decibel
+o.p.pre.mag2db = false; % Log-transform magnitude to decibel
 % Normalize/standardize
 o.p.pre.runNorm = "robust"; % Normalize run ["robust"|"zscore"|""]; skip=""
 o.p.pre.trialBaseline = ""; % Subtract trial by mean or median of baseline period (skip=[])
@@ -136,7 +142,7 @@ o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness
 o.p.pre.antialiasing = 0; % Target sampling rate for AA passband calculation
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
-o.p.pre.freqs = []; %[5 300];
+o.p.pre.freqs = [5 300]; %[5 300];
 % Spectral PCA (within-channel/IC)
 o.p.pre.pca = 0; % Spectral components to keep per channel/ROI/whole-brain (skip=0)
 o.p.pre.pcaVarThr = 0; % Variance threshold for kept PCA comps (0=skip; supersedes o.p.pre.pca)
@@ -145,15 +151,13 @@ o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % Spectral dimensionality reduction into bands (skip=[])
-o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
 
-% o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+
+
 
 
 %% ANALYSIS DATA SPLIT: ec_analSplit(...,o.s)
@@ -165,7 +169,7 @@ o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
 o.s.stdUseOnly = true; % Compute standardization params from obs.use rows only (avoids cc-trial leak into train scaler)
 
-% PCA (channelwise: no split-level PCA; rank helps diagnostics when o.s.pca is off)
+% PCA
 o.s.rank = false; % calculate data rank if no PCA
 o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
@@ -180,7 +184,8 @@ o.s.pcaSaveWts = false; % Save PCA weights
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save options
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD" "K_pca1"]; % psy vars to include in observations output
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD" "VD1" "VD2"...
+    "K_pca1" "K_pca2" "K_pca3" "K_pca4"]; % psy vars to include in observations output
 
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
@@ -188,7 +193,7 @@ o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"i
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 
 % Observations per timepoint (o.p.timeVar)
-o.nMin = 15; % minimum observations per class within timepoint
+o.nMin = 50; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint
 
 % Function handles to inject into classifier routines
@@ -217,16 +222,16 @@ if isequal(o.fun,@fitclinear)
     o.hyper.Learner = "logistic"; % "svm"
     o.hyper.Lambda = "auto";
     o.hyper.Regularization = "ridge";
-    o.hyper.Solver = "bfgs"; % "lbfgs"/"bfgs" for chs (small p), "dual" for ROIs (large p)
+    %o.hyper.Solver = "dual"; % "bfgs" for chs / "dual" for ROIs
     o.hyper.FitBias = true;
     o.hyper.PostFitBias = false;
-    o.hyper.OptimizeLearnRate = false; % stabler/faster when comparing to fitcdiscr
+    o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
-    % Shrinkage LDA: tune Gamma first; leave Delta at 0 unless sparse coeffs are needed
+    % Shrinkage LDA: tune Gamma & Delta jointly (pseudolinear handles rank-deficient cov)
     o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
     o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
-    o.hyper.Delta = 0; % no coefficient thresholding; use o.OptimizeHyperparameters="Delta" to tune
+    o.hyper.Delta = 0; % initial value; tuned by optimizer when in OptimizeHyperparameters
 elseif isequal(o.fun,@fitcsvm)
     % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
     o.hyper.KernelFunction = "linear";
@@ -251,15 +256,14 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = ["Gamma" "Delta"]; % joint tuning for high-P ROI features
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
 % Repartition must be false when ec_classify passes a custom CVPartition (trial-grouped cvh)
+% NumGridDivisions: 10 per hyperparameter -> 10*10=100 grid points for [Gamma Delta]
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
     Optimizer="gridsearch",NumGridDivisions=10,Repartition=false,UseParallel=false);
-    %Optimizer="bayesopt",AcquisitionFunctionName="expected-improvement-plus",...
-    %MaxObjectiveEvaluations=15,Repartition=false,UseParallel=false);
 
 
 %% Run

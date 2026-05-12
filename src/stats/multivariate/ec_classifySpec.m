@@ -74,6 +74,7 @@ for s = 1:height(logs)
     if ~logs.class(s)
         %% Run subject
         try
+            %%
             sLog = runSbj_lfn(o,logs(s,:));
             logs(s,:) = sLog;
             logs.class(s) = true;
@@ -117,12 +118,45 @@ sLog.sbjID = dirs.sbjID;
 %% Channel selection (optional)
 % Pre-filter channels via ec_selectChsBySig BEFORE ec_analPrep — the resulting
 % removal list is plumbed through o.p.chRm into ec_analPrep's existing chPrep_lfn.
+% Mirrors the chSelection_lfn approach of ec_condConChsROI_perm.
 if isfield(o,"chSel") && ~isempty(o.chSel)
-    chNfoSbj = ec_loadSbj(dirs,sfx=o.p.sfx,vars="chNfo");
-    keep = ec_selectChsBySig(o.chSel,sLog.sbjID,chNfoSbj);
-    o.p.chRm = chNfoSbj.ch(~keep);
-    fprintf("[ec_classifySpec] chSel: keeping %d/%d chans for %s\n",...
-        nnz(keep),numel(keep),sLog.sbj);
+    chSel = o.chSel;
+
+    % Resolve chSelDir/chSelName → full chTable path (mirrors chSelection_lfn).
+    % Only applied when chTable is not already set and source is not "perm".
+    noTable = ~isfield(chSel,"chTable") || isempty(chSel.chTable);
+    notPerm = ~isfield(chSel,"source")  || string(chSel.source)~="perm";
+    if noTable && notPerm
+        if isfield(chSel,"chSelName") && isany(chSel.chSelName)
+            selDir = "condConCh"; % default source subdir
+            if isfield(chSel,"chSelDir") && isany(chSel.chSelDir)
+                selDir = string(chSel.chSelDir);
+            end
+            selPath = dirs.anal+selDir+filesep+string(chSel.chSelName)+filesep;
+            chSel.chTable = selPath+"chNfoA_"+string(chSel.chSelName)+".mat";
+            chSel.source  = "table";
+            disp("[ec_classifySpec] chSel table: "+chSel.chTable);
+        else
+            warning("[ec_classifySpec] chSel set but no chTable, chSelName, or srcDir; skipping.");
+            chSel = [];
+        end
+    end
+
+    if ~isempty(chSel)
+        % Auto-propagate o.p.cond/condx → chSel for "self"/"condAndCondx" modes.
+        if (~isfield(chSel,"cond")  || isempty(chSel.cond))  && isfield(o.p,"cond")
+            chSel.cond  = o.p.cond;
+        end
+        if (~isfield(chSel,"condx") || isempty(chSel.condx)) && isfield(o.p,"condx")
+            chSel.condx = o.p.condx;
+        end
+
+        chNfoSbj = ec_loadSbj(dirs,sfx=o.p.sfx,vars="chNfo");
+        keep = ec_selectChsBySig(chSel,sLog.sbjID,chNfoSbj);
+        o.p.chRm = chNfoSbj.ch(~keep);
+        fprintf("[ec_classifySpec] chSel: keeping %d/%d chans for %s\n",...
+            nnz(keep),numel(keep),sLog.sbj);
+    end
 end
 
 

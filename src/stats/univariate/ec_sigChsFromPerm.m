@@ -179,7 +179,9 @@ dur = sum(times(re) - times(rs)) + dt_nat*numel(rs);
 
 % Peak: extremum of mu over qualifying-run sig timepoints
 maskT = false(size(sig));
-for r = 1:numel(rs); maskT(rs(r):re(r)) = true; end
+for r = 1:numel(rs)
+    maskT(rs(r):re(r)) = true;
+end
 muM = mu(:);
 muM(~(maskT & sig)) = nan;
 if all(isnan(muM)); return; end

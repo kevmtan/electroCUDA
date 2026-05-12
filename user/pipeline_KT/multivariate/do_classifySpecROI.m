@@ -19,36 +19,47 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "classifySpecROI"; % directory name within dirs.anal
-o.analName = "zf_hpfBands_50ms_SemEpi_LDA_gamma"; % directory name within o.analDir
+o.analName = "zf_bands_50ms_SemEpi_LDA_nestedDeltaGamma"; % directory name within o.analDir
 
 
-%% CHANNEL SELECTION (optional): ec_selectChsBySig(...,o.chSel)
-% Applied per-subject in ec_classifySpec BEFORE ec_analPrep, via o.p.chRm.
-% Leave as empty struct or remove the block to skip channel selection.
+%% CHANNEL SELECTION: ec_selectChsBySig(...,o.chSel)
+% Mirrors ec_condConChsROI_perm channel selection (chSelection_lfn + chSelMask_lfn).
+% Channels are selected if they had significant activation/deactivation in a SOURCE
+% analysis (use a DIFFERENT analysis to reduce circularity — e.g. bands analysis
+% to select channels for a full-spectrum run).
 %
-% Example A — table source (precomputed via ec_condConChs_sigChs):
-% o.chSel = struct;
-% o.chSel.scope    = "subject";                                    % "subject" | "roi"
-% o.chSel.source   = "table";
-% o.chSel.chTable  = "/01/lbcn/anal/condConChs/<analName>/chNfoA_<analName>.mat";
+% ec_classifySpec.runSbj_lfn resolves chSelDir/chSelName → full chNfoA path
+% (dirs.anal/chSelDir/chSelName/chNfoA_<chSelName>.mat) and auto-propagates
+% o.p.cond and o.p.condx — no need to set chSel.cond/condx manually.
+%
+%   cond1Sample = "any":          any act/dea across ALL contrasts (least circular).
+%   cond1Sample = "self":         act/dea for o.p.cond conditions only.
+%   cond1Sample = "condAndCondx": act/dea in o.p.cond AND act/dea in o.p.condx.
+%                                 Recommended for cross-classification — keeps only
+%                                 channels responsive to BOTH condition pairs.
+%   cond1Sample = "condOrCondx":  act/dea in EITHER condition group (less restrictive).
+%
+% PRIMARY MODE — auto column resolution via chSelDir/chSelName:
+o.chSel = struct;
+o.chSel.scope       = "subject";          % "subject" | "roi"
+o.chSel.chSelDir    = "condConCh";        % subdir under dirs.anal (source chNfoA)
+o.chSel.chSelName   = "zf_hpfLPF_bandsParam"; % analName of source chNfoA
+o.chSel.cond1Sample = "condAndCondx";    % recommended for cross-classification
+% o.chSel.topN      = [];               % optional cap per scope group
+%
+% MANUAL OVERRIDE — explicit column list (takes precedence over cond1Sample):
 % o.chSel.vars     = ["SemanticvsEpisodic_act" "SemanticvsEpisodic_dea"];
-% o.chSel.combine  = "or";                                         % "or" | "and"
-% % Optional: cap per scope group by max|peak<mVar>| ranking
-% % o.chSel.topN    = 10;
-% % o.chSel.rankVar = "SemanticvsEpisodic_peakA_mu";
-% % o.chSel.bandIdx = [5 6]; % restrict matrix-valued cols to specific band columns
+% o.chSel.combine  = "or";              % "or" | "and" across vars
+o.chSel.bandIdx  = 2:6;            % restrict matrix-valued cols to band indices
+% o.chSel.rankVar  = "SemanticvsEpisodic_peakA_mu"; % rank for topN
 %
-% Example B — perm source (threshold raw ec_condConChs_perm results inline):
-% o.chSel = struct;
-% o.chSel.scope    = "subject";
+% PERM SOURCE — threshold raw ec_condConChs_perm results inline:
 % o.chSel.source   = "perm";
-% o.chSel.srcDir   = "/01/lbcn/anal/condConChs/<analName>/";
+% o.chSel.srcDir   = "/01/lbcn/anal/condConCh/<analName>/";
 % o.chSel.contrasts= "Semantic vs Episodic";
-% o.chSel.sigVar   = "q";
-% o.chSel.sigThr   = 0.05;
-% o.chSel.sigDur   = 50; % ms
-% o.chSel.direction = "any"; % "act" | "dea" | "any"
-o.chSel = []; % default: no channel selection
+% o.chSel.sigVar   = "q"; o.chSel.sigThr = 0.05; o.chSel.sigDur = 50;
+%
+% o.chSel = []; % ← set to [] to disable channel selection
 
 
 %% ANALYSIS PREP: ec_analPrep(...,o.p)
@@ -124,7 +135,7 @@ o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
@@ -140,15 +151,12 @@ o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % Spectral dimensionality reduction into bands (skip=[])
-o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
+o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
 
-% o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
+
 
 
 
@@ -185,7 +193,7 @@ o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"i
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 
 % Observations per timepoint (o.p.timeVar)
-o.nMin = 100; % minimum observations per class within timepoint
+o.nMin = 50; % minimum observations per class within timepoint
 o.balanceConds = true; % balance sample size per class within timepoint
 
 % Function handles to inject into classifier routines
