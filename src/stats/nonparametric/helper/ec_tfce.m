@@ -18,10 +18,13 @@ function tfce = ec_tfce(stat,featureSize,opts)
 %       'conn'          BWCONNCOMP connectivity (default conndef(max(2,K),
 %                       "minimal") = rook adjacency: 4-conn in 2-D, 6-conn
 %                       in 3-D, chain in 1-D)
-%       'spatialDims'   subset of 1:numel(FEATURESIZE) declaring which
-%                       feature dims form the spatial neighborhood; trailing
-%                       (non-spatial) dims are treated as independent panels
-%                       enhanced separately (default = all dims spatial)
+%       'spatialDims'   feature-dim indices (1-based, into FEATURESIZE, *not*
+%                       the raw data array) that form the TFCE neighborhood;
+%                       trailing dims are treated as independent panels
+%                       enhanced separately (default = all dims). In the
+%                       electroCUDA pipeline this is resolved from named
+%                       strings ("time","spect") by ec_contrast_perm before
+%                       being passed here as numeric indices.
 %       'voxelWeights'  per-voxel extent weights, same shape as the spatial
 %                       reshape (i.e., featureSize(spatialDims)). Used as
 %                       extent = sum(voxelWeights(idx)) instead of numel(idx)
@@ -151,11 +154,20 @@ if ~isempty(opts.voxelWeights)
     opts.voxelWeights = cast(opts.voxelWeights(:),"like",stat);  % flat [nSpat x 1]
 end
 
-%% Permute spatial dims to front so each panel sits in contiguous memory
-stat3 = reshape(stat,[featureSize,N]);                     % [d1 ... dK N]
-permOrder = [spatialDims,nonSpatial,nFeatDims+1];
-stat3 = permute(stat3,permOrder);                           % spatial-major
-stat3 = reshape(stat3,nSpat,nPanels,N);                     % [nSpat x nPanels x N]
+%% Permute spatial dims to front so each panel sits in contiguous memory.
+% When all feature dims are spatial (nonSpatial empty), no permutation is
+% needed and we avoid building a permOrder that wouldn't match the array's
+% dimensionality (permute requires ndims(A) <= numel(order)).
+if isempty(nonSpatial)
+    stat3 = reshape(stat,nSpat,1,N);                       % [nSpat x 1 x N]
+    invPerm = [];                                          % sentinel: skip inverse permute
+else
+    stat3 = reshape(stat,[featureSize,N]);                 % [d1 ... dK N]
+    permOrder = [spatialDims,nonSpatial,nFeatDims+1];
+    stat3 = permute(stat3,permOrder);                      % spatial-major
+    stat3 = reshape(stat3,nSpat,nPanels,N);                % [nSpat x nPanels x N]
+    [~,invPerm] = sort(permOrder);
+end
 
 %% Per-panel, per-permutation TFCE (loop is unavoidable: bwconncomp scalar)
 tfceFlat = zeros(nSpat,nPanels,N,"like",stat);
@@ -170,11 +182,15 @@ for n = 1:N
     end
 end
 
-%% Inverse permute back to caller's [nVar x N] layout
-tfceND = reshape(tfceFlat,[spatialSize,nonSpatSize,N]);
-[~,invPerm] = sort(permOrder);
-tfceND = permute(tfceND,invPerm);
-tfce = reshape(tfceND,nVar,N);
+%% Reshape back to caller's [nVar x N] layout
+if isempty(invPerm)
+    % No panels: tfceFlat is already in spatial-major order, just flatten.
+    tfce = reshape(tfceFlat,nVar,N);
+else
+    tfceND = reshape(tfceFlat,[spatialSize,nonSpatSize,N]);
+    tfceND = permute(tfceND,invPerm);
+    tfce = reshape(tfceND,nVar,N);
+end
 
 
 

@@ -16,7 +16,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "condConCh"; % directory name within dirs.anal
-o.analName = "zf_hpfLPF_bands_spect"; % directory name within o.analDir
+o.analName = "zf_hpfLPF_spectParam"; % directory name within o.analDir
 
 % Float precision
 o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
@@ -167,9 +167,16 @@ else
 end
 
 % Multiple comparisons
-o.maxCorrect = false; % max multiple comparison correction (false=do FDR instead)
+o.correct      = "none";         % "none"|"max"|"tfce"
+o.matmulThresh = 0;              % 0=always use BLAS matmul kernel (fastest on multi-core CPU)
+o.tfceE        = 0.5;            % TFCE extent exponent (Smith & Nichols 2009)
+o.tfceH        = 2;              % TFCE height exponent
+o.tfceDh       = 0;              % TFCE step size (0=auto: max(|stat|)/100 per block)
+o.tfceConn     = [];             % TFCE connectivity ([] = rook: 4-conn 2-D, 6-conn 3-D)
+o.tfceDims         = ["time" "spect"];  % dims to cluster across; ch/IC treated as independent panels
+o.tfceVoxelWeights = [];         % per-voxel extent weights ([] = uniform pixel count)
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
-o.fdrTimeRng = []; % Range of times for FDR
+o.fdrTimeRng = [0 inf]; % Range of times for FDR
 
 % Stats contrast names (eg. cond1-cond0)
 o.contrasts = [...

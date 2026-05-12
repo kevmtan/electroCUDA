@@ -78,9 +78,9 @@ end
 
 
 %% Finalize & save
-chNfoA = vertcat(chNfoA{:}); % concatenate sbjROIs
+chNfoA = vertcat(chNfoA{:}); % concatenate sbjChs
 
-% Save sbjROIs
+% Save sbjChs
 if o.save
     save(o.outDir+"chNfoA_"+o.analName,"chNfoA");
 end

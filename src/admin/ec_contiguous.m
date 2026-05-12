@@ -1,4 +1,4 @@
-function runs = contiguousKT(A,varargin)
+function runs = ec_contiguous(A,varargin)
 %   RUNS = CONTIGUOUS(A,NUM) returns the start and stop indices for contiguous
 %   runs of the elements NUM within vector A.  A and NUM can be vectors of
 %   integers or characters.  Output RUNS is a 2-column cell array where the ith

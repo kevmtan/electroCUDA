@@ -13,7 +13,7 @@ arguments
     tt (1,1) uint64 = tic
 end
 
-con = o.contrasts(c); % contrast name 
+con = o.contrasts(c); % contrast name
 
 % Comparison condition index
 id1 = ismember(ob.cnd,o.cond1(c,~ismissing(o.cond1(c,:))));
@@ -27,15 +27,22 @@ else
 end
 
 
+% Resolve named TFCE dims ("time","spect") to numeric featureSize indices.
+% Layout is fixed: 3-D x=[obs,time,freq]  → featureSize=[nTime,nFreq]
+%                  4-D x=[obs,time,ch,freq]→ featureSize=[nTime,nCh,nFreq]
+o.tfceDimsResolved = resolveTfceDims_lfn(o.tfceDims, x);
+
 %% Contrast
 if ~any(id0,"all")
     if o.nPerm
         % 1-sample permutation test of comparison condition(s)
         [t,p,ci,mu,df] = ec_permuttest(x(id1,:,:,:),0,ob(id1,o.grpVars),alpha=o.alpha,...
             tail=o.tail,nPerm=o.nPerm,blockElMax=o.blockElMax,blockMemFrac=o.blockMemFrac,...
-            nBlocks=o.nBlocks,correct=o.maxCorrect,parallel=o.parallel,ramAvail=o.ramAvail,...
+            nBlocks=o.nBlocks,correct=o.correct,parallel=o.parallel,ramAvail=o.ramAvail,...
             gather=o.gather,stream=o.stream,ciMode=o.ciMode,floatType=o.floatAnal,...
-            idxType=o.idxType,verbose=o.verbose);
+            idxType=o.idxType,verbose=o.verbose,...
+            tfceE=o.tfceE,tfceH=o.tfceH,tfceDh=o.tfceDh,tfceConn=o.tfceConn,...
+            tfceDims=o.tfceDimsResolved,tfceVoxelWeights=o.tfceVoxelWeights);
     else
         % 1-sample parametric test
         [t,p,ci,mu,df] = ec_ttest(cast(x(id1,:,:,:),o.floatAnal),0,...
@@ -46,10 +53,13 @@ else
         % 2-sample permutation test of comparison & reference conditions
         [t,p,ci,mu,df] = ec_permuttest2(x(id1,:,:,:),x(id0,:,:,:),...
             ob(id1,o.grpVars2),ob(id0,o.grpVars2),alpha=o.alpha,tail=o.tail,...
-            varType=o.varType,stableVar=o.stableVar,correct=o.maxCorrect,...
+            varType=o.varType,stableVar=o.stableVar,correct=o.correct,...
             nPerm=o.nPerm,blockElMax=o.blockElMax2,blockMemFrac=o.blockMemFrac2,...
             nBlocks=o.nBlocks2,parallel=o.parallel2,ramAvail=o.ramAvail2,gather=o.gather,...
-            stream=o.stream,ciMode=o.ciMode,floatType=o.floatAnal,idxType=o.idxType2,verbose=o.verbose);
+            stream=o.stream,ciMode=o.ciMode,floatType=o.floatAnal,idxType=o.idxType2,...
+            verbose=o.verbose,matmulThresh=o.matmulThresh,...
+            tfceE=o.tfceE,tfceH=o.tfceH,tfceDh=o.tfceDh,tfceConn=o.tfceConn,...
+            tfceDims=o.tfceDimsResolved,tfceVoxelWeights=o.tfceVoxelWeights);
     else
         % 2-sample parametric test 
         [t,p,ci,mu,df] = ec_ttest2(cast(x(id1,:,:,:),o.floatAnal),...
@@ -73,8 +83,8 @@ end
 disp("[ec_contrast_perm] Finished contrast: "+con+" | toc="+toc(tt));
 
 
-%% FDR if no max correction
-if ~o.maxCorrect
+%% FDR if no correction (max-stat and TFCE are their own corrections)
+if o.correct=="none"
     % Preallocate FDR-adjusted p-values
     q = nan(size(p));
 
@@ -111,9 +121,10 @@ if nargout == 1
 
     % Confidence intervals / standard errors
     if o.nPerm
-        % Permutation CIs
-        sc.ciL = ci(1,:,:);
-        sc.ciH = ci(2,:,:);
+        % Permutation CIs — shiftdim drops the leading [lo/hi] singleton so
+        % the first remaining dim (time) matches table height.
+        sc.ciL = shiftdim(ci(1,:,:,:,:));
+        sc.ciH = shiftdim(ci(2,:,:,:,:));
     else
         % Parametric SEs
         sc.se = ci;
@@ -131,8 +142,42 @@ if nargout == 1
     end
 
     % Copy FDR p-values
-    if ~o.maxCorrect
+    if o.correct=="none"
         sc.q = q;
         sc = movevars(sc,"q",After="p");
     end
 end
+
+
+function dimIdx = resolveTfceDims_lfn(tfceDims, x)
+% Resolve named TFCE dims to numeric featureSize indices (obs dim = 1 always).
+%
+% Named dims accepted (case-insensitive):
+%   "time"  → feature dim 1 (always, regardless of 3-D or 4-D)
+%   "spect" → feature dim 2 (3-D: [obs,time,freq])
+%           → feature dim 3 (4-D: [obs,time,ch/IC,freq])
+%
+% Numeric values are passed through unchanged. Empty is passed through.
+if isempty(tfceDims) || isnumeric(tfceDims)
+    dimIdx = tfceDims; return
+end
+nd = ndims(x);  % total dims including obs
+switch nd
+    case 2, nameMap = struct("time",1);                      % [obs,time]
+    case 3, nameMap = struct("time",1,"spect",2);            % [obs,time,freq]
+    case 4, nameMap = struct("time",1,"spect",3);            % [obs,time,ch,freq]
+    otherwise
+        error("[ec_contrast_perm] Unsupported data ndims=%d for named tfceDims.",nd)
+end
+tfceDims = lower(string(tfceDims(:)).');
+dimIdx   = zeros(1,numel(tfceDims));
+for i = 1:numel(tfceDims)
+    k = char(tfceDims(i));
+    if isfield(nameMap,k)
+        dimIdx(i) = nameMap.(k);
+    else
+        error("[ec_contrast_perm] Unknown tfceDims name ""%s"". " + ...
+              "Accepted: ""time"", ""spect"" (numeric indices also accepted).",k)
+    end
+end
+dimIdx = sort(unique(dimIdx));

@@ -80,8 +80,8 @@ end
 st = vertcat(st{:});
 
 
-%% FDR across all tests
-if ~o.maxCorrect
+%% FDR across all tests (skipped when max-stat or TFCE correction is in use)
+if o.correct=="none"
     % Loop across contrasts
     for c = 1:nCons
         % Indices for contrast

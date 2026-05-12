@@ -62,7 +62,14 @@ else
 end
 
 % Multiple comparisons
-o.maxCorrect = false; % max multiple comparison correction (false=do FDR instead)
+o.correct      = "none";         % "none"|"max"|"tfce"
+o.matmulThresh = 0;              % 0=always use BLAS matmul kernel (fastest on multi-core CPU)
+o.tfceE        = 0.5;            % TFCE extent exponent (Smith & Nichols 2009)
+o.tfceH        = 2;              % TFCE height exponent
+o.tfceDh       = 0;              % TFCE step size (0=auto: max(|stat|)/100 per block)
+o.tfceConn     = [];             % TFCE connectivity ([] = rook: 4-conn 2-D, 6-conn 3-D)
+o.tfceDims         = ["time" "spect"];  % dims to cluster across
+o.tfceVoxelWeights = [];         % per-voxel extent weights ([] = uniform pixel count)
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
 o.fdrTimeRng = [0 inf]; % Range of times for FDR
 

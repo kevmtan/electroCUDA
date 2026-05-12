@@ -16,7 +16,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "condConCh"; % directory name within dirs.anal
-o.analName = "zf_hpfLPF_bands_param"; % directory name within o.analDir
+o.analName = "zf_hpfLPF_bandsParam"; % directory name within o.analDir
 
 % Float precision
 o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
@@ -60,9 +60,9 @@ o.p.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
+o.p.epoch.dur = 2; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.025; % latency bin width (secs)
+o.p.epoch.bin = 0.005; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -93,17 +93,17 @@ o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 5; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.p.pre.olThrBL = 3; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.p.pre.olThrCond = 5; % Outlier threshold for conditions within timepts
+o.p.pre.olThrCond = 4; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
 o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
+o.p.pre.lpf = 20; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.85; % LPF steepness
-o.p.pre.antialiasing = 40; % Target sampling rate for AA passband calculation
+o.p.pre.antialiasing = 0; % Target sampling rate for AA passband calculation
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = []; %[5 300];
 % Spectral PCA (within-channel/IC)
@@ -150,7 +150,7 @@ o.grpVars2 = [];  % group variables for 2-sample grouped/nested stats
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.tail = "both"; % hypothesis tail
-o.varType = "equal"; % ["equal"=standard t-test | "unequal"=Welch's t-test]
+o.varType = "unequal"; % ["equal"=standard t-test | "unequal"=Welch's t-test]
 o.stableVar = true; % Stable variance calculation (false=fast but prone to cancellation with many obs)
 o.ciMode = "approx";
 o.nPerm = 0; % number of permutations
@@ -167,9 +167,16 @@ else
 end
 
 % Multiple comparisons
-o.maxCorrect = false; % max multiple comparison correction (false=do FDR instead)
+o.correct      = "none";         % "none"|"max"|"tfce"
+o.matmulThresh = 0;              % 0=always use BLAS matmul kernel (fastest on multi-core CPU)
+o.tfceE        = 0.5;            % TFCE extent exponent (Smith & Nichols 2009)
+o.tfceH        = 2;              % TFCE height exponent
+o.tfceDh       = 0;              % TFCE step size (0=auto: max(|stat|)/100 per block)
+o.tfceConn     = [];             % TFCE connectivity ([] = rook: 4-conn 2-D, 6-conn 3-D)
+o.tfceDims         = ["time" "spect"];  % dims to cluster across; ch/IC treated as independent panels
+o.tfceVoxelWeights = [];         % per-voxel extent weights ([] = uniform pixel count)
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
-o.fdrTimeRng = []; % Range of times for FDR
+o.fdrTimeRng = []; %[0 inf]; % Range of times for FDR
 
 % Stats contrast names (eg. cond1-cond0)
 o.contrasts = [...

@@ -70,11 +70,10 @@ function [t,p,ci,mu,df,se,dist] = ec_permuttest(x,m,g,a)
 %   - Improved NaN handling for paired complete-row filtering and per-block reductions.
 %   - Reduced memory traffic via numeric parfor accumulators, GPU-side reductions, and fewer temporaries.
 %   - Preserved pairwise-column mode with matrix-form output handling.
-%   - Generalized 'correct' from logical to enum {"none","max","tfce"} with backward-compat
-%     for legacy logical inputs (true->"max", false->"none").
+%   - 'correct' is a string enum {"none","max","tfce"} validated in the arguments block.
 %   - Added TFCE (threshold-free cluster enhancement; Smith & Nichols 2009) cluster correction
 %     via shared helper helper/ec_tfce.m with separate +/- enhancement and 1-/2-/N-D spatial
-%     neighborhoods (a.tfceE, a.tfceH, a.tfceDh, a.tfceConn, a.tfceSpatialDims).
+%     neighborhoods (a.tfceE, a.tfceH, a.tfceDh, a.tfceConn, a.tfceDims).
 %   - Under correct="tfce", the 1st output 't' is OVERWRITTEN with the TFCE-enhanced
 %     observed map (signed, same shape as raw t). The raw pre-TFCE t-statistic is no
 %     longer separately returned. Rationale: the inference statistic under TFCE IS the
@@ -91,7 +90,9 @@ function [t,p,ci,mu,df,se,dist] = ec_permuttest(x,m,g,a)
 %   - TFCE default connectivity is rook adjacency (conndef(max(2,K),"minimal")):
 %     4-conn in 2-D and 6-conn in 3-D — diagonal time/freq/channel neighbors carry weaker
 %     physical meaning in iEEG so we exclude them by default.
-%   - Added warnings for likely-foot-gun TFCE configurations: (1) default tfceSpatialDims
+%   - Renamed a.tfceSpatialDims → a.tfceDims (less confusing: indexing is into featureSize,
+%     not into the input data array; obs dim is already stripped at that point).
+%   - Added warnings for likely-foot-gun TFCE configurations: (1) default tfceDims
 %     with multi-dim featureSize (recommends explicit setting for the iEEG layout
 %     [obs x time x channel(x freq)] where channels are independent observations);
 %     (2) TFCE+grouped runs CPU-only; (3) TFCE without streaming holds full [nPerm x nVar]
@@ -115,17 +116,17 @@ arguments
     a.tail string {mustBeMember(a.tail,["left","both","right"])} = "both" % hypothesis tail
     a.compare string {mustBeMember(a.compare,["zero","pairwise"])} = "zero" % one-sample comparison mode
     a.nPerm (1,1) double {mustBeInteger,mustBePositive} = 1e4 % number of permutations
-    a.correct = "none" % multiple-comparison correction: "none" | "max" | "tfce" (legacy logical accepted)
+    a.correct string {mustBeMember(a.correct,["none","max","tfce"])} = "none" % multiple-comparison correction: "none" | "max" | "tfce"
     a.tfceE (1,1) double {mustBePositive} = 0.5 % TFCE extent exponent (Smith & Nichols 2009)
     a.tfceH (1,1) double {mustBePositive} = 2 % TFCE height exponent (Smith & Nichols 2009)
     a.tfceDh (1,1) double {mustBeNonnegative} = 0 % TFCE step size (0=auto: max(|stat|)/100 per column)
     a.tfceConn = [] % TFCE bwconncomp connectivity (default conndef(max(2,K),"minimal") = rook: 4-conn 2-D, 6-conn 3-D, chain 1-D)
-    a.tfceSpatialDims double {mustBeInteger,mustBeNonnegative} = [] % feature dims forming TFCE neighborhood (default=all)
+    a.tfceDims double {mustBeInteger,mustBeNonnegative} = [] % feature dims forming TFCE neighborhood (default=all)
     a.tfceVoxelWeights {mustBeNumeric} = [] % per-voxel extent weights matching featureSize(spatialDims); default [] => uniform pixel count
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
     a.blockElMax (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % maximum block elements (0=auto from available memory)
     a.nBlocks (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % explicit number of permutation blocks (0=derive from blockElMax)
-    a.blockMemFrac (1,1) double {mustBeGreaterThan(a.blockMemFrac,0),mustBeLessThan(a.blockMemFrac,1)} = 0.2 % Fraction of available memory to use within permute blocks (for auto blockElMax)
+    a.blockMemFrac (1,1) double {mustBeNonnegative,mustBeLessThan(a.blockMemFrac,1)} = 0.2 % Fraction of available memory for auto block sizing; 0 = skip auto-sizing, use nBlocks directly
     a.parallel {mustBeMember(a.parallel,["none" "gpu" "cpu" ""])} = "none" % execution backend (CPU not worth it)
     a.ramAvail (1,1) double = 0 % available RAM/VRAM bytes (override upstream if needed)
     a.mat (1,1) logical = false % return pairwise results as square matrices
@@ -136,14 +137,6 @@ arguments
     a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
-end
-% Backward compat: a.correct used to be logical (true="max", false="none").
-if islogical(a.correct) || (isnumeric(a.correct) && isscalar(a.correct))
-    if logical(a.correct), a.correct = "max"; else, a.correct = "none"; end
-end
-a.correct = string(a.correct);
-if ~ismember(a.correct,["none","max","tfce"])
-    error("[ec_permuttest] a.correct must be ""none"", ""max"", or ""tfce"".")
 end
 % No parfor if running on GPU
 if isgpuarray(x); a.parallel="gpu"; end
@@ -265,12 +258,12 @@ t = mu./se;
 % Return if only t-value desired (under correct="tfce", t is the TFCE-enhanced map).
 if nargout==1
     if a.correct=="tfce"
-        spDims = a.tfceSpatialDims;
+        spDims = a.tfceDims;
         if isempty(spDims), spDims = 1:numel(a.featureSize); end
         opts = struct("E",a.tfceE,"H",a.tfceH,"dh",a.tfceDh,...
             "conn",a.tfceConn,"spatialDims",spDims,...
             "voxelWeights",a.tfceVoxelWeights);
-        t = ec_tfce(t(:),a.featureSize,opts).';
+        t = ec_tfce(t(:),a.featureSize,E=opts.E,H=opts.H,dh=opts.dh,conn=opts.conn,spatialDims=opts.spatialDims,voxelWeights=opts.voxelWeights).';
         if a.dim~=1 || xInputDims>2
             t = reshape(t,[1 featureSize]);
         end
@@ -290,11 +283,11 @@ if a.correct=="tfce"
     if a.mat
         error("[ec_permuttest] correct=""tfce"" is incompatible with pairwise comparison.")
     end
-    spatialDimsWasDefault = isempty(a.tfceSpatialDims);
+    spatialDimsWasDefault = isempty(a.tfceDims);
     if spatialDimsWasDefault
-        a.tfceSpatialDims = 1:numel(a.featureSize);
-    elseif any(a.tfceSpatialDims>numel(a.featureSize)) || ~isequal(a.tfceSpatialDims,unique(a.tfceSpatialDims))
-        error("[ec_permuttest] a.tfceSpatialDims must be a unique subset of 1:%d.",numel(a.featureSize))
+        a.tfceDims = 1:numel(a.featureSize);
+    elseif any(a.tfceDims>numel(a.featureSize)) || ~isequal(a.tfceDims,unique(a.tfceDims))
+        error("[ec_permuttest] a.tfceDims must be a unique subset of 1:%d.",numel(a.featureSize))
     end
     if a.parallel=="gpu"
         warning("[ec_permuttest] TFCE requires CPU bwconncomp; falling back to parallel=""none"".")
@@ -307,14 +300,14 @@ if a.correct=="tfce"
         warning("[ec_permuttest] TFCE spatial neighborhood defaulted to all featureSize dims [%s]. " + ...
             "For the standard iEEG layout [obs x time x channel] or [obs x time x channel x freq], " + ...
             "channels are typically independent observations (no implicit grid adjacency); " + ...
-            "set a.tfceSpatialDims=[1] (time only) or [1 3] (time+freq, channel as panels) explicitly.", ...
+            "set a.tfceDims=[1] (time only) or [1 3] (time+freq, channel as panels) explicitly.", ...
             num2str(a.featureSize))
     end
     if ~a.stream
         warning("[ec_permuttest] TFCE without streaming holds the full [nPerm x nVar] t-stat block in memory; consider stream=true.")
     end
     a.tfceOpts = struct("E",a.tfceE,"H",a.tfceH,"dh",a.tfceDh,...
-        "conn",a.tfceConn,"spatialDims",a.tfceSpatialDims,...
+        "conn",a.tfceConn,"spatialDims",a.tfceDims,...
         "voxelWeights",a.tfceVoxelWeights);
 end
 
@@ -336,6 +329,9 @@ end
 % Generate random permutations
 rng(a.seed);
 
+if a.blockMemFrac==0 && a.nBlocks<=0
+    error("[ec_permuttest] blockMemFrac=0 disables auto block sizing; set nBlocks>0 explicitly.")
+end
 if a.nBlocks>0
     a.bPerms = max(1,ceil(a.nPerm/a.nBlocks));
     if a.verbose
@@ -571,7 +567,7 @@ if a.stream
             % statistic (avoids forcing nargout>=8 to retrieve it, which
             % would disable streaming). CI under TFCE is uncorrected
             % (normal approx from per-feature null moments).
-            t = ec_tfce(t(:),a.featureSize,a.tfceOpts).';   % [1 x nVar] (overwrites raw t)
+            t = ec_tfce(t(:),a.featureSize,E=a.tfceOpts.E,H=a.tfceOpts.H,dh=a.tfceOpts.dh,conn=a.tfceOpts.conn,spatialDims=a.tfceOpts.spatialDims,voxelWeights=a.tfceOpts.voxelWeights).';   % [1 x nVar] (overwrites raw t)
             d = sort(dist(~isnan(dist)));
             switch a.tail
                 case "both";  countExt = countGE_lfn_sorted(d,abs(t));
@@ -629,14 +625,14 @@ else
             case "left";  dist = min(dist,[],2);
         end
     elseif a.correct=="tfce"
-        tfceCols = ec_tfce(dist.',a.featureSize,a.tfceOpts);   % [nVar x nPerm] signed
+        tfceCols = ec_tfce(dist.',a.featureSize,E=a.tfceOpts.E,H=a.tfceOpts.H,dh=a.tfceOpts.dh,conn=a.tfceOpts.conn,spatialDims=a.tfceOpts.spatialDims,voxelWeights=a.tfceOpts.voxelWeights);   % [nVar x nPerm] signed
         switch a.tail
             case "both";  dist = max(abs(tfceCols),[],1).';
             case "right"; dist = max(tfceCols,[],1).';
             case "left";  dist = min(tfceCols,[],1).';
         end
         % Overwrite raw t with observed TFCE map; this becomes the inference statistic.
-        t = ec_tfce(t(:),a.featureSize,a.tfceOpts).';   % [1 x nVar] observed
+        t = ec_tfce(t(:),a.featureSize,E=a.tfceOpts.E,H=a.tfceOpts.H,dh=a.tfceOpts.dh,conn=a.tfceOpts.conn,spatialDims=a.tfceOpts.spatialDims,voxelWeights=a.tfceOpts.voxelWeights).';   % [1 x nVar] observed
     end
 
     if a.verbose
@@ -818,7 +814,7 @@ function d1 = blockTfceMax_lfn(bDist,a)
 % Per-permutation: signed TFCE map -> tail-aware extremum -> [nbPerms x 1].
 % bDist is [nbPerms x nVar]; transpose so each column is one permutation's
 % flattened stat map for ec_tfce, then collapse spatially.
-tfceCols = ec_tfce(bDist.',a.featureSize,a.tfceOpts);   % [nVar x nbPerms] signed
+tfceCols = ec_tfce(bDist.',a.featureSize,E=a.tfceOpts.E,H=a.tfceOpts.H,dh=a.tfceOpts.dh,conn=a.tfceOpts.conn,spatialDims=a.tfceOpts.spatialDims,voxelWeights=a.tfceOpts.voxelWeights);   % [nVar x nbPerms] signed
 switch a.tail
     case "both";  d1 = max(abs(tfceCols),[],1).';
     case "right"; d1 = max(tfceCols,[],1).';
