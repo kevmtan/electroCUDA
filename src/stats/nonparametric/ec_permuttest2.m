@@ -1,4 +1,4 @@
-function [t,p,ci,mu,df,sd,dist] = ec_permuttest2(x,y,gx,gy,a)
+function [t,p,ci,mu,df,se,dist] = ec_permuttest2(x,y,gx,gy,a)
 % ec_permuttest2: modified from PERMUTOOLS for electroCUDA (see
 %   modifications below)
 %
@@ -47,6 +47,53 @@ function [t,p,ci,mu,df,sd,dist] = ec_permuttest2(x,y,gx,gy,a)
 %   - Added one-sort corrected counting helpers (tail-aware max/min/abs handling).
 %   - Reduced grouped CPU peak memory by tiling permutation columns within each block.
 %   - Replaced streaming parfor cell accumulators with numeric sliced arrays to reduce overhead.
+%   - Generalized 'correct' from logical to enum {"none","max","tfce"} with backward-compat
+%     for legacy logical inputs (true->"max", false->"none").
+%   - Added TFCE (threshold-free cluster enhancement; Smith & Nichols 2009) cluster correction
+%     via shared helper helper/ec_tfce.m with separate +/- enhancement and 1-/2-/N-D spatial
+%     neighborhoods (a.tfceE, a.tfceH, a.tfceDh, a.tfceConn, a.tfceSpatialDims).
+%   - Under correct="tfce", the 1st output 't' is OVERWRITTEN with the TFCE-enhanced
+%     observed map (signed, same shape as raw t). The raw pre-TFCE t-statistic is no
+%     longer separately returned. Rationale: the inference statistic under TFCE IS the
+%     TFCE map (it is what gets compared to the null max-TFCE distribution to produce p),
+%     so the primary output should be it. Returning it as an extra 8th output forced
+%     nargout>=8 to retrieve it, which forced needDist=true and disabled streaming —
+%     making "give me the inference statistic" implicitly costly. Recompute raw t
+%     externally if needed (mu./se from outputs 4+6 or unaffected by correct).
+%   - Streaming-aware TFCE: per-block reduction returns max-TFCE so dist stays [nPerm x 1];
+%     when needCI requested with TFCE, also accumulates per-feature null moments for an
+%     uncorrected normal-approximation CI (CI semantics differ from p-values under TFCE).
+%   - GPU+TFCE auto-falls back to parallel="none" with warning (bwconncomp is CPU-only).
+%   - Errors out if correct="tfce" combined with pairwise comparison (spatial structure undefined).
+%   - Widened the selection-matmul fast path to grouped permutations (drops the ~useGroups gate);
+%     after building idx, dispatches to blockDist_matmul_lfn using the X-arm slice idx(1:nObsXMax,:)
+%     instead of the [nObsXMax x bPerms x nVar] gather kernel.
+%   - Exposed the matmul threshold as option a.matmulThresh (default 5e4, was hard-coded
+%     5e6); set 0 to always use matmul or Inf to always use the gather kernel.
+%   - Cached z.^2 once per call (a.z2) instead of recomputing inside every block; the cache
+%     lives on the same device as z (CPU or GPU) so the matmul kernel reuses it directly.
+%   - Updated the per-block memory estimator to account for the cached z.^2 fixed cost,
+%     the smaller idx footprint of ungrouped+matmul (idx1 only), and the matmul A matrix.
+%   - TFCE default connectivity is rook adjacency (conndef(max(2,K),"minimal")):
+%     4-conn in 2-D and 6-conn in 3-D — diagonal time/freq/channel neighbors carry weaker
+%     physical meaning in iEEG so we exclude them by default.
+%   - Added warnings for likely-foot-gun TFCE configurations: (1) default tfceSpatialDims
+%     with multi-dim featureSize (recommends explicit setting for the iEEG layout
+%     [obs x time x channel(x freq)] where channels are independent observations);
+%     (2) TFCE+grouped runs CPU-only; (3) TFCE without streaming holds full [nPerm x nVar]
+%     in memory.
+%   - Added a.tfceVoxelWeights (forwarded as tfceOpts.voxelWeights) for non-uniform spatial
+%     sampling: extent = sum(weights(idx)) instead of numel(idx). Not needed for the standard
+%     iEEG TF layout (uniform log-freq + uniform linear time has pixel count proportional to
+%     octaves x seconds already); intended for mixed linear/log axes or irregular binning.
+%   - 6th output 'sd' replaced with 'se' (the standard error of the mean difference used
+%     internally for the t-statistic and CI formulas). The Welch (vartype="unequal") path
+%     no longer materializes the per-arm [sd_X; sd_Y] array, and the 2-row reshape special
+%     case in the output organization block is removed. CALLER-FACING NUMERIC CHANGE: the
+%     6th output is now 'se' = sqrt(varX/nX + varY/nY) for Welch or
+%     sqrt((dfX*varX+dfY*varY)/df) * sqrt((nX+nY)/(nX*nY)) for equal-variance — different
+%     from the previous 'sd' value, and per-arm SDs are no longer recoverable from this
+%     output.
 
 %% Arguments validation
 arguments
@@ -60,11 +107,18 @@ arguments
     a.vartype string {mustBeMember(a.vartype,["equal","unequal"])} = "equal" % equal-variance or Welch t-statistic
     a.stableVar (1,1) logical = false % use centered variance (more stable, slower)
     a.nPerm (1,1) double {mustBeInteger,mustBePositive} = 1e4 % number of permutations
-    a.correct (1,1) logical = true % apply max-stat multiple-comparison correction
+    a.correct = "none" % multiple-comparison correction: "none" | "max" | "tfce" (legacy logical accepted)
+    a.tfceE (1,1) double {mustBePositive} = 0.5 % TFCE extent exponent (Smith & Nichols 2009)
+    a.tfceH (1,1) double {mustBePositive} = 2 % TFCE height exponent (Smith & Nichols 2009)
+    a.tfceDh (1,1) double {mustBeNonnegative} = 0 % TFCE step size (0=auto: max(|stat|)/100 per column)
+    a.tfceConn = [] % TFCE bwconncomp connectivity (default conndef(max(2,K),"minimal") = rook: 4-conn 2-D, 6-conn 3-D, chain 1-D)
+    a.tfceSpatialDims double {mustBeInteger,mustBeNonnegative} = [] % feature dims forming TFCE neighborhood (default=all)
+    a.tfceVoxelWeights {mustBeNumeric} = [] % per-voxel extent weights matching featureSize(spatialDims); default [] => uniform pixel count
     a.rows string {mustBeMember(a.rows,["all","complete"])} = "all" % NaN row handling
     a.blockElMax (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % maximum block elements (0=auto from available memory)
     a.nBlocks (1,1) double {mustBeInteger,mustBeNonnegative} = 0 % explicit number of permutation blocks (0=derive from blockElMax)
     a.blockMemFrac (1,1) double {mustBeGreaterThan(a.blockMemFrac,0),mustBeLessThan(a.blockMemFrac,1)} = 0.2 % Fraction of available memory to use within permute blocks (for auto blockElMax)
+    a.matmulThresh (1,1) double {mustBeNonnegative} = 5e4 % min nObsXMax*nVar to use selection-matmul kernel (0=always; Inf=never)
     a.parallel {mustBeMember(a.parallel,["none" "gpu" "cpu" ""])} = "none" % execution backend (CPU not worth it)
     a.ramAvail (1,1) double = nan % available RAM/VRAM bytes (override upstream if needed)
     a.mat (1,1) logical = false % return pairwise results as square matrices
@@ -75,6 +129,14 @@ arguments
     a.floatType {mustBeMember(a.floatType,["double" "single" "half"])} = class(x)
     a.verbose (1,1) logical = true % print status messages
     a.seed {mustBeSeedOption(a.seed)} = "shuffle" % RNG seed or "shuffle"
+end
+% Backward compat: a.correct used to be logical (true="max", false="none").
+if islogical(a.correct) || (isnumeric(a.correct) && isscalar(a.correct))
+    if logical(a.correct), a.correct = "max"; else, a.correct = "none"; end
+end
+a.correct = string(a.correct);
+if ~ismember(a.correct,["none","max","tfce"])
+    error("[ec_permuttest2] a.correct must be ""none"", ""max"", or ""tfce"".")
 end
 if isgpuarray(x) || isgpuarray(y)
     a.parallel = "gpu";
@@ -94,7 +156,10 @@ end
 xInputDims = ndims(x);
 if a.dim~=1 || xInputDims>2
     [x,featureSize] = ec_reshape2D(x,a.dim);
+else
+    featureSize = size(x,2);   % single feature dim (2D input on dim=1)
 end
+a.featureSize = featureSize;
 gx = ec_groupIndex(gx,size(x,1),"gx");
 
 % Set up comparison
@@ -203,13 +268,12 @@ switch a.vartype
     case "equal"
         nObs = a.nObsX+a.nObsY;
         df = nObs-2;
-        sd = sqrt((a.dfX.*varX+a.dfY.*varY)./df);
-        se = sd.*sqrt(nObs./(a.nObsX.*a.nObsY));
+        sdPooled = sqrt((a.dfX.*varX+a.dfY.*varY)./df);
+        se = sdPooled.*sqrt(nObs./(a.nObsX.*a.nObsY));
     case "unequal"
         se2X = varX./a.nObsX;
         se2Y = varY./a.nObsY;
         df = (se2X+se2Y).^2./(se2X.^2./a.dfX+se2Y.^2./a.dfY);
-        sd = sqrt([varX;varY]);
         se = sqrt(se2X+se2Y);
 end
 a.df = df;
@@ -218,8 +282,21 @@ a.df = df;
 mu = sumX./a.nObsX - sumY./a.nObsY;
 t = mu./se;
 
-% Return if only t-value desired
-if nargout==1; return; end
+% Return if only t-value desired (under correct="tfce", t is the TFCE-enhanced map).
+if nargout==1
+    if a.correct=="tfce"
+        spDims = a.tfceSpatialDims;
+        if isempty(spDims), spDims = 1:numel(a.featureSize); end
+        opts = struct("E",a.tfceE,"H",a.tfceH,"dh",a.tfceDh,...
+            "conn",a.tfceConn,"spatialDims",spDims,...
+            "voxelWeights",a.tfceVoxelWeights);
+        t = ec_tfce(t(:),a.featureSize,opts).';
+        if a.dim~=1 || xInputDims>2
+            t = reshape(t,[1 featureSize]);
+        end
+    end
+    return
+end
 
 
 %% Permutation setup
@@ -244,12 +321,44 @@ a.needDist = nargout > 6;
 a.needApproxCI = a.needCI && a.ciMode=="approx";
 a.stream = a.stream && ~a.needDist && (~a.needCI || a.needApproxCI);
 
+% TFCE setup (validate spatial dims, force CPU since bwconncomp is CPU-only).
+if a.correct=="tfce"
+    if a.mat
+        error("[ec_permuttest2] correct=""tfce"" is incompatible with pairwise comparison.")
+    end
+    spatialDimsWasDefault = isempty(a.tfceSpatialDims);
+    if spatialDimsWasDefault
+        a.tfceSpatialDims = 1:numel(a.featureSize);
+    elseif any(a.tfceSpatialDims>numel(a.featureSize)) || ~isequal(a.tfceSpatialDims,unique(a.tfceSpatialDims))
+        error("[ec_permuttest2] a.tfceSpatialDims must be a unique subset of 1:%d.",numel(a.featureSize))
+    end
+    if a.parallel=="gpu"
+        warning("[ec_permuttest2] TFCE requires CPU bwconncomp; falling back to parallel=""none"".")
+        a.parallel = "none";
+    end
+    if a.useGroups
+        warning("[ec_permuttest2] TFCE+grouped runs CPU-only (bwconncomp is CPU-only and grouped permutations don't use GPU).")
+    end
+    if spatialDimsWasDefault && numel(a.featureSize)>=2
+        warning("[ec_permuttest2] TFCE spatial neighborhood defaulted to all featureSize dims [%s]. " + ...
+            "For the standard iEEG layout [obs x time x channel] or [obs x time x channel x freq], " + ...
+            "channels are typically independent observations (no implicit grid adjacency); " + ...
+            "set a.tfceSpatialDims=[1] (time only) or [1 3] (time+freq, channel as panels) explicitly.", ...
+            num2str(a.featureSize))
+    end
+    if ~a.stream
+        warning("[ec_permuttest2] TFCE without streaming holds the full [nPerm x nVar] t-stat block in memory; consider stream=true.")
+    end
+    a.tfceOpts = struct("E",a.tfceE,"H",a.tfceH,"dh",a.tfceDh,...
+        "conn",a.tfceConn,"spatialDims",a.tfceSpatialDims,...
+        "voxelWeights",a.tfceVoxelWeights);
+end
+
 % Selection-matmul path avoids the [nObsXMax x bPerms x nVar] gather intermediate.
-% Restricted to: no groups (grouped path has its own tiling), no stableVar.
 % NaNs are handled by zeroing them in z after sumZ/sumZ2 are computed, so A*z
-% gives the same result as sum(x1,1,"omitmissing").
-a.useMatmul = ~a.stableVar && ~a.useGroups && ...
-    double(a.nObsXMax)*double(a.nVar) > 5e6;
+% gives the same result as sum(x1,1,"omitmissing"). Now applies to grouped
+% path too (the kernel is selection-matrix-based so it works for any idx1).
+a.useMatmul = ~a.stableVar && double(a.nObsXMax)*double(a.nVar) > a.matmulThresh;
 if a.useMatmul && a.nan=="omitmissing"
     z(isnan(z)) = 0;
 end
@@ -310,14 +419,30 @@ elseif a.parallel=="gpu"
     end
 end
 
+% Cache z.^2 once per call for the matmul kernel (after possible GPU move so
+% it lives on the same device as z). Avoids recomputing per block.
+if a.useMatmul
+    a.z2 = z.^2;
+else
+    a.z2 = [];
+end
+
 % Preallocate distances from mean (per block)
 if a.stream
     % Stream per-block statistics instead of storing full permutation dist.
     dist = [];
     nSeen = 0;
-    if a.correct
+    if a.correct=="max"
         % Keep one tail-extremal null value per permutation; sort once later.
         dist = zeros(a.nPerm,1,a.floatType);
+    elseif a.correct=="tfce"
+        % Same shape as max: one max-TFCE value per permutation.
+        dist = zeros(a.nPerm,1,a.floatType);
+        if a.needApproxCI
+            % TFCE uses uncorrected per-feature CI; collect null moments too.
+            nullSum = zeros(1,a.nVar,a.floatType);
+            nullSumSq = zeros(1,a.nVar,a.floatType);
+        end
     else
         countExt = zeros(1,a.nVar,a.floatType);
         if a.needApproxCI
@@ -340,7 +465,7 @@ end
 
 %% Permutation stats
 if a.stream
-    if a.correct
+    if a.correct=="max"
         if a.parallel=="cpu"
             blkDist = cell(nBlocks,1);
             blkN = zeros(nBlocks,1);
@@ -360,6 +485,44 @@ if a.stream
                 end
                 dist(bStarts(b):bEnds(b)) = d1;
                 nSeen = nSeen + numel(d1);
+            end
+        end
+    elseif a.correct=="tfce"
+        % Per permutation: signed TFCE map -> tail-aware extremum (one column);
+        % optionally accumulate per-feature null moments for approx (uncorrected) CI.
+        if a.parallel=="cpu"
+            blkDist = cell(nBlocks,1);
+            blkN = zeros(nBlocks,1);
+            blkSum = []; blkSumSq = [];
+            if a.needApproxCI
+                blkSum   = zeros(nBlocks,a.nVar,a.floatType);
+                blkSumSq = zeros(nBlocks,a.nVar,a.floatType);
+            end
+            parfor b = 1:nBlocks
+                bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
+                blkDist{b} = blockTfceMax_lfn(bDist,a);
+                blkN(b) = size(bDist,1);
+                if a.needApproxCI
+                    blkSum(b,:)   = sum(bDist,1);
+                    blkSumSq(b,:) = sum(bDist.^2,1);
+                end
+            end
+            dist = cell2mat(blkDist);
+            nSeen = sum(blkN);
+            if a.needApproxCI
+                nullSum   = sum(blkSum,1);
+                nullSumSq = sum(blkSumSq,1);
+            end
+        else
+            for b = 1:nBlocks
+                bDist = runBlock_lfn(z,sumZ,sumZ2,bStarts(b),bEnds(b),bSeeds(b),a);
+                d1 = blockTfceMax_lfn(bDist,a);
+                dist(bStarts(b):bEnds(b)) = d1;
+                nSeen = nSeen + numel(d1);
+                if a.needApproxCI
+                    nullSum   = nullSum   + sum(bDist,1);
+                    nullSumSq = nullSumSq + sum(bDist.^2,1);
+                end
             end
         end
     else
@@ -437,58 +600,102 @@ if a.stream
     if a.verbose
         fprintf("[ec_permuttest2] Streaming reductions complete over %d permutations.\n",nSeen);
     end
-    if a.correct
-        d = sort(dist(~isnan(dist)));
-        switch a.tail
-            case "both"
-                countExt = countGE_lfn_sorted(d,abs(t));
-            case "right"
-                countExt = countGE_lfn_sorted(d,t);
-            case "left"
-                countExt = countLE_lfn_sorted(d,t);
-        end
-        p = (countExt + 1) / (nSeen + 1);
-        if a.needApproxCI
+    switch a.correct
+        case "max"
+            d = sort(dist(~isnan(dist)));
             switch a.tail
                 case "both"
-                    critLo = prctile(d,100*(a.alpha/2));
-                    critHi = prctile(d,100*(1-a.alpha/2));
-                    ci = [mu-critHi.*se;mu-critLo.*se];
+                    countExt = countGE_lfn_sorted(d,abs(t));
                 case "right"
-                    crit = prctile(d,100*(1-a.alpha)).*se;
-                    ci = [mu-crit;Inf(1,a.nVar)];
+                    countExt = countGE_lfn_sorted(d,t);
                 case "left"
-                    crit = prctile(d,100*a.alpha).*se;
-                    ci = [-Inf(1,a.nVar);mu-crit];
+                    countExt = countLE_lfn_sorted(d,t);
             end
-        elseif a.needCI
-            error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
-        end
-    else
-        p = (countExt + 1) / (nSeen + 1);
-        if a.needApproxCI
-            nullMu = nullSum ./ nSeen;
-            nullVar = max(0, nullSumSq ./ nSeen - nullMu.^2);
-            nullSd = sqrt(nullVar);
+            p = (countExt + 1) / (nSeen + 1);
+            if a.needApproxCI
+                switch a.tail
+                    case "both"
+                        critLo = prctile(d,100*(a.alpha/2));
+                        critHi = prctile(d,100*(1-a.alpha/2));
+                        ci = [mu-critHi.*se;mu-critLo.*se];
+                    case "right"
+                        crit = prctile(d,100*(1-a.alpha)).*se;
+                        ci = [mu-crit;Inf(1,a.nVar)];
+                    case "left"
+                        crit = prctile(d,100*a.alpha).*se;
+                        ci = [-Inf(1,a.nVar);mu-crit];
+                end
+            elseif a.needCI
+                error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
+            end
+        case "tfce"
+            % Null distribution is [nPerm x 1] of max-TFCE; comparator is the
+            % TFCE-enhanced observed t-map (signed). The raw t output is
+            % overwritten with this so the 1st output IS the inference
+            % statistic (avoids forcing nargout>=8 to retrieve it, which
+            % would disable streaming). CI under TFCE is uncorrected
+            % (normal approx from per-feature null moments).
+            t = ec_tfce(t(:),a.featureSize,a.tfceOpts).';   % [1 x nVar] (overwrites raw t)
+            d = sort(dist(~isnan(dist)));
             switch a.tail
                 case "both"
-                    qLo = normInv_lfn(a.alpha/2, nullMu, nullSd);
-                    qHi = normInv_lfn(1-a.alpha/2, nullMu, nullSd);
-                    ci = [mu-qHi.*se; mu-qLo.*se];
+                    countExt = countGE_lfn_sorted(d,abs(t));
                 case "right"
-                    q = normInv_lfn(1-a.alpha, nullMu, nullSd);
-                    ci = [mu-q.*se; Inf(1,a.nVar)];
+                    countExt = countGE_lfn_sorted(d,t);
                 case "left"
-                    q = normInv_lfn(a.alpha, nullMu, nullSd);
-                    ci = [-Inf(1,a.nVar); mu-q.*se];
+                    countExt = countLE_lfn_sorted(d,t);
             end
-        elseif a.needCI
-            error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
-        end
+            p = (countExt + 1) / (nSeen + 1);
+            if a.needApproxCI
+                nullMu = nullSum ./ nSeen;
+                nullVar = max(0, nullSumSq ./ nSeen - nullMu.^2);
+                nullSd = sqrt(nullVar);
+                switch a.tail
+                    case "both"
+                        qLo = normInv_lfn(a.alpha/2, nullMu, nullSd);
+                        qHi = normInv_lfn(1-a.alpha/2, nullMu, nullSd);
+                        ci = [mu-qHi.*se; mu-qLo.*se];
+                    case "right"
+                        q = normInv_lfn(1-a.alpha, nullMu, nullSd);
+                        ci = [mu-q.*se; Inf(1,a.nVar)];
+                    case "left"
+                        q = normInv_lfn(a.alpha, nullMu, nullSd);
+                        ci = [-Inf(1,a.nVar); mu-q.*se];
+                end
+            elseif a.needCI
+                error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
+            end
+        case "none"
+            p = (countExt + 1) / (nSeen + 1);
+            if a.needApproxCI
+                nullMu = nullSum ./ nSeen;
+                nullVar = max(0, nullSumSq ./ nSeen - nullMu.^2);
+                nullSd = sqrt(nullVar);
+                switch a.tail
+                    case "both"
+                        qLo = normInv_lfn(a.alpha/2, nullMu, nullSd);
+                        qHi = normInv_lfn(1-a.alpha/2, nullMu, nullSd);
+                        ci = [mu-qHi.*se; mu-qLo.*se];
+                    case "right"
+                        q = normInv_lfn(1-a.alpha, nullMu, nullSd);
+                        ci = [mu-q.*se; Inf(1,a.nVar)];
+                    case "left"
+                        q = normInv_lfn(a.alpha, nullMu, nullSd);
+                        ci = [-Inf(1,a.nVar); mu-q.*se];
+                end
+            elseif a.needCI
+                error("[ec_permuttest2] Exact CI requested in streaming mode. Use ciMode='approx' or disable streaming.");
+            end
     end
 else
-    % Apply max correction if specified
-    if a.correct
+    % Non-streaming: dist is the full [nPerm x nVar] t-stat distribution.
+    % Preserve it for TFCE's uncorrected CI before tail-collapse.
+    distOrig = [];
+    if a.correct=="tfce" && a.needCI
+        distOrig = dist;
+    end
+    % Apply tail-aware extremal collapse (max-stat or TFCE).
+    if a.correct=="max"
         switch a.tail
             case "both"
                 [~,idx] = max(abs(dist),[],2);
@@ -500,6 +707,15 @@ else
             case "left"
                 dist = min(dist,[],2);
         end
+    elseif a.correct=="tfce"
+        tfceCols = ec_tfce(dist.',a.featureSize,a.tfceOpts);   % [nVar x nPerm] signed
+        switch a.tail
+            case "both";  dist = max(abs(tfceCols),[],1).';
+            case "right"; dist = max(tfceCols,[],1).';
+            case "left";  dist = min(tfceCols,[],1).';
+        end
+        % Overwrite raw t with observed TFCE map; this becomes the inference statistic.
+        t = ec_tfce(t(:),a.featureSize,a.tfceOpts).';   % [1 x nVar] observed
     end
     if a.verbose
         fprintf("[ec_permuttest2] Number of effective permutations: %d\n",a.nPerm)
@@ -507,43 +723,57 @@ else
 
     % Compute p-value & CI
     if a.verbose
-        if a.correct
-            fprintf("[ec_permuttest2] Computing max-corrected p-values (serial threshold counting)...\n");
-        else
-            fprintf("[ec_permuttest2] Computing uncorrected p-values/CI from full permutation distribution...\n");
+        switch a.correct
+            case "max";  fprintf("[ec_permuttest2] Computing max-corrected p-values (serial threshold counting)...\n");
+            case "tfce"; fprintf("[ec_permuttest2] Computing TFCE-corrected p-values...\n");
+            case "none"; fprintf("[ec_permuttest2] Computing uncorrected p-values/CI from full permutation distribution...\n");
         end
     end
     switch a.tail
         case "both"
-            if a.correct
-                p = (countGE_lfn(dist,abs(t))+1)/(a.nPerm+1);
-            else
-                tAbs = abs(t);
-                p = (sum((dist>=tAbs) | (dist<=-tAbs))+1)/(a.nPerm+1);
+            switch a.correct
+                case "max";  p = (countGE_lfn(dist,abs(t))+1)/(a.nPerm+1);
+                case "tfce"; p = (countGE_lfn(dist,abs(t))+1)/(a.nPerm+1);  % t is overwritten with TFCE map
+                case "none"
+                    tAbs = abs(t);
+                    p = (sum((dist>=tAbs) | (dist<=-tAbs))+1)/(a.nPerm+1);
             end
             if nargout > 2
-                critLo = prctile(dist,100*(a.alpha/2));
-                critHi = prctile(dist,100*(1-a.alpha/2));
+                if a.correct=="tfce"
+                    critLo = prctile(distOrig,100*(a.alpha/2));
+                    critHi = prctile(distOrig,100*(1-a.alpha/2));
+                else
+                    critLo = prctile(dist,100*(a.alpha/2));
+                    critHi = prctile(dist,100*(1-a.alpha/2));
+                end
                 ci = [mu-critHi.*se;mu-critLo.*se];
             end
         case "right"
-            if a.correct
-                p = (countGE_lfn(dist,t)+1)/(a.nPerm+1);
-            else
-                p = (sum(t<=dist)+1)/(a.nPerm+1);
+            switch a.correct
+                case "max";  p = (countGE_lfn(dist,t)+1)/(a.nPerm+1);
+                case "tfce"; p = (countGE_lfn(dist,t)+1)/(a.nPerm+1);  % t is overwritten with TFCE map
+                case "none"; p = (sum(t<=dist)+1)/(a.nPerm+1);
             end
             if nargout > 2
-                crit = prctile(dist,100*(1-a.alpha)).*se;
+                if a.correct=="tfce"
+                    crit = prctile(distOrig,100*(1-a.alpha)).*se;
+                else
+                    crit = prctile(dist,100*(1-a.alpha)).*se;
+                end
                 ci = [mu-crit;Inf(1,a.nVar)];
             end
         case "left"
-            if a.correct
-                p = (countLE_lfn(dist,t)+1)/(a.nPerm+1);
-            else
-                p = (sum(t>=dist)+1)/(a.nPerm+1);
+            switch a.correct
+                case "max";  p = (countLE_lfn(dist,t)+1)/(a.nPerm+1);
+                case "tfce"; p = (countLE_lfn(dist,t)+1)/(a.nPerm+1);  % t is overwritten with TFCE map
+                case "none"; p = (sum(t>=dist)+1)/(a.nPerm+1);
             end
             if nargout > 2
-                crit = prctile(dist,100*a.alpha).*se;
+                if a.correct=="tfce"
+                    crit = prctile(distOrig,100*a.alpha).*se;
+                else
+                    crit = prctile(dist,100*a.alpha).*se;
+                end
                 ci = [-Inf(1,a.nVar);mu-crit];
             end
     end
@@ -570,14 +800,7 @@ if a.mat
         df = ptvec2mat(df);
     end
     if nargout > 5
-        if size(sd,1)==2
-            sd1 = ptvec2mat(sd(1,:));
-            sd2 = ptvec2mat(sd(2,:));
-            sd = cat(3,sd1,sd2);
-            sd = permute(sd,[3,1,2]);
-        else
-            sd = ptvec2mat(sd);
-        end
+        se = ptvec2mat(se);
     end
 
 elseif a.dim~=1 || xInputDims>2
@@ -597,13 +820,9 @@ elseif a.dim~=1 || xInputDims>2
         df = reshape(df,outSize);
     end
     if nargout > 5
-        if size(sd,1)==2
-            sd = reshape(sd,[2 featureSize]);
-        else
-            sd = reshape(sd,outSize);
-        end
+        se = reshape(se,outSize);
     end
-    if a.needDist && ~a.correct
+    if a.needDist && a.correct=="none"
         dist = reshape(dist,[a.nPerm featureSize]);
     end
 end
@@ -654,6 +873,8 @@ end
 
 function bDist = runBlock_cpu_grouped_lfn(z,sumZ,sumZ2,bStart,bEnd,seed,a)
 % Grouped permutation on CPU. Uses pre-cached a.xOffsets/a.yOffsets/a.nXPerGroup.
+% When a.useMatmul, dispatches to the selection-matmul kernel (only the X-arm
+% slice of idx is needed); otherwise uses the 3D-gather kernel.
 nbPerms = bEnd-bStart+1;
 rs = RandStream("mt19937ar","Seed",seed);
 bDist = zeros(nbPerms,a.nVar,"like",z);
@@ -677,20 +898,26 @@ for tpStart = 1:tilePerms:nbPerms
         idx(xR,:) = pg(1:nXg,:);
         idx(yR,:) = pg(nXg+1:end,:);
     end
-    bDist(tpStart:tpEnd,:) = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
+    if a.useMatmul
+        bDist(tpStart:tpEnd,:) = blockDist_matmul_lfn(z,idx(1:a.nObsXMax,:),sumZ,sumZ2,a);
+    else
+        bDist(tpStart:tpEnd,:) = blockDist_fromIdx_lfn(z,idx,sumZ,sumZ2,a);
+    end
 end
 
 
 function bDist = blockDist_matmul_lfn(z,idx1,sumZ,sumZ2,a)
-% Selection-matmul path: idx1 is [nObsXMax x nbPerms] from mink (X-arm only).
-% Builds a [nbPerms x nObsTot] binary selection matrix and uses A*z instead of
-% a 3D gather, avoiding the [nObsXMax x nbPerms x nVar] intermediate.
+% Selection-matmul path: idx1 is [nObsXMax x nbPerms] of X-arm row indices.
+% Builds a [nbPerms x nObsTot] binary selection matrix and uses A*z (and
+% A*a.z2) instead of a 3D gather, avoiding the [nObsXMax x nbPerms x nVar]
+% intermediate. Works for both ungrouped (idx1 from mink) and grouped (idx1
+% from group-constrained idx) permutation generation.
 nbPerms = size(idx1,2);
 A = zeros(nbPerms, a.nObsTot, like=z);
 linIdx = (1:nbPerms) + (double(idx1)-1)*nbPerms;        % [nObsXMax x nbPerms], broadcast
 A(linIdx(:)) = 1;                                       % [nbPerms x nObsTot]
 sum1   = A * z;                                         % [nbPerms x nVar]
-sumsq1 = A * (z.^2);                                   % z.^2 is [nObsTot x nVar]
+sumsq1 = A * a.z2;                                       % a.z2 cached once per call
 sum2   = sumZ   - sum1;
 sumsq2 = sumZ2  - sumsq1;
 var1 = (sumsq1-(sum1.^2)./a.nObsX)./a.dfX;
@@ -863,6 +1090,18 @@ switch a.tail
 end
 
 
+function d1 = blockTfceMax_lfn(bDist,a)
+% Per-permutation: signed TFCE map -> tail-aware extremum -> [nbPerms x 1].
+% bDist is [nbPerms x nVar]; transpose so each column is one permutation's
+% flattened stat map for ec_tfce, then collapse spatially.
+tfceCols = ec_tfce(bDist.',a.featureSize,a.tfceOpts);   % [nVar x nbPerms] signed
+switch a.tail
+    case "both";  d1 = max(abs(tfceCols),[],1).';
+    case "right"; d1 = max(tfceCols,[],1).';
+    case "left";  d1 = min(tfceCols,[],1).';
+end
+
+
 function c = countGE_lfn_sorted(d,vals)
 n = numel(d);
 v = vals(:);
@@ -931,28 +1170,35 @@ fixedBytes = 0;
 % Full dist is retained only on the non-streaming path.
 if ~a.stream
     fixedBytes = fixedBytes + double(a.nPerm)*double(a.nVar)*bytesFloat;
-elseif a.correct
-    % Streaming+corrected retains one extremal value per permutation.
+elseif a.correct~="none"
+    % Streaming+corrected (max or tfce) retains one extremal value per permutation.
     fixedBytes = fixedBytes + double(a.nPerm)*bytesFloat;
 end
 % Concatenated sample matrix.
 fixedBytes = fixedBytes + double(a.nObsTot)*double(a.nVar)*bytesFloat;
+% Cached z.^2 (matmul path only).
+if a.useMatmul
+    fixedBytes = fixedBytes + double(a.nObsTot)*double(a.nVar)*bytesFloat;
+end
 
 % Per-permutation variable memory.
 perPermBytes = 0;
-% Index matrix (grouped/ungrouped).
-perPermBytes = perPermBytes + double(a.nObsTot)*bytesIdx;
+% Index matrix (grouped builds full idx; ungrouped+matmul only builds idx1).
+if a.useMatmul && ~a.useGroups
+    perPermBytes = perPermBytes + double(a.nObsXMax)*bytesIdx;
+else
+    perPermBytes = perPermBytes + double(a.nObsTot)*bytesIdx;
+end
 % Block output rows.
 perPermBytes = perPermBytes + double(a.nVar)*bytesFloat;
-% Ungrouped paths build dense random-key matrices before sort.
+% Ungrouped paths build dense random-key matrices before sort/mink.
 if ~a.useGroups
     perPermBytes = perPermBytes + double(a.nObsTot)*bytesFloat;
 end
 
 if a.useMatmul
-    % Matmul path: A [nbPerms x nObsTot] selection matrix (tiny) + z.^2 temporary
-    % [nObsTot x nVar] computed once per block — treat as fixed overhead.
-    fixedBytes = fixedBytes + double(a.nObsTot)*double(a.nVar)*bytesFloat;
+    % Matmul path: A [nbPerms x nObsTot] selection matrix.
+    perPermBytes = perPermBytes + double(a.nObsTot)*bytesFloat;
 else
     % Gather intermediate [nObsXMax x bPerms x nVar] + element-wise temporary.
     if a.stableVar
