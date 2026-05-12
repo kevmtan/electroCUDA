@@ -23,32 +23,11 @@ elseif istext(x)
 elseif isobject(x)
     y = true;
 elseif istable(x) || istimetable(x)
-    y = any(varfun(@(xi) lfn(xi,dim),x,OutputFormat="uniform"),dim);
+    y = any(varfun(@(xi) isany(xi,dim),x,OutputFormat="uniform"),dim);
 elseif isstruct(x)
-    y = any(structfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
+    y = any(structfun(@(xi) isany(xi,dim),x,UniformOutput=true),dim);
 elseif iscell(x)
-    y = any(cellfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
-else
-    error("Unsupported input type");
-end
-
-
-% Nested checks subfunction
-function yi = lfn(xi,dim)
-if isempty(xi)
-    yi = false;
-elseif isnumeric(xi) || islogical(xi)
-    yi = any(xi,dim);
-elseif istext(xi)
-    yi = any(xi~="" & ~ismissing(xi),dim);
-elseif isobject(xi)
-    yi = true;
-elseif istable(xi) || istimetable(xi)
-    yi = any(varfun(@(xi) lfn(xi,dim),x,OutputFormat="uniform"),dim);
-elseif isstruct(xi)
-    yi = any(structfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
-elseif iscell(xi)
-    yi = any(cellfun(@(xi) lfn(xi,dim),x,UniformOutput=true),dim);
+    y = any(cellfun(@(xi) isany(xi,dim),x,UniformOutput=true),dim);
 else
     error("Unsupported input type");
 end
