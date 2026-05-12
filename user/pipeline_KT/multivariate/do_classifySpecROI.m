@@ -22,6 +22,35 @@ o.analDir = "classifySpecROI"; % directory name within dirs.anal
 o.analName = "zf_hpfBands_50ms_SemEpi_LDA_gamma"; % directory name within o.analDir
 
 
+%% CHANNEL SELECTION (optional): ec_selectChsBySig(...,o.chSel)
+% Applied per-subject in ec_classifySpec BEFORE ec_analPrep, via o.p.chRm.
+% Leave as empty struct or remove the block to skip channel selection.
+%
+% Example A — table source (precomputed via ec_condConChs_sigChs):
+% o.chSel = struct;
+% o.chSel.scope    = "subject";                                    % "subject" | "roi"
+% o.chSel.source   = "table";
+% o.chSel.chTable  = "/01/lbcn/anal/condConChs/<analName>/chNfoA_<analName>.mat";
+% o.chSel.vars     = ["SemanticvsEpisodic_act" "SemanticvsEpisodic_dea"];
+% o.chSel.combine  = "or";                                         % "or" | "and"
+% % Optional: cap per scope group by max|peak<mVar>| ranking
+% % o.chSel.topN    = 10;
+% % o.chSel.rankVar = "SemanticvsEpisodic_peakA_mu";
+% % o.chSel.bandIdx = [5 6]; % restrict matrix-valued cols to specific band columns
+%
+% Example B — perm source (threshold raw ec_condConChs_perm results inline):
+% o.chSel = struct;
+% o.chSel.scope    = "subject";
+% o.chSel.source   = "perm";
+% o.chSel.srcDir   = "/01/lbcn/anal/condConChs/<analName>/";
+% o.chSel.contrasts= "Semantic vs Episodic";
+% o.chSel.sigVar   = "q";
+% o.chSel.sigThr   = 0.05;
+% o.chSel.sigDur   = 50; % ms
+% o.chSel.direction = "any"; % "act" | "dea" | "any"
+o.chSel = []; % default: no channel selection
+
+
 %% ANALYSIS PREP: ec_analPrep(...,o.p)
 
 % Input data suffix
@@ -130,6 +159,7 @@ o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 
 % Normalize/standardize
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
+o.s.stdUseOnly = true; % Compute standardization params from obs.use rows only (avoids cc-trial leak into train scaler)
 
 % PCA
 o.s.rank = false; % calculate data rank if no PCA
@@ -190,9 +220,10 @@ if isequal(o.fun,@fitclinear)
     o.hyper.OptimizeLearnRate = true;
     o.hyper.Verbose = 0;
 elseif isequal(o.fun,@fitcdiscr)
-    % Linear discriminant analysis
+    % Shrinkage LDA: tune Gamma & Delta jointly (pseudolinear handles rank-deficient cov)
     o.hyper.DiscrimType = "pseudolinear"; % "linear" "pseudolinear" "diaglinear"
     o.hyper.FillCoeffs = "on"; % "off" makes CV unreliable
+    o.hyper.Delta = 0; % initial value; tuned by optimizer when in OptimizeHyperparameters
 elseif isequal(o.fun,@fitcsvm)
     % SVM hyperparameters (mathworks.com/help/stats/fitcsvm.html)
     o.hyper.KernelFunction = "linear";
@@ -217,13 +248,14 @@ if isequal(o.fun,@fitcsvm)
 elseif isequal(o.fun,@fitclinear)
     o.OptimizeHyperparameters = "Lambda"; % "Lambda" "Learner"
 elseif isequal(o.fun,@fitcdiscr)
-    o.OptimizeHyperparameters = "Gamma"; % "Gamma" "Delta"
+    o.OptimizeHyperparameters = ["Gamma" "Delta"]; % joint tuning for high-P ROI features
 elseif isequal(o.fun,@fitcknn)
     o.OptimizeHyperparameters = ["Distance" "NumNeighbors"];
 end
 % Repartition must be false when ec_classify passes a custom CVPartition (trial-grouped cvh)
+% NumGridDivisions: 10 per hyperparameter -> 10*10=100 grid points for [Gamma Delta]
 o.HyperparameterOptimizationOptions = struct(ShowPlots=false,Verbose=0,...
-    Optimizer="gridsearch",NumGridDivisions=15,Repartition=false,UseParallel=false);
+    Optimizer="gridsearch",NumGridDivisions=10,Repartition=false,UseParallel=false);
 
 
 %% Run

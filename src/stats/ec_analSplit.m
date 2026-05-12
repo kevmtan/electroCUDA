@@ -16,6 +16,7 @@ arguments
     a.pcaGPU (1,1) logical = false      % GPU for rank calculation & PCA    
     a.pcaSaveWts (1,1) logical = true   % Save PCA weights
     a.floatAnal (1,1) string = "single" % Floating-point precision for analysis ("double"|"single")
+    a.stdUseOnly (1,1) logical = false  % Compute standardization params from obs.use rows only
 end
 % Make logical flags about data
 if isfield(n,"ROIs"), a.roi=true; else; a.roi=false; end
@@ -107,6 +108,16 @@ if a.roi
     stc.width(:) = width(xc);
 end
 
+% Use-only standardization gate: track whether obc has a 'use' column.
+% If stdUseOnly is requested and 'use' is all-false for this entire split,
+% bail out early with empties — vertcat at the orchestrator skips empties cleanly.
+hasUse = a.stdUseOnly && ~isempty(obc) && ...
+    ismember("use",string(obc.Properties.VariableNames));
+if hasUse && ~any(obc.use)
+    xc = []; stc = []; obc = []; wtc = [];
+    return;
+end
+
 
 %% Within-channel processing
 if isany(a.pca) && a.pca~="split"
@@ -161,7 +172,12 @@ if a.pca=="split"
 elseif isany(a.std)
     % Standardize features
     for t = 1:n.nTimes
-        xc{t} = withinSplit_lfn(xc{t},[],a);
+        useT = [];
+        if hasUse
+            useT = obc{t}.use;
+            if ~any(useT); useT = []; end   % fall back to all-rows at this t
+        end
+        xc{t} = withinSplit_lfn(xc{t},[],a,useT);
     end
 end
 
@@ -170,10 +186,13 @@ end
 
 
 
-function [xs,sts,w] = withinSplit_lfn(xs,sts,a)
+function [xs,sts,w] = withinSplit_lfn(xs,sts,a,useT)
 %%% Within-split routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if nargin<4; useT = []; end
 if a.pca=="split"
     % Standardize predictors, calculate rank, run PCA
+    % NOTE: stdUseOnly is not threaded through the PCA path; ec_pca handles
+    % its own standardization. Extend here if needed.
     [xs,w,sts.rank] = ec_pca(xs,nComps=a.pcaComps,robust=a.pcaRobust,...
         varThr=a.pcaVarThr,nCompLims=a.pcaCompLims,std=a.std,...
         gpu=a.pcaGPU,double=true,gather=false,exact=true);
@@ -187,8 +206,21 @@ if a.pca=="split"
     end
 else
     % Standardize predictors
-    if a.std=="robust"
-        xs = normalize(xs,1,"zscore","robust"); % robust z-score
+    if ~isempty(useT) && any(useT)
+        % Compute scaler from use-rows only, apply to all rows
+        if a.std=="robust"
+            ctr = median(xs(useT,:),1,"omitnan");
+            scl = mad(xs(useT,:),1,1);          % 1 = median absolute deviation
+            scl(scl==0) = 1;                    % avoid divide-by-zero
+            xs = (xs - ctr) ./ scl;
+        elseif isany(a.std) % zscore (mean/std)
+            ctr = mean(xs(useT,:),1,"omitnan");
+            scl = std(xs(useT,:),0,1,"omitnan");
+            scl(scl==0) = 1;
+            xs = (xs - ctr) ./ scl;
+        end
+    elseif a.std=="robust"
+        xs = normalize(xs,1,"zscore","robust"); % robust z-score (pooled fallback)
     elseif isany(a.std)
         xs = normalize(xs,1,a.std); % standard z-score
     end

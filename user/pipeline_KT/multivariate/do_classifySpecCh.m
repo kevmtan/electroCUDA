@@ -22,6 +22,35 @@ o.analDir = "classifySpecCh"; % directory name within dirs.anal
 o.analName = "zf_50ms_SemEpi_LDA_bandsGamma"; % autobio: Sem vs Epi; CC: Self & Other
 
 
+%% CHANNEL SELECTION (optional): ec_selectChsBySig(...,o.chSel)
+% Applied per-subject in ec_classifySpec BEFORE ec_analPrep, via o.p.chRm.
+% Leave as empty struct or remove the block to skip channel selection.
+%
+% Example A — table source (precomputed via ec_condConChs_sigChs):
+% o.chSel = struct;
+% o.chSel.scope    = "subject";                                    % "subject" | "roi"
+% o.chSel.source   = "table";
+% o.chSel.chTable  = "/01/lbcn/anal/condConChs/<analName>/chNfoA_<analName>.mat";
+% o.chSel.vars     = ["SemanticvsEpisodic_act" "SemanticvsEpisodic_dea"];
+% o.chSel.combine  = "or";                                         % "or" | "and"
+% % Optional: cap per scope group by max|peak<mVar>| ranking
+% % o.chSel.topN    = 10;
+% % o.chSel.rankVar = "SemanticvsEpisodic_peakA_mu";
+% % o.chSel.bandIdx = [5 6]; % restrict matrix-valued cols to specific band columns
+%
+% Example B — perm source (threshold raw ec_condConChs_perm results inline):
+% o.chSel = struct;
+% o.chSel.scope    = "subject";
+% o.chSel.source   = "perm";
+% o.chSel.srcDir   = "/01/lbcn/anal/condConChs/<analName>/";
+% o.chSel.contrasts= "Semantic vs Episodic";
+% o.chSel.sigVar   = "q";
+% o.chSel.sigThr   = 0.05;
+% o.chSel.sigDur   = 50; % ms
+% o.chSel.direction = "any"; % "act" | "dea" | "any"
+o.chSel = []; % default: no channel selection
+
+
 %% ANALYSIS PREP: ec_analPrep(...,o.p)
 
 % Input data suffix
@@ -130,6 +159,7 @@ o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 
 % Normalize/standardize
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
+o.s.stdUseOnly = true; % Compute standardization params from obs.use rows only (avoids cc-trial leak into train scaler)
 
 % PCA (channelwise: no split-level PCA; rank helps diagnostics when o.s.pca is off)
 o.s.rank = false; % calculate data rank if no PCA

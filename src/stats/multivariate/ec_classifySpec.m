@@ -114,6 +114,18 @@ dirs = ec_loadSbj(sbj=sLog.sbj,proj=o.proj,task=o.task,sfx=o.p.sfx);
 sLog.sbjID = dirs.sbjID;
 
 
+%% Channel selection (optional)
+% Pre-filter channels via ec_selectChsBySig BEFORE ec_analPrep — the resulting
+% removal list is plumbed through o.p.chRm into ec_analPrep's existing chPrep_lfn.
+if isfield(o,"chSel") && ~isempty(o.chSel)
+    chNfoSbj = ec_loadSbj(dirs,sfx=o.p.sfx,vars="chNfo");
+    keep = ec_selectChsBySig(o.chSel,sLog.sbjID,chNfoSbj);
+    o.p.chRm = chNfoSbj.ch(~keep);
+    fprintf("[ec_classifySpec] chSel: keeping %d/%d chans for %s\n",...
+        nnz(keep),numel(keep),sLog.sbj);
+end
+
+
 %% Prepare analysis data
 oo = namedargs2cell(o.p);                % expand name-value arguments
 [x,ep,n] = ec_analPrep(dirs,tt,oo{:});   % run data prep
