@@ -1,4 +1,4 @@
-function [stat,p,ci,mu,stats,dist] = ec_nonparametricTest1(x,m,g,a)
+function [stat,p,ci,mu,stats,dist] = ec_nonparametricTest(x,m,g,a)
 %EC_NONPARAMETRICTEST1 Non-parametric one-sample test of average/location.
 %   [STAT,P,CI,MU,STATS,DIST] = EC_NONPARAMETRICTEST1(X,M,A) performs a
 %   non-parametric one-sample test on X against null value M0.
