@@ -157,6 +157,10 @@ if isfield(o,"chSel") && ~isempty(o.chSel)
         fprintf("[ec_classifySpec] chSel: keeping %d/%d chans for %s\n",...
             nnz(keep),numel(keep),sLog.sbj);
     end
+
+    if ~any(keep)
+        error("No channels remaining after selection: "+sLog.sbj);
+    end
 end
 
 

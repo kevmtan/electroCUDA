@@ -139,6 +139,9 @@ end
 
 % Collate chans to keep/remove
 n.chKeep = ~chBad & ~chRm & chROIs;
+if ~any(n.chKeep)
+    error("No channels remaining after removal: "+n.sbj);
+end
 
 % Remove chans
 if any(~n.chKeep)
