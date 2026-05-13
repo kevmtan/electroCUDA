@@ -65,7 +65,13 @@ h = figure(Position=[0 0 op.res],Visible=op.visible,WindowStyle="normal",...
     Theme="light",Color="w");
 
 % Initialize tiledlayout
-ht = tiledlayout(h,"flow",TileSpacing="compact",padding="tight");
+if isnumeric(op.arrange) && numel(op.arrange)==2
+    ht = tiledlayout(h,op.arrange(1),op.arrange(2),TileSpacing="compact",padding="tight");
+elseif ismember(op.arrange,["flow" "vertical" "horizontal"])
+    ht = tiledlayout(h,op.arrange,TileSpacing="compact",padding="tight");
+else
+    ht = tiledlayout(h,"flow",TileSpacing="compact",padding="tight");
+end
 
 % Title
 if op.txtSzTitle
@@ -75,11 +81,18 @@ end
 
 %% Plot contrasts
 for c = 1:numel(contrasts)
+    % Contrast
     con = contrasts(c);
+    idc = str.contrast==con; % indices
 
-    % Indices
-    idc = str.contrast==con;
+    % Significant values
     sig = str.(op.sigVar)(idc,:)<op.sigThr;
+
+    % Limit significance to time range
+    if any(op.sigTimeRng) && numel(op.sigTimeRng)==2
+        id = stc.time(idc)>=op.sigTimeRng(1) & stc.time(idc)<=op.sigTimeRng(2);
+        sig(~id) = false;
+    end
 
     % Measure data
     m = str.(op.mVar)(idc,:);
@@ -91,11 +104,6 @@ for c = 1:numel(contrasts)
 
     %% Subplot
     ha = nexttile(ht);
-
-    % Title
-    if op.txtSz
-        title(ha,con,FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
-    end
 
     % Plot measure
     imagesc(ha,m',AlphaData=ma',XData=str.time(idc));
@@ -114,6 +122,11 @@ for c = 1:numel(contrasts)
     hold on;
     plot(ha,[0 0],ylim,"k-","LineWidth",op.limWidth);
     hold off;
+
+    % Title
+    if op.txtSz
+        title(ha,con,FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
+    end
 end
 
 
