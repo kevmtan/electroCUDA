@@ -54,7 +54,7 @@ o.blGrpVars    = "cnd";      % "cnd" = grand pool within condition; add "sbjCh" 
 
 
 %% Permutation test / stats parameters (ec_contrast_perm)
-o.nPerm        = 10000;
+o.nPerm        = 1e5;
 o.alpha        = 0.05;
 o.tail         = "both";     % "both" | "right" | "left"
 o.grpVars      = []; %"sbjID";    % stratification var(s) for permutation

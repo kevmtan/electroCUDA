@@ -233,75 +233,73 @@ function str = runROI_lfn(stRoi,roi,n,o,chNfoSel,oCh,tt)
 roi = string(roi);
 nCons = numel(o.contrasts);
 
-% Optional pre-averaging (collapses observations across o.avgVars)
+% obsKey determines the observation unit (sbjCh, or collapsed avgVars)
 if isfield(o,"avgVars") && isany(o.avgVars)
-    stRoi = avgObs_lfn(stRoi,o,roi,tt);
     obsKey = string(o.avgVars(:))';
 else
     obsKey = "sbjCh";
 end
 
-% Build a single-string observation id from obsKey columns
-if isscalar(obsKey)
-    stRoi.obsId = string(stRoi.(obsKey));
-else
-    parts = strings(height(stRoi),numel(obsKey));
-    for k = 1:numel(obsKey)
-        parts(:,k) = string(stRoi.(obsKey(k)));
-    end
-    stRoi.obsId = join(parts,"_",2);
-end
-
-% Sort so each (obsId, contrast) has nTimes consecutive rows in time order
-stRoi = sortrows(stRoi,["obsId","contrast","time"]);
-
-% Unique (obsId, contrast) pairs — these are the observations
-[~,ia] = unique(stRoi(:,["obsId","contrast"]),"rows","stable");
-nObs = numel(ia);
-if mod(height(stRoi),nObs)~=0
-    error("[ec_condConChsROI_perm] Non-uniform timepoints per (obs,contrast) in ROI: "+roi);
-end
-nTimes = height(stRoi)/nObs;
-
-% Reshape long-format mVar (nObs*nTimes × nFreq) -> wide (nObs × nTimes × nFreq)
-mu = stRoi.(o.mVar);
-nFreq = size(mu,2);
-x = reshape(mu,nTimes,nObs,nFreq);
-x = permute(x,[2 1 3]);
-
-% Observation table: one row per observation; cnd = contrast
-ob = stRoi(ia,:);
-ob.cnd = ob.contrast;
-
-% Optional pooled baseline correction across sbjCh (per obs × baseline timepoints)
-if isfield(o,"baseline") && isany(o.baseline)
-    x = baselineCorr_lfn(x,ob,n,roi,o,tt);
-end
-
-% Run contrasts (1-sample test against 0 within each contrast)
+% Per-contrast: channel selection → averaging → baseline → test.
+% Selection happens first so excluded channels don't affect the
+% grand-pool baseline estimate or subject-level averaging.
 str = cell(nCons,1);
 for c = 1:nCons
-    % Rows for this contrast
-    idC = ismember(ob.cnd, o.cond1(c, ~ismissing(o.cond1(c,:))));
+    cond1c = o.cond1(c, ~ismissing(o.cond1(c,:)));
 
-    % Per-contrast channel selection
-    if ~isempty(chNfoSel) && any(idC)
+    %% Channel selection (on raw long-format rows, before averaging/baseline)
+    stC = stRoi(ismember(stRoi.contrast, cond1c), :);
+    if ~isempty(chNfoSel) && ~isempty(stC)
         selMask = chSelMask_lfn(chNfoSel,oCh,o,c);
-        idC     = idC & ismember(string(ob.sbjCh), string(chNfoSel.sbjCh(selMask)));
-        if ~any(idC)
+        selChs  = string(chNfoSel.sbjCh(selMask));
+        stC = stC(ismember(string(stC.sbjCh), selChs), :);
+        if isempty(stC)
             warning("[ec_condConChsROI_perm] No channels after selection: "+o.contrasts(c)+" roi="+roi);
             continue;
         end
-        disp("[ec_condConChsROI_perm] "+numel(unique(ob.sbjCh(idC)))+" ch selected | "+o.contrasts(c)+" roi="+roi);
+        disp("[ec_condConChsROI_perm] "+numel(unique(stC.sbjCh))+" ch selected | "+o.contrasts(c)+" roi="+roi);
     end
 
-    str{c} = ec_contrast_perm(x(idC,:,:), ob(idC,:), n, o, c, tt);
+    %% Optional pre-averaging across obsKey vars (e.g., subject-level)
+    if isfield(o,"avgVars") && isany(o.avgVars)
+        stC = avgObs_lfn(stC,o,roi,tt);
+    end
 
-    % Replace cond1/cond0 in str with the channelwise values (all rows
-    % for a given contrast carry the same values, so take the first)
+    %% Build obsId, reshape long → wide (nObs × nTimes × nFreq)
+    if isscalar(obsKey)
+        stC.obsId = string(stC.(obsKey));
+    else
+        parts = strings(height(stC),numel(obsKey));
+        for k = 1:numel(obsKey)
+            parts(:,k) = string(stC.(obsKey(k)));
+        end
+        stC.obsId = join(parts,"_",2);
+    end
+    stC = sortrows(stC,["obsId","time"]);
+    [~,ia] = unique(stC.obsId,"stable");
+    nObs = numel(ia);
+    if mod(height(stC),nObs)~=0
+        error("[ec_condConChsROI_perm] Non-uniform timepoints per obs in ROI: "+roi+" contrast: "+o.contrasts(c));
+    end
+    nTimes = height(stC)/nObs;
+    mu   = stC.(o.mVar);
+    nFreq = size(mu,2);
+    xC   = permute(reshape(mu,nTimes,nObs,nFreq),[2 1 3]);
+    obC  = stC(ia,:);
+    obC.cnd = obC.contrast;
+
+    %% Optional pooled baseline correction (only selected channels pooled)
+    if isfield(o,"baseline") && isany(o.baseline)
+        xC = baselineCorr_lfn(xC,obC,n,roi,o,tt);
+    end
+
+    %% Run contrast
+    str{c} = ec_contrast_perm(xC, obC, n, o, c, tt);
+
+    % Replace cond1/cond0 with channelwise values from first obs
     for sv = ["cond1" "cond0"]
-        if ismember(sv, ob.Properties.VariableNames)
-            str{c}.(sv) = repmat(ob.(sv)(find(idC,1),:), height(str{c}), 1);
+        if ismember(sv, obC.Properties.VariableNames)
+            str{c}.(sv) = repmat(obC.(sv)(1,:), height(str{c}), 1);
         end
     end
 end
