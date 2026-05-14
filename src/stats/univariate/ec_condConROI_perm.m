@@ -40,11 +40,6 @@ disp("[ec_condConROI_perm] Loaded 'n' of 1st subject: "+logs.n(1)+" toc="+toc(tt
 outDir = dirs.anal+o.analDir+filesep+o.analName+filesep;
 if ~isfolder(outDir); mkdir(outDir); end
 
-% Save options
-fn = outDir+"o.mat";
-save(fn,"o","-v7");
-disp("[ec_condConROI_perm] Saved: "+fn+" | toc="+toc(tt));
-
 
 %% Contrast conditions
 
@@ -70,10 +65,19 @@ end
 st = cell(nROIs,1);
 
 
+%% Channel selection setup
+[chNfoSel,oCh,o] = chSelection_lfn(o,dirs,tt);
+
+% Save options (after contrasts and channel-selection opts are resolved)
+fn = outDir+"o.mat";
+save(fn,"o","-v7");
+disp("[ec_condConROI_perm] Saved: "+fn+" | toc="+toc(tt));
+
+
 %% Run ROIs
 for r = 1:nROIs
     idr = sbjROIs.roi==o.ROIs(r);
-    st{r} = runROI_lfn(sbjROIs(idr,:),n,o,tt);
+    st{r} = runROI_lfn(sbjROIs(idr,:),n,o,chNfoSel,oCh,tt);
 end
 
 % Concatenate across ROIs
@@ -107,7 +111,7 @@ disp("[ec_condConROI_perm] Saved: "+fn+" | toc="+toc(tt));
 
 
 
-function str = runROI_lfn(ROI,n,o,tt)
+function str = runROI_lfn(ROI,n,o,chNfoSel,oCh,tt)
 %%% Run stats for ROI %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                       ROI=sbjROIs(idr,:);
 roi = string(ROI.roi(1));
@@ -124,20 +128,38 @@ str = cell(nCons,1); % Statistical contrasts
 [x,ob] = loadSbjData_lfn(x,ob,ROI,o,tt);
 
 
-%% Average across observations
-if isany(o.avgVars)
-    [x,ob] = avgObs_lfn(x,ob,roi,o,tt);
-end
-
-%% Pooled baseline correction (across trials)
-if isany(o.baseline)
-    x = baselineCorr_lfn(x,ob,n,roi,o,tt);
-end
-
-
-%% Run contrasts
+%% Run contrasts (channel filter → avg → baseline → perm, per contrast)
 for c = 1:nCons
-    str{c} = ec_contrast_perm(x,ob,n,o,c,tt);
+    xC = x;
+    obC = ob;
+
+    % Per-contrast channel selection before avg/baseline
+    if ~isempty(chNfoSel)
+        if ~ismember("sbjCh",obC.Properties.VariableNames)
+            error("[ec_condConROI_perm] ob missing 'sbjCh' column; required for channel selection");
+        end
+        selMask = chSelMask_lfn(chNfoSel,oCh,o,c);
+        idC     = ismember(string(obC.sbjCh), string(chNfoSel.sbjCh(selMask)));
+        if ~any(idC)
+            warning("[ec_condConROI_perm] No observations after channel selection: "+...
+                o.contrasts(c)+" roi="+roi);
+            continue;
+        end
+        xC = xC(idC,:,:);
+        obC = obC(idC,:);
+        disp("[ec_condConROI_perm] "+numel(unique(obC.sbjCh))+" ch selected | "+...
+            o.contrasts(c)+" roi="+roi);
+    end
+
+    if isany(o.avgVars)
+        [xC,obC] = avgObs_lfn(xC,obC,roi,o,tt);
+    end
+
+    if isany(o.baseline)
+        xC = baselineCorr_lfn(xC,obC,n,roi,o,tt);
+    end
+
+    str{c} = ec_contrast_perm(xC,obC,n,o,c,tt);
 end
 
 
@@ -293,3 +315,137 @@ end
 x = reshape(xFlat, sz);
 disp("[ec_condConROI_perm] Baseline ["+blRng(1)+","+blRng(2)+"]"+...
     " | roi: "+roi+" | toc="+toc(tt));
+
+
+
+
+
+function [chNfoA,oCh,o] = chSelection_lfn(o,dirs,tt)
+%%% Channel selection for inclusion in ROI analyses %%%%%%%%%%%%%%%%%%%%%%%
+chNfoA = []; oCh = [];
+if isfield(o,"chSel") && o.chSel
+    if ~isfield(o,"chSelName") || ~isany(o.chSelName)
+        warning("[ec_condConROI_perm] o.chSel=true but o.chSelName empty; skipping channel selection");
+        return;
+    end
+    selName = string(o.chSelName);
+    if isfield(o,"chSelDir") && isany(o.chSelDir)
+        selPath = dirs.anal+o.chSelDir+filesep+selName+filesep;
+    else
+        warning("[ec_condConROI_perm] o.chSel=true but o.chSelDir empty; skipping channel selection");
+        return;
+    end
+
+    % Load chNfoA from the channel selection source
+    fn = selPath+"chNfoA_"+selName+".mat";
+    if isfile(fn)
+        load(fn,"chNfoA"); % Load
+        disp("[ec_condConROI_perm] Loaded chNfoSel: "+fn+" | toc="+toc(tt));
+        d = dir(selPath+"o_*.mat");
+        if ~isempty(d)
+            Soch = load(selPath+string(d(1).name),"o"); oCh = Soch.o;
+            disp("[ec_condConROI_perm] Loaded oCh from: "+selPath+string(d(1).name)+" | toc="+toc(tt));
+
+            % Normalize cond1/cond0 to padded string matrix (same conversion
+            % as ec_condConChs_perm.runSbj_lfn; the saved o predates it)
+            nChCons = numel(oCh.contrasts);
+            for fld = ["cond1" "cond0"]
+                if isfield(oCh,fld) && iscell(oCh.(fld))
+                    cv = oCh.(fld);
+                    w  = max(cellfun(@numel,cv));
+                    sm = repmat(string(missing),nChCons,w);
+                    for cc = 1:nChCons
+                        v = string(cv{cc}); if isempty(v); continue; end
+                        sm(cc,1:numel(v)) = v;
+                    end
+                    oCh.(fld) = sm;
+                end
+            end
+        end
+    else
+        warning("[ec_condConROI_perm] chNfoSel not found: "+fn+"; skipping channel selection");
+        chNfoA = [];
+    end
+end
+
+% Store normalized source cond1/cond0 in o for saved reference
+if ~isempty(oCh)
+    if isfield(oCh,"cond1")
+        o.chSelCond1 = oCh.cond1; end
+    if isfield(oCh,"cond0")
+        o.chSelCond0 = oCh.cond0; end
+end
+
+
+
+
+function selMask = chSelMask_lfn(chNfoSel,oCh,o,c)
+%%% Logical row mask over chNfoSel rows for contrast c %%%%%%%%%%%%%%%%%%%%
+%
+% 2-sample contrasts: channels where cond1 OR cond0 had any act/dea
+% 1-sample "any":     channels with any act/dea across all contrasts
+% 1-sample "self":    channels where the same contrast's cond1 had act/dea
+%                     (more circular — use knowingly)
+con      = string(o.contrasts(c));
+varNames = string(chNfoSel.Properties.VariableNames);
+actDeaVars = varNames(endsWith(varNames,"_act") | endsWith(varNames,"_dea"));
+
+% Look up cond1 / cond0 for this contrast in the channelwise opts
+% (oCh was already normalized to padded string matrix at load time)
+cond1ch = string([]); cond0ch = string([]);
+if ~isempty(oCh) && isfield(oCh,"contrasts")
+    [tf,idx] = ismember(con, string(oCh.contrasts));
+    if tf
+        cond1ch = string(oCh.cond1(idx, ~ismissing(oCh.cond1(idx,:))));
+        if isfield(oCh,"cond0") && ~isempty(oCh.cond0)
+            row0 = string(oCh.cond0(idx, ~ismissing(oCh.cond0(idx,:))));
+            cond0ch = row0(isany(row0));
+        end
+    end
+end
+
+% Fall back to this analysis's cond1/cond0 when source opts lack the contrast
+if isempty(cond1ch) && isfield(o,"cond1")
+    cond1ch = string(o.cond1(c, ~ismissing(o.cond1(c,:))));
+end
+if isempty(cond0ch) && isfield(o,"cond0") && ~isempty(o.cond0)
+    row0 = string(o.cond0(c, ~ismissing(o.cond0(c,:))));
+    cond0ch = row0(isany(row0));
+end
+
+is2sample = ~isempty(cond0ch) && isany(cond0ch);
+
+% Determine which column prefixes to OR over
+if is2sample
+    checkPfx = regexprep(string([cond1ch(:)' cond0ch(:)']),"[^a-zA-Z0-9_]","");
+elseif ~isfield(o,"chSel1Sample") || o.chSel1Sample=="any"
+    checkPfx = string([]);  % empty = use all act/dea cols
+else
+    % "self": same-contrast conditions
+    if ~isempty(cond1ch)
+        checkPfx = regexprep(string(cond1ch(:)'),"[^a-zA-Z0-9_]","");
+    else
+        checkPfx = regexprep(con,"[^a-zA-Z0-9_]",""); % fall back to contrast name
+    end
+end
+
+% Resolve to actual column names
+if isempty(checkPfx)
+    checkVars = actDeaVars;
+else
+    colBase   = regexprep(actDeaVars,"_(act|dea)$","");
+    checkVars = actDeaVars(ismember(colBase, checkPfx));
+    if isempty(checkVars)
+        warning("[ec_condConROI_perm] No act/dea cols matched for %s; using all",con);
+        checkVars = actDeaVars;
+    end
+end
+
+% Row mask: true if any checked column has any true entry (any freq band)
+selMask = false(height(chNfoSel),1);
+for v = checkVars
+    dat = chNfoSel.(v);
+    if islogical(dat) || isnumeric(dat)
+        selMask = selMask | any(dat,2);
+    end
+end

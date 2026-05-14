@@ -90,6 +90,18 @@ o.cond1 = {...
     };
 
 
+%% Channel selection (requires chNfoA built by ec_condConChs_sigChs)
+% Set chSelName to a different analName to cross-select (e.g., use bandsParam
+% chNfoA to select channels for a spectral ROI contrast — less circular).
+% 2-sample contrasts: select if cond1 OR cond0 had any act/dea cluster.
+% 1-sample contrasts: "any" = any act/dea in chNfoSel (less circular);
+%                     "self" = same contrast's act/dea (more circular).
+o.chSel        = false;
+o.chSel1Sample = "self";           % "any" | "self"
+o.chSelDir     = "condConCh";      % chNfoSel source dir under dirs.anal
+o.chSelName    = "zf_hpfLPF_bandsParam"; % chNfoSel analName (ec_condConChs_perm output)
+
+
 %% Start parpool
 try delete(gcp("nocreate")); catch;end
 try parpool("local12"); catch;end
