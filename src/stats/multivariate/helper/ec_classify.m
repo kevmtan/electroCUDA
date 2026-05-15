@@ -94,11 +94,12 @@ function [sts,obs] = main_lfn(xs,sts,obs,o,isTest)
 % Necessary parts of routine are repeated for permutation testing of
 % classifier performance significance
 
-% TEST - make this more elegant
+% TODO: limit tuning to timerange
 %if sts.t<0; o.doTuning=false; end
 
 
-%% Train & optimize (full training set)
+%% Train full model
+% Uses entire training set for cross-classification & non-nested hyperparameter tuning
 if ~o.doCV || (o.doCV && ~o.doNestedCV && o.doTuning) || (o.doCC && ~isTest)
     % Extract options
     oo = namedargs2cell(o.hyper);
@@ -125,13 +126,15 @@ end
 
 %% Cross-classify 
 if o.doCC && ~isTest
-    [obs.pred(obs.cc),obs.pp(obs.cc,:)] = mdl.predict(xs(obs.cc,:));
+    % Predict observations excluded from training with full model
+    [obs.pred(~obs.use),obs.pp(~obs.use,:)] = mdl.predict(xs(~obs.use,:));
 end
 
 
 %% Cross-validate
 if o.doCV
     if o.doNestedCV
+        % Nested CV
         [obs,sts] = nestedCV_lfn(xs,obs,sts,o);
     else
         % Flat CV
@@ -153,6 +156,7 @@ if o.doCV
         end
     end
 
+    % Predict testing folds from training folds
     if ~o.doNestedCV
         % Fit SVM score to posterior probability transform
         if isequal(o.fun,@fitcsvm)
@@ -165,14 +169,20 @@ if o.doCV
         sts.loss = mdlCV.kfoldLoss; % (Mode="individual")'
     end
 else
-    % No CV - predict training obs with full model
-    [obs.pred(obs.use),obs.pp(obs.use,:)] = mdl.predict(xs(obs.use,:));
+    % No CV, predict already-seen observations 👀😬
+    if o.doCC
+        % Predict training observations with full model
+        [obs.pred(obs.use),obs.pp(obs.use,:)] = mdl.predict(xs(obs.use,:));
+    else
+        % Predict all obs with full model
+        [obs.pred,obs.pp] = mdl.predict(xs);
+    end
 end
 
 
 %% Performance
 
-% Accurately-classified observations
+% Mark accurately-classified observations
 obs.acc = obs.pred==obs.y;
 
 % Accuracy stats (parametric)
@@ -197,7 +207,7 @@ sts.auc1 = mean(sts.auc,"omitmissing");
 
 
 function [obs,sts] = nestedCV_lfn(xs,obs,sts,o)
-%%% Explicit nested CV outer-loop classification %%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Nested cross-validation (predict on outer-loop, tune on inner-loop) %%%
 cvOuter = sts.cv{1};
 cvInner = sts.cvhn{1};
 nOuter = cvOuter.NumTestSets;
@@ -247,12 +257,13 @@ sts.loss = mean(foldLoss,"omitmissing");
 function sts = permute_lfn(xs,sts,obs,o)
 %%% Permutation testing for classifier performance significance %%%%%%%%%%%
 %
-% TO DO:  figure out threshold for mean PR-AUC (o.perfVar=="auc1")
+% TO DO: figure out threshold for mean PR-AUC (o.perfVar=="auc1")
 
 % Only do permutation test for above-chance acurracy, otherwise the
 % parametric test result is kept to save compute)
 if o.perfVar=="acc" && sts.acc < 1/numel(o.p.cond)
-    return; end
+    return;
+end
 
 % Stats info
 stat = sts.(o.perfVar); % actual perfomance statistic value
