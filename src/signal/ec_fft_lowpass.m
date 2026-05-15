@@ -55,25 +55,48 @@ if ~isany(mask_full) || numel(mask_full)~=xFrames
 
     if o.antialiasing > 0
         targetNyq = o.antialiasing / 2;
-        k = 0.99 - 0.98*steepness;
-        aliasband = (targetNyq - k*fNyquist) / (1 - k);
-        if aliasband <= 0 || aliasband >= fs/2
-            error("electroCUDA:ec_fft_lowpass:AntialiasingPassband", ...
-                "Anti-aliasing aliasband (%.4g Hz) invalid for target_fs=%.1f, input fs=%.1f, steepness=%.3g.", ...
-                aliasband,o.antialiasing,fs,steepness);
-        end
-        % passbandIn<=0: AA-only (e.g. o.lpf unset); else stricter of user LPF vs AA solve
-        if passbandIn > 0
-            passband = min(passbandIn, aliasband);
+
+        if targetNyq >= fNyquist
+            % target_fs >= input_fs: no downsampling, AA not needed
+            k = 0.99 - 0.98 * steepness;
+            passband = passbandIn;
         else
-            passband = aliasband;
+            % Steepness is treated as a suggestion in AA mode. The highest
+            % steepness without cosine-taper ringing is data-driven:
+            %   aliasband = targetNyq - min_fTrans  (analytical)
+            %   k_opt = min_fTrans / (fNyquist - targetNyq + min_fTrans)
+            % min_fTrans = max(1 FFT bin, 10% of targetNyq) ensures the
+            % taper spans at least one frequency bin and leaves >=90% passband.
+            fRes = fs / xFrames;
+            min_fTrans = max(fRes, 0.1 * targetNyq);
+            k_opt = min_fTrans / (fNyquist - targetNyq + min_fTrans);
+            s_aa = min(0.99, (0.99 - k_opt) / 0.98);
+            k = 0.99 - 0.98 * s_aa;  % recompute from clamped steepness
+            aliasband = (targetNyq - k * fNyquist) / (1 - k);
+            if aliasband <= 0
+                % Only reachable for extreme ratios (>~50:1) where s=0.99
+                % still can't clear targetNyq; use 90% fallback.
+                aliasband = 0.9 * targetNyq;
+                warning("electroCUDA:ec_fft_lowpass:AntialiasingFallback", ...
+                    "%.1f→%.1f Hz AA (%.1fx ratio): steepness=0.99 still yields " + ...
+                    "negative aliasband; using aliasband=%.3g Hz " + ...
+                    "(transition extends past target Nyquist).", ...
+                    fs, o.antialiasing, fs/o.antialiasing, aliasband);
+            end
+            % passbandIn<=0: AA-only; else stricter of user LPF vs AA
+            if passbandIn > 0
+                passband = min(passbandIn, aliasband);
+            else
+                passband = aliasband;
+            end
         end
     else
+        k = 0.99 - 0.98 * steepness;
         passband = passbandIn;
     end
 
-    % Transition width uses finalized passband
-    fTrans = (0.99 - 0.98*steepness) * (fNyquist - passband);
+    % Transition width uses finalized passband and effective k
+    fTrans = k * (fNyquist - passband);
     freqs = (0:floor(xFrames/2)) * (fs/xFrames);
 
     % Cosine-tapered mask
