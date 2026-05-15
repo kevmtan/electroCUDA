@@ -1,5 +1,8 @@
 function [x,n,sts,obs] = ec_analSplit(x,n,st,ob,tt,a)
 % Splits data for analyses (chans/ICs/ROIs x timepoints)
+%
+% When a.rank is true and channel/ROI PCA is off (a.pca ""), warns and forces
+% ec_pca to matrix rank if rank < feature width for that channel/ROI.
 arguments
     x                                   % EEG data (matrix or cell array)
     n struct                            % Info struct
@@ -16,7 +19,7 @@ arguments
     a.pcaGPU (1,1) logical = false      % GPU for rank calculation & PCA    
     a.pcaSaveWts (1,1) logical = true   % Save PCA weights
     a.floatAnal (1,1) string = "single" % Floating-point precision for analysis ("double"|"single")
-    a.stdUseOnly (1,1) logical = false  % Compute standardization params from obs.use rows only
+    a.useOnly (1,1) logical = false     % Compute standardization/PCA params from obs.use rows only
 end
 % Make logical flags about data
 if isfield(n,"ROIs"), a.roi=true; else; a.roi=false; end
@@ -43,8 +46,8 @@ ide = (1:height(x{1}))';
 
 % Preallocate split data
 sts = cell(nCh,1);
-obs = sts;
-wts = sts;
+obs = cell(nCh,1);
+wts = cell(nCh,1);
 
 
 %% Main
@@ -69,6 +72,10 @@ x = vertcat(x{:});
 sts = vertcat(sts{:});
 obs = vertcat(obs{:});
 n.splits = numel(x); % number of splits
+if n.splits==0
+    error("[ec_analSplit] All splits were dropped for %s. Check obs.use/useOnly, rank, and preprocessing filters.",...
+        n.sbj);
+end
 
 % Save PCA weights
 if a.pcaSaveWts && isany(a.pca) && (a.pcaComps || a.pcaVarThr)
@@ -85,6 +92,7 @@ disp("[ec_analSplit] Data split by "+n.splits+" (chs/ICs/ROIs x timepoints) "+..
 
 function [xc,stc,obc,wtc] = withinCh_lfn(xc,n,stc,obc,a,c,ide)
 %%% Within-channel/IC/ROI routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                           
+wtc = [];
 
 % Get info
 if a.roi
@@ -108,76 +116,85 @@ if a.roi
     stc.width(:) = width(xc);
 end
 
-% Use-only standardization gate: track whether obc has a 'use' column.
-% If stdUseOnly is requested and 'use' is all-false for this entire split,
+% Handle missing observations table
+if isempty(obc)
+    hasObs = false;
+else
+    hasObs = true;
+end
+
+% Use-only gate: track whether obc has a 'use' column.
+% If useOnly is requested and 'use' is all-false for this entire split,
 % bail out early with empties — vertcat at the orchestrator skips empties cleanly.
-hasUse = a.stdUseOnly && ~isempty(obc) && ...
+hasUse = a.useOnly && hasObs && ...
     ismember("use",string(obc.Properties.VariableNames));
 if hasUse && ~any(obc.use)
-    xc = []; stc = []; obc = []; wtc = [];
+    warning("[ec_analSplit] %s %s: all obs.use=false; dropping split (returning empties).",...
+        n.sbj,string(sbjCh));
+    xc=[]; stc=[]; obc=[];
     return;
+elseif hasUse
+    use = obc.use;
+else
+    use = true(height(xc),1);
 end
 
 
 %% Within-channel processing
-if isany(a.pca) && a.pca~="split"
-    % Run PCA
-    [xc,wtc,stc.rank(:)] = ec_pca(xc,nComps=a.pcaComps,robust=a.pcaRobust,...
+if (isany(a.pca) && a.pca~="split") || (a.rank && a.pca~="split")
+    % Rank calculation & PCA
+    [xc,wtc,stc.rank(:)] = ec_pca(xc,use,nComps=a.pcaComps,robust=a.pcaRobust,...
         varThr=a.pcaVarThr,nCompLims=a.pcaCompLims,std=a.std,...
         gpu=a.pcaGPU,double=true,gather=true,exact=true);    
+    if stc.rank(1)==0
+        warning("[ec_analSplit] %s %s: xRank=0; dropping split (returning empties).",...
+            n.sbj,string(sbjCh));
+        xc=[]; stc=[]; obc=[]; wtc=[];
+        return;
+    end
     % Final number of features
     stc.features(:) = width(xc);
     % Save PCA weights
     if a.pcaSaveWts
         wtc = single(wtc);
-    else
-        wtc = [];
     end
-elseif ~isany(a.pca)
-    % Rank calculation
-    if a.rank
-        stc.rank(:) = ec_rank(xc,gpu=a.pcaGPU); 
-    end
-    wtc = [];
 end
 
 
 %% Split data by timepoint
-xc = splitapply(@(e){xc(e,:)},ide,n.timesG);
-if ~isempty(obc)
-    obc = splitapply(@(e){obc(e,:)},ide,n.timesG);
+xc = splitapply(@(t){xc(t,:)},ide,n.timesG);
+use = splitapply(@(t){use(t)},ide,n.timesG);
+if hasObs
+    obc = splitapply(@(t){obc(t,:)},ide,n.timesG);
+else
+    obc = []; % return empty so vertcat skips downstream
 end
 
 
-%% Within-split processing
+%% Within-split processing: standardize features & PCA
 if a.pca=="split"
-    % PCA weight preallocation
-    wtc = cell(n.nTimes,1);
+    % Standardize & run PCA
+    wtc = cell(n.nTimes,1); % preallocate weights
 
     % Copy to GPU
     if a.pcaGPU
         xc = cellfun(@gpuArray,xc,UniformOutput=false);
     end
 
-    % Run PCA
+    % Standardize features & run PCA
     for t = 1:n.nTimes
-        [xc{t},stc(t,:),wtc{t}] = withinSplit_lfn(xc{t},stc(t,:),a);
+        [xc{t},stc(t,:),wtc{t}] = withinSplit_lfn(xc{t},stc(t,:),use{t},a);
     end
 
     % Gather from GPU
-    if a.pcaGPU
+    if a.pca=="split" && a.pcaGPU
         xc = cellfun(@gather,xc,UniformOutput=false);
         wtc = cellfun(@gather,wtc,UniformOutput=false);
-    end
-elseif isany(a.std)
-    % Standardize features
+    end 
+else
+    % Standardize only (won't overwrite existing PCA weights)
     for t = 1:n.nTimes
-        useT = [];
-        if hasUse
-            useT = obc{t}.use;
-            if ~any(useT); useT = []; end   % fall back to all-rows at this t
-        end
-        xc{t} = withinSplit_lfn(xc{t},[],a,useT);
+        [xc{t},stc(t,:)] = withinSplit_lfn(xc{t},stc(t,:),use{t},a);
     end
 end
 
@@ -186,14 +203,20 @@ end
 
 
 
-function [xs,sts,w] = withinSplit_lfn(xs,sts,a,useT)
+
+function [xs,sts,w] = withinSplit_lfn(xs,sts,useT,a)
 %%% Within-split routine %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if nargin<4; useT = []; end
+if ~any(useT)
+    warning("[ec_analSplit] withinSplit: all use=false; returning empty split.");
+    xs = [];
+    w = [];
+    return;
+end
 if a.pca=="split"
     % Standardize predictors, calculate rank, run PCA
-    % NOTE: stdUseOnly is not threaded through the PCA path; ec_pca handles
-    % its own standardization. Extend here if needed.
-    [xs,w,sts.rank] = ec_pca(xs,nComps=a.pcaComps,robust=a.pcaRobust,...
+    % ec_pca computes standardization/PCA params from 'useT' rows only,
+    % then applies scaling and PCA transform to all rows.
+    [xs,w,sts.rank] = ec_pca(xs,useT,nComps=a.pcaComps,robust=a.pcaRobust,...
         varThr=a.pcaVarThr,nCompLims=a.pcaCompLims,std=a.std,...
         gpu=a.pcaGPU,double=true,gather=false,exact=true);
     % Final number of features
@@ -205,24 +228,17 @@ if a.pca=="split"
         w = []; % delete
     end
 else
-    % Standardize predictors
-    if ~isempty(useT) && any(useT)
-        % Compute scaler from use-rows only, apply to all rows
-        if a.std=="robust"
-            ctr = median(xs(useT,:),1,"omitnan");
-            scl = mad(xs(useT,:),1,1);          % 1 = median absolute deviation
-            scl(scl==0) = 1;                    % avoid divide-by-zero
-            xs = (xs - ctr) ./ scl;
-        elseif isany(a.std) % zscore (mean/std)
-            ctr = mean(xs(useT,:),1,"omitnan");
-            scl = std(xs(useT,:),0,1,"omitnan");
-            scl(scl==0) = 1;
-            xs = (xs - ctr) ./ scl;
-        end
-    elseif a.std=="robust"
-        xs = normalize(xs,1,"zscore","robust"); % robust z-score (pooled fallback)
-    elseif isany(a.std)
-        xs = normalize(xs,1,a.std); % standard z-score
+    % Standardize predictors: compute scaler from use-rows only, apply to all rows
+    if a.std=="robust"
+        ctr = median(xs(useT,:),1,"omitnan");
+        scl = mad(xs(useT,:),1,1);          % 1 = median absolute deviation
+        scl(scl==0) = 1;                    % avoid divide-by-zero
+        xs = (xs - ctr) ./ scl;
+    elseif isany(a.std) % zscore (mean/std)
+        ctr = mean(xs(useT,:),1,"omitnan");
+        scl = std(xs(useT,:),0,1,"omitnan");
+        scl(scl==0) = 1;
+        xs = (xs - ctr) ./ scl;
     end
 end
 

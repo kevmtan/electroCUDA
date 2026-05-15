@@ -163,7 +163,7 @@ o.s.floatAnal = o.floatAnal; % copy from o.floatAnal above
 
 % Normalize/standardize
 o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % don't standardize to keep baseline at 0
-o.s.stdUseOnly = true; % Compute standardization params from obs.use rows only (avoids cc-trial leak into train scaler)
+o.s.useOnly = true; % Compute standardization params from obs.use rows only (avoids cc-trial leak into train scaler)
 
 % PCA (channelwise: no split-level PCA; rank helps diagnostics when o.s.pca is off)
 o.s.rank = false; % calculate data rank if no PCA

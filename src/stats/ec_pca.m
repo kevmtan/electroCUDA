@@ -1,4 +1,4 @@
-function [x,w,xR,xS] = ec_pca(x,a)
+function [x,w,xRank,xS] = ec_pca(x,use,a)
 % Denoise with robust PCA, dimensionality reduction with standard PCA.
 % Reduces dimensionality to matrix rank if width(x) or a.nComps exceeds
 % rank
@@ -14,9 +14,10 @@ function [x,w,xR,xS] = ec_pca(x,a)
 %% Input validation
 arguments
     x (:,:){mustBeFloat}                % Input matrix: x(observations,features)
+    use (:,1){mustBeNumericOrLogical} = true(height(x),1) % Rows used to fit standardization/PCA
     a.nComps (1,1) double = 0           % Number of components [0=skip|Inf=rank]
     a.varThr (1,1) double = 0           % Variance threshold to keep (0=skip; <=1 fraction, >1 percent)
-    a.nCompLims (1,2) double = [0 Inf] % Bounds on kept components: [lower upper]
+    a.nCompLims (1,2) double = [0 Inf]  % Bounds on kept components: [lower upper]
     a.robust (1,1) logical = false      % Use robust PCA
     a.exact (1,1) logical = false       % Use exact rank
     a.std string {mustBeMember(a.std,["zscore" "robust" "" []])} = "robust" % Z-score
@@ -25,6 +26,30 @@ arguments
     a.gather (1,1) logical = false      % Gather outputs from GPU
 end
 if isgpuarray(x); a.gpu=true; end
+
+% Validate 'use' argument 
+if islogical(use)
+    % Logical mask mode
+    if numel(use) ~= height(x)
+        error("[ec_pca] Logical 'use' length (%d) must match rows in x (%d).",numel(use),height(x));
+    end
+elseif isnumeric(use)
+    % Numeric index mode (allow explicit row indices)
+    if numel(use)==height(x) && all(ismember(use,[0 1]))
+        % Numeric mask mode (0/1)
+        use = logical(use);
+    elseif any(~isfinite(use)) || any(use<1) || any(use>height(x)) || any(use~=round(use))       
+        error("[ec_pca] Numeric 'use' must contain valid row indices in [1,%d].",height(x));
+    end
+end
+if ~any(use)
+    warning("[ec_pca] No rows selected in 'use'; returning empty outputs.");
+    x = [];
+    w = [];
+    xRank = 0;
+    xS = [];
+    return;
+end
 
 
 %% Prep
@@ -45,9 +70,15 @@ end
 
 %% Standardize predictors
 if a.std=="robust"
-    x = normalize(x,1,"zscore","robust"); % robust z-score
+    ctr = median(x(use,:),1,"omitnan");
+    scl = mad(x(use,:),1,1);          % 1 = median absolute deviation
+    scl(scl==0) = 1;                  % avoid divide-by-zero
+    x = (x - ctr) ./ scl;             % apply scaler to all rows
 elseif isany(a.std)
-    x = normalize(x,1,a.std); % standard z-score
+    ctr = mean(x(use,:),1,"omitnan");
+    scl = std(x(use,:),0,1,"omitnan");
+    scl(scl==0) = 1;
+    x = (x - ctr) ./ scl;             % apply scaler to all rows
 end
 
 
@@ -67,37 +98,64 @@ end
 
 
 %% Matrix rank
-xR = ec_rank(x(all(~isnan(x),2),:),exact=a.exact);
+xFit = x(use,:); % rows used to fit PCA
+xRank = ec_rank(xFit(all(~isnan(xFit),2),:),exact=a.exact);
 
 
 %% Standard PCA (dimensionality reduction)
-if a.varThr || a.nComps
+if a.varThr || a.nComps || width(x)>xRank
+    % Degenerate rank: nothing to project.
+    if xRank==0
+        warning("[ec_pca] Matrix is degenerate (rank=0); skipping PCA dimensionality reduction.");
+        w = [];
+        if a.gpu && a.gather
+            x = gather(x);
+            w = gather(w);
+            xS = gather(xS);
+        end
+        return;
+    end
+
     % Resolve component bounds and clamp by rank
-    [nCompMin,nCompMax] = compLims_lfn(a.nCompLims,xR);
+    [nCompMin,nCompMax] = compLims_lfn(a.nCompLims,xRank);
     
-    % Run PCA once to full rank, then keep requested subset
-    [wAll,xAll,~,~,explained] = pca(x,NumComponents=xR);
+    % Run PCA on fit rows only, then project all rows with learned weights.
+    [wAll,~,~,~,explained,mu] = pca(xFit,NumComponents=xRank);
 
     % Variance threshold supersedes explicit component count
     if a.varThr
         nKeep = find(cumsum(explained)>=a.varThr*100,1,"first");
         if isempty(nKeep)
-            nKeep = xR;
+            nKeep = xRank;
         end
     else
         nKeep = a.nComps;
+        % Internal rank-deficiency guard: if no explicit dimensionality
+        % target is set (nComps=0,varThr=0) but matrix is rank-deficient,
+        % reduce to full rank.
+        if ~nKeep && ~a.varThr && width(x)>xRank
+            nKeep = xRank;
+        end
         if isinf(nKeep)
-            nKeep = xR;
+            nKeep = xRank;
         end
     end
 
     % Keep bounded number of components
     nKeep = clampCompN_lfn(nKeep,nCompMin,nCompMax);
     if ~nKeep
+        warning("[ec_pca] nKeep=0 after clamping; skipping PCA dimensionality reduction.");
         w = [];
+        if a.gpu && a.gather
+            x = gather(x);
+            w = gather(w);
+            xS = gather(xS);
+        end
+        return;
     else
         w = wAll(:,1:nKeep);
-        x = xAll(:,1:nKeep);
+        % Apply fit-row centering and PCA weights to all rows.
+        x = (x - mu) * w;
     end
 else
     w = [];
