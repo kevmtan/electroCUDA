@@ -19,7 +19,7 @@ function [mu,pval,se] = ec_binomTest(dataOrK,N,p0,tail)
 
 arguments
     dataOrK (:,1) {mustBeNumericOrLogical} % either a vector of 0/1 or logicals, or a scalar count k
-    N {mustBePositive,mustBeScalarOrEmpty} = [] % N: total count when calling with (k,N,...). Leave empty when passing a vector.
+    N double {mustBePositive,mustBeScalarOrEmpty} = [] % N: total count when calling with (k,N,...). Leave empty when passing a vector.
     p0 (1,1) double {mustBePositive,mustBeLessThanOrEqual(p0,1)} = 0.5 % null hypothesis proportion in [0,1]
     tail (1,1) string {mustBeMember(tail,["left","right","two"])} = "right"
 end

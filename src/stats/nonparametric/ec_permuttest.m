@@ -290,11 +290,12 @@ if a.correct=="tfce"
         error("[ec_permuttest] a.tfceDims must be a unique subset of 1:%d.",numel(a.featureSize))
     end
     if a.parallel=="gpu"
-        warning("[ec_permuttest] TFCE requires CPU bwconncomp; falling back to parallel=""none"".")
-        a.parallel = "none";
-    end
-    if a.useGroups
-        warning("[ec_permuttest] TFCE+grouped runs CPU-only (bwconncomp is CPU-only and grouped permutations don't use GPU).")
+        if a.useGroups
+            warning("[ec_permuttest] TFCE+grouped does not support GPU (bwconncomp is CPU-only); falling back to parallel=""cpu"".")
+        else
+            warning("[ec_permuttest] TFCE requires CPU bwconncomp; falling back to parallel=""cpu"".")
+        end
+        a.parallel = "cpu";
     end
     if spatialDimsWasDefault && numel(a.featureSize)>=2
         warning("[ec_permuttest] TFCE spatial neighborhood defaulted to all featureSize dims [%s]. " + ...
@@ -415,19 +416,14 @@ if a.stream
         if a.parallel=="cpu"
             blkD1 = cell(nBlocks,1);
             blkN  = zeros(nBlocks,1);
-            blkSum = []; blkSumSq = [];
-            if a.needApproxCI
-                blkSum   = zeros(nBlocks,a.nVar,like=x);
-                blkSumSq = zeros(nBlocks,a.nVar,like=x);
-            end
+            blkSum   = zeros(nBlocks,a.nVar,like=x);
+            blkSumSq = zeros(nBlocks,a.nVar,like=x);
             parfor b = 1:nBlocks
                 bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
                 blkD1{b} = blockTfceMax_lfn(bDist,a);
                 blkN(b)  = size(bDist,1);
-                if a.needApproxCI
-                    blkSum(b,:)   = sum(bDist,1);
-                    blkSumSq(b,:) = sum(bDist.^2,1);
-                end
+                blkSum(b,:)   = sum(bDist,1);
+                blkSumSq(b,:) = sum(bDist.^2,1);
             end
             dist  = cell2mat(blkD1);
             nSeen = sum(blkN);
@@ -463,20 +459,15 @@ if a.stream
         if a.parallel=="cpu"
             blkCount = zeros(nBlocks,a.nVar,like=x);
             blkN     = zeros(nBlocks,1);
-            blkSum = []; blkSumSq = [];
-            if a.needApproxCI
-                blkSum   = zeros(nBlocks,a.nVar,like=x);
-                blkSumSq = zeros(nBlocks,a.nVar,like=x);
-            end
+            blkSum   = zeros(nBlocks,a.nVar,like=x);
+            blkSumSq = zeros(nBlocks,a.nVar,like=x);
             parfor b = 1:nBlocks
                 bDist = runBlock_lfn(x,groupSums,sx2,sqrtn,bStarts(b),bEnds(b),bSeeds(b),a);
                 [cnt,s,ssq] = streamBlockReduce_lfn(bDist,t,a);
                 blkCount(b,:) = cnt;
                 blkN(b)       = size(bDist,1);
-                if a.needApproxCI
-                    blkSum(b,:)   = s;
-                    blkSumSq(b,:) = ssq;
-                end
+                blkSum(b,:)   = s;
+                blkSumSq(b,:) = ssq;
             end
             countExt = sum(blkCount,1);
             nSeen    = sum(blkN);
@@ -823,19 +814,14 @@ end
 
 
 function [cnt,blkSum,blkSumSq] = streamBlockReduce_lfn(bDist,t,a)
-% Per-block uncorrected streaming reduction (per-feature counts + optional
-% running first/second moments for approx-CI).
+% Per-block uncorrected streaming reduction (per-feature counts + moments).
 switch a.tail
     case "both";  cnt = sum((bDist>=abs(t)) | (bDist<=-abs(t)),1);
     case "right"; cnt = sum(bDist>=t,1);
     case "left";  cnt = sum(bDist<=t,1);
 end
-if a.needApproxCI
-    blkSum   = sum(bDist,1);
-    blkSumSq = sum(bDist.^2,1);
-else
-    blkSum = []; blkSumSq = [];
-end
+blkSum   = sum(bDist,1);
+blkSumSq = sum(bDist.^2,1);
 
 
 function c = countGE_lfn(nullDist,vals)
