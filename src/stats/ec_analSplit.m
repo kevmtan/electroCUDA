@@ -167,7 +167,7 @@ use = splitapply(@(t){use(t)},ide,n.timesG);
 if hasObs
     obc = splitapply(@(t){obc(t,:)},ide,n.timesG);
 else
-    obc = []; % return empty so vertcat skips downstream
+    obc = [];
 end
 
 
@@ -196,6 +196,32 @@ else
     for t = 1:n.nTimes
         [xc{t},stc(t,:)] = withinSplit_lfn(xc{t},stc(t,:),use{t},a);
     end
+end
+
+% Remove bad/empty time-splits (keep channel if at least one split is valid).
+keepT = ~cellfun(@isempty,xc);
+if hasObs
+    keepT = keepT & ~cellfun(@isempty,obc);
+end
+if ~all(keepT)
+    warning("[ec_analSplit] %s %s: dropped %d/%d bad time-splits.",...
+        n.sbj,string(sbjCh),nnz(~keepT),numel(keepT));
+end
+if ~any(keepT)
+    warning("[ec_analSplit] %s %s: all time-splits dropped (returning empties).",...
+        n.sbj,string(sbjCh));
+    xc=[]; stc=[]; obc=[]; wtc=[];
+    return;
+end
+xc = xc(keepT);
+stc = stc(keepT,:);
+if hasObs
+    obc = obc(keepT);
+else
+    obc = [];
+end
+if a.pca=="split"
+    wtc = wtc(keepT);
 end
 
 
