@@ -22,10 +22,8 @@ arguments
     o struct % options struct (description below in "Options struct validation" section)
     logs table = table
 end
-% Ensure subject list is string array when building logs from o.sbjs
-if isempty(logs)
-    o.sbjs = string(o.sbjs);
-end
+% Ensure subject list is string array
+o.sbjs = string(o.sbjs);
 % o.test = 1;
 
 %% Prep
@@ -44,22 +42,32 @@ if o.save
     save(o.analOut+"o_"+o.analName+".mat","o");
 end
 
-% Make log table (nonempty logs supersedes o.sbjs, e.g. continuing an interrupted run)
+% chSel pre-flight: validate source chTable & required cols before subject loop.
+% Fail-fast on misconfig (missing file, missing _act/_dea cols, missing cond cols)
+% rather than per-subject identical failures.
+chSelPreflight_lfn(o,dirs);
+
+% Auto-resume: if logs arg empty and a logs file exists, load it. Append any new
+% subjects from o.sbjs not in loaded logs. Warn about subjects in logs not in o.sbjs.
+fnLogs = o.analOut+"logs_"+o.analName+".mat";
+if isempty(logs) && exist(fnLogs,"file")
+    load(fnLogs,"logs");
+    sbjsNew  = string(setdiff(o.sbjs,logs.sbj,"stable"));
+    sbjsExtra = string(setdiff(logs.sbj,o.sbjs,"stable"));
+    if ~isempty(sbjsNew)
+        logs = [logs; initLogs_lfn(sbjsNew)];
+    end
+    if ~isempty(sbjsExtra)
+        warning("[ec_classifySpec] Loaded logs has %d subjects not in o.sbjs (kept): %s",...
+            numel(sbjsExtra),strjoin(sbjsExtra,", "));
+    end
+    fprintf("[ec_classifySpec] Auto-resume: %d/%d done, %d new appended | %s\n",...
+        nnz(logs.class),height(logs),numel(sbjsNew),fnLogs);
+end
+
+% Fresh init if logs is still empty (no resume file, no logs arg passed)
 if isempty(logs)
-    nSbjs = numel(o.sbjs);
-    logs = table;
-    logs.sbj = string(o.sbjs);
-    logs.sbjID(:) = uint16(0);
-    logs.class(:) = false;
-    logs.post(:) = false;
-    logs.plot(:) = false;    
-    logs.error = cell(nSbjs,1);
-    logs.splitErrs = cell(nSbjs,1); % default [] per row (same as cell(height(logs),1))
-    logs.n = cell(nSbjs,1);
-    logs.st(:) = string(missing);
-    logs.ob(:) = string(missing);
-    logs.out(:) = string(missing);
-    logs.time(:) = string(datetime('now','TimeZone','local','Format','yyMMdd_HHmm'));
+    logs = initLogs_lfn(o.sbjs);
 end
 if ~ismember("splitErrs",string(logs.Properties.VariableNames))
     logs.splitErrs = cell(height(logs),1);
@@ -156,10 +164,10 @@ if isfield(o,"chSel") && ~isempty(o.chSel)
         o.p.chRm = chNfoSbj.ch(~keep);
         fprintf("[ec_classifySpec] chSel: keeping %d/%d chans for %s\n",...
             nnz(keep),numel(keep),sLog.sbj);
-    end
 
-    if ~any(keep)
-        error("No channels remaining after selection: "+sLog.sbj);
+        if ~any(keep)
+            error("No channels remaining after selection: "+sLog.sbj);
+        end
     end
 end
 
@@ -325,3 +333,104 @@ for v = 1:numel(vsQ)
     end
 end
 disp("[ec_classifySpec] Ran FDR: "+n.sbj+" toc="+toc(tt));
+
+
+
+
+function logs = initLogs_lfn(sbjs)
+%%% Build fresh log table for a list of subjects %%%%%%%%%%%%%%%%%%%%%%%%%%
+sbjs = string(sbjs);
+nSbjs = numel(sbjs);
+logs = table;
+logs.sbj = sbjs(:);
+logs.sbjID(:) = uint16(0);
+logs.class(:) = false;
+logs.post(:) = false;
+logs.plot(:) = false;
+logs.error = cell(nSbjs,1);
+logs.splitErrs = cell(nSbjs,1);
+logs.n = cell(nSbjs,1);
+logs.st(:) = string(missing);
+logs.ob(:) = string(missing);
+logs.out(:) = string(missing);
+logs.time(:) = string(datetime("now",TimeZone="local",Format="yyMMdd_HHmm"));
+
+
+
+
+function chSelPreflight_lfn(o,dirs)
+%%% Validate chSel source table & required cols before subject loop %%%%%%%
+if ~isfield(o,"chSel") || isempty(o.chSel); return; end
+chk = o.chSel;
+
+% Skip pre-flight for perm-source mode (validation happens per-subject)
+if isfield(chk,"source") && string(chk.source)=="perm"; return; end
+
+% Resolve chTable path (mirrors runSbj_lfn)
+if (~isfield(chk,"chTable") || isempty(chk.chTable)) ...
+        && isfield(chk,"chSelName") && isany(chk.chSelName)
+    selDir = "condConCh";
+    if isfield(chk,"chSelDir") && isany(chk.chSelDir)
+        selDir = string(chk.chSelDir);
+    end
+    chk.chTable = dirs.anal+selDir+filesep+...
+        string(chk.chSelName)+filesep+"chNfoA_"+...
+        string(chk.chSelName)+".mat";
+end
+
+% Nothing to validate if no chTable resolved (matches runSbj_lfn's skip warning)
+if ~isfield(chk,"chTable") || ~isany(chk.chTable); return; end
+
+chTblFn = string(chk.chTable);
+if ~isfile(chTblFn)
+    error("[ec_classifySpec] chSel source file not found: %s",chTblFn);
+end
+
+chTblVar = "chNfoA";
+if isfield(chk,"chTableVar") && isany(chk.chTableVar)
+    chTblVar = string(chk.chTableVar);
+end
+S = load(chTblFn);
+if isfield(S,chTblVar)
+    chT = S.(chTblVar);
+else
+    fns = fieldnames(S);
+    tabFlds = fns(structfun(@istable,S));
+    if isempty(tabFlds)
+        error("[ec_classifySpec] No table variable in chSel source: %s",chTblFn);
+    end
+    chT = S.(tabFlds{1});
+end
+
+% Check _act/_dea columns are present (need ec_condConChs_sigChs to have run)
+vN = string(chT.Properties.VariableNames);
+adCols = vN(endsWith(vN,"_act") | endsWith(vN,"_dea"));
+if isempty(adCols)
+    error("[ec_classifySpec] chSel source has no _act/_dea cols — " + ...
+        "run ec_condConChs_sigChs first: %s",chTblFn);
+end
+
+% If cond1Sample uses cond/condx, verify per-condition cols exist
+cond1Sample = "any";
+if isfield(chk,"cond1Sample") && isany(chk.cond1Sample)
+    cond1Sample = string(chk.cond1Sample);
+end
+if ismember(cond1Sample,["self" "condAndCondx" "condOrCondx"]) && isfield(o.p,"cond")
+    colBase = regexprep(adCols,"_(act|dea)$","");
+    cond = regexprep(string(o.p.cond),"[^a-zA-Z0-9_]","");
+    missCond = cond(~ismember(cond,colBase));
+    if ~isempty(missCond)
+        error("[ec_classifySpec] chSel source missing _act/_dea for o.p.cond [%s] in: %s",...
+            strjoin(missCond,", "),chTblFn);
+    end
+    if ismember(cond1Sample,["condAndCondx" "condOrCondx"]) ...
+            && isfield(o.p,"condx") && ~isempty(o.p.condx)
+        condx = regexprep(string(o.p.condx),"[^a-zA-Z0-9_]","");
+        missCondx = condx(~ismember(condx,colBase));
+        if ~isempty(missCondx)
+            error("[ec_classifySpec] chSel source missing _act/_dea for o.p.condx [%s] in: %s",...
+                strjoin(missCondx,", "),chTblFn);
+        end
+    end
+end
+disp("[ec_classifySpec] chSel pre-flight OK: "+chTblFn);

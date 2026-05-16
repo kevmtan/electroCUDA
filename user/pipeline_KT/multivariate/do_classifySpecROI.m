@@ -19,22 +19,25 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "classifySpecROI"; % directory name within dirs.anal
-o.analName = "zf_bands_50ms_SemEpi_LDA_nestedDeltaGamma"; % directory name within o.analDir
+o.analName = "zf_hpf_SemEpi_LDA_nestedGammaDelta"; % directory name within o.analDir
 
 
 %% CHANNEL SELECTION: ec_selectChsBySig(...,o.chSel)
 % Mirrors ec_condConChsROI_perm channel selection (chSelection_lfn + chSelMask_lfn).
-% Channels are selected if they had significant activation/deactivation in a SOURCE
-% analysis (use a DIFFERENT analysis to reduce circularity — e.g. bands analysis
-% to select channels for a full-spectrum run).
+% Selects channels by significant per-condition activation/deactivation (vs baseline)
+% in a SOURCE analysis (use a DIFFERENT source to reduce circularity — e.g. bands
+% analysis to select channels for a full-spectrum run).
 %
 % ec_classifySpec.runSbj_lfn resolves chSelDir/chSelName → full chNfoA path
 % (dirs.anal/chSelDir/chSelName/chNfoA_<chSelName>.mat) and auto-propagates
 % o.p.cond and o.p.condx — no need to set chSel.cond/condx manually.
 %
-%   cond1Sample = "any":          any act/dea across ALL contrasts (least circular).
-%   cond1Sample = "self":         act/dea for o.p.cond conditions only.
-%   cond1Sample = "condAndCondx": act/dea in o.p.cond AND act/dea in o.p.condx.
+% cond1Sample modes match per-condition <CondName>_act/_dea cols (vs-baseline tests
+% from the source perm analysis — NOT pairwise contrast cols like AvsB_act):
+%   cond1Sample = "any":          act/dea for ANY condition in source (least circular).
+%   cond1Sample = "self":         act/dea for any o.p.cond condition only.
+%   cond1Sample = "condAndCondx": act/dea in ANY o.p.cond AND act/dea in ANY o.p.condx.
+%                                 (within-group OR; across-group AND)
 %                                 Recommended for cross-classification — keeps only
 %                                 channels responsive to BOTH condition pairs.
 %   cond1Sample = "condOrCondx":  act/dea in EITHER condition group (less restrictive).
@@ -47,11 +50,12 @@ o.chSel.chSelName   = "zf_hpfLPF_bandsParam"; % analName of source chNfoA
 o.chSel.cond1Sample = "condAndCondx";    % recommended for cross-classification
 % o.chSel.topN      = [];               % optional cap per scope group
 %
-% MANUAL OVERRIDE — explicit column list (takes precedence over cond1Sample):
+% MANUAL OVERRIDE — explicit column list (takes precedence over cond1Sample).
+% Use to select by pairwise CONTRAST columns instead (more circular than vs-baseline):
 % o.chSel.vars     = ["SemanticvsEpisodic_act" "SemanticvsEpisodic_dea"];
 % o.chSel.combine  = "or";              % "or" | "and" across vars
 o.chSel.bandIdx  = 2:6;            % restrict matrix-valued cols to band indices
-% o.chSel.rankVar  = "SemanticvsEpisodic_peakA_mu"; % rank for topN
+% o.chSel.rankVar  = "SemanticvsEpisodic_peakA_mu"; % rank for topN (contrast-based)
 %
 % PERM SOURCE — threshold raw ec_condConChs_perm results inline:
 % o.chSel.source   = "perm";
@@ -99,7 +103,7 @@ o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
 o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
-o.p.epoch.bin = 0.05; % latency bin width (secs)
+o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
 % Epoch baseline period for subsequent processing
 %   (none=[], all pre/post times=inf, relative on stim onset/onset=[latency], freeform range=[latency1,latency2]):
@@ -135,7 +139,7 @@ o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpf = 0.5; % HPF cutoff in hertz (skip=0) — remove slow drift; well below freqs=[5 300]
 o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
@@ -151,10 +155,10 @@ o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % Spectral dimensionality reduction into bands (skip=[])
-o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
+% o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+% o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+% o.p.pre.bandsF = [5 8; 8 14; 14 30; 30 60; 60 180]; % Band limits
 
 
 
@@ -170,7 +174,7 @@ o.s.std = "robust"; % normalize data within-split ["zscore"|"robust"|""=skip] % 
 o.s.useOnly = true; % Compute standardization params from obs.use rows only (avoids cc-trial leak into train scaler)
 
 % PCA
-o.s.rank = false; % calculate data rank if no PCA
+o.s.rank = true; % calculate data rank if no PCA
 o.s.pca = ""; % Run rank calculation & PCA by ["ch"|"roi"|"split"|""=skip]
 o.s.pcaComps = 0; % Number of components (0=skip, inf=matrix rank)
 o.s.pcaVarThr = 0; % Variance threshold for number of components (0=skip; supersedes o.s.pcaComps)
