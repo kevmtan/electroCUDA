@@ -13,7 +13,23 @@ end
 %% Load data
 
 % Function call or running from editor?
-if numel(dbstack)<2; op.test=true; else; op.test=false; end 
+if numel(dbstack)<2; op.test=true; else; op.test=false; end
+
+% Force hardware-accelerated renderer to avoid auto-detect overhead per figure
+if string(get(groot,"DefaultFigureRenderer")) ~= "opengl"
+    set(groot,"DefaultFigureRenderer","opengl");
+end
+
+% Default sort method passed to ec_plotCortex (axes.SortMethod):
+%   ""           -> leave axes default (MATLAB picks "depth" for 3D)
+%   "depth"      -> render by camera distance (electrodes can be hidden behind ridges)
+%   "childorder" -> render in insertion order (forces value-sorted electrodes on top
+%                   of overlapping ones; cortex still added first so it stays below)
+if ~isfield(op,"sortMethod"); op.sortMethod = ""; end
+
+if isfield(op,"proj") && isfield(op,"task")
+    op = ec_plotCortexUtil("fillPlotDirs",op);
+end
 
 % Stats results
 if (~exist("stats","var") || isempty(stats)) && ~isempty(logp)
@@ -37,7 +53,7 @@ if op.test; statsOg=stats; chsOg=chs; end %#ok<NASGU>
 %% Prep stats & channel info
 
 % Order channel info
-if logp.ICA
+if ~isempty(logp) && any(logp.ICA)
     chs = sortrows(chs,["sbjID" "ic"]);
 else
     chs = sortrows(chs,["sbjID" "ch"]);
@@ -82,6 +98,12 @@ end
 %% Make plot data
 dp = makePlotData_lfn(stats,chs,op);
 
+% Pre-load FS surface once and broadcast via op.cort — avoids ec_plotCortexSurf
+% reloading the surface for every tile / view (huge win for 6×6 × 2 views grids).
+if ~isfield(op,"cort") || isempty(op.cort)
+    op.cort = preloadCort_lfn(op);
+end
+
 
 %% Plot individual
 if op.indiv.do
@@ -91,7 +113,11 @@ end
 
 %% Plot gallery of times & freqs (separate per cond)
 if op.cond.do
-    conds_lfn(dp,op);
+    if isfield(op.cond,"compose") && op.cond.compose
+        condsCompose_lfn(dp,op);   % parfor-render tiles → compose serially
+    else
+        conds_lfn(dp,op);          % serial build of full tiledlayout per cnd
+    end
 end
 
 
@@ -261,6 +287,10 @@ for c = 1:condN % conds loop
             [d.col(idx,:),d.order(idx)] = ec_colorsFromValues(...
                 sp.(op.actVar)(idx,f),op.cmap,op.clim);
 
+            % Abs-magnitude sort key (so largest |actVar| renders on top of others)
+            d.absVal = zeros(height(d),1);
+            d.absVal(idx) = abs(sp.(op.actVar)(idx,f));
+
             % Other properties (sig chans)
             d.marker(idx) = op.marker; % marker type
             d.sz(idx) = op.markSz; % marker size
@@ -299,7 +329,11 @@ if ~exist(dirOut,"dir")
 conds = categories(dp.cnd);
 
 %% Loop across plots
-parfor p = 1:height(dp)
+nWorkers = inf;
+if isfield(op,"parallel") && ~op.parallel
+    nWorkers = 0; % serialize (MATLAB can crash on large figs in parallel workers)
+end
+parfor (p = 1:height(dp), nWorkers)
     plotIndiv_lfn(dp(p,:),op,conds,dirOut);
 end
 
@@ -310,25 +344,36 @@ end
 
 %%% Plot individual image %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function plotIndiv_lfn(dpp,op,conds,dirOut)
-% Title text
+% Title text (omit cnd segment when empty/missing)
 if isany(dpp.frq); txt = dpp.frqD+" | "; else; txt = ""; end
-txt = txt + string(dpp.cnd)+" | "+dpp.time+op.timeUnit;
+if ~ismissing(dpp.cnd) && string(dpp.cnd)~=""
+    txt = txt + string(dpp.cnd)+" | "; end
+txt = txt + dpp.time+op.timeUnit;
 
-% Initialize figure
-h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+% Initialize figure (docked forces visible; use normal+invisible for headless save)
+if op.test; ws = "docked"; else; ws = "normal"; end
+h = figure(Position=[0 0 op.indiv.res],Visible=op.test,WindowStyle=ws,...
     Theme="light",Color="w");
 
-% Plot cortex
-ec_plotCortex("L",["lateral","medial"],dpp.d,h,sbj=op.fsSbj,sbjDir=op.fsDir,...
-    surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
-    title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend");
+% Plot cortex (dpp.d is a 1×1 cell column — extract the inner table; also drop non-sig rows)
+d = dpp.d{1};
+d(d.order==-inf,:) = [];
+ec_plotCortex("L",["lateral","medial"],d,h,sbj=op.fsSbj,sbjDir=op.fsDir,...
+    cort=op.cort,surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
+    title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend",...
+    sortMethod=op.sortMethod);
 
 %% Save
 if op.save && ~op.test
     c = find(conds==dpp.cnd);
     fn = dirOut+c+"_"+string(dpp.cnd)+"_"+string(dpp.frq)+"_"+dpp.time+".jpg";
-    print(h,fn,"-djpeg","-r150");
-    % exportgraphics(h,fn,Resolution=150);
+    drawnow; % force render before capture (hidden figs aren't auto-rendered)
+    % exportgraphics is generally faster but not safe inside parfor workers
+    if isfield(op,"parallel") && ~op.parallel
+        exportgraphics(h,fn,Resolution=150);
+    else
+        print(h,fn,"-djpeg","-r150");
+    end
     disp("[ec_PlotTimesCortex] saved: "+fn);
     delete(h);
 end
@@ -349,7 +394,11 @@ if ~exist(dirOut,"dir")
 dp = splitapply(@(ci){dp(ci,:)},(1:height(dp))',findgroups(dp.cnd));
 
 %% Loop across plots
-parfor c = 1:numel(dp)
+nWorkers = inf;
+if isfield(op,"parallel") && ~op.parallel
+    nWorkers = 0; % serialize (MATLAB can crash on large figs in parallel workers)
+end
+parfor (c = 1:numel(dp), nWorkers)
     %%
     plotCond_lfn(dp{c},c,dirOut,op);
 end
@@ -371,15 +420,16 @@ dc = sortrows(dc,["time" "frq"],"ascend");
 dc.cnd = string(dc.cnd);
 dc.frq = string(dc.frq);
 
-% Initialize figure
-h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="docked",...
+% Initialize figure (docked forces visible; use normal+invisible for headless save)
+if op.test; ws = "docked"; else; ws = "normal"; end
+h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle=ws,...
         Theme="light",Color="w");
 
 % Initialize tiledlayout
 ht = tiledlayout(h,timesN,frqN,TileSpacing="compact",padding="tight"); % tiledlayout
 
-% Title
-if any(op.txtSz)
+% Title (skip when cndLabel is empty/missing)
+if any(op.txtSz) && ~ismissing(dc.cnd(1)) && string(dc.cnd(1))~=""
     title(ht,dc.cnd(1),FontSize=op.txtSz*1.5,FontWeight="bold"); end
 
 
@@ -394,20 +444,162 @@ for p = 1:height(dc)
     d(d.order==-inf,:) = [];
 
     % Plot cortex
-    ec_plotCortex("L",["lateral","medial"],d,ht,sbj=op.fsSbj,sbjDir=op.fsDir,......
-        surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
+    ec_plotCortex("L",["lateral","medial"],d,ht,sbj=op.fsSbj,sbjDir=op.fsDir,...
+        cort=op.cort,surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=op.test,...
         title=txt,titleSz=op.txtSz,labelVars=op.labelVars,flip=true,order="ascend",...
-        tile=p);
+        sortMethod=op.sortMethod,tile=p);
 end
 
 %% Save
 if op.save && ~op.test
     fn = dirOut+c+"_"+dc.cnd(1)+".jpg";
-    print(h,fn,"-djpeg","-r150");
-    % exportgraphics(h,fn,Resolution=150);
+    drawnow; % force render before capture (hidden figs aren't auto-rendered)
+    % exportgraphics is generally faster but not safe inside parfor workers
+    if isfield(op,"parallel") && ~op.parallel
+        exportgraphics(h,fn,Resolution=150);
+    else
+        print(h,fn,"-djpeg","-r150");
+    end
     disp("[ec_PlotTimesCortex] saved: "+fn);
     delete(ht); delete(h);
 end
+
+
+
+
+%%% Compose mode: parfor-render tiles → cache RGB → compose serially %%%%%
+function condsCompose_lfn(dp,op)
+% Renders each (cnd, time, freq) tile in parallel as a small lateral+medial
+% figure, captures RGB into memory, then composes into a tiledlayout per cnd
+% by imshow-ing the cached arrays. Lets parfor reach full worker count even
+% when there's only one contrast.
+
+dirOut = op.dirOut+op.cond.saveDir+filesep;
+if ~exist(dirOut,"dir"); mkdir(dirOut); end
+
+% Stable order for composition: by cnd, then time, then freq
+dp = sortrows(dp,["cnd" "time" "frq"],"ascend");
+
+conds = unique(dp.cnd,"stable");
+times = unique(dp.time);
+frqs  = string(unique(dp.frq,"stable"));
+nT = numel(times); nF = numel(frqs);
+
+% Optimal per-tile resolution. Account for vertical space consumed by titles:
+%   - master title (overarching cnd at top): ~op.txtSz*1.5 font + leading + padding
+%   - per-tile title (freq | time): ~op.txtSz font + leading + padding
+% Rough estimate (px): font_pt * 1.33 (pt→px at 96dpi) * 1.5 (line height + pad)
+ovrTitleH = 0; tileTitleH = 0;
+if any(op.txtSz)
+    ovrTitleH  = round(op.txtSz * 1.5 * 1.33 * 1.5); % e.g. txtSz=10 → ~30px
+    tileTitleH = round(op.txtSz * 1.33 * 1.5);       % e.g. txtSz=10 → ~20px
+end
+availW = op.cond.res(1);
+availH = op.cond.res(2) - ovrTitleH;
+tileW  = max(64, round(availW / nF));
+tileH  = max(64, round(availH / nT) - tileTitleH);
+tileRes = [tileW, tileH];
+fprintf("[ec_PlotTimesCortex:compose] grid=%dx%d, op.cond.res=[%d %d], titles=[ovr=%d tile=%d], tileRes=[%d %d]\n",...
+    nT, nF, op.cond.res(1), op.cond.res(2), ovrTitleH, tileTitleH, tileRes(1), tileRes(2));
+
+% PHASE 1 — parfor render each tile to RGB
+nWorkers = inf;
+if isfield(op,"parallel") && ~op.parallel
+    nWorkers = 0; % serialize
+end
+rgbs = cell(height(dp),1);
+parfor (p = 1:height(dp), nWorkers)
+    rgbs{p} = renderTileRGB_lfn(dp(p,:),op,tileRes); %#ok<PFBNS>
+end
+
+% PHASE 2 — compose each cnd's tiledlayout serially
+for c = 1:numel(conds)
+    cnd = string(conds(c));
+    h = figure(Position=[0 0 op.cond.res],Visible=op.test,WindowStyle="normal",...
+            Theme="light",Color="w");
+    ht = tiledlayout(h,nT,nF,TileSpacing="none",Padding="tight");
+    if any(op.txtSz) && ~ismissing(cnd) && cnd~=""
+        title(ht,char(cnd),FontSize=op.txtSz*1.5,FontWeight="bold");
+    end
+    for t = 1:nT
+        for f = 1:nF
+            id = find(dp.cnd==conds(c) & dp.time==times(t) & string(dp.frq)==frqs(f),1);
+            ax = nexttile(ht);
+            if ~isempty(id) && ~isempty(rgbs{id})
+                imshow(rgbs{id},Parent=ax,Border="tight");
+            end
+            if any(op.txtSz)
+                if nF>1
+                    ttxt = frqs(f)+" | "+times(t)+op.timeUnit;
+                else
+                    ttxt = times(t)+op.timeUnit;
+                end
+                title(ax,ttxt,FontSize=op.txtSz);
+            end
+        end
+    end
+    if op.save && ~op.test
+        fn = dirOut+c+"_"+cnd+".jpg";
+        drawnow;
+        % -r0 uses screen DPI → output JPG matches figure Position exactly (op.cond.res)
+        print(h,fn,"-djpeg","-r0");
+        disp("[ec_PlotTimesCortex] saved (compose): "+fn);
+        delete(h);
+    end
+end
+
+
+
+
+%%% Render one tile (lateral+medial) and return RGB %%%%%%%%%%%%%%%%%%%%%%%
+function rgb = renderTileRGB_lfn(dpp,op,tileRes)
+% Build a small lateral+medial figure for one (cnd, time, freq) tile,
+% capture as RGB, delete. Runs inside parfor.
+d = dpp.d{1};
+d(d.order==-inf,:) = [];
+
+h = figure(Position=[0 0 tileRes],Visible="off",WindowStyle="normal",...
+    Theme="light",Color="w");
+try
+    ec_plotCortex("L",["lateral","medial"],d,h,sbj=op.fsSbj,sbjDir=op.fsDir,...
+        cort=op.cort,surfType=op.surfType,opacity=op.alpha,pullF=op.pullF,visible=false,...
+        title="",titleSz=0,labelVars=op.labelVars,flip=true,order="ascend",...
+        sortMethod=op.sortMethod);
+    drawnow;
+    % -r0 = screen DPI → captured RGB matches Position exactly (tileRes pixels)
+    rgb = print(h,"-RGBImage","-r0");
+catch ME
+    delete(h);
+    rethrow(ME);
+end
+delete(h);
+
+
+
+
+%%% Pre-load freesurfer surface once for all tiles %%%%%%%%%%%%%%%%%%%%%%%%
+function cort = preloadCort_lfn(op)
+% Only "L" is used by the indiv/cond plotting calls; load lh.<surfType> as a
+% triangulation and pass through op.cort (cell array, indexed by hem in ec_plotCortex).
+% Optionally decimate via reducepatch when op.surfReduce in (0,1) — keeps that
+% fraction of faces (e.g. 0.5 = halve). 1 or unset = full resolution.
+sbjDir = string(op.fsDir);
+if endsWith(sbjDir,"subjects"+filesep,'IgnoreCase',true) || ...
+        endsWith(sbjDir,"freesurfer"+filesep,'IgnoreCase',true)
+    sbjDir = fullfile(sbjDir, string(op.fsSbj));
+end
+surfFn = fullfile(sbjDir, "surf", "lh."+string(op.surfType));
+tri = ec_readSurfTri(surfFn);
+if isfield(op,"surfReduce") && ~isempty(op.surfReduce) ...
+        && op.surfReduce > 0 && op.surfReduce < 1
+    fv.faces    = tri.ConnectivityList;
+    fv.vertices = tri.Points;
+    fv = reducepatch(fv, op.surfReduce);
+    tri = triangulation(double(fv.faces), fv.vertices);
+    fprintf("[ec_plotTimesCortex] surf decimated %.1f%% (%d faces)\n",...
+        100*op.surfReduce, size(fv.faces,1));
+end
+cort = {tri};
 
 
 

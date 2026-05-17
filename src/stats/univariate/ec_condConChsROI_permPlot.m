@@ -41,41 +41,46 @@ end
 
 %% Plot ROIs (op.ROIs sets order; falls back to o.ROIs)
 if isfield(op,"ROIs") && isany(op.ROIs)
-    plotROIs = string(op.ROIs);
+    op.ROIs = string(op.ROIs);
 else
-    plotROIs = string(o.ROIs);
+    op.ROIs = string(o.ROIs);
 end
-for r = 1:numel(plotROIs)
-    str = st(st.roi==plotROIs(r),:);
+
+% Loop across ROIs
+for r = 1:numel(op.ROIs)
+    str = st(st.roi==op.ROIs(r),:);
     if isempty(str); continue; end
-    plotROI_lfn(str,r,plotROIs(r),op,tt);
+    plotROI_lfn(str,r,op,tt);
 end
 
 
 
 
-function plotROI_lfn(str,r,roi,op,tt)
+function plotROI_lfn(str,r,op,tt)
 %%% Plot ROI %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                         r=1; str=st(st.roi==plotROIs(r),:);
 contrasts = unique(str.contrast,"stable");
+roi = op.ROIs(r);
 
 
 %% Initialize figure
-h = figure(Position=[0 0 op.res],Visible=op.visible,WindowStyle="normal",...
-    Theme="light",Color="w");
+if ~op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,WindowStyle="normal",...
+        Theme="light",Color="w");
 
-% Initialize tiledlayout
-if isnumeric(op.arrange) && numel(op.arrange)==2
-    ht = tiledlayout(h,op.arrange(1),op.arrange(2),TileSpacing="compact",padding="tight");
-elseif ismember(op.arrange,["flow" "vertical" "horizontal"])
-    ht = tiledlayout(h,op.arrange,TileSpacing="compact",padding="tight");
-else
-    ht = tiledlayout(h,"flow",TileSpacing="compact",padding="tight");
-end
+    % Initialize tiledlayout
+    if isnumeric(op.arrange) && numel(op.arrange)==2
+        ht = tiledlayout(h,op.arrange(1),op.arrange(2),TileSpacing="compact",padding="tight");
+    elseif ismember(op.arrange,["flow" "vertical" "horizontal"])
+        ht = tiledlayout(h,op.arrange,TileSpacing="compact",padding="tight");
+    else
+        ht = tiledlayout(h,"flow",TileSpacing="compact",padding="tight");
+    end
 
-% Title
-if op.txtSzTitle
-    title(ht,roi,FontSize=op.txtSzTitle,Color=op.txtCol,FontWeight="bold");
+    % Title
+    if op.txtSzTitle
+        title(ht,roi,FontSize=op.txtSzTitle,Color=op.txtCol,FontWeight="bold");
+    end
 end
 
 
@@ -89,28 +94,53 @@ for c = 1:numel(contrasts)
     sig = str.(op.sigVar)(idc,:)<op.sigThr;
 
     % Limit significance to time range
-    if any(op.sigTimeRng) && numel(op.sigTimeRng)==2
-        id = stc.time(idc)>=op.sigTimeRng(1) & stc.time(idc)<=op.sigTimeRng(2);
-        sig(~id) = false;
+    if any(op.sigTimeRng) && numel(op.sigTimeRng)==2 && op.sigThr<1
+        id = str.time(idc)>=op.sigTimeRng(1) & str.time(idc)<=op.sigTimeRng(2);
+        sig(~id,:) = false;
     end
 
     % Measure data
     m = str.(op.mVar)(idc,:);
 
     % Alpha transparency (significant = nontransparent)
-    ma = ones(size(m)) * op.alpha;
+    ma = ones(size(m)) * op.sigAlpha;
     ma(sig) = 1;
+    % if op.sigAlpha
+    %     ma = ones(size(m)) * op.sigAlpha;
+    %     ma(sig) = 1;
+    % else
+    %     m(~sig) = nan;
+    % end
 
 
     %% Subplot
-    ha = nexttile(ht);
+    if ~op.indiv
+        ha = nexttile(ht);
+    else
+        h = figure(Position=[0 0 op.res],Visible=op.visible,WindowStyle="normal",...
+            Theme="light",Color="w");
+        ha = gca;
+    end
 
     % Plot measure
     imagesc(ha,m',AlphaData=ma',XData=str.time(idc));
+    % if op.sigAlpha
+    %     imagesc(ha,m',AlphaData=ma',XData=str.time(idc));
+    % else
+    %     imagesc(ha,m',XData=str.time(idc));
+    % end
+
+    % Colormap
+    cmap = flip(cbrewer2('RdBu'));
+    % if ~op.sigAlpha && any(~sig,"all")
+    %     cmap = [1 1 1; cmap]; %#ok<AGROW>
+    % end
+    colormap(ha,cmap);
+
 
     % Set properties
-    colormap(ha,flip(cbrewer2('RdBu')));
-    clim(ha,op.clim*.5);
+    
+    clim(ha,op.clim);
     ha.YDir = "normal";
     ha.FontSize = op.txtSzAx;
 
@@ -127,11 +157,22 @@ for c = 1:numel(contrasts)
     if op.txtSz
         title(ha,con,FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
     end
+
+    if op.indiv
+        fn = op.figPath+r+"_"+roi+"_"+c+"_"+con+".jpg";
+        exportgraphics(ha,fn);
+        %print(h,fn,"-djpeg","-r150");
+        disp("SAVED: "+fn+" | toc="+toc(tt));
+        delete(h);
+    end
 end
 
 
 %% Save fig
-fn = op.figPath+r+"_"+roi+".jpg";
-print(h,fn,"-djpeg","-r150");
-disp("SAVED: "+fn+" | toc="+toc(tt));
-delete(h);
+if ~op.indiv
+    fn = op.figPath+r+"_"+roi+".jpg";
+    exportgraphics(ht,fn);
+    %print(h,fn,"-djpeg","-r150");
+    disp("SAVED: "+fn+" | toc="+toc(tt));
+    delete(h);
+end

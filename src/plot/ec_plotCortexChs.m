@@ -24,11 +24,15 @@ arguments
 end
 
 %% Prep
-nChs = height(d);
-
-% Sort if ordered
+% Sort so that channels with the largest |actVar| are drawn LAST (rendered on top).
+% Prefer d.absVal (true magnitude); fall back to d.order (colormap index) for legacy.
 if isany(a.order)
-    d = sortrows(d,order=a.order); end
+    sortVar = "order"; % legacy: colormap index (not magnitude with diverging maps)
+    if ismember("absVal",string(d.Properties.VariableNames))
+        sortVar = "absVal";
+    end
+    d = sortrows(d,sortVar,a.order);
+end
 
 % Flip all chs to single hemisphere
 if a.flip
@@ -55,38 +59,51 @@ if a.pullF
     end
 end
 
-%% Plot electrodes
-hCh = gobjects(nChs,1);
-for e = 1:nChs
-    hCh(e) = plotCh_lfn(d(e,:),ha,a);
-end
+%% Plot electrodes — vectorize via scatter3, group by (marker, bSz, bCol)
+% scatter3 lets us pass per-point face color (n×3) and size (n×1) but Marker,
+% LineWidth, and MarkerEdgeColor are scalar-per-call. So we group rows sharing
+% those three attributes and emit one scatter3 per group (typically 1 in practice).
 
+% Treat "no edge" rows (NaN/zero bSz) as a single bucket regardless of bCol
+hasEdge = ~isnan(d.bSz) & d.bSz>0 & ~isnan(d.bCol(:,1));
+bSzKey  = d.bSz;       bSzKey(~hasEdge)    = NaN;
+bColKey = d.bCol;      bColKey(~hasEdge,:) = NaN;
 
+% Group key per row
+keys = string(d.marker) + "|" + string(bSzKey) + "|" + ...
+    string(bColKey(:,1)) + "|" + string(bColKey(:,2)) + "|" + string(bColKey(:,3));
+[uKeys,~,grp] = unique(keys,"stable");
 
+hCh = gobjects(numel(uKeys),1);
+for m = 1:numel(uKeys)
+    r = grp==m;
+    rep = find(r,1); % representative row for scalar attrs
 
-%% SUBFUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function he = plotCh_lfn(de,hAx,a)
-% Plot electrode on cortex
-if ~isnan(de.bSz) && de.bSz>0 && ~isnan(de.bCol(1,1))
-    % With edge border
-    he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.marker,...
-        MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=a.align,...
-        LineWidth=de.bSz,MarkerEdgeColor=de.bCol);
-else
-    % Without edge border
-    he = plot3(hAx,de.pos(1),de.pos(2),de.pos(3),de.marker,...
-        MarkerSize=de.sz,MarkerFaceColor=de.col,AlignVertexCenters=a.align,...
-        MarkerEdgeColor=de.col);
-end
+    % scatter3 size is in points² (area), plot3 was in points (diameter).
+    % d.sz was authored in plot3 units — square it to preserve visual size.
+    szArea = d.sz(r).^2;
 
-% Datatips
-if a.visible && isany(a.labelVars)
-    for v = 1:numel(a.labelVars)
-        dv = a.labelVars(v);
-        if v==1
-            he.DataTipTemplate.DataTipRows = dataTipTextRow(dv,de.(dv));
-        else
-            he.DataTipTemplate.DataTipRows(end+1) = dataTipTextRow(dv,de.(dv));
+    if hasEdge(rep)
+        hCh(m) = scatter3(ha,d.pos(r,1),d.pos(r,2),d.pos(r,3),...
+            szArea,d.col(r,:),d.marker(rep),"filled",...
+            LineWidth=d.bSz(rep),MarkerEdgeColor=d.bCol(rep,:),...
+            AlignVertexCenters=a.align);
+    else
+        % edge color = face color (per point) — equivalent to old MarkerEdgeColor=de.col
+        hCh(m) = scatter3(ha,d.pos(r,1),d.pos(r,2),d.pos(r,3),...
+            szArea,d.col(r,:),d.marker(rep),"filled",...
+            MarkerEdgeColor="flat",AlignVertexCenters=a.align);
+    end
+
+    % Datatips
+    if a.visible && isany(a.labelVars)
+        for v = 1:numel(a.labelVars)
+            dv = a.labelVars(v);
+            if v==1
+                hCh(m).DataTipTemplate.DataTipRows = dataTipTextRow(dv,d.(dv)(r,:));
+            else
+                hCh(m).DataTipTemplate.DataTipRows(end+1) = dataTipTextRow(dv,d.(dv)(r,:));
+            end
         end
     end
 end

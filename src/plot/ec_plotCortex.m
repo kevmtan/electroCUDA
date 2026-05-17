@@ -63,6 +63,7 @@ arguments
     a.tile (1,1) double = nan % Tile number if placed within tiledchart
     a.tilespan (1,2) double = [1 1] % Tile span if placed within tiledlayout
     a.image (1,1) logical = false  % Convert graphics objects to RGB image data
+    a.sortMethod (1,1) string {mustBeMember(a.sortMethod,["depth","childorder",""])} = "" % axes child render order: "depth" (default), "childorder" (insertion order on top — forces value-sorted electrodes above overlapping ones regardless of camera distance), ""=leave axes default
 end
 % MORE INFO:
 %  pullF = Pull factor for obscured electrodes (numeric): pullF(hems,views)
@@ -132,15 +133,23 @@ if a.image || ~any(isgraphics(h))
     if any(isgraphics(h,"axes"))
         hin = h(isgraphics(h,"axes")); end
 
-    % Initialize figure if no input graphics handle
-    h = figure(Position=a.figPos,Visible=a.visible,WindowStyle="docked",...
+    % Initialize figure (docked forces visible; use normal+invisible for headless save)
+    if a.visible; ws = "docked"; else; ws = "normal"; end
+    h = figure(Position=a.figPos,Visible=a.visible,WindowStyle=ws,...
             Theme="light",Color="w",AutoResizeChildren="on");
 elseif any(isgraphics(h,"TiledLayout"))
     % Isolate tiledlayout handle if exist
     h = h(isgraphics(h,"TiledLayout"));
-else 
-    % Get current figure if input is graphics
-    h = gcf;
+elseif any(isgraphics(h,"figure"))
+    % h is already a figure handle — use as-is
+    h = h(isgraphics(h,"figure"));
+else
+    % h is some other graphics object (axes, etc.) — get its figure ancestor.
+    % NOTE: do NOT use gcf here — with HandleVisibility="off" it won't find
+    % our hidden figure and will silently create a new visible one.
+    hAnc = ancestor(h,'figure');
+    if isempty(hAnc); error("[ec_plotCortex] No figure ancestor for input handle."); end
+    h = hAnc;
 end
 
 % Create tiled layout if multiple hems/views
@@ -174,6 +183,7 @@ for l = 1:hemN
             ha.Position = a.insPos; % inset position
         end
         axis tight; axis equal; axis off;
+        if isany(a.sortMethod); ha.SortMethod = a.sortMethod; end
         hold on;
 
         % Plot cortex
@@ -223,8 +233,9 @@ if a.image
         % Show image
         h = imshow(rgb,Parent=hin,Border="tight",InitialMagnification="fit");
     elseif a.visible || (nargout==0 && ~a.save)
-        % Initialize image figure
-        figure(Position=a.figPos,Visible=a.visible,WindowStyle="docked",...
+        % Initialize image figure (docked forces visible; use normal+invisible for headless)
+        if a.visible; ws = "docked"; else; ws = "normal"; end
+        figure(Position=a.figPos,Visible=a.visible,WindowStyle=ws,...
                 Theme="light",Color="w",AutoResizeChildren="on");
 
         % Show image
