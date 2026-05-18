@@ -182,6 +182,8 @@ stats = stats(~ismissing(stats.sbjCh),:);
 disp("[ec_condConChs_plotCortex] Loaded "+k+" subjects, "+height(stats)+...
     " stat rows, "+height(chs)+" channels.");
 
+
+%% Plot
 ec_plotTimesCortex(op, [], stats, chs);
 
 

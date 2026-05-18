@@ -127,32 +127,33 @@ if ~isempty(d)
 end
 
 
-%% Initialize figure
+%% Resolve target figure handle
+% Four cases for the input h:
+%   (a) image mode OR no valid graphics → create a new figure
+%   (b) h is a TiledLayout              → use it directly (caller wants nested layout)
+%   (c) h is a Figure                   → use as-is
+%   (d) h is some other graphics (axes) → walk up to its figure ancestor
+%       NOTE: do NOT fall back to gcf here — with HandleVisibility="off" gcf
+%       won't find our hidden figure and will silently create a new visible one.
 if a.image || ~any(isgraphics(h))
-    % Copy input graphics handle
-    if any(isgraphics(h,"axes"))
+    if any(isgraphics(h,"axes")) % preserve caller's axes handle for image mode
         hin = h(isgraphics(h,"axes")); end
-
-    % Initialize figure (docked forces visible; use normal+invisible for headless save)
     if a.visible; ws = "docked"; else; ws = "normal"; end
     h = figure(Position=a.figPos,Visible=a.visible,WindowStyle=ws,...
             Theme="light",Color="w",AutoResizeChildren="on");
 elseif any(isgraphics(h,"TiledLayout"))
-    % Isolate tiledlayout handle if exist
     h = h(isgraphics(h,"TiledLayout"));
 elseif any(isgraphics(h,"figure"))
-    % h is already a figure handle — use as-is
     h = h(isgraphics(h,"figure"));
 else
-    % h is some other graphics object (axes, etc.) — get its figure ancestor.
-    % NOTE: do NOT use gcf here — with HandleVisibility="off" it won't find
-    % our hidden figure and will silently create a new visible one.
     hAnc = ancestor(h,'figure');
     if isempty(hAnc); error("[ec_plotCortex] No figure ancestor for input handle."); end
     h = hAnc;
 end
 
-% Create tiled layout if multiple hems/views
+% If we'll be plotting multiple hem/view combinations, wrap them in a
+% tiledlayout. When h is already a TiledLayout, nest this layout inside
+% it as a single tile (tile=p with span [1 1]).
 if hemN>1 || viewN>1
     ht = tiledlayout(h,hemN,viewN,TileSpacing="none",padding="tight");
     if isgraphics(h,"TiledLayout") && any(a.tile)
@@ -160,54 +161,46 @@ if hemN>1 || viewN>1
         ht.Layout.TileSpan = a.tilespan;
     end
 end
-p = 0; % initialize plot index
+p = 0; % tile counter across hem×view iterations
 
-%% Plot each hemisphere & view combination
 
-% Loop across hemispheres
+%% Plot each hemisphere × view combination
 for l = 1:hemN
     hem = hems(l);
-    if ~isempty(cort); a.cort = cort{l}; end % Custom cortex
+    if ~isempty(cort); a.cort = cort{l}; end % per-hem custom mesh override
 
-    %% Loop across views    
     for v = 1:viewN
-        view = views(v); % current view name
-        p = p+1; % plot index
-        a.pullF = pullF(l,v); % load pull factor
+        view = views(v);
+        p = p+1;
+        a.pullF = pullF(l,v); % per-(hem,view) pull factor for electrodes
 
-        % Axis
+        % Get the target axes — nexttile for grids, current axes otherwise
         if hemN>1 || viewN>1
             ha = nexttile(ht,p);
         else
             ha = gca;
-            ha.Position = a.insPos; % inset position
+            ha.Position = a.insPos;
         end
         axis tight; axis equal; axis off;
         if isany(a.sortMethod); ha.SortMethod = a.sortMethod; end
         hold on;
 
-        % Plot cortex
+        % 1) Cortex mesh (trisurf + lighting)
         ec_plotCortexSurf(hem,view,a,ha);
 
-        % Electrode channels
+        % 2) Electrode markers (subset to those visible from this view)
         if ~isempty(d)
             iCh = true(height(d),1);
-
-            % Remove chs hidden from view/hemisphere
             if a.rmHidden
-                % Select hemisphere
                 if ~a.flip
                     iCh = ismember(d.hem,[hem "both" ""]); end
-                % Select medial/lateral
                 if ismember(view,["lateral","medial"])
                     iCh(iCh) = ismember(d.lat(iCh),[view "both" ""]); end
-                % Skip elec plots if no elecs left
-                if ~any(iCh); warning("no electrodes for: "+hem+" "+view);
+                if ~any(iCh)
+                    warning("no electrodes for: "+hem+" "+view);
                     continue;
                 end
             end
-
-            % Plot electrode channels
             ec_plotCortexChs(hem,view,d(iCh,:),a,ha);
         end
         hold off;

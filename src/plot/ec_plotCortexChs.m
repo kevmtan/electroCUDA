@@ -1,18 +1,33 @@
 function hCh = ec_plotCortexChs(hem,view,d,a,ha)
 % Plots electrode channels on a freesurfer cortical surface (fsavg or custom)
-% This function is meant to be called with plotCortex
-% If not using plotCortex, you must call plotCortexSurf *before* this function
+% Meant to be called from ec_plotCortex (or after ec_plotCortexSurf).
+%
+% RENDERING STRATEGY
+%   1. Sort d by |actVar| ascending → largest magnitudes are last in array,
+%      so they render ON TOP of overlapping smaller-magnitude markers
+%      (scatter3 draws in array order; sortMethod="childorder" on the axes
+%      forces this ordering even when camera-depth would say otherwise).
+%   2. Mirror chs to viewed hemisphere if a.flip, then pull them outward
+%      from the cortex via a.pullF so they sit above the surface.
+%   3. scatter3 in one call per (marker, bSz, bCol) group. In the common
+%      case where all sig chans share the same marker style and edge
+%      attrs, that's ONE scatter3 with N points instead of N plot3 calls.
+%      Vectorizes face color (n×3) and size (n×1); marker shape + edge
+%      width + edge color must be uniform per scatter3 call so we group.
+%
+% INPUTS
+%   hem, view : hemisphere ("L"|"R") and view ("lateral"|"medial"|...)
+%   d         : per-channel plot table (pos, marker, col, bCol, sz, bSz,
+%               order, absVal, ...) — built by ec_plotTimesCortex.makePlotData_lfn
+%   a         : plot options struct from ec_plotCortex (order, flip, pullF,
+%               align, visible, labelVars, ...)
+%   ha        : target axes handle (defaults to gca)
+%
+% OUTPUT
+%   hCh : gobjects array of scatter handles (one per group)
 %
 % AUTHOR: Kevin Tan, 2025 (github.com/kevmtan/electroCUDA)
 % LICENSE: GNU GPL - use at your own risk!
-%
-% INPUTS:
-%  d = table of plotting data per electrode channel (see ec_plotCortex)
-%  a = plot options (see ec_plotCortex)
-%  h = graphics array, output of ec_plotCortexSurf
-%
-% OUTPUT:
-%  h = graphics array of figure/axis/cortex/lighting/marker handles
 
 %% Check inputs
 arguments
