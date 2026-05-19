@@ -7,7 +7,7 @@ op = struct;
 op.proj = "lbcn";
 op.task = "MMR";
 op.analDir = "classifySpecCh";
-op.analNames = ["zf_MathAb_LDA_Gamma" "zf_50ms_MathAb_LDA_gamma"];
+op.analNames = "zf_MathAb_LDA_Gamma";
 % op.analNames = [...
 %     "zf_50ms_MathAb_LDA_gamma",...
 %     "zf_50ms_MathAb_LDA_bandsGamma",...
@@ -25,16 +25,16 @@ op.cndLabel = [];
 op.conds = [];
 
 op.timeUnit = "ms";
-op.times = [50 250 500 750 1000 2000];
+op.times = [100 250 500 750 1000 2000];
 op.frqs = [];
 
 % Single var: e.g. "ppc" or "ppxc". String array → side-by-side concat:
 % op.actVar = ["ppc" "ppxc"]; % auto-labels cols as "ppc:Self", "ppxc:Self", ...
-op.actVar = ["ppc" "ppxc"];
-%op.actVar = "acc";
+%op.actVar = ["ppc" "ppxc"];
+op.actVar = "acc";
 op.actUnit = "pp";
-op.clim = [-0.4 0.4];
-%op.clim = [0.2 0.8];
+%op.clim = [-0.4 0.4];
+op.clim = [0.2 0.8];
 
 op.sigVar = "q";
 op.sigThr = 0.05;
@@ -63,14 +63,14 @@ op.cmap = "RdBu";
 op.nsCol = [0 0 0];
 op.bCol = [0 0 0];
 op.txtCol = [.8 .8 .8];
-op.txtSz = 0;
+op.txtSz = 12;
 op.labelVars = ["sbjCh" op.actVar "q"];
 % Axes render order — "depth" (default; sort by camera distance) or "childorder"
 % (insertion order, forces largest-|actVar| electrodes on top regardless of depth)
-op.sortMethod = "childorder";
+op.sortMethod = "depth";
 % Not used, NS is removed from stats table:
-% op.nsMark = "o";
-% op.nsSz = 0.001;
+op.nsMark = "o";
+op.nsSz = 0;
 
 % Save paths (auto-derived from op.proj/task/analDir/analName + actVar/sigVar/sigThr)
 %   Base dir : <dirs.anal>/<analDir>/<analName>/
@@ -78,15 +78,20 @@ op.sortMethod = "childorder";
 %   File     : "<c>_<cnd>.jpg"                        (c=cnd group idx, cnd=op.cndLabel)
 % Override sub-dir name via op.cond.saveDir / op.indiv.saveDir ([]=auto):
 op.indiv.do = false;
-op.indiv.res = [1980 1080];
+op.indiv.res = [660 360];
 op.indiv.saveDir = []; % []=auto "indiv_<tag>"; or e.g. "indiv_ppcppxc"
 
 op.cond.do = true;
-op.cond.res = [1320*1.25 1080*1.25];
-%op.cond.res = [330*1.25 1080*1.25];
+%op.cond.res = [1320 1080];
+% op.cond.res = [1320*1.25 1080*1.25];
+op.cond.res = [330 1080];
+op.cond.res = [330*1.25 1080*1.25];
 op.cond.saveDir = []; % []=auto "con_<tag>";   or e.g. "con_ppcppxc"
-op.cond.compose = true; % parfor-render tiles → compose RGB in memory (parallelizes per-tile, ideal for single-cnd plots)
+op.cond.compose = false; % parfor-render tiles → compose RGB in memory (parallelizes per-tile, ideal for single-cnd plots)
 
+% Parallelize per-condition figures across workers (MATLAB can crash on
+% large figures in parallel — set false to run serially).
+op.parallel = false;
 
 %% CHANNEL SELECTION: ec_selectChsBySig(...,op.chSel)
 % Re-filter channels at plot time by significant per-condition activation/deactivation
@@ -131,20 +136,15 @@ op.chSel.bandIdx  = 2:6;            % restrict matrix-valued cols to band indice
 % op.chSel = []; % ← set to [] to disable channel selection at plot time
 
 
-
-% Parallelize per-condition figures across workers (MATLAB can crash on
-% large figures in parallel — set false to run serially).
-op.parallel = false;
-
 %% Start parfor
 %try delete(gcp("nocreate")); catch;end
 if op.parallel
-    try parpool("local6"); catch;end
+    try parpool("Processes",22); catch;end
 end
 
 %% Loop across analysis runs
 % Auto-cleanup: deletes any leaked figures on normal exit, error, or Ctrl+C
-figCleanup = onCleanup(@() delete(findall(groot,"Type","figure"))); %#ok<NASGU>
+figCleanup = onCleanup(@() delete(findall(groot,"Type","figure")));
 
 for io = 1:numel(op.analNames)
     op.analName = op.analNames(io);

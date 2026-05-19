@@ -6,7 +6,7 @@ op = struct;
 op.proj = "lbcn";
 op.task = "MMR";
 op.analDir = "condConCh";
-op.analName = "zf_50ms_hpfLPF_bandsParam";
+op.analName = "zf_25ms_hpf0.2_lpf10_bandsParam";
 
 op.save = true;
 op.ICA = false;
@@ -23,15 +23,15 @@ op.conds = []; % []=do all contrasts
 
 op.timeVar = "time";
 op.timeUnit = "ms";
-op.times = [50 250 500 750 1000 2000];
+op.times = [100 250 500 750 1000 2000];
 op.frqs = [];
 
-op.actVar = "mu";
-op.actUnit = "z";
-op.clim = [-1 1];
+op.actVar = "t";
+op.actUnit = "t";
+op.clim = [-8 8];
 
 op.sigVar = "q";
-op.sigThr = 0.005;
+op.sigThr = 0.001;
 
 % Subplot column titles (one per matrix column of op.actVar)
 % [] = auto-resolve from saved n.spect (frequency bands), falling back to o.p.pre.bands.
@@ -53,7 +53,7 @@ op.cmap = "RdBu";
 op.nsCol = [0 0 0];
 op.bCol = [0 0 0];
 op.txtCol = [.8 .8 .8];
-op.txtSz = 0;
+op.txtSz = 12;
 op.labelVars = ["sbjCh" op.actVar "q"];
 % Axes render order — "depth" (default; sort by camera distance) or "childorder"
 % (insertion order, forces largest-|actVar| electrodes on top regardless of depth)

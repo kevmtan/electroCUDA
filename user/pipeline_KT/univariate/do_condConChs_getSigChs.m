@@ -3,7 +3,7 @@ oa = struct;
 oa.save = true; % !!!!!!!!!!!
 
 % Channelwise analysis directory (must match the analDir+analName used in ec_condConChs_perm)
-oa.analDir = "/01/lbcn/anal/condConCh/zf_hpfLPF_bandsParam/";
+oa.analDir = "/01/lbcn/anal/condConCh/zf_50ms_hpfLPF_bandsParam/";
 
 
 %% Options

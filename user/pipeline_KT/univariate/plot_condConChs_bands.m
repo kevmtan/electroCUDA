@@ -68,9 +68,11 @@ op.contrasts = ["Other" "Self" "Semantic" "Episodic" "Math" "Rest"]; % []=all
 
 %%
 try delete(gcp("nocreate")); catch;end
-try ppool = parpool("Processes",24); catch;end
+try ppool = parpool("Processes",22); catch;end
 
 
 %% Run
-op.analDir = "/01/lbcn/anal/condConCh/zf_hpfLPF_bandsParam/";
+op.analDir = "/01/lbcn/anal/condConCh/zf_25ms_hpf0.2_lpf10_bandsParam/";
 ec_condConChs_permBandsPlot(op);
+
+try delete(gcp("nocreate")); catch;end

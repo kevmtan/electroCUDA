@@ -16,12 +16,11 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "condConCh"; % directory name within dirs.anal
-o.analName = "zf_hpfLPF_spectParam"; % directory name within o.analDir
+o.analName = "zf_hpfLPF_bandsTFCE"; % directory name within o.analDir
 
 % Float precision
 o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
 o.floatOut = "single"; % Save results at floating-point precision ["double"|"single"|"half"]
-
 
 % Variables in trialNfo to copy to epoch/observations table 'ob'
 o.trialVars = ["run" "cnd" "category" "RT" "resp" "acu" "valence"...
@@ -60,7 +59,7 @@ o.p.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.p.epoch.dur = nan; % Duration after stim onset, supersedes 'post' [nan = no limit]
+o.p.epoch.dur = 2; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
 o.p.epoch.bin = 0.025; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
@@ -93,15 +92,15 @@ o.p.pre.badFrameVars = ["hfo" "flatA"]; % Bad frame removal vars (n.xBad) to use
 o.p.pre.olCenter = "median";
 o.p.pre.olThr = 5; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
-o.p.pre.olThrBL = 3; % Outlier threshold for baseline period (for baseline correction)
+o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
 o.p.pre.olThrCond = 5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpf = 0.2; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.p.pre.lpf = 15; % LPF cutoff in hz (skip=0)
+o.p.pre.lpf = 10; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.95; % LPF steepness
 o.p.pre.steepnessClamp = true; % Cap LPF steepness when transition < minTransBins FFT bins (ec_fft_lowpass)
 o.p.pre.minTransBins = 1; % Minimum LPF transition width in FFT bins
@@ -116,10 +115,10 @@ o.p.pre.pcaRobust = false;
 o.p.pre.pcaStd = ""; % don't standardize to keep baseline at 0
 o.p.pre.pcaGPU = false;
 % Spectral dimensionality reduction into bands (skip=[])
-% o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
-% o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
-%     "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
-% o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
+o.p.pre.bands = ["delta" "theta" "alpha" "beta" "gamma" "hfb"]; % Band name
+o.p.pre.bands2 = ["Delta (2-4hz)" "Theta (4-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
+    "Gamma (30-60hz)" "HFB (60-200hz)"]; % Band display name
+o.p.pre.bandsF = [2 4; 4 8; 8 14; 14 30; 30 60; 60 200]; % Band limits
 
 % o.p.pre.bands = ["theta" "alpha" "beta" "gamma" "hfb"]; % Band name
 % o.p.pre.bands2 = ["Theta (5-8hz)" "Alpha (8-14hz)" "Beta (14-30hz)"...
@@ -128,9 +127,9 @@ o.p.pre.pcaGPU = false;
 
 
 %% Stats options
-o.idxType = "double";
-o.idxType2 = "double";
-o.parallel = "none"; % 1-sample permute parallelization: ["none"|"gpu"|"cpu"] (cpu not worth it)
+o.idxType = "uint32";
+o.idxType2 = "uint32";
+o.parallel = "cpu"; % 1-sample permute parallelization: ["none"|"gpu"|"cpu"] (cpu not worth it)
 o.parallel2 = "cpu"; % Permute parallelization: ["none"|"gpu"|"cpu"] (cpu not worth it)
 o.gather = "block"; % Gather data from GPU ["block"=each permute block|"final"=end of function]
 o.stream = true;
@@ -152,24 +151,24 @@ o.grpVars2 = [];  % group variables for 2-sample grouped/nested stats
 % Stats options
 o.alpha = 0.05; % Critical p-value (default=0.05)
 o.tail = "both"; % hypothesis tail
-o.varType = "equal"; % ["equal"=standard t-test | "unequal"=Welch's t-test]
-o.stableVar = true; % Stable variance calculation (false=fast but prone to cancellation with many obs)
+o.varType = "unequal"; % ["equal"=standard t-test | "unequal"=Welch's t-test]
+o.stableVar = false; % Stable variance calculation (false=fast but prone to cancellation with many obs)
 o.ciMode = "approx";
-o.nPerm = 0; % number of permutations
-o.nBlocks = 0;
-o.nBlocks2 = 0;
+o.nPerm = 5000; % number of permutations
+o.nBlocks = 96;
+o.nBlocks2 = 96;
 o.blockElMax = 0; % Max element count per permute block to limit RAM use (auto=0)
 o.blockElMax2 = 0;
 if o.parallel=="gpu"
     o.blockMemFrac = 0.2; % Fraction of available memory to use within permute blocks (for auto permBlockEl)
     o.blockMemFrac2 = 0.01; 
 else
-    o.blockMemFrac = 0.5;
-    o.blockMemFrac2 = 0.025; 
+    o.blockMemFrac = 0;
+    o.blockMemFrac2 = 0; 
 end
 
 % Multiple comparisons
-o.correct      = "none";         % "none"|"max"|"tfce"
+o.correct      = "tfce";         % "none"|"max"|"tfce"
 o.matmulThresh = 0;              % 0=always use BLAS matmul kernel (fastest on multi-core CPU)
 o.tfceE        = 0.5;            % TFCE extent exponent (Smith & Nichols 2009)
 o.tfceH        = 2;              % TFCE height exponent
@@ -178,7 +177,7 @@ o.tfceConn     = [];             % TFCE connectivity ([] = rook: 4-conn 2-D, 6-c
 o.tfceDims         = ["time" "spect"];  % dims to cluster across; ch/IC treated as independent panels
 o.tfceVoxelWeights = [];         % per-voxel extent weights ([] = uniform pixel count)
 o.fdrDep = "corr+"; % Dependence structure for FDR ["unknown"|"corr+"|"corr-"|"indep"]
-o.fdrTimeRng = [0 inf]; % Range of times for FDR
+o.fdrTimeRng = []; %[0 inf]; % Range of times for FDR
 
 % Stats contrast names (eg. cond1-cond0)
 o.contrasts = [...
@@ -228,6 +227,7 @@ o.cond1 = {...
     ["Self" "Other"],...
     ["Episodic" "Semantic"]
     };
+
 
 
 %% Run
