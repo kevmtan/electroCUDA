@@ -134,6 +134,8 @@ o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
 o.p.pre.lpf = 0; % LPF cutoff in hz (skip=0)
 o.p.pre.lpfSteep = 0.8; % LPF steepness
+o.p.pre.steepnessClamp = true; % Cap LPF steepness when transition < minTransBins FFT bins (ec_fft_lowpass)
+o.p.pre.minTransBins = 1; % Minimum LPF transition width in FFT bins
 o.p.pre.antialiasing = 0; % Target sampling rate for AA passband calculation
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = []; %[5 300];

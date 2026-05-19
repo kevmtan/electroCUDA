@@ -15,11 +15,17 @@ function [y, mask_full, passbandOut] = ec_fft_lowpass(x,n,passband,steepness,mas
 % [0.5, 1). Higher steepness => narrower transition band. Default 0.85.
 % Transition width (Hz) is W = (0.99 - 0.98*s) * (fs/2 - passband), as in
 % https://www.mathworks.com/help/signal/ref/lowpass.html
+%   When o.steepnessClamp=true (default), steepness may be reduced so the
+%   cosine transition spans at least o.minTransBins FFT bins (anti-ringing).
+%   Long epochs (e.g. 10 min @ 200 Hz) rarely trigger this; short segments do.
 %
 % o.antialiasing — target output sampling rate (Hz) for the AA solve; 0 = off.
 %   ec_epochPreproc passes o.antialiasing (future downsample rate if decimation is later). When > 0, aliasband
 %   solves so the cosine roll-off ends at that rate's Nyquist. Final passband
 %   = min(passband input, aliasband) when passbandIn>0, else aliasband.
+% o.steepnessClamp — if true (default), cap steepness when transition is too
+%   narrow for FFT resolution; warn when reduced (ID SteepnessAdjusted).
+% o.minTransBins — minimum transition width in FFT-bin units (default 1).
 arguments
     x {mustBeFloat} % Input data, filters over 1st dimension
     n (1,1) % Subject/recording metadata (struct) or sampling rate (numeric)
@@ -29,6 +35,8 @@ arguments
     mask_full = [] % Optional precomputed FFT mask (length=size(x,1))
     o.antialiasing (1,1) double = 0 % Target Fs (Hz) for AA cutoff; 0 = use passband as given
     o.maskOnly (1,1) logical = false % If true, only build mask + passbandOut; y = x unchanged
+    o.steepnessClamp (1,1) logical = true % Cap steepness when transition < minTransBins bins
+    o.minTransBins (1,1) double {mustBePositive,mustBeInteger} = 1 % Min transition width (FFT bins)
 end
 
 %% Prep
@@ -52,15 +60,12 @@ end
 %% Construct filter (or use precomputed mask)
 if ~isany(mask_full) || numel(mask_full)~=xFrames
     fNyquist = fs/2; % nyquist frequency
+    s_aa = inf;
 
     if o.antialiasing > 0
         targetNyq = o.antialiasing / 2;
 
-        if targetNyq >= fNyquist
-            % target_fs >= input_fs: no downsampling, AA not needed
-            k = 0.99 - 0.98 * steepness;
-            passband = passbandIn;
-        else
+        if targetNyq < fNyquist
             % Steepness is treated as a suggestion in AA mode. The highest
             % steepness without cosine-taper ringing is data-driven:
             %   aliasband = targetNyq - min_fTrans  (analytical)
@@ -68,11 +73,11 @@ if ~isany(mask_full) || numel(mask_full)~=xFrames
             % min_fTrans = max(1 FFT bin, 10% of targetNyq) ensures the
             % taper spans at least one frequency bin and leaves >=90% passband.
             fRes = fs / xFrames;
-            min_fTrans = max(fRes, 0.1 * targetNyq);
-            k_opt = min_fTrans / (fNyquist - targetNyq + min_fTrans);
+            min_fTrans_aa = max(fRes, 0.1 * targetNyq);
+            k_opt = min_fTrans_aa / (fNyquist - targetNyq + min_fTrans_aa);
             s_aa = min(0.99, (0.99 - k_opt) / 0.98);
-            k = 0.99 - 0.98 * s_aa;  % recompute from clamped steepness
-            aliasband = (targetNyq - k * fNyquist) / (1 - k);
+            k_aa = 0.99 - 0.98 * s_aa;
+            aliasband = (targetNyq - k_aa * fNyquist) / (1 - k_aa);
             if aliasband <= 0
                 % Only reachable for extreme ratios (>~50:1) where s=0.99
                 % still can't clear targetNyq; use 90% fallback.
@@ -89,11 +94,16 @@ if ~isany(mask_full) || numel(mask_full)~=xFrames
             else
                 passband = aliasband;
             end
+        else
+            % target_fs >= input_fs: no downsampling, AA passband solve N/A
+            passband = passbandIn;
         end
     else
-        k = 0.99 - 0.98 * steepness;
         passband = passbandIn;
     end
+
+    s_eff = effectiveSteepness_lfn(steepness,fs,xFrames,passband,fNyquist,o,s_aa);
+    k = 0.99 - 0.98 * s_eff;
 
     % Transition width uses finalized passband and effective k
     fTrans = k * (fNyquist - passband);
@@ -167,3 +177,53 @@ end
 
 % Restore NaNs
 y(idnan) = nan;
+end
+
+
+
+
+function s_eff = effectiveSteepness_lfn(steepness,fs,xFrames,passband,fNyquist,o,s_aa)
+% Cap steepness so cosine transition spans >= minTransBins FFT bins (ringing).
+% Also applies AA steepness cap s_aa when finite. Warns when user steepness reduced.
+
+if nargin < 7 || isempty(s_aa)
+    s_aa = inf;
+end
+
+fRes = fs / xFrames;
+band = fNyquist - passband;
+if band <= 0
+    error("electroCUDA:ec_fft_lowpass:InvalidPassband", ...
+        "Passband %.6g Hz must be below Nyquist %.6g Hz (fs=%.6g).", ...
+        passband,fNyquist,fs*2);
+end
+
+if ~o.steepnessClamp
+    s_eff = min([steepness,s_aa]);
+    return;
+end
+
+min_fTrans = max(fRes,o.minTransBins*fRes);
+k_min = min_fTrans / band;
+
+if k_min >= 0.99
+    s_cap = 0.5;
+    warning("electroCUDA:ec_fft_lowpass:SteepnessFloor", ...
+        "Passband %.3g Hz too close to Nyquist or N=%d too short at fs=%.3g; " + ...
+        "using minimum steepness %.3g (requested %.3g).", ...
+        passband,xFrames,fs,s_cap,steepness);
+else
+    s_cap = (0.99 - k_min) / 0.98;
+end
+
+s_ring = max(0.5,min(steepness,s_cap));
+s_eff = min([steepness,s_aa,s_ring]);
+s_eff = max(0.5,s_eff);
+
+if s_eff < steepness - 1e-6
+    nBins = round(min_fTrans/fRes);
+    warning("electroCUDA:ec_fft_lowpass:SteepnessAdjusted", ...
+        "Steepness %.3g reduced to %.3g (fTrans >= %.4g Hz, %d bins at N=%d, fs=%.3g, passband=%.3g).", ...
+        steepness,s_eff,min_fTrans,nBins,xFrames,fs,passband);
+end
+end

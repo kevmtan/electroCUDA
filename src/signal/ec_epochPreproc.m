@@ -65,7 +65,9 @@ arguments
     o.hpfSteep (1,1) double = 0.8;            % HPF steepness
     o.hpfImpulse (1,1) string {mustBeMember(o.hpfImpulse,["auto" "fir" "iir"])} = "auto"; % HPF impulse: ["auto"|"fir"|"iir"]
     o.lpf (1,1) double = 0;                   % LPF cutoff in hz (skip=0)
-    o.lpfSteep (1,1) double = 0.8;            % LPF steepness
+    o.lpfSteep (1,1) double = 0.8;            % LPF steepness (may be auto-reduced by ec_fft_lowpass for short runs)
+    o.steepnessClamp (1,1) logical = true     % Cap LPF steepness when transition < minTransBins FFT bins
+    o.minTransBins (1,1) double {mustBePositive,mustBeInteger} = 1 % Min LPF transition width (FFT bins)
     o.antialiasing (1,1) double = 0           % Target Fs (Hz) for FFT AA mask in ec_fft_lowpass (e.g. future downsample rate)
     %o.lpfImpulse {mustBeMember(o.lpfImpulse,["auto" "fir" "iir"])} = "auto"; % LPF impulse: ["auto"|"fir"|"iir"]
 end
@@ -335,7 +337,9 @@ if o.lpf
     else
         mask = [];
     end
-    xcr = ec_fft_lowpass(xcr,n,o.lpf,o.lpfSteep,mask);
+    xcr = ec_fft_lowpass(xcr,n,o.lpf,o.lpfSteep,mask,...
+        steepnessClamp=o.steepnessClamp,minTransBins=o.minTransBins,...
+        antialiasing=o.antialiasing);
 end
 
 % Downsample
@@ -546,7 +550,8 @@ if isany([o.lpf o.antialiasing])
             xTmp = gpuArray(xTmp);
         end
         [~, mf, pb] = ec_fft_lowpass(xTmp,n,o.lpf,o.lpfSteep,[],maskOnly=true,...
-            antialiasing=aaTargetFs);
+            antialiasing=aaTargetFs,steepnessClamp=o.steepnessClamp,...
+            minTransBins=o.minTransBins);
         if i==1
             o.lpf = pb;
         end
