@@ -99,8 +99,8 @@ nCons = numel(o.contrasts);
 dirs = ec_loadSbj(sbj=sLog.sbj,proj=o.proj,task=o.task,sfx=o.p.sfx);
 sLog.sbjID = dirs.sbjID;
 sLog.dir = o.outDir+"s"+dirs.sbjID+filesep;
-sLog.st = sLog.dir+"st";
-sLog.n = sLog.dir+"n";
+sLog.st = sLog.dir+"st.mat";
+sLog.n = sLog.dir+"n.mat";
 
 % Make subject output dir
 if o.save && ~exist(sLog.dir,"dir")

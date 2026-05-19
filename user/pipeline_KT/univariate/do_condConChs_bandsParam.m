@@ -16,7 +16,7 @@ o.sbjs = ["S12_33_DA";"S12_34_TC";"S12_35_LM";"S12_36_SrS";"S12_38_LK";"S12_39_R
 o.proj = "lbcn"; % analysis project
 o.task = "MMR"; % analysis task
 o.analDir = "condConCh"; % directory name within dirs.anal
-o.analName = "zf_hpfLPF_bandsParam"; % directory name within o.analDir
+o.analName = "zf_lpf10_bandsParam"; % directory name within o.analDir
 
 % Float precision
 o.floatAnal = "double"; % Analysis at floating-point precision ["double"|"single"|"half"]
@@ -60,7 +60,7 @@ o.p.epoch.badTrialVars = "noPdio"; % Bad trial removal criteria
 % Epoch time limits (secs) [nan=variable, 0=none]
 o.p.epoch.pre = nan; % Duration before stim onset [nan = pre-stim ITI]
 o.p.epoch.post = nan; % Duration after stim offset [nan = post-stim ITI]
-o.p.epoch.dur = 2; % Duration after stim onset, supersedes 'post' [nan = no limit]
+o.p.epoch.dur = 2.05; % Duration after stim onset, supersedes 'post' [nan = no limit]
 % Epoch time bins
 o.p.epoch.bin = 0.005; % latency bin width (secs)
 o.p.epoch.binPct = 1; % latency percentage bin width (<=100)
@@ -95,14 +95,14 @@ o.p.pre.olThr = 5; % Outlier threshold (pre-HPF)
 o.p.pre.olThr2 = 0; % Outlier threshold (post-HPF,pre-BL)
 o.p.pre.olThrBL = 2.5; % Outlier threshold for baseline period (for baseline correction)
 o.p.pre.olThrTime = 0; % Outlier threshold within timepoints across epochs
-o.p.pre.olThrCond = 4; % Outlier threshold for conditions within timepts
+o.p.pre.olThrCond = 5; % Outlier threshold for conditions within timepts
 o.p.pre.olFillTime = "clip"; % Outlier fill method for timepts/conds
 % Filtering (within-run):
-o.p.pre.hpf = 0.1; % HPF cutoff in hertz (skip=0)
+o.p.pre.hpf = 0; % HPF cutoff in hertz (skip=0)
 o.p.pre.hpfSteep = 0.75; % HPF steepness
 o.p.pre.hpfImpulse = "iir"; % HPF impulse: ["auto"|"fir"|"iir"]
-o.p.pre.lpf = 20; % LPF cutoff in hz (skip=0)
-o.p.pre.lpfSteep = 0.85; % LPF steepness
+o.p.pre.lpf = 10; % LPF cutoff in hz (skip=0)
+o.p.pre.lpfSteep = 0.95; % LPF steepness
 o.p.pre.antialiasing = 0; % Target sampling rate for AA passband calculation
 % Spectral frequencies to keep, range per row: [minFreq1 maxFreq2; minFreq1 maxFreq2; ...])
 o.p.pre.freqs = []; %[5 300];
@@ -138,9 +138,6 @@ o.verbose = true;
 
 % Save options
 o.saveDF = false;
-
-% ROIs
-o.ROIs = ["Visual" "TPJ" "PCC" "ATL" "amPFC" "dmPFC" "vmPFC"]; 
 
 % Variables in observations table
 o.condVar = "cnd";              % condition variable
@@ -188,10 +185,10 @@ o.contrasts = [...
     "Rest",...
     "Mz",...
     "Autobio",...
-    "Other-Self"...
-    "Episodic-Semantic"...
-    "Mz-Autobio"...
-    "Mz-Math"...
+    "Other-Self",...
+    "Episodic-Semantic",...
+    "Mz-Autobio",...
+    "Mz-Math",...
     "Autobio-Math"
     ]; % 
 % Reference conditions - leave blank for cond vs. baseline
