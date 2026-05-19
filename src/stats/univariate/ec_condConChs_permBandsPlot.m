@@ -7,23 +7,22 @@ end
 %% Prep
 tt = tic; % start timer
 
-% Locate & load analysis options ('o_<analName>.mat')
-d = dir(op.analDir+"o_*.mat");
+% Load logs
+d = dir(op.analDir+"logs_*.mat");
 if isempty(d)
-    error("[ec_condConChs_permSpectPlot] No options file found in: "+op.analDir);
+    d = dir(op.analDir+"logs_*");
+    if isempty(d)
+        error("[ec_condConChs_permSpectPlot] No logs file found in: "+op.analDir);
+    end
 end
 fn = op.analDir+string(d(1).name);
-load(fn,"o");
+load(fn,"logs");
 disp("[ec_condConChs_permSpectPlot] Loaded: "+fn+" | toc="+toc(tt));
 
 % Figure directory path
 op.figPath = op.analDir+op.figDir+filesep;
 if ~isfolder(op.figPath); mkdir(op.figPath); end
 
-% Load logs
-fn = op.analDir+"logs_"+o.analName+".mat";
-load(fn,"logs");
-disp("[ec_condConChs_permSpectPlot] Loaded: "+fn+" | toc="+toc(tt));
 
 
 %% Loop subjects

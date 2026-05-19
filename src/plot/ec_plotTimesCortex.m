@@ -508,8 +508,9 @@ for c = 1:numel(conds)
                 imshow(rgbs{id},Parent=ax,Border="tight");
             end
             if any(op.txtSz)
-                if nF>1; ttxt = frqs(f)+" | "+times(t)+op.timeUnit;
-                else;    ttxt = times(t)+op.timeUnit; end
+                % Use display label (dp.frqD) for the tile title, matching plotCond_lfn
+                if nF>1 && ~isempty(id); ttxt = string(dp.frqD(id))+" | "+times(t)+op.timeUnit;
+                else;                    ttxt = times(t)+op.timeUnit; end
                 title(ax,ttxt,FontSize=op.txtSz);
             end
         end
