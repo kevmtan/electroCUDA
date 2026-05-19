@@ -87,8 +87,9 @@ o.p.chConcat = "roi"; % Concatenate channels by ["roi"|"all"|""], default="" (no
 o.p.timeVar = "bin"; % Timepoint variable from 'psy'/'ep' ["frame"|"latency"|"bin"|"binPct"|"binRT"]
 o.p.timeRng = [-200 2000]; % Range of times to run including baseline ([]=epochPsy output)
 
-% Copy trialNfo vars to 'ep'
-o.p.trialVars = ["VD" "VD1" "VD2" "K_pca1" "K_pca2" "K_pca3" "K_pca4"];
+% Copy trialNfo vars to 'ep' (add "ep.Cond" for record of original condition
+% before remapping ep.cond/ep.cnd for classifier)
+o.p.trialVars = ["Cond" "VD" "VD1" "VD2" "K_pca1" "K_pca2" "K_pca3" "K_pca4"];
 
 % Task Epoching (see 'ec_epochPsy')
 o.p.epoch.float = o.floatAnal; % task metadata output floating-point precision
@@ -189,8 +190,9 @@ o.s.pcaSaveWts = false; % Save PCA weights
 
 %%%%%%%%%%%%%%%%%%%%%%%%% ANALYSIS OPTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Save options
-o.psyVars = ["frame" "latency" "pct" "RT" "resp" "valence" "VD" "VD1" "VD2"...
+% Vars from 'psy'/'ep' to include in observations output (add "Cond" for record of
+% original condition before remapping ep.cond/ep.cnd for classifier)
+o.psyVars = ["frame" "latency" "pct" "RT" "resp" "Cond" "valence" "VD" "VD1" "VD2"...
     "K_pca1" "K_pca2" "K_pca3" "K_pca4"]; % psy vars to include in observations output
 
 % Stats options
