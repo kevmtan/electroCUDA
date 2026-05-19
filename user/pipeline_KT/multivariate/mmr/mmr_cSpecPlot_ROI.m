@@ -1,8 +1,8 @@
-function mmr_cSpecPlot_ROI(analDir,op)
+function mmr_cSpecPlot_ROI(op)
 % analDir = "/01/lbcn/anal/classifySpecROI/MzAb_LDA_band_260421_1255/"
 
 % Analysis Directory
-op.analDir = analDir+filesep;
+op.analDir = op.analDir+filesep;
 
 % Fig directory
 op.figDir = op.analDir+op.figDir+filesep;
@@ -39,15 +39,16 @@ sigVar = "_" + string(op.sigVar);
 
 
 %% Initialize figure
-h = figure(Position=[0 0 op.res],Visible=op.visible,WindowStyle="normal",...
-    Theme="light",Color="w");
+if ~op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
 
-% Initialize tiledlayout
-ht = tiledlayout(h,2,3,TileSpacing="compact",padding="tight"); % tiledlayout
+    % Initialize tiledlayout
+    ht = tiledlayout(h,2,3,TileSpacing="compact",padding="tight"); % tiledlayout
 
-% Title
-if op.txtSzTitle
-    title(ht,roi,FontSize=op.txtSzTitle,Color=op.txtCol,FontWeight="bold");
+    % Title
+    if op.txtSzTitle
+        title(ht,roi,FontSize=op.txtSzTitle,Color=op.txtCol,FontWeight="bold");
+    end
 end
 
 
@@ -57,22 +58,35 @@ ySE = stc.acc_SE;
 ySig = y;
 ySig(~(stc.("acc"+sigVar)<op.sigThr)) = nan;
 
-% Initialize subplot
-ha = nexttile(ht);
-ha.FontSize=op.txtSzAx;
+% Initialize plot/subplot
+if op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
+    ha = gca;
+else
+    ha = nexttile(ht);
+end
 if op.txtSz
     title(ha,"Accuracy",...
         FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
 end
+ha.FontSize=op.txtSzAx;
 
 % Timecourses & error
-mseb(stc.time',y',ySE',op.a,1);
+ec_mseb(stc.time',y',ySE',op.a,1);
 hold on; axis tight;
 
 % Sig timepoints
 plot(stc.time,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
 plot(xlim,[0.5 0.5],"k-","LineWidth",op.a.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.a.wSig);
+
+% Save
+if op.indiv
+    fn = op.figDir+r+"_"+roi+"_acc.jpg";
+    exportgraphics(h,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
 
 
 %% Accuracy (logistic mixed-effects)
@@ -81,22 +95,36 @@ ySE = stc.accl_SE;
 ySig = y;
 ySig(~(stc.("accl"+sigVar)<op.sigThr)) = nan;
 
-% Initialize subplot
-ha = nexttile(ht);
-ha.FontSize=op.txtSzAx;
+% Initialize plot/subplot
+if op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
+    ha = gca;
+else
+    ha = nexttile(ht);
+end
 if op.txtSz
     title(ha,"Accuracy (nested)",...
         FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
 end
+ha.FontSize=op.txtSzAx;
 
 % Timecourses & error
-mseb(stc.time',y',ySE',op.a,1);
+ec_mseb(stc.time',y',ySE',op.a,1);
 hold on; axis tight;
 
 % Sig timepoints
 plot(stc.time,ySig,".-",Color=op.a.col{1},MarkerFaceColor=op.a.col{1},LineWidth=op.a.wSig);
 plot(xlim,[0.5 0.5],"k-","LineWidth",op.a.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.a.wSig);
+
+% Save
+if op.indiv
+    fn = op.figDir+r+"_"+roi+"_accl.jpg";
+    exportgraphics(h,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
+
 
 
 %% PP per cond
@@ -108,16 +136,21 @@ ySig(~(stc.("ppc"+sigVar)(:,2)<op.sigThr),2) = nan; % episodic
 ySig(~(stc.("ppxc"+sigVar)(:,1)<op.sigThr),3) = nan; % self
 ySig(~(stc.("ppxc"+sigVar)(:,2)<op.sigThr),4) = nan; % other
 
-% Initialize subplot
-ha = nexttile(ht);
-ha.FontSize=op.txtSzAx;
+% Initialize plot/subplot
+if op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
+    ha = gca;
+else
+    ha = nexttile(ht);
+end
 if op.txtSz
     title(ha,"Posterior Probability (PP)",...
         FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
 end
+ha.FontSize=op.txtSzAx;
 
 % Timecourses & error
-mseb(stc.time',y',ySE',op.c,1);
+ec_mseb(stc.time',y',ySE',op.c,1);
 hold on; axis tight;
 
 % Plot sig timepoints
@@ -128,31 +161,55 @@ plot(stc.time,ySig(:,4),".-",Color=op.c.col{4},MarkerFaceColor=op.c.col{4},LineW
 plot(xlim,[0 0],"k-","LineWidth",op.c.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.c.wSig);
 
+% Save
+if op.indiv
+    fn = op.figDir+r+"_"+roi+"_PP.jpg";
+    exportgraphics(h,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
+
+
 
 %% PP cond difference
-y = [stc.ppc1 stc.ppxc1];
-ySE = [stc.ppc1_SE stc.ppxc1_SE];
+y = [stc.ppc1 stc.ppxc1 stc.ppc2];
+ySE = [stc.ppc1_SE stc.ppxc1_SE stc.ppc2_SE];
 ySig = y;
 ySig(~(stc.("ppc1"+sigVar)<op.sigThr),1) = nan; % Episodic-Semantic
 ySig(~(stc.("ppxc1"+sigVar)<op.sigThr),2) = nan; % Other-Self
+ySig(~(stc.("ppc2"+sigVar)<op.sigThr),3) = nan; % Mental-Autobio
 
-% Initialize subplot
-ha = nexttile(ht);
-ha.FontSize=op.txtSzAx;
+% Initialize plot/subplot
+if op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
+    ha = gca;
+else
+    ha = nexttile(ht);
+end
 if op.txtSz
     title(ha,"PP Cond Diff",...
         FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
 end
+ha.FontSize=op.txtSzAx;
 
 % Timecourses & error
-mseb(stc.time',y',ySE',op.d,1);
+ec_mseb(stc.time',y',ySE',op.d,1);
 hold on; axis tight;
 
 % Plot sig timepoints
 plot(stc.time,ySig(:,1),".-",Color=op.d.col{1},MarkerFaceColor=op.d.col{1},LineWidth=op.d.wSig);
 plot(stc.time,ySig(:,2),".-",Color=op.d.col{2},MarkerFaceColor=op.d.col{2},LineWidth=op.d.wSig);
+plot(stc.time,ySig(:,3),".-",Color=op.d.col{3},MarkerFaceColor=op.d.col{3},LineWidth=op.d.wSig);
 plot(xlim,[0 0],"k-","LineWidth",op.d.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.d.wSig);
+
+% Save
+if op.indiv
+    fn = op.figDir+r+"_"+roi+"_PPdiff.jpg";
+    exportgraphics(h,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
 
 
 %% Autobio PP regression: RT & RC
@@ -162,16 +219,21 @@ ySig = y;
 ySig(~(stc.("ppr_RT"+sigVar)<op.sigThr),1) = nan;
 ySig(~(stc.("ppr_RC"+sigVar)<op.sigThr),2) = nan;
 
-% Initialize subplot
-ha = nexttile(ht);
-ha.FontSize=op.txtSzAx;
+% Initialize plot/subplot
+if op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
+    ha = gca;
+else
+    ha = nexttile(ht);
+end
 if op.txtSz
     title(ha,"Autobio PP Regression",...
         FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
 end
+ha.FontSize=op.txtSzAx;
 
 % Timecourses & error
-mseb(stc.time',y',ySE',op.r,1);
+ec_mseb(stc.time',y',ySE',op.r,1);
 hold on; axis tight;
 
 % Plot sig timepoints
@@ -179,6 +241,14 @@ plot(stc.time,ySig(:,1),".-",Color=op.r.col{1},MarkerFaceColor=op.r.col{1},LineW
 plot(stc.time,ySig(:,2),".-",Color=op.r.col{2},MarkerFaceColor=op.r.col{2},LineWidth=op.r.wSig);
 plot(xlim,[0 0],"k-","LineWidth",op.r.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
+
+% Save
+if op.indiv
+    fn = op.figDir+r+"_"+roi+"_PPreg_ab.jpg";
+    exportgraphics(h,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
 
 
 %% Mentalizing (CC) PP regression: RT, RC & valence
@@ -189,16 +259,21 @@ ySig(~(stc.("ppxr_RT"+sigVar)<op.sigThr),1) = nan;
 ySig(~(stc.("ppxr_RC"+sigVar)<op.sigThr),2) = nan;
 ySig(~(stc.("ppxr_val"+sigVar)<op.sigThr),3) = nan;
 
-% Initialize subplot
-ha = nexttile(ht);
-ha.FontSize=op.txtSzAx;
+% Initialize plot/subplot
+if op.indiv
+    h = figure(Position=[0 0 op.res],Visible=op.visible,Theme="light",Color="w");
+    ha = gca;
+else
+    ha = nexttile(ht);
+end
 if op.txtSz
     title(ha,"Mentalizing PP Regression",...
         FontSize=op.txtSz,Color=op.txtCol,FontWeight="normal");
 end
+ha.FontSize=op.txtSzAx;
 
 % Timecourses & error
-mseb(stc.time',y',ySE',op.r,1);
+ec_mseb(stc.time',y',ySE',op.r,1);
 hold on; axis tight;
 
 % Plot sig timepoints
@@ -208,9 +283,20 @@ plot(stc.time,ySig(:,3),".-",Color=op.r.col{3},MarkerFaceColor=op.r.col{3},LineW
 plot(xlim,[0 0],"k-","LineWidth",op.r.wSig);
 plot([0 0],ylim,"k-","LineWidth",op.r.wSig);
 
+% Save
+if op.indiv
+    fn = op.figDir+r+"_"+roi+"_PPreg_mz.jpg";
+    exportgraphics(h,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
+
+
 
 %% Save fig
-fn = op.figDir+r+"_"+roi+".jpg";
-print(h,fn,"-djpeg","-r150");
-disp("SAVED: "+fn);
-delete(h);
+if ~op.indiv
+    fn = op.figDir+r+"_"+roi+".jpg";
+    exportgraphics(ht,fn,Resolution=150);
+    disp("SAVED: "+fn);
+    delete(h);
+end
